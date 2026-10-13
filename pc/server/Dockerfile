@@ -1,4 +1,4 @@
-# recvx-server in a container (docs/COOP_SERVER.md "Running a server"). From the repository root:
+# recvx-server in a container (docs/SERVER.md "Running a server"). From the repository root:
 #   docker build -f pc/server/Dockerfile -t recvx-server .
 #   docker run -d --name recvx-server --restart unless-stopped -p 7141:7141/udp --read-only --cap-drop ALL \
 #       -v "$PWD/recvx-server.conf:/etc/recvx-server.conf:ro" recvx-server

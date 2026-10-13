@@ -1,3 +1,98 @@
+> [!IMPORTANT]
+> **AI-assisted project.** Most of the code, tools and documentation in this repository were written by AI coding agents (Anthropic's Claude models, plus OpenAI Codex for parts of the map tooling), directed and reviewed by hand by the maintainer, who also tested the results in-game. Treat it like any other early-stage community project: expect bugs, read the code before relying on it, and report problems via issues.
+> The underlying decompilation ([AshfordFamily/recvx-decomp](https://github.com/AshfordFamily/recvx-decomp)) is a separate, human-led project. Our changes to it live in a fork and are disclosed as AI-assisted, as that project asks.
+> No game data is included. You need your own legally obtained copy of *Resident Evil Code: Veronica X* (PS2, NTSC-U, SLUS-20184).
+
 # recvx-enhanced-recomp
 
-A native Linux/Windows PC port of Resident Evil Code: Veronica X (PS2, US release SLUS-20184), built from the [recvx-decomp](https://github.com/AshfordFamily/recvx-decomp) decompilation, with an enhanced renderer, online co-op (with a small C relay server), a third-person camera, model swaps and mod support. No game data is included: you need your own disc image. Clone with `git clone --recursive` (or run `git submodule update --init --recursive`; the decomp's large mwcc compiler submodule is skipped), then build with CMake as described in [docs/PORT.md](docs/PORT.md). Parts of this project were written with AI assistance. See `LICENSE` and `THIRD_PARTY_NOTICES.md`.
+A native PC port of *Resident Evil Code: Veronica X* (PS2) for Linux and Windows, built from the
+community decompilation [recvx-decomp](https://github.com/AshfordFamily/recvx-decomp). The
+original game code and its PS2 platform layer are compiled for the PC; the PS2 hardware
+underneath (GS, VU, DMA, sound driver, disc, memory card, pad) is emulated at its boundaries, and
+native paths replace the expensive parts. The game reads your own disc image in place.
+
+## Features
+
+- **Enhanced renderer**: native 3D and textures on the GPU, widescreen (hor+, up to ultrawide),
+  internal resolution up to 8x, in-between frames up to the display's refresh rate while the game
+  logic stays at its original 30 FPS, a frame rate limit, optional PS2 motion trail.
+- **Online co-op for two players**: direct, automatic or server-relayed connections, a lobby in
+  the title menu, join codes and passwords, trading with item requests, shared or individual loot,
+  saved partner inventories, rejoin after a crash. Includes a small C rendezvous/relay server.
+- **Third-person mode** (optional): over-the-shoulder camera with mouse/keyboard controls, free
+  aim and two camera styles.
+- **Model swaps**: play as other characters and creatures, with matching voices and cutscene
+  doubles.
+- **Enemy options**: extra enemies, rearranged placements, a seeded randomizer, and an enemy
+  spawner.
+- **PC settings** in the game's own OPTION menu and an F1 overlay; full rebinding of keyboard,
+  mouse and gamepad; per-window input source for local co-op on one PC.
+- **Cheats and debug tools** (F2), co-op window (F3).
+- **Mods**: replacement room files and archive entries from a `mods/` folder, plus tools to build
+  new rooms.
+- **Tooling** for determinism checks, rendering comparisons and profiling.
+
+## Requirements
+
+- Your own disc image of *Resident Evil Code: Veronica X*, PS2 NTSC-U, **SLUS-20184** (`.iso`).
+- **Linux**: an x86 PC; the game is a 32-bit (i686) program and needs glibc 2.34 or newer plus
+  the 32-bit (multilib) OpenGL, X11/Wayland and audio libraries.
+- **Windows**: Windows 10 or later (32-bit executable, runs on 64-bit Windows).
+- A GPU with OpenGL 3.3.
+
+## Quick start
+
+```sh
+git clone --recursive https://github.com/aikatore/recvx-enhanced-recomp.git
+cd recvx-enhanced-recomp
+cmake -B build -G Ninja -DCMAKE_TOOLCHAIN_FILE=cmake/linux-i686.cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo
+cmake --build build
+./build/pc/recvx
+```
+
+`--recursive` fetches the decompilation and its header submodules; the decomp's large compiler
+submodule is skipped by design (the PC build does not use it). On the first start a file
+selector asks for the disc image; the choice is remembered. The Windows build is cross-compiled
+with mingw-w64: see [docs/BUILDING.md](docs/BUILDING.md).
+
+## Documentation
+
+| Document | For |
+|---|---|
+| [docs/USER_GUIDE.md](docs/USER_GUIDE.md) | players: first start, settings, controls, cheats, saves, troubleshooting |
+| [docs/COOP.md](docs/COOP.md) | players and developers: online and local co-op, protocol reference |
+| [docs/SERVER.md](docs/SERVER.md) | running the co-op rendezvous/relay server |
+| [docs/BUILDING.md](docs/BUILDING.md) | building on Linux and for Windows, CMake options, tests |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | developers: how the port works, renderer, determinism, test aids |
+| [docs/THIRDPERSON.md](docs/THIRDPERSON.md) | third-person mode internals |
+| [docs/ACTORS.md](docs/ACTORS.md) | models, skeletons, animation, model swaps |
+| [docs/ENEMIES.md](docs/ENEMIES.md) | enemy data, spawner, enemy options |
+| [docs/modding/](docs/modding/README.md) | room format and building custom rooms |
+| [CHANGELOG.md](CHANGELOG.md) | feature history |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | how to contribute |
+
+## Credits
+
+- **[recvx-decomp](https://github.com/AshfordFamily/recvx-decomp)** by AshfordFamily and its
+  contributors: the decompilation this port is built on (MIT).
+- **[SkeletonPicture](https://github.com/SkeletonPicture)** for hosting the Katana SDK and CRI
+  Middleware header repositories the decomp uses as submodules.
+- Libraries: [SDL 3](https://github.com/libsdl-org/SDL) (zlib),
+  [Dear ImGui](https://github.com/ocornut/imgui) (MIT),
+  [miniupnpc and libnatpmp](https://github.com/miniupnp) (BSD-3-Clause),
+  [Monocypher](https://github.com/LoupVaillant/Monocypher) (BSD-2-Clause or CC0). Versions and
+  details: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+## License
+
+The code in this repository is released under the [MIT License](LICENSE). The decompilation in
+`decomp/` is MIT-licensed by its authors; third-party components keep their own licenses (see
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)).
+
+## Legal
+
+This is an unofficial fan project, not affiliated with or endorsed by Capcom, Sony Interactive
+Entertainment, Sega or CRI Middleware. *Resident Evil* and *Code: Veronica* are trademarks of
+Capcom; PlayStation is a trademark of Sony Interactive Entertainment. No game assets are
+distributed: you must supply your own legally obtained copy of the game. Files you generate from
+your copy (for example modded rooms) contain game-derived data and must not be shared.

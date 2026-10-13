@@ -1,7 +1,7 @@
 /* The port's settings as one table (pc/src/host/settings.c), read by the native OPTION menu's
    PC SETTINGS pages (pc/glue/options_glue.c, game thread) and by the F1 overlay (overlay.cpp
    settings_imgui; of the CO-OP and EXTRAS pages only the entries flagged SET_F1). Both edit the same variables (g_config, g_tps, g_coop,
-   g_cheat, ...); recvx.ini keys stay in config.c. docs/PORT.md "Options menu" says how to add one. */
+   g_cheat, ...); recvx.ini keys stay in config.c. docs/ARCHITECTURE.md "Settings" says how to add one. */
 #ifndef RECVX_SETTINGS_H
 #define RECVX_SETTINGS_H
 #ifdef __cplusplus

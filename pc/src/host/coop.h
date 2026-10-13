@@ -12,7 +12,7 @@ enum { COOP_OFF, COOP_HOSTING, COOP_JOINING, COOP_CONNECTED, COOP_LOST };
 enum { COOP_TRADE_OFFER = 1, COOP_TRADE_ACCEPT, COOP_TRADE_DECLINE, COOP_TRADE_CANCEL };
 
 #define COOP_DEFAULT_PORT 7140
-/* the co-op server (docs/COOP_SERVER.md) filled in when recvx.ini has none: self-hosted servers
+/* the co-op server (docs/SERVER.md) filled in when recvx.ini has none: self-hosted servers
    only for now, so empty (Automatic then behaves exactly as Direct). host or host:port, UDP 7141. */
 #define COOP_DEFAULT_SERVER ""
 #define COOP_E2E 1                      /* hosting through the server: encrypt end to end (the joiner follows the host) */
@@ -58,7 +58,7 @@ typedef struct CoopState {
        stream_point): its name and, when it is busy (cutscene / menu / item box), what with */
     int busy_kind;
     char code[12];                  /* host: the join code of this run (shown in the lobby and F3, in "Copy join address") */
-    /* the co-op server (docs/COOP_SERVER.md) */
+    /* the co-op server (docs/SERVER.md) */
     int conn;                       /* COOP_CONN_*: Automatic (server when one is set, else direct), Direct, Via server (relay) (ini coop_conn) */
     char server[128];               /* host or host:port (ini coop_server) */
     char password[64];              /* room password, both sides; never saved */

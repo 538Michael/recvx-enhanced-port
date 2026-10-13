@@ -1,4 +1,4 @@
-/* Control bindings (pc/src/input/bindings.c, docs/PORT.md "Controls"): which keyboard keys,
+/* Control bindings (pc/src/input/bindings.c, docs/ARCHITECTURE.md "Input"): which keyboard keys,
    mouse buttons and gamepad inputs press the DualShock 2 buttons the game reads (pad.c), the
    third-person keys (tps_input.c) and the port's hotkeys. The game's own key type (KEY CONFIG
    A-D) then turns the DS2 buttons into game actions, so a row is named after what its button
@@ -63,7 +63,7 @@ int  bind_quickturn(int which, int held);   /* which 0 game, 1 third person: 0 o
 int  pad_quick_knife(void);            /* the quick-knife row is held (pad.c) */
 
 /* Input source of this window (F1 Controls, PC SETTINGS -> CONTROLS; ini input_source, input_pad;
-   docs/PORT.md "Input source"). Auto: keyboard/mouse and the gamepad, while focused. Gamepad only:
+   docs/USER_GUIDE.md "Input source (per window)"). Auto: keyboard/mouse and the gamepad, while focused. Gamepad only:
    keyboard/mouse no longer play (hotkeys, F1/F2/F3 windows and lobby text fields still work) and
    the gamepad keeps working in the background. */
 enum { INPUT_AUTO, INPUT_KBM, INPUT_PAD };

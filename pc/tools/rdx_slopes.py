@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Slope test room (docs/MAPS_DESIGN.md "Slopes"), no disc data: the player on type-6 slopes.
+"""Slope test room (docs/modding/BUILDING_ROOMS.md "Slopes"), no disc data: the player on type-6 slopes.
 
     rdx_slopes.py OUT
     rdxbuild.py build OUT/room.json -o mods/RM_1280.RDX

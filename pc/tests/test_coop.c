@@ -1,4 +1,4 @@
-/* Co-op packet checks (pc/src/net/coop_proto.c, docs/COOP.md "Protocol 11"): every event type
+/* Co-op packet checks (pc/src/net/coop_proto.c, docs/COOP.md "Security"): every event type
    with malformed fields, bad datagrams, transfers, the event ring, the join code and the room
    script checks of world events - each rejected without changing anything - then a fuzz loop of
    random and mutated datagrams. */

@@ -329,7 +329,7 @@ static void cheat_window(void)
     ImGui::End();
 }
 
-/* co-op trade (docs/COOP.md, M8): offer an item to the partner standing next to you */
+/* co-op trade (docs/COOP.md "Trading from the F3 window"): offer an item to the partner standing next to you */
 static const char* coop_item(unsigned int e, char* buf, size_t n)
 {
     unsigned id = (e >> 16) & 0xFF;
@@ -403,7 +403,7 @@ static void coop_window(void)
     if (c->conn != COOP_CONN_DIRECT) {   /* first how to connect, then only what it needs (as the lobby) */
         if (ImGui::InputText("Co-op server", c->server, sizeof(c->server))) changed = true;
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-            ImGui::SetTooltip("The rendezvous/relay server (recvx-server, docs/COOP_SERVER.md): host name or IP, port 7141 implied\n"
+            ImGui::SetTooltip("The rendezvous/relay server (recvx-server, docs/SERVER.md): host name or IP, port 7141 implied\n"
                               "(host:port for another). Both players use the same server. Empty: no server.");
         ImGui::InputText("Room password", c->password, sizeof(c->password), ImGuiInputTextFlags_Password);
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))

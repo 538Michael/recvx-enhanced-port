@@ -1,6 +1,6 @@
 #!/bin/bash
 # layout_check.sh BIN_A BIN_B OUTDIR [ISO]
-# Determinism check (docs/PORT.md "Determinism"): runs both binaries headless with the same
+# Determinism check (docs/ARCHITECTURE.md "Determinism"): runs both binaries headless with the same
 # scripted input (new game, teleport to 0/6 with the handgun, walk, shoot, idle while two
 # zombies change motions), in vanilla and in enhanced mode (in-between images at
 # RECVX_INTERP_T=0.5), dumping every 10th frame from 300 to LAST, and compares the dumps

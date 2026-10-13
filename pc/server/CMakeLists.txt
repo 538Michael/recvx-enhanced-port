@@ -1,4 +1,4 @@
-# recvx-server: co-op rendezvous + relay (docs/COOP_SERVER.md). No game, no SDL, no disc.
+# recvx-server: co-op rendezvous + relay (docs/SERVER.md). No game, no SDL, no disc.
 # Part of the game's build (pc/CMakeLists.txt adds it), or on its own for a server machine:
 #   cmake -S pc/server -B build-server -DCMAKE_BUILD_TYPE=Release && cmake --build build-server
 cmake_minimum_required(VERSION 3.20)

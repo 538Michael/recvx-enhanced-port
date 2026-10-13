@@ -1,6 +1,6 @@
 /* recvx-server settings: the config file (INI-style "key = value", # or ; comments) and the
    command line (--key value, the same names with '-'), one table for both. recvx-server.conf.example
-   and docs/COOP_SERVER.md "Configuration" describe the keys. Portable C (the Windows test build
+   and docs/SERVER.md "Configuration" describe the keys. Portable C (the Windows test build
    links it too). */
 #include "server.h"
 #include <ctype.h>

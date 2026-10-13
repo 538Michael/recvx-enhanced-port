@@ -1,5 +1,5 @@
 /*
- * libcdvd on the host: reads the user's game disc image (ISO9660) in place.
+ * libcdvd on the host: reads the player's game disc image (ISO9660) in place.
  * Sector reads complete synchronously; the async API (sceCdRead + sceCdSync)
  * therefore always reports "done".
  */

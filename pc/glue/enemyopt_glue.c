@@ -1,4 +1,4 @@
-/* Enemy options (docs/ENEMIES.md section 7): (a) extra enemies of types the room already has,
+/* Enemy options (docs/ENEMIES.md "Enemy options"): (a) extra enemies of types the room already has,
  * (b) rearranged placements, (c) the enemy randomizer. Off by default; with everything off nothing
  * here touches the game.
  *
@@ -189,7 +189,7 @@ static void place(const EnemyOpts* o)
 }
 
 /* ---------------------------------------------------------------- (c) randomizer */
-/* Free-roaming records become other types within the slot budget of docs/ENEMIES.md section 5
+/* Free-roaming records become other types within the slot budget of docs/ENEMIES.md "Requirements for randomizers and difficulty options"
    (helper code, et_lp rows and the texture heap no longer limit the mix on the PC); everything else
    (story, cutscene, scripted HP, bosses, "all dead" rooms) stays; any failure keeps the original. */
 /* A co-op guest randomizes as the host (the same options, seed and room file), but each side refuses a

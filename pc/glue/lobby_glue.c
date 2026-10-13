@@ -533,7 +533,7 @@ static void font_release(void)
 }
 
 /* ---------------------------------------------------------------- the lobby */
-/* In steps (docs/COOP.md "Lobby screen"): 1 how to connect (Direct / Via server) and Host or Join,
+/* In steps (docs/COOP.md "Lobby"): 1 how to connect (Direct / Via server) and Host or Join,
    2 only that choice's rows plus the player and game rows, 3 the game rules (host: edits them,
    guest: the host's, read-only). BACK goes one step back; from step 1 it leaves the lobby.
    The rows in display order; a gap where the group changes. */
@@ -573,7 +573,7 @@ static int row_visible(int r)
     if (lb.step == 3) return (r >= R_EXTRA && r <= R_SEED) || ((r == R_LOOT || r == R_TFREEZE || r == R_RSEED) && host);
     switch (r) {
     case R_PORT: return host && !srv;
-    case R_SERVER: case R_PW: case R_RELAY: return srv;   /* the co-op server (docs/COOP_SERVER.md) */
+    case R_SERVER: case R_PW: case R_RELAY: return srv;   /* the co-op server (docs/SERVER.md) */
     case R_ADDR: case R_ITEMS: case R_FOLLOW: case R_JOIN: return !host;
     case R_NAME: case R_CHAR: return 1;
     case R_START: return host;
@@ -1156,7 +1156,7 @@ static void lobby_open(void)
     lb.want_chr = -1;
     lb.items_sent = -2;
     lb.role = joining() ? 1 : 0;
-    /* Automatic without a server is direct (docs/COOP.md "Playing through a co-op server") */
+    /* Automatic without a server is direct (docs/COOP.md "Connection modes") */
     lb.mode = !(g_coop.conn == COOP_CONN_DIRECT || (g_coop.conn == COOP_CONN_AUTO && !g_coop.server[0]));
     lb.step = session_on() ? 2 : 1;   /* a session hosted or joined through F3: its options */
     lb.row = first_row();

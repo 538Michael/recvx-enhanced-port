@@ -114,7 +114,7 @@ target_compile_options(recvx_game PRIVATE
     -ffp-contract=off         # no FMA fusion: keep the PS2's operation order
     -msse2 -mfpmath=sse       # IEEE single precision, no x87 extended intermediates
     -fno-tree-vectorize
-    -ftrivial-auto-var-init=zero  # deterministic stand-in for MWCC's stale registers (docs/uninitialized-locals.txt)
+    -ftrivial-auto-var-init=zero  # deterministic stand-in for MWCC's stale registers (docs/dev/uninitialized-locals.txt)
 )
 # the decomp is compiled as is, without warnings except calls to undeclared functions (an implicit
 # int return breaks float and 64-bit results); missing returns and uninitialized locals are listed by
@@ -173,7 +173,7 @@ if(WIN32)
                         -Wl,--stack,8388608)
 endif()
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    # Place the image inside the PS2 address window (see docs/PORT.md, "Memory model").
+    # Place the image inside the PS2 address window (see docs/ARCHITECTURE.md, "Data model and memory").
     target_link_options(recvx PRIVATE -no-pie -Wl,-Ttext-segment=0x30000000 -static-libgcc -static-libstdc++)
     set_target_properties(recvx PROPERTIES POSITION_INDEPENDENT_CODE OFF)
 endif()

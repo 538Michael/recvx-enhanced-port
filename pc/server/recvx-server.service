@@ -1,4 +1,4 @@
-# systemd unit for recvx-server (docs/COOP_SERVER.md "Running a server").
+# systemd unit for recvx-server (docs/SERVER.md "Running a server").
 #   sudo install -m 755 recvx-server /usr/local/bin/
 #   sudo install -m 644 recvx-server.conf.example /etc/recvx-server.conf   # optional: the defaults
 #   sudo cp recvx-server.service /etc/systemd/system/ && sudo systemctl enable --now recvx-server

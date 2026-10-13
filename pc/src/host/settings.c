@@ -1,5 +1,5 @@
 /* The settings table shared by the native OPTION menu (PC SETTINGS) and the F1 overlay.
-   docs/PORT.md "Options menu": to add a setting, add its variable's ini key in config.c and
+   docs/ARCHITECTURE.md "Settings": to add a setting, add its variable's ini key in config.c and
    one entry here (F1 shows it too; SET_F1 on the CO-OP and EXTRAS pages). */
 #include "../ps2_platform.h"
 #include "settings.h"

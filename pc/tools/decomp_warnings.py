@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regenerate docs/missing-returns.txt and docs/uninitialized-locals.txt.
+"""Regenerate docs/dev/missing-returns.txt and docs/dev/uninitialized-locals.txt.
 
     python3 pc/tools/decomp_warnings.py [BUILD_DIR]   (default: build)
 
@@ -32,7 +32,7 @@ HEADERS = {
         '# function; pc/tools/decomp_warnings.py writes this file. The PC build zero-initializes all locals\n'
         '# (-ftrivial-auto-var-init=zero); on the PS2 these read stale register/stack values. Verify the\n'
         '# ones that matter against the retail ELF. Fixed: ps2_sg_sd.c Volume_Control (dvol of a fade up,\n'
-        '# docs/PORT.md "1:1 notes").\n'),
+        '# docs/ARCHITECTURE.md "Fidelity notes").\n'),
 }
 
 
@@ -82,8 +82,8 @@ if __name__ == '__main__':
     lists = {'missing-returns.txt': [w for w in found if w[2] in ('-Wreturn-type', '-Wreturn-mismatch')],
              'uninitialized-locals.txt': [w for w in found if 'uninitialized' in w[2]]}
     for name, ws in lists.items():
-        with open(os.path.join(ROOT, 'docs', name), 'w') as f:
+        with open(os.path.join(ROOT, 'docs', 'dev', name), 'w') as f:
             f.write(HEADERS[name])
             for src, func, _, msg in ws:
                 f.write('%s %s: %s\n' % (src, func, msg))
-        print('docs/%s: %d entries' % (name, len(ws)))
+        print('docs/dev/%s: %d entries' % (name, len(ws)))

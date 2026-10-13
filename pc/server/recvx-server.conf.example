@@ -1,4 +1,4 @@
-# recvx-server configuration (docs/COOP_SERVER.md "Configuration").
+# recvx-server configuration (docs/SERVER.md "Configuration").
 #
 # Install as /etc/recvx-server.conf (read at start when it exists) or pass --config PATH.
 # Format: one "key = value" per line; '#' or ';' starts a comment; no sections. Unknown keys are
@@ -64,12 +64,13 @@ rooms_per_ip_per_min = 6
 requests_total_per_sec = 5000
 
 # Failed joins per minute from all addresses together: room-code guessing with many addresses.
-# When it is used up, joins wait for the next minute (also correct ones). A room also refuses its
-# joins for the rest of a minute after 10 wrong passwords (from any addresses).
+# When it is used up, joins wait for the next minute (also correct ones). After 10 wrong passwords
+# within a minute, a room slows down addresses that already failed (a short gap between their
+# tries); addresses without failures are always checked, so there is no lockout.
 failed_joins_total_per_min = 600
 
 # --- relay limits ------------------------------------------------------------------------------
-# Measured game traffic (RECVX_COOP_STATS, docs/COOP_SERVER.md "Configuration"): a busy host
+# Measured game traffic (RECVX_COOP_STATS, docs/SERVER.md "Sizing the relay"): a busy host
 # sends ~3.6 KB in 4-5 datagrams per frame at 30 frames/s (~110 KB/s, ~135 datagrams/s); the
 # worst case seen (extra enemies, 48 snapshots, room loads, joins) stays below ~170 KB/s and
 # ~200 datagrams/s. The defaults leave ~3x headroom. Each player has its own budget (a bucket

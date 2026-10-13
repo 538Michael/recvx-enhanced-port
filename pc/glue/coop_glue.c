@@ -1,4 +1,4 @@
-/* Online co-op, milestone 1 "ghost partner" (docs/COOP.md).
+/* Online co-op (docs/COOP.md "Architecture").
  *
  * Each instance sends its player's pose once per game frame (UDP, at the frame hand-off) and
  * draws the partner as a second player model in the same room. The partner is a puppet: its
@@ -163,7 +163,7 @@ static void setup_hair(O_WRK* objs, BH_PWORK* who, int chr)
 
 /* Mesh of part file `chr + costume*4` with the motions of part file `mfile` (the sender's own
    character: its motion numbers index that set). A different mesh is loaded over the first
-   file's model, its motions into a sink (docs/ACTORS.md, mesh replacement option A). chr 4..:
+   file's model, its motions into a sink (docs/ACTORS.md "Option A"). chr 4..:
    catalogue model chr - 4 (pc/src/host/actors.h), drawn over part file `mfile`'s model. */
 static int load_player(int chr, int costume, int mfile)
 {
@@ -752,7 +752,7 @@ static BH_PWORK ply2_save;
 static unsigned char exp_save[256];
 static int swap_pid = -1;
 
-/* Voices (sdfunc.c CallPlayerVoice, docs/ACTORS.md 8 "Voices"): a player vocal sound (SE bank 4,
+/* Voices (sdfunc.c CallPlayerVoice, docs/ACTORS.md "Voices"): a player vocal sound (SE bank 4,
    0x400 + program) in the voice of the character shown (appear_voice). Ours from "You appear as",
    and it goes to the partner (Pose.voice); the partner's while partner_sounds plays it. Returns the
    extra bank: 0 = the game's bank 4 (CORE_<ply_id>) when that is the voice, else that CORE bank
@@ -1935,7 +1935,7 @@ static void session_reset(void)
 static struct { unsigned int itm[384], stflg[4]; char wno[4]; short hp[4]; } own;
 static int own_valid, own_fixed;   /* own_fixed: a source was given (coop_own_source), no snapshots */
 /* saved partner inventories (protocol 16, "saved partner inventories" below), the guest's side */
-static int blob_rec, want_rec;          /* the host's game state on its way carries our saved items; we asked for them */
+static int blob_rec, want_rec;          /* the host's game state on its way carries our saved items; we requested them */
 static char note_msg[96];               /* "Restored your saved items ...": shown with the status line for a while */
 static unsigned int note_until;
 static void note(const char* m) { snprintf(note_msg, sizeof(note_msg), "%s", m); note_until = net_ms() + 30000; host_log("coop: %s\n", m); }
@@ -1981,7 +1981,7 @@ void coop_own_from_save(const void* save)
 static void own_restore(void)
 {
     unsigned int box[160], ic = sys->ic_flg[15];
-    /* our saved items came with the state (the host's record of us): asked for, or a rejoin after
+    /* our saved items came with the state (the host's record of us): requested, or a rejoin after
        our game ended without a goodbye - not over the game we are playing (a resync) */
     int i, rec = blob_rec && (want_rec || own_fixed || !own_valid);
     memcpy(box, &sys->itm[64], sizeof(box));   /* the host's: with shared loot, the one box both use */
@@ -2011,7 +2011,7 @@ static void own_restore(void)
     blob_rec = want_rec = 0;   /* this join's; later states (a story switch, a host restart) keep our own */
 }
 
-/* host: our enemy options to the guest (docs/ENEMIES.md section 7): the placements and the
+/* host: our enemy options to the guest (docs/ENEMIES.md "Enemy options"): the placements and the
    randomizer change records at the room load on both sides alike */
 static EnemyOpts eopts_sent;
 static unsigned int eopts_sid;          /* the partner session they went to */
@@ -4670,7 +4670,7 @@ static char code_rx[COOP_CODE_LEN + 1];   /* the session's code (host: ours; joi
 static char ver_msg[96];                /* a sender of another protocol version (shown while waiting) */
 static char srv_msg[160];               /* host: why there is no room on the server (shown while waiting) */
 
-/* Through the server (docs/COOP_SERVER.md) the partner is rdv_peer, whatever the path (punched,
+/* Through the server (docs/SERVER.md) the partner is rdv_peer, whatever the path (punched,
    relayed): rendezvous.c frames, encrypts and routes what goes there, and its join code (derived
    by both games from the session keys) replaces the host's for that partner. */
 static int via_rdv(const NetAddr* a) { return rdv_active() && a->ip == rdv_peer.ip && a->port == rdv_peer.port; }

@@ -1,4 +1,4 @@
-/* recvx-server core (docs/COOP_SERVER.md): rooms, codes, introductions, relay, limits, metrics,
+/* recvx-server core (docs/SERVER.md): rooms, codes, introductions, relay, limits, metrics,
    the config file. No sockets and no clock of its own: main.c feeds datagrams and the time,
    pc/tests/test_rdv.c does the same. */
 #ifndef RECVX_SERVER_H

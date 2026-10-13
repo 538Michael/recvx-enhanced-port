@@ -1,7 +1,7 @@
 /* The rendezvous client state machine (pc/src/net/rendezvous.c) against the real server core, on a
    fake network and clock: deterministic. The partner is played by the test with rdv_proto.c's
-   functions, so it can alter, reorder and replay what the client sees. Covers docs/COOP_SERVER.md
-   section 11: INTRO validation and epochs, the encryption policy (no downgrade), counters never
+   functions, so it can alter, reorder and replay what the client sees. Covers docs/SERVER.md
+   "Security": INTRO validation and epochs, the encryption policy (no downgrade), counters never
    restarting under the same keys, member replacement, relay frames, punching and the late switch
    from the relay to a direct path, server restart, DNS on a thread with a deadline, no randomness. */
 #include "../server/server.h"

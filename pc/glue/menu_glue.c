@@ -2,7 +2,7 @@
    The mouse drives the menus' own state: hovering moves the game's cursor (listcsr_0/2,
    maincsr) the way its d-pad code does, clicks become the game's confirm/cancel pad bits,
    so keyboard and gamepad keep working unchanged. Game thread: menu_pad from bhSetPad
-   (pad.c), menu_examine from ItemModelCheck (itemview.c). docs/PORT.md "Mouse in menus". */
+   (pad.c), menu_examine from ItemModelCheck (itemview.c). docs/ARCHITECTURE.md "Input". */
 #include "../../decomp/include/ps2/veronica/prog/types.h"
 #include "../../decomp/include/ps2/veronica/prog/main.h"
 #include "../../decomp/include/ps2/veronica/prog/sub1.h"
@@ -220,7 +220,7 @@ void menu_examine(STCAM_WRK* sc)
     if (!g_menu_mouse.active) return;
     sc->cay += (int)(dmx * 91.0f);   /* 0.5 degrees per pixel dragged */
     sc->cax -= (int)(dmy * 91.0f);
-    sc->pos_1.z -= wheel * 0.3f;   /* wheel away from the user = closer */
+    sc->pos_1.z -= wheel * 0.3f;   /* wheel away from the player = closer */
     wheel = 0;
     if (sc->pos_1.z > 3.0f) sc->pos_1.z = 3.0f;
     if (sc->pos_1.z < -3.0f) sc->pos_1.z = -3.0f;

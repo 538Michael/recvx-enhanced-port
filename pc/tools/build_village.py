@@ -2,7 +2,7 @@
 """Build the village from retail references only; run with RECVX_ISO set.
 
 All generated geometry, palettes, models and room files stay in ignored scratch/ and mods/.
-No hooks or changes to retail events. See docs/AREA_VILLAGE.md for acceptance.
+No hooks or changes to retail events. See docs/modding/BUILDING_ROOMS.md "Example area: village from retail assets".
 """
 import argparse
 import copy

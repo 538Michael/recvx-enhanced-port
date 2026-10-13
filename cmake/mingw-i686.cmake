@@ -1,4 +1,4 @@
-# Cross-build the 32-bit Windows executable with mingw-w64 GCC (see docs/PORT.md, "Windows build").
+# Cross-build the 32-bit Windows executable with mingw-w64 GCC (see docs/BUILDING.md, "Windows").
 #   cmake -B build-win -G Ninja -DCMAKE_TOOLCHAIN_FILE=cmake/mingw-i686.cmake -DMINGW_PREFIX=/path/to/usr
 # GCC, not clang: the decomp relies on GCC's data layout (arrays of 32+ bytes are 32-byte aligned,
 # which the EE packet buffers need); llvm-mingw only aligns them naturally and misrenders.

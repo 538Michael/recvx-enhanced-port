@@ -1,4 +1,4 @@
-/* Online co-op wire format (protocol 11, docs/COOP.md "Protocol 11: packets and security") and
+/* Online co-op wire format (protocol 18, docs/COOP.md "Protocol 18" and "Security") and
    the checks every received packet passes before it may change anything. No game state here:
    pc/glue/coop_glue.c applies what passes; pc/tests/test_coop.c feeds malformed packets. */
 #ifndef RECVX_COOP_PROTO_H
@@ -300,7 +300,7 @@ int coop_xfer_chunk(CoopXfer* x, int tid, int total, int off, int len, const uin
 #define COOP_TGT_REACH 40.0f            /* 4 m: how far an enemy goes for the free player */
 int coop_pick_target(int cur, float d_us, float d_p, int busy_us, int busy_p, int committed);
 
-/* room scripts (docs/MAPS.md section 5) */
+/* room scripts (docs/modding/ROOM_FORMAT.md "Event scripts") */
 int coop_insn_len_raw(const uint8_t* p);    /* bytes of the instruction at p, 0 unknown */
 int coop_op_cond(int op);                   /* tests: continue or skip, nothing else */
 int coop_op_flow(int op);                   /* End IfelCk ElseCk Endif, loops, Sleep, EvtNext, EvtEnd */

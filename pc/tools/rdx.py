@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Room files (RM_SRRC.RDX) of Resident Evil Code: Veronica X (PS2, SLUS-20184).
 
-Reads the user's own disc image at run time; nothing derived from it lives in the repo.
-Format reference: docs/MAPS.md. Commands (run with -h for options):
+Reads the player's own disc image at run time; nothing derived from it lives in the repo.
+Format reference: docs/modding/ROOM_FORMAT.md. Commands (run with -h for options):
 
   list                         room files in RDX_LNK.AFS (index, name, packed size)
   dump ROOM [-o x.json]        all sections of a room as JSON (ROOM = RM_1000, 1000 or a file)
@@ -15,11 +15,11 @@ Format reference: docs/MAPS.md. Commands (run with -h for options):
   teximport ROOM L K x.png -o OUT   write a PNG into texture K of list L in place
                                (same size, nearest colours of its palette)
   obj ROOM -o x.obj            export the room model (positions, strips, UVs) as Wavefront OBJ
-  census                       statistics over all rooms (used for docs/MAPS.md)
+  census                       statistics over all rooms (used for docs/modding/ROOM_FORMAT.md)
   selftest                     LZ round trip + JSON round trip on a few rooms
 
 ISO path: --iso, $RECVX_ISO, or ISO/SLUS-20184 ROM.iso in the repository.
-Modded rooms go to <mods dir>/RM_xxxx.RDX (the port loads them instead of the disc's, docs/MAPS.md).
+Modded rooms go to <mods dir>/RM_xxxx.RDX (the port loads them instead of the disc's, docs/modding/README.md "The mods folder").
 """
 import argparse, json, os, re, struct, sys, zlib
 
@@ -385,7 +385,7 @@ class Room:
             if recs is None:
                 continue
             if len(recs) != self.rom['cnt'][ci]:
-                sys.exit('%s: %d records, room has %d (record counts are fixed, see docs/MAPS.md)' % (k, len(recs), self.rom['cnt'][ci]))
+                sys.exit('%s: %d records, room has %d (record counts are fixed, see docs/modding/BUILDING_ROOMS.md "Editing a retail room")' % (k, len(recs), self.rom['cnt'][ci]))
             for i, r in enumerate(recs):
                 pack_into(st, self.d, self.rom['ptr'][pi] + i * st[0].size, r)
         for i, c in enumerate(j.get('cuts', [])):
@@ -759,7 +759,7 @@ def cnk_model(d, top, moff):
 
 def parse_vlist(d, p):
     """vertex chunks -> {index: (x,y,z)}; types: 41 CV_VN (pos + normal), 51 CV_VN for the PS2 VU
-    path (same element layout as far as positions go, see docs/MAPS.md)"""
+    path (same element layout as far as positions go, see docs/modding/ROOM_FORMAT.md "MLB models and the room model")"""
     verts, types = {}, []
     while True:
         t = d[p]
@@ -922,7 +922,7 @@ def cmd_script(args):
     lines, ok = disasm(load_room(args, args.room))
     print('\n'.join(lines))
     if not ok:
-        print('; warning: a sweep did not end cleanly (see docs/MAPS.md, script)')
+        print('; warning: a sweep did not end cleanly (see docs/modding/ROOM_FORMAT.md "Event scripts")')
 
 def cmd_tex(args):
     r = load_room(args, args.room)

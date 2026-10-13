@@ -1,5 +1,5 @@
 /* Control bindings: keyboard/mouse and gamepad -> DS2 buttons, third-person keys, hotkeys.
-   docs/PORT.md "Controls". The defaults are the port's fixed layout from before (pad.c,
+   docs/ARCHITECTURE.md "Input". The defaults are the port's fixed layout from before (pad.c,
    tps_input.c, host.c, overlay.cpp), so nothing changes until a binding is edited. */
 #include "../host/bindings.h"
 #include "../host/tps.h"

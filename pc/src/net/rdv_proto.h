@@ -1,4 +1,4 @@
-/* Co-op server protocol (docs/COOP_SERVER.md section 2): the messages between a game and the
+/* Co-op server protocol (docs/SERVER.md "Wire protocol"): the messages between a game and the
    rendezvous/relay server (pc/server), the hole-punching messages between the games, and the
    end-to-end encryption of game datagrams in server sessions. Pure functions, no sockets: the
    server, the game (rendezvous.c) and pc/tests/test_rdv.c share them. Little-endian, packed by
@@ -12,8 +12,8 @@ extern "C" {
 
 #define RDV_MAGIC 0x53585643u           /* "CVXS": server message / punch / relay frame */
 #define RDV_E2E_MAGIC 0x45585643u       /* "CVXE": an encrypted game datagram */
-#define RDV_VERSION 3                   /* 2: authenticated RELAY frames, keys bound to the introduction (docs/COOP_SERVER.md 11);
-                                           3: JOIN carries a rejoin tag (a crashed player takes its own slot back), KICK (docs/COOP_SERVER.md 12) */
+#define RDV_VERSION 3                   /* 2: authenticated RELAY frames, keys bound to the introduction (docs/SERVER.md "Security");
+                                           3: JOIN carries a rejoin tag (a crashed player takes its own slot back), KICK (docs/SERVER.md "Rejoin, KICK and member timeout") */
 #define RDV_DEFAULT_PORT 7141
 #define RDV_HDR 8                       /* magic, version, type, flags */
 #define RDV_RELAY_HDR 24                /* + room id, counter, MAC (8): the sender's token authenticates the frame to the server */
@@ -31,7 +31,7 @@ enum { RDV_F_PW = 1, RDV_F_E2E = 2 };   /* CREATE / INTRO flags; JOIN: RDV_F_PW 
 enum { RDV_BAD_SIZE = -1, RDV_BAD_HDR = -2, RDV_BAD_VERSION = -3, RDV_BAD_TYPE = -4, RDV_BAD_FIELD = -5 };
 
 /* an address on the wire: family 4 or 6 (0 none), port, 16 bytes (IPv4: the first 4). IPv6 is
-   not used yet (docs/COOP_SERVER.md "IPv4 / IPv6"); the format already carries it. */
+   not used yet (docs/SERVER.md "IPv4 / IPv6"); the format already carries it. */
 typedef struct RdvAddr { uint8_t fam; uint16_t port; uint8_t ip[16]; uint8_t via; } RdvAddr;   /* port: host order */
 /* via: the server's local socket the address was seen on (listen = several addresses); not on the wire */
 #define RDV_ADDR_LEN 19

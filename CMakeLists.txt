@@ -12,7 +12,7 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "Debug, Release, RelWithDebInfo, MinSizeRel" FORCE)   # not -O0
 endif()
 
-# Linux: run on older glibc than the build machine's (cmake/glibc_compat.h/.c, docs/PORT.md "Building")
+# Linux: run on older glibc than the build machine's (cmake/glibc_compat.h/.c, docs/BUILDING.md "Running on older distributions (glibc)")
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     option(RECVX_GLIBC_COMPAT "Bind glibc symbols to versions up to 2.34" ON)
     if(RECVX_GLIBC_COMPAT)

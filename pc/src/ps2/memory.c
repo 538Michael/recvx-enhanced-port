@@ -4,7 +4,7 @@
 /*
  * PS2 address-space setup.
  *
- * Memory model (docs/PORT.md): the executable is linked at 0x30000000 so that
+ * Memory model (docs/ARCHITECTURE.md "Data model and memory"): the executable is linked at 0x30000000 so that
  * the EE's uncached / uncached-accelerated aliases (addr|0x20000000,
  * addr|0x30000000) are identities on every game object, and DMA tags can hold
  * plain 31-bit host addresses. The 16 KB scratchpad is mapped at its real EE
@@ -90,7 +90,7 @@ void ps2_memory_init(void)
         if (((uintptr_t)&ps2_window_probe & 0x30000000u) != 0x30000000u)
             host_fatal("executable is not linked inside the PS2 address window (0x30000000)");
         /* all static game memory (room arena, texture heap, ...) must lie in the window: the budgets
-           in pc_prelude.h share the 256 MB up to 0x40000000 (docs/MAPS.md 7) */
+           in pc_prelude.h share the 256 MB up to 0x40000000 (docs/modding/ROOM_FORMAT.md "Limits and budgets") */
         if (end > 0x40000000u)
             host_fatal("the executable's data end at 0x%08X, past the PS2 address window (0x40000000)", (unsigned)end);
     }

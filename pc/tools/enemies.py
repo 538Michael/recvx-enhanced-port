@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Enemy census over the room files (docs/ENEMIES.md). Reads the user's disc image at run time
+"""Enemy census over the room files (docs/ENEMIES.md). Reads the player's disc image at run time
 through pc/tools/rdx.py (imported, not changed); prints counts, ids and script references only.
 
   room ROOM       the room's enemy records and every script reference to them, with the

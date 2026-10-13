@@ -13,7 +13,7 @@ typedef struct MenuMouse {
     volatile int x, y;      /* cursor in the game's 2D screen space (njDrawSprite2D: 640x480, 4:3 part), 1/16 px */
     volatile int held;      /* 1 left, 2 right */
     volatile int left, right, left_up;   /* button presses / left releases since the game last looked */
-    volatile int wheel;     /* notches, > 0 = away from the user */
+    volatile int wheel;     /* notches, > 0 = away from the player */
 } MenuMouse;
 
 extern MenuMouse g_menu_mouse;

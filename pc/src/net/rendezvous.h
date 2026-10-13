@@ -1,4 +1,4 @@
-/* Co-op through the server, client side (docs/COOP_SERVER.md): room create/join, hole punching,
+/* Co-op through the server, client side (docs/SERVER.md): room create/join, hole punching,
    relay fallback, end-to-end encryption. Runs on net.c's socket, driven from the game thread
    (coop_glue.c) or the CLI test client (pc/server/client.c). One session at a time. */
 #ifndef RECVX_RENDEZVOUS_H

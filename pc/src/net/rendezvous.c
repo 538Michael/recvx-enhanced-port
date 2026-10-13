@@ -1,4 +1,4 @@
-/* Co-op through the server, client side (rendezvous.h, docs/COOP_SERVER.md 1, 9 and 11). */
+/* Co-op through the server, client side (rendezvous.h, docs/SERVER.md "Connection flow" and "Security"). */
 #include "rendezvous.h"
 #include "rdv_proto.h"
 #include "monocypher.h"
@@ -232,7 +232,7 @@ void rdv_start(const RdvConfig* c)
         crypto_wipe(cfg.password, sizeof(cfg.password));
     }
     /* the host's encryption policy, enforced here and never taken from the server: a password
-       room is always encrypted (docs/COOP_SERVER.md 11) */
+       room is always encrypted (docs/SERVER.md "End-to-end encryption") */
     flags = cfg.host ? ((cfg.e2e || pw_used) ? RDV_F_E2E : 0) | (pw_used ? RDV_F_PW : 0) : 0;
     host_log("rdv: %s %s via %s\n", cfg.host ? "creating a room" : "joining room", cfg.host ? "" : fmt_code(cfg.code),
              cfg.server_name[0] ? cfg.server_name : net_addr_str(&cfg.server));
@@ -346,7 +346,7 @@ static void keys_confirmed(void)
    expects one) and takes only a newer member sequence (the epoch), at most EPOCH_STEP ahead: a
    repeat changes nothing, an older, too new or altered one is dropped, and every accepted one gets
    keys bound to its epoch, so counters never start again under the same keys. The joiner takes the first one. Encryption follows the
-   local policy, not the INTRO's flags (docs/COOP_SERVER.md 11). */
+   local policy, not the INTRO's flags (docs/SERVER.md "End-to-end encryption"). */
 #define EPOCH_STEP 64   /* epochs accepted: ours + 1 .. ours + EPOCH_STEP (no far-future epoch that blocks the real next ones) */
 static void on_intro(const RdvMsg* m)
 {

@@ -79,7 +79,7 @@ void  pc_native_strip(const unsigned short* idx_uv, int n, const struct VU1_STRI
                       int color_mode, int single, float uv_scale);   /* enhanced mode: clip volume enlarged into the GS guard band */
 int   pc_screen_filter_mode(void);
 int   pc_skip_door_demo(void);
-/* mods folder (pc/src/audio/adx.c, docs/MAPS.md): size of <mods>/name or -1; ADXF handle or NULL */
+/* mods folder (pc/src/audio/adx.c, docs/modding/README.md "The mods folder"): size of <mods>/name or -1; ADXF handle or NULL */
 int   pc_mod_file_size(const char* name);
 void* pc_mod_open(const char* name);
 int   pc_model_cull(void);      /* actors/objects off-screen are skipped (bhCheckClipModel/Point) */
@@ -117,13 +117,13 @@ extern int actor_on, appear_on;
 int   actor_put_player(void);                 /* 1 = drawn */
 int   actor_put_enemy(struct BH_PWORK* ep);   /* 1 = drawn */
 void  actor_hands_back(void);                 /* game.c, before bhControlPlayer: the source's own head and hands back */
-/* PS2 budgets raised on the PC (docs/ENEMIES.md 2.2): the texture heap (the EE copies of the
+/* PS2 budgets raised on the PC (docs/ENEMIES.md "Budgets on the PC"): the texture heap (the EE copies of the
    TIM2s the GS loads from; 10 MB on the PS2) and its entry table (256). Vanilla rooms use the same
    first entries and bytes as before; only what used to exit(0) now fits. */
 #define PC_TEX_HEAP_SIZE (64 << 20)
 #define PC_TEX_ENTRIES 1024
 /* The room arena (freemem: persistent player data, then the room file and what it allocates;
-   12.25 MB block on the PS2, ~11.7 MB of it arena) grows by this much (docs/MAPS.md 7). The
+   12.25 MB block on the PS2, ~11.7 MB of it arena) grows by this much (docs/modding/ROOM_FORMAT.md "Limits and budgets"). The
    buffers above it (njplus, vertex buffers) keep their sizes and move up; allocations from the
    bottom keep their offsets, so vanilla rooms are laid out as before and only the packed room
    file is read higher up. Costs address space only (bss, pages never touched stay free), but
@@ -139,7 +139,7 @@ void  actor_hands_back(void);                 /* game.c, before bhControlPlayer:
 /* ROM_WORK.flg bit that rdxbuild sets in "budget": "pc" rooms (retail rooms use bits 0..1): the
    player (and every actor through bhCheckWallEx) stands on type-6 slope walls, its y read from
    the slope at its x/z (hitchk.c pc_slope_ground); the camera and the co-op partner follow that
-   y. Retail rooms never have it: unchanged. docs/MAPS.md 4.3. */
+   y. Retail rooms never have it: unchanged. docs/modding/ROOM_FORMAT.md "Floors and heights". */
 #define PC_ROOM_SLOPES 0x100
 struct BH_PWORK;
 int   pc_slope_ground(struct BH_PWORK* pw, void* pos, float ah);   /* hitchk.c: 1 = on a slope, pos y + floor set */

@@ -193,7 +193,7 @@ int iop_rpc_dispatch(u_int server, u_int fno, void* send, int ssize, void* recei
 
 /* ---------------------------------------------------------------- PC: extra enemy banks */
 /* Enemies play their sound ids in SE bank 3, which a room's sound pack (RM_SRRC.SPQ) fills with the
-   sounds of the room's own types only; ids collide between types (docs/ENEMIES.md 2.3). For a type
+   sounds of the room's own types only; ids collide between types (docs/ENEMIES.md "Sounds of added types"). For a type
    spawned into a room that has none of it, the spawner (spawn_glue.c) loads the bank 3 of the type's
    source room here, straight from the disc (MULTSPQ1/2: either half of the game), and its requests
    name the bank in the port byte. On the PS2 the room's banks fill the SPU2's 2 MB; here banks are

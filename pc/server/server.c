@@ -1,4 +1,4 @@
-/* recvx-server core (server.h, docs/COOP_SERVER.md). Single-threaded; all state in memory. */
+/* recvx-server core (server.h, docs/SERVER.md). Single-threaded; all state in memory. */
 #include "server.h"
 #include "monocypher.h"
 #include <stdarg.h>
@@ -41,7 +41,7 @@ typedef struct Room {
 
 typedef struct Recent { char code[RDV_CODE_LEN + 1]; uint64_t until; } Recent;   /* closed codes in their grace period */
 
-/* Two tables per source address (docs/COOP_SERVER.md 11, review finding 3):
+/* Two tables per source address (docs/SERVER.md "Amplification and flood protection"):
    * Pre: flood control for everything that is not RELAY, before any check (HELLO comes from
      anywhere, spoofed or not). Direct-mapped, a collision overwrites: all it guards is how many
      replies an address gets, and the global requests_total_per_sec caps that too.
@@ -84,7 +84,7 @@ static uint64_t rate_ms, rate_req, rate_in, rate_out;   /* the rates: counters a
 static double log_tokens;
 static uint64_t log_fill, log_held, total_log_ms, full_log_ms;
 
-/* the defaults, and why: docs/COOP_SERVER.md "Configuration" */
+/* the defaults, and why: docs/SERVER.md "Configuration" */
 void srv_defaults(SrvConfig* c)
 {
     memset(c, 0, sizeof(*c));
@@ -96,7 +96,7 @@ void srv_defaults(SrvConfig* c)
     c->creates_per_min = 6;     /* a game opens one room per lobby; a loop of them fills the code grace table */
     c->req_total_per_sec = 5000;    /* ~5000 games starting at once; a flood from many (spoofed) addresses stops here */
     c->joins_total_per_min = 600;   /* guessing with many addresses: 600 a minute against 2^40 codes */
-    c->relay_kbps = 512;    /* per player: ~3x the measured worst case (docs/COOP_SERVER.md "Configuration") */
+    c->relay_kbps = 512;    /* per player: ~3x the measured worst case (docs/SERVER.md "Sizing the relay") */
     c->relay_pps = 600;     /* per player: ~3x the measured worst case */
     c->ip_kbps = 1024;      /* per address: two busy players behind one router, or ~6 hosts */
     c->ip_pps = 1200;
@@ -493,7 +493,7 @@ static void on_join(const RdvAddr* from, const RdvMsg* q, uint64_t now)
     if (r->flags & RDV_F_PW) {
         if (!(q->flags & RDV_F_PW)) { send_err(from, RDV_E_NEED_PW, r->salt); V("room %s: JOIN without the password%s%s", rname(r), WHO(from)); return; }
         if (now - r->pw_fail_start >= 60000) { r->pw_fail_start = now; r->pw_fails = 0; }
-        /* soft backoff (docs/COOP_SERVER.md 11): no lockout. Past ROOM_PW_FREE wrong passwords a
+        /* soft backoff (docs/SERVER.md "Password guessing backoff"): no lockout. Past ROOM_PW_FREE wrong passwords a
            minute, an address that failed a join this minute waits ROOM_PW_GAP_MS after the room's last
            wrong one; an address without failures is always checked, so guessers from many addresses
            cannot keep a joiner out (each address still has its own failed_joins_per_min, and all

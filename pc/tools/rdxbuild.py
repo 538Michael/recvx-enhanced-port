@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """RDX authoring compiler. JSON records + OBJ/PNG, with lossless retail sidecars.
 
-No game data is bundled. The rdx_demo.py source resolves its zombie dependency from the user's disc.
-See docs/MAPS_DESIGN.md for coordinates, budgets, commands and limitations.
+No game data is bundled. The rdx_demo.py source resolves its zombie dependency from the player's disc.
+See docs/modding/BUILDING_ROOMS.md for coordinates, budgets, commands and limitations.
 """
 import argparse
 import copy
@@ -14,7 +14,7 @@ import struct
 from collections import Counter
 import rdx
 
-# Authoring budgets (docs/MAPS_DESIGN.md "Budgets", docs/MAPS.md 7). "retail" (the default) keeps a
+# Authoring budgets (docs/modding/BUILDING_ROOMS.md "Budgets", docs/modding/ROOM_FORMAT.md "Limits and budgets"). "retail" (the default) keeps a
 # room within the PS2's memory, as the retail rooms are; "pc" (room.json "budget": "pc") uses the
 # PC build's raised limits (pc_prelude.h): such a room needs that build.
 BUDGETS = {
@@ -36,7 +36,7 @@ RECORD_LIMITS = {'enemies': 128, 'objects': 32, 'items': 32, 'triggers': 256, 'f
 # ROM_WORK.flg bit the PC build reads (pc_prelude.h PC_ROOM_SLOPES): the player stands on type-6
 # slope walls. Set in every "budget": "pc" room; retail rooms use bits 0..1 only.
 ROOM_SLOPES = 0x100
-# Type-6 slope walls (docs/MAPS_DESIGN.md "Slopes"): wall `id` = the direction the surface rises.
+# Type-6 slope walls (docs/modding/BUILDING_ROOMS.md "Slopes"): wall `id` = the direction the surface rises.
 SLOPE_RISE = {'+x': 0, '-z': 1, '+z': 2, '-x': 3}
 FLAT = 0.001   # h of a flat patch (h 0 would mean the room's default wall height)
 

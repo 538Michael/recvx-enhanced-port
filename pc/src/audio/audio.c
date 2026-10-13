@@ -39,7 +39,7 @@ typedef struct {
 static SDL_AudioDeviceID dev;
 static AdxVoice voices[MAX_VOICES];
 static int mono_out;
-/* The game thread starts/stops voices and the movie stream; the main thread applies the user
+/* The game thread starts/stops voices and the movie stream; the main thread applies the player
    volumes (F1, settings_poll). This lock covers a stream's publication (used / movie_stream),
    its gain and its removal, so the main thread never sets the gain of a destroyed stream. */
 static SDL_Mutex* lock;

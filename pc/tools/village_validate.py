@@ -11,7 +11,7 @@ def require(value,message):
 
 
 def walkable(walls,w,d):
-    """1-unit grid of player positions, with the clearances measured in game (docs/AREA_PLAN.md)."""
+    """1-unit grid of player positions, with the clearances measured in game (docs/modding/BUILDING_ROOMS.md "Validation")."""
     def clear(x,z):
         return 5.5<=x<=w-5.5 and 5.5<=z<=d-5.5 and not any(
             a['px']-(5.5 if a['h']>12 else 3.5)<x<a['px']+a['w']+(5.5 if a['h']>12 else 3.5)

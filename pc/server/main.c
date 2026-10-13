@@ -1,4 +1,4 @@
-/* recvx-server: the co-op rendezvous and relay server (docs/COOP_SERVER.md). UDP, IPv4, no disk
+/* recvx-server: the co-op rendezvous and relay server (docs/SERVER.md). UDP, IPv4, no disk
    state, runs as any user. Settings: defaults < config file < RECVX_SERVER_PORT < command line;
    SIGHUP reads the file again (limits, log level, stats interval; port, listen and max_rooms need
    a restart). Linux. */
@@ -60,7 +60,7 @@ static void flush_log(void)
 
 static void usage(FILE* f)
 {
-    fprintf(f, "recvx-server: co-op rendezvous and relay server (docs/COOP_SERVER.md)\n"
+    fprintf(f, "recvx-server: co-op rendezvous and relay server (docs/SERVER.md)\n"
                "usage: recvx-server [--config PATH] [-v] [--KEY VALUE ...]\n"
                "  --config PATH              the config file (default %s if it exists)\n"
                "  -v, --verbose              log requests, joins and relay changes too\n"

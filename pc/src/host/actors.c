@@ -1,6 +1,6 @@
 /* The catalogue of pc/src/host/actors.h: where each enemy / NPC model is on the disc. Room and
    record were picked by a census over all room files (the smallest room holding the model and,
-   for a model with its own motions, its type's motion set; docs/ACTORS.md section 8). */
+   for a model with its own motions, its type's motion set; docs/ACTORS.md "You appear as"). */
 #include "actors.h"
 
 #define MA ANIM_MALE    /* a man's (Chris's while Claire is played) */
@@ -94,7 +94,7 @@ int appear_part_anim(int file) { return file == 0 || file == 4 ? ANIM_FEMALE : A
    The player's vocal sounds (SE bank 4: hit 1024/1026/1027, death 1025, grabs) come from
    CORE_<ply_id>.SPQ; the disc has one per player character (Claire, Chris, Steve, Wesker, same 4
    programs each). The story cast speaks with its own, other men with Chris's, women with Claire's;
-   creatures that play their own idle motion keep the played character's (docs/ACTORS.md 8). */
+   creatures that play their own idle motion keep the played character's (docs/ACTORS.md "Voices"). */
 int appear_voice(int chr)
 {
     static const signed char files[COOP_CHR_ACTOR] = { -1, 0, 1, 2, 3, 0 };
@@ -133,7 +133,7 @@ int appear_grab_motion(int id, int mtn, int from, int to)
 }
 
 /* ---------------------------------------------------------------- "You appear as" list
-   Left out of the menus (docs/ACTORS.md section 8, "The list"): event and cutscene doubles that
+   Left out of the menus (docs/ACTORS.md "The list"): event and cutscene doubles that
    look like an entry that stays. Their chr values keep working; each maps to the one kept. */
 #define M(n) (COOP_CHR_ACTOR + (n))   /* chr of catalogue entry n */
 static const struct { short hidden, kept; } twins[] = {

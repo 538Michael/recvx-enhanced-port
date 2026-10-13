@@ -1,8 +1,8 @@
 #!/bin/sh
-# Headless room test (docs/archive/MAPS_TASKS.md "Common setup"): new game, teleport, frame dumps, log.
+# Headless room test (docs/modding/BUILDING_ROOMS.md "Headless room testing"): new game, teleport, frame dumps, log.
 #   pc/tools/room_test.sh OUT STAGE:ROOM:POS [SECONDS]
 # Environment: RECVX_ISO (disc image), RECVX_MODS (mods folder, default ./mods), and any test
-# aid of docs/PORT.md, e.g. RECVX_WARP, extra RECVX_INPUT entries in MORE_INPUT, RECVX_BIN (binary)
+# aid of docs/ARCHITECTURE.md "Environment variables", e.g. RECVX_WARP, extra RECVX_INPUT entries in MORE_INPUT, RECVX_BIN (binary)
 # (presented frames; the new game is started by frame ~300, the teleport lands ~frame 330).
 # Output: OUT/frames/*.bmp (every 30th frame), OUT/log.txt (look for "mods:", "read file =").
 set -e

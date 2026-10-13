@@ -2,7 +2,7 @@
 # function; pc/tools/decomp_warnings.py writes this file. The PC build zero-initializes all locals
 # (-ftrivial-auto-var-init=zero); on the PS2 these read stale register/stack values. Verify the
 # ones that matter against the retail ELF. Fixed: ps2_sg_sd.c Volume_Control (dvol of a fade up,
-# docs/PORT.md "1:1 notes").
+# docs/ARCHITECTURE.md "Fidelity notes").
 binfunc.c bhBscBinRealize: 'mshP' may be used uninitialized
 cut.c bhCheckCutAreaInnerTriangle: 'pos_0.x' may be used uninitialized
 cut.c bhCheckCutAreaInnerTriangle: 'pos_0.z' may be used uninitialized

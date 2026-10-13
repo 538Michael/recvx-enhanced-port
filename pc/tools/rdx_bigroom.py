@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Synthetic stress room for the PC budget (docs/MAPS_DESIGN.md "Budgets"), no disc data.
+"""Synthetic stress room for the PC budget (docs/modding/BUILDING_ROOMS.md "Budgets"), no disc data.
 
     rdx_bigroom.py OUT [--grid 224] [--size 1200] [--textures 300]
     rdxbuild.py build OUT/room.json -o mods/RM_1290.RDX

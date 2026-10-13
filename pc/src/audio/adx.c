@@ -30,7 +30,7 @@
 
 /* ---------------- mods folder ----------------
    Files in $RECVX_MODS (default ./mods) replace disc files without touching the image
-   (docs/MAPS.md): <mods>/NAME for files opened by name (room files RM_SRRC.RDX, also names the
+   (docs/modding/README.md "The mods folder"): <mods>/NAME for files opened by name (room files RM_SRRC.RDX, also names the
    disc does not have, and plain ISO files), <mods>/<AFS file>/<id> for entries of AFS archives
    (e.g. mods/MRY.AFS/12). */
 static FILE* mod_open_path(const char* name, uint32_t* size, char* path, size_t npath)

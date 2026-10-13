@@ -1,4 +1,4 @@
-/* Quick knife (docs/PORT.md "Controls"): while its key is held the knife is equipped and
+/* Quick knife (docs/ARCHITECTURE.md "Input"): while its key is held the knife is equipped and
    readied as if chosen in the inventory and aimed, so the fire button slashes; on release the
    weapon equipped before comes back once the knife is lowered again. Everything goes through
    the inventory's own WeaponSet (equipped slot sys->itm[ply*16], weapon number, the weapon

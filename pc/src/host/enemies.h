@@ -1,4 +1,4 @@
-/* Enemy options (docs/ENEMIES.md section 7): extra enemies, rearranged placements, randomizer;
+/* Enemy options (docs/ENEMIES.md "Enemy options"): extra enemies, rearranged placements, randomizer;
    shared with the co-op glue (the host's options and its added enemies go to the guest). */
 #ifndef RECVX_ENEMIES_H
 #define RECVX_ENEMIES_H

@@ -1,4 +1,4 @@
-/* Fuzz target for the co-op server protocol (docs/COOP_SERVER.md 11), built with AddressSanitizer
+/* Fuzz target for the co-op server protocol (docs/SERVER.md "Security"), built with AddressSanitizer
    and UBSan (ctest rdv_fuzz). LLVMFuzzerTestOneInput works with libFuzzer (clang -fsanitize=fuzzer
    -DRDV_LIBFUZZER); without it, main() runs its own mutation loop over seeds of every message type.
    The first input byte picks the target:

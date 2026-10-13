@@ -1,4 +1,4 @@
-/* Enemy and NPC models a player can appear as ("You appear as", docs/ACTORS.md section 8).
+/* Enemy and NPC models a player can appear as ("You appear as", docs/ACTORS.md "You appear as").
    The catalogue names where each model is found on the disc (room file and enemy record); the
    game thread loads it from there (pc/glue/actor_glue.c). No disc data lives here. */
 #ifndef RECVX_ACTORS_H
@@ -80,7 +80,7 @@ int  actor_put_body(int who, struct BH_PWORK* src);   /* draw src (bhPutModel), 
 void actor_textures_released(void);     /* njReleaseTextureAll */
 
 /* game thread: where a catalogue-format model is in its room file (read and expanded into a buffer
-   that stays valid until another room file is asked for); used by the enemy spawner too */
+   that stays valid until another room file is requested); used by the enemy spawner too */
 typedef struct ActorData {
     const void* rec;                    /* its ETTY_WORK record */
     const unsigned char *mdl, *mtn;     /* its model chunk list, its type's motion list (NULL: none) */

@@ -1,4 +1,4 @@
-/* Any model as a player's appearance ("You appear as", docs/ACTORS.md section 8; catalogue in
+/* Any model as a player's appearance ("You appear as", docs/ACTORS.md "You appear as"; catalogue in
  * pc/src/host/actors.c).
  *
  * A model is read from the room file that carries it (or a player part file), into buffers of
@@ -559,7 +559,7 @@ static int tex_room(const char* name, int texn)
 void actor_tex_free(int* entries, int* heap) { bhGarbageTexture(NULL, 0); *entries = free_entries(); *heap = heap_free(); }
 
 /* Where the catalogue-format model `am` is in its room file: the file is read and expanded into
-   `room` (kept until another room file is asked for; nothing is realized in it), and `out` gets the
+   `room` (kept until another room file is requested; nothing is realized in it), and `out` gets the
    record, its model chunk list, its type's motion list (the first record of the type that has one,
    as bhFinishRoom) and the texture data of each textured sub-model in chunk order. Also used by the
    enemy spawner (spawn_glue.c). */

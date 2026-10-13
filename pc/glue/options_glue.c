@@ -1,4 +1,4 @@
-/* PC SETTINGS in the game's OPTION menu (docs/PORT.md "Options menu"): an eighth row on the
+/* PC SETTINGS in the game's OPTION menu (docs/ARCHITECTURE.md "Settings"): an eighth row on the
  * option screen, set in the screen's own lettering, opens pages of the port's settings drawn
  * like the co-op lobby (the game's font, the option screen's background and title, its cursor
  * sounds). Game thread, from adv.c (Adv_GameOptionScreen and DisplayOptionPlate*): option

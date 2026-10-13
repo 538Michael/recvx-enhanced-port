@@ -25,8 +25,8 @@ void snd_synth_unlock(void);
 uint16_t snd_synth_se_active(int port);
 uint16_t snd_synth_midi_active(void);   /* playing MIDI ports */
 void snd_synth_xbanks_stop(void);       /* (lock held) stop what plays from the extra banks */
-/* PC extra banks (docs/ENEMIES.md 2.3): a room's bank 3 from the disc (key stage*1000 + room*10 +
-   case), or a player voice bank CORE_00n bank 4 (key 0xFFF0 + n, docs/ACTORS.md 8); 1..31 or 0 (none) */
+/* PC extra banks (docs/ENEMIES.md "Sounds of added types"): a room's bank 3 from the disc (key stage*1000 + room*10 +
+   case), or a player voice bank CORE_00n bank 4 (key 0xFFF0 + n, docs/ACTORS.md "Voices"); 1..31 or 0 (none) */
 int  snd_xbank_load(int key);
 void snd_xbank_release(void);
 /* co-op (coop_glue.c): the partner's weapon bank - the shot bank of an ARMS_nnn.SPQ - beside our own
