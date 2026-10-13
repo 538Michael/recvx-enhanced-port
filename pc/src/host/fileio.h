@@ -7,6 +7,7 @@ extern "C" {
 #endif
 
 FILE* pc_fopen(const char* utf8_path, const char* mode);
+int   pc_chdir(const char* utf8_path);   /* 1 = changed */
 /* Writes utf8_path through a temporary file next to it: fill() writes and returns 0 on success;
    the data is flushed to disk and renamed over the file (rename on POSIX, MoveFileEx on
    Windows). On any error the file is left as it was. Returns 0 on success, -1 on error. */

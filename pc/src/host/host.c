@@ -17,9 +17,7 @@ void render_loop(void);
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#ifdef _WIN32
-#include <windows.h>
-#else
+#ifndef _WIN32
 #include <execinfo.h>
 #include <signal.h>
 #include <unistd.h>
@@ -194,11 +192,7 @@ static void home_dir(void)
     const char* base;
     if (save_given || SDL_GetPathInfo("save", NULL)) return;
     if (!(base = SDL_GetBasePath())) return;
-#ifdef _WIN32
-    { wchar_t w[1024]; if (MultiByteToWideChar(CP_UTF8, 0, base, -1, w, 1024)) SetCurrentDirectoryW(w); }
-#else
-    if (chdir(base) != 0) return;
-#endif
+    pc_chdir(base);
 }
 
 static void parse_args(int argc, char** argv)

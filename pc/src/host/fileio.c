@@ -19,6 +19,18 @@ static wchar_t* wide(const char* s)
 }
 #endif
 
+int pc_chdir(const char* path)
+{
+#ifdef _WIN32
+    wchar_t* w = wide(path);
+    int ok = w && SetCurrentDirectoryW(w);
+    free(w);
+    return ok;
+#else
+    return chdir(path) == 0;
+#endif
+}
+
 FILE* pc_fopen(const char* path, const char* mode)
 {
 #ifdef _WIN32
