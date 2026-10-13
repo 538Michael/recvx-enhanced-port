@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0 (unreleased)
+## 0.1.0 (2026-10-13)
 
 First release. Native Linux and Windows (32-bit, i686) port of Resident Evil Code: Veronica X
 (PS2, SLUS-20184), built on the recvx-decomp decompilation. No game data is included; you need your
