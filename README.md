@@ -46,7 +46,7 @@ native paths replace the expensive parts. The game reads your own disc image in 
 
 Prebuilt Linux and Windows builds and the co-op server are on the
 [Releases](https://github.com/aikatore/recvx-enhanced-recomp/releases) page (no game data
-included). Unpack and run `start.bat` (Windows) or `./recvx.sh` (Linux); see
+included). Unpack and run `recvx.exe` (Windows) or `./recvx` (Linux); see
 [docs/USER_GUIDE.md](docs/USER_GUIDE.md).
 
 ## Building from source

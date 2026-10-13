@@ -17,7 +17,9 @@ void render_loop(void);
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#ifndef _WIN32
+#ifdef _WIN32
+#include <windows.h>
+#else
 #include <execinfo.h>
 #include <signal.h>
 #include <unistd.h>
@@ -146,7 +148,8 @@ static void usage(void)
     fprintf(stderr,
         "recvx-enhanced-recomp " RECVX_VERSION "\n"
         "usage: recvx [options] <game disc image (.iso)>\n"
-        "  --save-dir <dir>   memory card directory (default: ./save)\n"
+        "  --save-dir <dir>   settings and memory card directory (default: ./save if it exists,\n"
+        "                     else save/ next to the program, which also holds mods/ and logs)\n"
         "  --size WxH         window size (default 1280x960)\n"
         "  --fullscreen\n"
         "  --enhanced         display-rate frames (60+ FPS) blended from the 30 FPS game (default)\n"
@@ -171,14 +174,40 @@ static void usage(void)
 
 static char log_path[1024], profile_path[1024];
 static int iso_given;   /* image from the command line / RECVX_ISO: no file selector */
+static int save_given;  /* --save-dir */
+static char start_dir[1024];   /* where the program was started: relative image paths are taken from here */
+
+static void iso_from(const char* s)
+{
+    int absolute = s[0] == '/' || s[0] == '\\' || (s[0] && s[1] == ':');
+    if (absolute || !start_dir[0]) SDL_strlcpy(g_config.iso_path, s, sizeof(g_config.iso_path));
+    else SDL_snprintf(g_config.iso_path, sizeof(g_config.iso_path), "%s%s", start_dir, s);
+    iso_given = 1;
+}
+
+/* Started from somewhere else (a file manager, a shortcut, another directory): the program's own
+   folder holds save/, mods/ and the logs, so the release binaries need no start script. A save
+   folder in the current directory or an explicit --save-dir keeps the current directory (several
+   instances with their own folders, test setups). */
+static void home_dir(void)
+{
+    const char* base;
+    if (save_given || SDL_GetPathInfo("save", NULL)) return;
+    if (!(base = SDL_GetBasePath())) return;
+#ifdef _WIN32
+    { wchar_t w[1024]; if (MultiByteToWideChar(CP_UTF8, 0, base, -1, w, 1024)) SetCurrentDirectoryW(w); }
+#else
+    if (chdir(base) != 0) return;
+#endif
+}
 
 static void parse_args(int argc, char** argv)
 {
     const char* env = SDL_getenv("RECVX_ISO");   /* UTF-8 on Windows too */
-    if (env) { SDL_strlcpy(g_config.iso_path, env, sizeof(g_config.iso_path)); iso_given = 1; }
+    if (env) iso_from(env);
     SDL_strlcpy(g_config.save_dir, "save", sizeof(g_config.save_dir));
     for (int i = 1; i < argc; i++) {
-        if (!strcmp(argv[i], "--save-dir") && i + 1 < argc) SDL_strlcpy(g_config.save_dir, argv[++i], sizeof(g_config.save_dir));
+        if (!strcmp(argv[i], "--save-dir") && i + 1 < argc) { SDL_strlcpy(g_config.save_dir, argv[++i], sizeof(g_config.save_dir)); save_given = 1; }
         else if (!strcmp(argv[i], "--size") && i + 1 < argc) sscanf(argv[++i], "%dx%d", &g_config.window_w, &g_config.window_h);
         else if (!strcmp(argv[i], "--fullscreen")) g_config.fullscreen = 1;
         else if (!strcmp(argv[i], "--enhanced")) g_config.interpolate = 1;
@@ -199,7 +228,7 @@ static void parse_args(int argc, char** argv)
             SDL_strlcpy(profile_path, argv[i][9] ? argv[i] + 10 : "recvx_profile.csv", sizeof(profile_path));
         else if (!strcmp(argv[i], "--help") || !strcmp(argv[i], "-h")) { usage(); exit(0); }
         else if (!strcmp(argv[i], "--version")) { printf("recvx-enhanced-recomp " RECVX_VERSION "\n"); exit(0); }
-        else if (argv[i][0] != '-') { SDL_strlcpy(g_config.iso_path, argv[i], sizeof(g_config.iso_path)); iso_given = 1; }
+        else if (argv[i][0] != '-') iso_from(argv[i]);
         else { usage(); exit(1); }
     }
 }
@@ -242,7 +271,9 @@ int main(int argc, char** argv)
 {
     setvbuf(stdout, NULL, _IONBF, 0); /* the game's printf diagnostics */
     argv = pc_utf8_argv(argc, argv);   /* paths are UTF-8 everywhere (fileio.h) */
+    { char* cwd = SDL_GetCurrentDirectory(); if (cwd) { SDL_strlcpy(start_dir, cwd, sizeof(start_dir)); SDL_free(cwd); } }
     parse_args(argc, argv);
+    home_dir();
     if (log_path[0]) { extern void log_start(const char*); log_start(log_path); }
     host_log("recvx-enhanced-recomp " RECVX_VERSION "\n");
     if (profile_path[0]) { extern void prof_open_csv(const char*); prof_open_csv(profile_path); }

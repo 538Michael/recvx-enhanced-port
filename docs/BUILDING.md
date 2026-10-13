@@ -125,8 +125,8 @@ packs finished builds into the release archives, named after the version in the 
 
 | Archive | Contents |
 |---|---|
-| `recvx-enhanced-recomp-VER-linux-i686.tar.gz` | `recvx` (stripped), `recvx.sh`, README, LICENSE, THIRD_PARTY_NOTICES, CHANGELOG, `docs/USER_GUIDE.md` |
-| `recvx-enhanced-recomp-VER-windows-x86.zip` | `recvx.exe` (stripped), `start.bat`, the same docs |
+| `recvx-enhanced-recomp-VER-linux-i686.tar.gz` | `recvx` (stripped), README, LICENSE, THIRD_PARTY_NOTICES, CHANGELOG, `docs/USER_GUIDE.md` |
+| `recvx-enhanced-recomp-VER-windows-x86.zip` | `recvx.exe` (stripped), the same docs |
 | `recvx-server-VER-linux-x86_64.tar.gz` | `recvx-server` (static), `recvx-client`, example config, systemd unit, `docs/SERVER.md` |
 | `...-linux-i686-debug.tar.gz`, `...-windows-x86-debug.zip` | the unstripped binaries, for `addr2line` on crash-log addresses |
 

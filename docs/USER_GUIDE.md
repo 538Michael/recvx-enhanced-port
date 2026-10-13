@@ -9,8 +9,9 @@ You need your own disc image of *Resident Evil Code: Veronica X* (PS2, NTSC-U, *
 as an `.iso` file. Other regions and releases are not supported. The image is read in place;
 nothing is extracted or copied.
 
-- Release downloads: unpack the archive and run `start.bat` (Windows) or `./recvx.sh` (Linux);
-  both start the game in its own folder, so saves and settings go to `save/` next to it.
+- Release downloads: unpack the archive and run `recvx.exe` (Windows) or `./recvx` (Linux).
+  Settings, saves (`save/`), `mods/` and logs live next to the program, wherever it is started
+  from; a `save/` folder in the current directory, or `--save-dir`, takes precedence.
 - Start `recvx` (Linux) or `recvx.exe` (Windows). The first start opens a file selector (on
   Linux the desktop portal or `zenity`); pick the image. The choice is saved in `recvx.ini`
   (`iso = ...`) and the selector only comes back if that file disappears.

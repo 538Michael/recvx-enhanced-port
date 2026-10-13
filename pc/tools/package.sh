@@ -33,9 +33,7 @@ while [ $# -gt 0 ]; do
         b=$2/pc/recvx; need "$b"
         n=recvx-enhanced-recomp-$ver-linux-i686; d=$stage/$n; mkdir -p "$d"
         ${STRIP:-strip} -o "$d/recvx" "$b"
-        printf '%s\n' '#!/bin/sh' '# starts the game from this folder: settings and saves go to ./save next to it' \
-            'cd "$(dirname "$0")" && exec ./recvx "$@"' > "$d/recvx.sh"
-        chmod 755 "$d/recvx" "$d/recvx.sh"
+        chmod 755 "$d/recvx"
         copy_docs "$d" $docs
         tgz "$n"
         mkdir -p "$stage/$n-debug"; cp "$b" "$stage/$n-debug/recvx"; tgz "$n-debug"
@@ -45,7 +43,6 @@ while [ $# -gt 0 ]; do
         ws=${WIN_STRIP:-${MINGW_PREFIX:+$MINGW_PREFIX/bin/}i686-w64-mingw32-strip}
         n=recvx-enhanced-recomp-$ver-windows-x86; d=$stage/$n; mkdir -p "$d"
         "$ws" -o "$d/recvx.exe" "$b"
-        printf '@echo off\r\nrem starts the game from this folder: settings and saves go to .\\save next to it\r\ncd /d "%%~dp0"\r\nrecvx.exe %%*\r\nif errorlevel 1 pause\r\n' > "$d/start.bat"
         copy_docs "$d" $docs
         (cd "$stage" && rm -f "$out/$n.zip" && zip -qrX "$out/$n.zip" "$n")
         mkdir -p "$stage/$n-debug"; cp "$b" "$stage/$n-debug/recvx.exe"
@@ -75,9 +72,9 @@ done
 - Your own disc image of *Resident Evil Code: Veronica X*, PS2 NTSC-U, **SLUS-20184** (\`.iso\`).
   No game data is included in these downloads.
 - **Windows** (\`recvx-enhanced-recomp-$ver-windows-x86.zip\`): Windows 10 or later, OpenGL 3.3.
-  Unpack and run \`start.bat\` (or \`recvx.exe\`).
+  Unpack and run \`recvx.exe\`.
 - **Linux** (\`recvx-enhanced-recomp-$ver-linux-i686.tar.gz\`): glibc 2.34 or newer and the 32-bit
-  (multilib) OpenGL, X11/Wayland and audio libraries. Unpack and run \`./recvx.sh\`.
+  (multilib) OpenGL, X11/Wayland and audio libraries. Unpack and run \`./recvx\`.
 - On the first start a file selector asks for the disc image; the choice is remembered. Settings
   and saves go to \`save/\` next to the game. F1 opens the settings. See \`docs/USER_GUIDE.md\`.
 - Co-op server (\`recvx-server-$ver-linux-x86_64.tar.gz\`): static Linux binary, see \`docs/SERVER.md\`.
