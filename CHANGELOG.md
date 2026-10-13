@@ -1,9 +1,10 @@
 # Changelog
 
-## Initial public release
+## 0.1.0 (unreleased)
 
-Native Linux and Windows (32-bit, i686) port of Resident Evil Code: Veronica X (PS2, SLUS-20184),
-built on the recvx-decomp decompilation. No game data is included; you need your own disc image.
+First release. Native Linux and Windows (32-bit, i686) port of Resident Evil Code: Veronica X
+(PS2, SLUS-20184), built on the recvx-decomp decompilation. No game data is included; you need your
+own disc image.
 Co-op protocol version 18, rendezvous protocol version 3.
 
 ### Platform and port
