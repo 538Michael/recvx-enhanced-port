@@ -1,0 +1,3 @@
+# recvx-enhanced-recomp
+
+A native Linux/Windows PC port of Resident Evil Code: Veronica X (PS2, US release SLUS-20184), built from the [recvx-decomp](https://github.com/AshfordFamily/recvx-decomp) decompilation, with an enhanced renderer, online co-op (with a small C relay server), a third-person camera, model swaps and mod support. No game data is included: you need your own disc image. Clone with `git clone --recursive` (or run `git submodule update --init --recursive`; the decomp's large mwcc compiler submodule is skipped), then build with CMake as described in [docs/PORT.md](docs/PORT.md). Parts of this project were written with AI assistance. See `LICENSE` and `THIRD_PARTY_NOTICES.md`.

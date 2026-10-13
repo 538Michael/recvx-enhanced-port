@@ -1,0 +1,284 @@
+/*
+ * Host entry point: configuration, SDL window/GL context, event pump, and the
+ * hand-off into the original game's main() (renamed recvx_game_main).
+ */
+#include "ps2_platform.h"
+#include "../gs/stream.h"
+#include "prof.h"
+#include "coop.h"
+#include "tps.h"
+#include "menu_mouse.h"
+#include "lobby.h"
+#include "bindings.h"
+#include "settings.h"
+void render_loop(void);
+#include <SDL3/SDL.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#ifndef _WIN32
+#include <execinfo.h>
+#include <signal.h>
+#include <unistd.h>
+#endif
+
+int recvx_game_main(int argc, char* argv[]);
+void audio_init(void);
+void gs_renderer_init(void);
+
+int pc_screen_filter_mode(void) { return g_config.screen_filter; }
+int pc_skip_door_demo(void) { return g_config.skip_doors; }
+int pc_quick_knife_on(void) { return g_config.quick_knife; }
+/* the game tests a few joints of a model against the screen; with a wide or moving free
+   camera that drops models that are partly visible, so third person never culls */
+extern int tps_cam_active;
+int pc_model_cull(void) { return g_config.model_cull && !tps_cam_active; }
+int pc_frame_blend(void) { return g_config.frame_blend < 0 ? !g_config.interpolate : g_config.frame_blend; }
+int pc_skip_intro(void) { return g_config.skip_intro; }
+int pc_skip_intro_press_start(void)
+{
+    static int done;
+    if (!g_config.skip_intro || done) return 0;
+    done = 1;
+    return 1;
+}
+int pc_config_native_tex(void) { return g_config.native_tex; }
+int pc_native_3d(void)
+{
+    static int env = -2;
+    if (env == -2) env = getenv("RECVX_NATIVE3D") ? atoi(getenv("RECVX_NATIVE3D")) != 0 : -1;
+    return env >= 0 ? env : g_config.native_3d;
+}
+
+/* full-screen 2D overlays: 0 original 4:3, 1 stretched to the (widened) view, 2 off;
+   fades always cover the whole view */
+enum { PC_OVL_CINEMA, PC_OVL_FADE, PC_OVL_EFFECT };   /* as in pc_prelude.h */
+static int overlay_stretch;
+int pc_overlay_begin(int kind)
+{
+    int mode = kind == PC_OVL_CINEMA ? g_config.cinema_bars : kind == PC_OVL_EFFECT ? g_config.screen_effects : 1;
+    if (mode == 2) return 0;
+    overlay_stretch = mode == 1;
+    return 1;
+}
+void pc_overlay_end(void) { overlay_stretch = 0; }
+float pc_overlay_x(float x)
+{
+    extern float pc_hor_scale(void);
+    return overlay_stretch ? 320.0f + (x - 320.0f) * pc_hor_scale() : x;
+}
+
+HostConfig g_config = { .window_w = 1280, .window_h = 960, .vsync = 1, .log_level = 1, .music_volume = 100, .sfx_volume = 100, .interpolate = 1, .frame_blend = 0, .aspect = 2, .show_fps = 1, .show_ping = 1,
+                       .screen_filter = 1, .cinema_bars = 1, .screen_effects = 1, .native_3d = 1, .model_cull = 1, .native_tex = 1, .quick_knife = 1,
+                       .skip_doors = 1, .skip_intro = 1 };   /* first-start defaults; recvx.ini overrides */
+SDL_Window* g_window;
+SDL_GLContext g_gl;
+
+void host_log(const char* fmt, ...)
+{
+    va_list ap;
+    if (g_config.log_level <= 0) return;
+    va_start(ap, fmt);
+    vfprintf(stderr, fmt, ap);
+    va_end(ap);
+}
+
+void host_fatal(const char* fmt, ...)
+{
+    char buf[1024];
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(buf, sizeof(buf), fmt, ap);
+    va_end(ap);
+    fprintf(stderr, "fatal: %s\n", buf);
+    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "recvx", buf, g_window);
+    exit(1);
+}
+
+void host_pump_events(void)
+{
+    SDL_Event ev;
+    bind_test_frame();
+    while (SDL_PollEvent(&ev)) {
+        if (ev.type == SDL_EVENT_GAMEPAD_ADDED || ev.type == SDL_EVENT_GAMEPAD_REMOVED) { extern void pad_devices_changed(void); pad_devices_changed(); }
+        if (bind_event(&ev)) continue;   /* a "press a key" of the settings */
+        if (overlay_event(&ev)) continue;
+        tps_input_event(&ev);
+        menu_mouse_event(&ev);
+        lobby_io_event(&ev);
+        switch (ev.type) {
+        case SDL_EVENT_QUIT:
+            exit(0);
+        case SDL_EVENT_KEY_DOWN:
+            if (bind_hotkey(&ev, B_FULLSCREEN)) {
+                g_config.fullscreen = !g_config.fullscreen;
+                SDL_SetWindowFullscreen(g_window, g_config.fullscreen);
+                settings_save_later();
+            }
+            if (bind_hotkey(&ev, B_TPS_TOGGLE) && !g_lobby_io.text_on) {
+                g_tps.on = !g_tps.on;
+                settings_save_later();
+            }
+            break;
+        }
+    }
+    settings_poll();
+    lobby_io_frame(g_window);
+}
+
+#ifndef _WIN32
+/* debugging aid: RECVX_WATCHDOG=<seconds> prints a backtrace and exits (headless runs) */
+static void watchdog(int sig)
+{
+    void* frames[64];
+    int n = backtrace(frames, 64);
+    (void)sig;
+    fprintf(stderr, "watchdog: backtrace\n");
+    backtrace_symbols_fd(frames, n, 2);
+    if (getenv("RECVX_PROFILE")) exit(3);   /* run atexit: profile dump */
+    _exit(3);
+}
+#endif
+
+static void usage(void)
+{
+    fprintf(stderr,
+        "usage: recvx [options] <game disc image (.iso)>\n"
+        "  --save-dir <dir>   memory card directory (default: ./save)\n"
+        "  --size WxH         window size (default 1280x960)\n"
+        "  --fullscreen\n"
+        "  --enhanced         display-rate frames (60+ FPS) blended from the 30 FPS game\n"
+        "  --vanilla          original 30 FPS presentation (default)\n"
+        "  --skip-doors       room transitions (doors, stairs, ladders) without their animation\n"
+        "  --skip-intro       boot straight into the title menu (no warning, logos, intro movie)\n"
+        "  --third-person     over-the-shoulder camera, mouse/keyboard controls (toggle: F5)\n"
+        "  --coop-host PORT   online co-op: wait for a partner on this UDP port (F3: co-op window)\n"
+        "  --coop-join HOST:PORT#CODE | ROOM  online co-op: join a host, or a room through the co-op server\n"
+        "  --coop-server ADDR   co-op server (host or host:port, UDP 7141)  --coop-conn auto|direct|server  --coop-pw PASSWORD\n"
+        "  --quiet\n"
+        "  --log[=file]       copy all output to a log file (default recvx.log), crash backtraces included\n"
+        "  --profile[=file]   per-frame timing CSV (default recvx_profile.csv): logic, vu0, vu1, gs,\n"
+        "                     interp, present, wait; also shown live in the F1 overlay\n"
+        "  --profile-samples=file  sampling CPU profiler (summarise with pc/tools/profile.py)\n"
+        "F1 opens the settings overlay; settings are saved in <save dir>/recvx.ini.\n"
+        "The image can also be given with the RECVX_ISO environment variable. Without one, a file\n"
+        "selector asks for it on the first start and recvx.ini remembers it (key iso).\n");
+}
+
+static char log_path[1024], profile_path[1024];
+static int iso_given;   /* image from the command line / RECVX_ISO: no file selector */
+
+static void parse_args(int argc, char** argv)
+{
+    const char* env = SDL_getenv("RECVX_ISO");   /* UTF-8 on Windows too */
+    if (env) { SDL_strlcpy(g_config.iso_path, env, sizeof(g_config.iso_path)); iso_given = 1; }
+    SDL_strlcpy(g_config.save_dir, "save", sizeof(g_config.save_dir));
+    for (int i = 1; i < argc; i++) {
+        if (!strcmp(argv[i], "--save-dir") && i + 1 < argc) SDL_strlcpy(g_config.save_dir, argv[++i], sizeof(g_config.save_dir));
+        else if (!strcmp(argv[i], "--size") && i + 1 < argc) sscanf(argv[++i], "%dx%d", &g_config.window_w, &g_config.window_h);
+        else if (!strcmp(argv[i], "--fullscreen")) g_config.fullscreen = 1;
+        else if (!strcmp(argv[i], "--enhanced")) g_config.interpolate = 1;
+        else if (!strcmp(argv[i], "--vanilla")) g_config.interpolate = 0;
+        else if (!strcmp(argv[i], "--skip-doors")) g_config.skip_doors = 1;
+        else if (!strcmp(argv[i], "--skip-intro")) g_config.skip_intro = 1;
+        else if (!strcmp(argv[i], "--third-person")) g_tps.on = 1;
+        else if (!strcmp(argv[i], "--quiet")) g_config.log_level = 0;
+        else if (!strcmp(argv[i], "--coop-host") && i + 1 < argc) { g_coop.port = atoi(argv[++i]); g_coop.request = COOP_REQ_HOST; }
+        else if (!strcmp(argv[i], "--coop-join") && i + 1 < argc) { SDL_strlcpy(g_coop.join, argv[++i], sizeof(g_coop.join)); g_coop.request = COOP_REQ_JOIN; }
+        else if (!strcmp(argv[i], "--coop-server") && i + 1 < argc) SDL_strlcpy(g_coop.server, argv[++i], sizeof(g_coop.server));
+        else if (!strcmp(argv[i], "--coop-pw") && i + 1 < argc) SDL_strlcpy(g_coop.password, argv[++i], sizeof(g_coop.password));
+        else if (!strcmp(argv[i], "--coop-conn") && i + 1 < argc) { i++; g_coop.conn = !strcmp(argv[i], "direct") ? COOP_CONN_DIRECT : !strcmp(argv[i], "server") ? COOP_CONN_SERVER : COOP_CONN_AUTO; }
+        else if (!strncmp(argv[i], "--log", 5) && (argv[i][5] == 0 || argv[i][5] == '='))
+            SDL_strlcpy(log_path, argv[i][5] ? argv[i] + 6 : "recvx.log", sizeof(log_path));
+        else if (!strncmp(argv[i], "--profile-samples=", 18)) SDL_setenv_unsafe("RECVX_PROFILE", argv[i] + 18, 1);
+        else if (!strncmp(argv[i], "--profile", 9) && (argv[i][9] == 0 || argv[i][9] == '='))
+            SDL_strlcpy(profile_path, argv[i][9] ? argv[i] + 10 : "recvx_profile.csv", sizeof(profile_path));
+        else if (!strcmp(argv[i], "--help") || !strcmp(argv[i], "-h")) { usage(); exit(0); }
+        else if (argv[i][0] != '-') { SDL_strlcpy(g_config.iso_path, argv[i], sizeof(g_config.iso_path)); iso_given = 1; }
+        else { usage(); exit(1); }
+    }
+}
+
+/* First start (or the remembered image is gone): ask for the disc image, remember it in recvx.ini. */
+static void SDLCALL iso_picked(void* done, const char* const* files, int filter)
+{
+    (void)filter;
+    if (!files) host_log("file selector: %s\n", SDL_GetError());
+    else if (files[0]) SDL_strlcpy(g_config.iso_path, files[0], sizeof(g_config.iso_path));
+    SDL_SetAtomicInt(done, 1);
+}
+
+static void pick_iso(void)
+{
+    static const SDL_DialogFileFilter filters[] = { { "PS2 disc image (*.iso)", "iso" }, { "All files", "*" } };
+    static SDL_AtomicInt done;
+    SDL_PropertiesID props = SDL_CreateProperties();
+    g_config.iso_path[0] = 0;
+    SDL_SetPointerProperty(props, SDL_PROP_FILE_DIALOG_FILTERS_POINTER, (void*)filters);
+    SDL_SetNumberProperty(props, SDL_PROP_FILE_DIALOG_NFILTERS_NUMBER, SDL_arraysize(filters));
+    SDL_SetStringProperty(props, SDL_PROP_FILE_DIALOG_TITLE_STRING, "Select the Resident Evil Code: Veronica X disc image (SLUS-20184)");
+    SDL_ShowFileDialogWithProperties(SDL_FILEDIALOG_OPENFILE, iso_picked, &done, props);
+    SDL_DestroyProperties(props);
+    while (!SDL_GetAtomicInt(&done)) { SDL_Event ev; SDL_WaitEventTimeout(&ev, 50); }
+}
+
+/* The game (the decomp's main loop, VU, GIF recording) runs on its own thread; the main
+   thread renders (host/render.c). */
+static int SDLCALL game_thread(void* ud)
+{
+    char* game_argv[] = { "cdrom0:\\SLUS_201.84;1", NULL };
+    (void)ud;
+    prof_thread(PROF_LOGIC);
+    { extern void profile_thread(char); profile_thread('g'); }   /* RECVX_PROFILE */
+    exit(recvx_game_main(1, game_argv));
+}
+
+int main(int argc, char** argv)
+{
+    setvbuf(stdout, NULL, _IONBF, 0); /* the game's printf diagnostics */
+    argv = pc_utf8_argv(argc, argv);   /* paths are UTF-8 everywhere (fileio.h) */
+    parse_args(argc, argv);
+    if (log_path[0]) { extern void log_start(const char*); log_start(log_path); }
+    if (profile_path[0]) { extern void prof_open_csv(const char*); prof_open_csv(profile_path); }
+#ifndef _WIN32
+    if (getenv("RECVX_WATCHDOG")) { signal(SIGALRM, watchdog); alarm((unsigned)atoi(getenv("RECVX_WATCHDOG"))); }
+    { extern void profile_start(void); profile_start(); }
+#endif
+    config_load();
+    parse_args(argc, argv);   /* command line overrides the saved settings */
+    ps2_memory_init();
+
+    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD))
+        host_fatal("SDL_Init: %s", SDL_GetError());
+    bind_apply_source();   /* Gamepad only: gamepads also in the background */
+
+    if (!iso_given && (!g_config.iso_path[0] || !cdvd_open_image(g_config.iso_path))) {
+        pick_iso();
+        if (!g_config.iso_path[0]) { usage(); host_fatal("no game disc image selected (or start with: recvx <image.iso>)"); }
+        if (!cdvd_open_image(g_config.iso_path)) host_fatal("cannot open game disc image '%s'", g_config.iso_path);
+        config_save();
+    } else {
+        if (!g_config.iso_path[0]) { usage(); host_fatal("no game disc image given"); }
+        if (!cdvd_open_image(g_config.iso_path)) host_fatal("cannot open game disc image '%s'", g_config.iso_path);
+    }
+
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+    g_window = SDL_CreateWindow("Resident Evil Code: Veronica X", g_config.window_w, g_config.window_h,
+                                SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | (g_config.fullscreen ? SDL_WINDOW_FULLSCREEN : 0));
+    if (!g_window) host_fatal("SDL_CreateWindow: %s", SDL_GetError());
+    g_gl = SDL_GL_CreateContext(g_window);
+    if (!g_gl) host_fatal("SDL_GL_CreateContext: %s", SDL_GetError());
+    SDL_GL_SetSwapInterval(g_config.vsync ? 1 : 0);
+    gs_renderer_init();
+    overlay_init(g_window, g_gl);
+    audio_init();
+
+    stream_init();
+    if (!SDL_CreateThread(game_thread, "game", NULL)) host_fatal("cannot start the game thread: %s", SDL_GetError());
+    render_loop();   /* the main thread renders and presents; never returns */
+    return 0;
+}

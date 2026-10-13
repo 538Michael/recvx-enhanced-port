@@ -1,0 +1,482 @@
+/* PC SETTINGS in the game's OPTION menu (docs/PORT.md "Options menu"): an eighth row on the
+ * option screen, set in the screen's own lettering, opens pages of the port's settings drawn
+ * like the co-op lobby (the game's font, the option screen's background and title, its cursor
+ * sounds). Game thread, from adv.c (Adv_GameOptionScreen and DisplayOptionPlate*): option
+ * level 4 is ours. Values come from the shared settings table (pc/src/host/settings.c) and the
+ * control bindings (pc/src/input/bindings.c), the same ones the F1 overlay edits.
+ */
+#include "../../decomp/include/ps2/veronica/prog/types.h"
+#include "../../decomp/include/ps2/veronica/prog/main.h"
+#include "../../decomp/include/ps2/veronica/prog/adv.h"
+#include "../../decomp/include/ps2/veronica/prog/padman.h"
+#include "../../decomp/include/ps2/veronica/prog/sdfunc.h"
+#include "../../decomp/include/ps2/veronica/prog/ps2_NaDraw.h"
+#include "../src/host/settings.h"
+#include "../src/host/bindings.h"
+#include "../src/host/menu_mouse.h"
+#include <stdio.h>
+#include <string.h>
+
+extern ADV_WORK AdvWork;
+extern QUAD Qtex[16];
+extern unsigned int* pad_type[4];
+extern OPTION OptionDef[];
+void host_log(const char* fmt, ...);
+void pc_ui_text(float x, float y, const char* s, float sc, unsigned int argb);
+float pc_ui_text_w(const char* s, float sc);
+int pc_ui_text_wrap(float x, float y, float w, const char* s, float sc, unsigned int argb, int max_lines);
+void pc_ui_rect(float x0, float y0, float x1, float y1, unsigned int argb, float z);
+void pc_ui_arrow(float x, float y, int dir, unsigned int argb);
+int bind_any_down(void);
+
+enum { P_UP = 0x1000, P_RIGHT = 0x2000, P_DOWN = 0x4000, P_LEFT = 0x8000, P_START = 0x800, P_SELECT = 0x100, P_L1 = 0x4, P_R1 = 0x8 };   /* Pad[] bits */
+
+/* ---------------------------------------------------------------- glue for the host */
+int pc_in_game(void) { return sys && (sys->tk_flg & 0x80); }
+int pc_keytype(void) { return sys ? sys->keytype & 3 : 0; }
+
+/* the key type's DS2 buttons for virtual pad bit v (pad.c bhSetPad), in pad report bits */
+int pc_keytype_mask(int v)
+{
+    unsigned int n;
+    if (!sys || v < 0 || v > 17) return -1;
+    n = pad_type[sys->keytype & 3][v];
+    return (int)(((n & 0xFF) << 8) | ((n >> 8) & 0xFF));
+}
+
+/* ---------------------------------------------------------------- mouse */
+static MouseTake mt;                    /* the pointer (game 2D px) and what it did */
+
+
+static unsigned int ok_button(void) { return (sys->keytype & 3) < 3 ? AdvGetOkButton() : 0xC0; }
+static unsigned int cancel_button(void) { return (sys->keytype & 3) < 3 ? AdvGetCancelButton() : 0x20; }
+
+/* Adv_GameOptionScreen, every frame: the OS cursor shows while the option screen is up */
+void pc_options_frame(void) { g_menu_mouse.active = 1; }
+
+/* ---------------------------------------------------------------- level 0: the PC SETTINGS row */
+#define ROW8_X 336.0f
+#define ROW8_Y 352.0f
+/* "PC SETTINGS" from the row labels' own letters (texture 0: AUDIO SETUP at v 0, KEY CONFIG 32,
+   SCREEN SETUP 64, EXIT 192, SETUP 224; u = left edge, w = width, measured from the texture) */
+static const struct { short u, v, w; } row8[] = {
+    { 73, 224, 17 }, { 70, 32, 17 }, { -1, 0, 12 },                     /* P (SETUP) C (CONFIG) space */
+    { 0, 224, 15 }, { 16, 224, 16 }, { 33, 224, 18 }, { 33, 224, 18 }, /* S E T T (SETUP) */
+    { 38, 192, 11 }, { 88, 64, 19 }, { 158, 32, 19 }, { 0, 224, 15 },  /* I (EXIT) N (SCREEN) G (CONFIG) S */
+};
+
+static float row8_w(void)
+{
+    float w = 0;
+    for (int i = 0; i < (int)(sizeof(row8) / sizeof(row8[0])); i++) w += row8[i].w + 1;
+    return w;
+}
+
+/* DisplayOptionPlateLevel0, with the other rows: drawn as they are (dim, or pulsing when selected) */
+void pc_options_row8(int selected)
+{
+    ADV_WORK* ap = &AdvWork;
+    unsigned int col = selected ? (((unsigned int)ap->FlushCount2 + 255) << 24) | 0xFFFFFF : 0x7FAFAFAF;
+    float x = ROW8_X;
+    QUAD* q = &Qtex[15];
+    for (int i = 0; i < (int)(sizeof(row8) / sizeof(row8[0])); i++) {
+        if (row8[i].u >= 0) {
+            SetQuadPos(x, ROW8_Y, row8[i].w, 32.0f, q);
+            SetQuadUv2(row8[i].u, row8[i].v, row8[i].w, 32.0f, 0, q);
+            AdvEasyDrawTexture(0, col, q, 0.05f, 1);
+        }
+        x += row8[i].w + 1;
+    }
+}
+
+/* DisplayOptionPlateLevel0 before it reads the pad: hovering a row selects it, a click confirms
+   it (on STEREO/MONO, ON/OFF: picks that value), a right click leaves the option screen */
+void pc_options_mouse0(int port)
+{
+    ADV_WORK* ap = &AdvWork;
+    int hit = -1;
+    menu_mouse_take(&mt);
+    if (mt.x >= 32 && mt.x < 608 && mt.y >= 160 && mt.y < 384) {   /* rows 32 px apart, their values on the right */
+        hit = (int)(mt.y - 160) / 32;
+        if (hit == 6 && mt.x >= ROW8_X) hit = mt.x < ROW8_X + row8_w() ? 7 : -1;
+        else if (mt.x >= 320 && hit != 0 && hit != 4 && hit != 1) hit = -1;
+    }
+    if (hit >= 0 && (mt.moved || mt.left) && hit != ap->OptIndex) { ap->OptIndex = hit; CallSystemSe(0, 2); }
+    if (mt.left && hit >= 0) {
+        if ((hit == 0 || hit == 4) && mt.x >= 336) Pad[port].press |= mt.x < 472 ? P_LEFT : P_RIGHT;   /* STEREO / MONO, ON / OFF */
+        else Pad[port].press |= ok_button();
+    } else if (mt.right) Pad[port].press |= cancel_button();
+}
+
+/* levels 1-3 (KEY CONFIG, SCREEN SETUP, MONITOR ADJUSTMENT): a right click goes back */
+void pc_options_mouse_back(int port, int level)
+{
+    menu_mouse_take(&mt);
+    if (mt.right) Pad[port].press |= level == 2 || level == 3 ? 0x10 : P_START;
+}
+
+/* ---------------------------------------------------------------- the pages */
+enum { K_PAGE, K_SET, K_DEVICE, K_BIND, K_HEAD, K_RESET, K_BACK };
+typedef struct Row { int kind, idx; } Row;
+
+#define MAX_ROWS 80
+#define VISIBLE 7
+#define X_LABEL 44.0f
+#define X_VALUE 360.0f
+#define Y_ROW0 184.0f
+#define ROW_H 22.0f
+#define SC_ROW 0.55f
+#define Z_PANEL 0.02f
+#define Z_HI 0.3f
+
+static struct {
+    int page, sel, top, dev, slot;
+    int capture;                 /* waiting for a key: the bind row + 1 */
+    int wait_release;            /* after a capture: no input until everything is let go */
+    char msg[96];
+    int msg_t;
+    unsigned char pending[256];  /* actions to run when the menu closes */
+    int any_pending;
+} st;
+
+static Row rows[MAX_ROWS];
+static int nrows;
+
+static const char* const heads[] = { "", "THIRD PERSON (KEYBOARD AND MOUSE)", "HOTKEYS" };
+
+static void build_rows(void)
+{
+    nrows = 0;
+    rows[nrows++] = (Row){ K_PAGE, 0 };
+    if (st.page == SP_CONTROLS) {
+        int last = -1;
+        for (int i = 0; i < g_settings_n; i++)   /* input source, which gamepad */
+            if (g_settings[i].page == SP_CONTROLS) rows[nrows++] = (Row){ K_SET, i };
+        rows[nrows++] = (Row){ K_DEVICE, 0 };
+        for (int i = 0; i < B_COUNT && nrows < MAX_ROWS - 3; i++) {
+            int r = bind_order[i], g = bind_rows[r].group;
+            if (!bind_row_shown(r, st.dev)) continue;
+            if (g != last) { rows[nrows++] = (Row){ K_HEAD, g }; last = g; }
+            rows[nrows++] = (Row){ K_BIND, r };
+        }
+        rows[nrows++] = (Row){ K_RESET, 0 };
+    } else
+        for (int i = 0; i < g_settings_n && nrows < MAX_ROWS - 2; i++)
+            if (g_settings[i].page == st.page) rows[nrows++] = (Row){ K_SET, i };
+    rows[nrows++] = (Row){ K_BACK, 0 };
+    if (st.sel >= nrows) st.sel = nrows - 1;
+}
+
+static void say(const char* m) { snprintf(st.msg, sizeof(st.msg), "%s", m); st.msg_t = 120; }
+
+static void move_sel(int dir)
+{
+    for (int k = 0; k < nrows; k++) {
+        st.sel = (st.sel + dir + nrows) % nrows;
+        if (rows[st.sel].kind != K_HEAD) break;
+    }
+    CallSystemSe(0, 2);
+}
+
+static void set_page(int p)
+{
+    st.page = (p + SP_COUNT) % SP_COUNT;
+    st.sel = 0; st.top = 0;
+    CallSystemSe(0, 2);
+}
+
+static const Setting* row_set(const Row* r) { return r->kind == K_SET ? &g_settings[r->idx] : NULL; }
+
+/* left/right or a click on an arrow */
+static void change(const Row* r, int dir)
+{
+    const Setting* s = row_set(r);
+    switch (r->kind) {
+    case K_PAGE: set_page(st.page + dir); return;
+    case K_DEVICE: st.dev ^= 1; st.slot = 0; CallSystemSe(0, 2); return;
+    case K_BIND: st.slot = dir > 0; CallSystemSe(0, 2); return;
+    case K_SET:
+        if (s->flags & SET_ACTION) return;
+        if (settings_locked(s)) { CallSystemSe(0, 1); say(settings_locked(s)); return; }
+        settings_step(s, dir);
+        CallSystemSe(0, 2);
+        return;
+    }
+}
+
+static void capture_begin(int bind_row)
+{
+    st.capture = bind_row + 1;
+    bind_capture_start(st.dev);
+    CallSystemSe(0, 3);
+}
+
+/* 0 stay, 1 back to the option screen */
+static int activate(const Row* r)
+{
+    const Setting* s = row_set(r);
+    switch (r->kind) {
+    case K_PAGE: set_page(st.page + 1); return 0;
+    case K_DEVICE: change(r, 1); return 0;
+    case K_BIND: capture_begin(r->idx); return 0;
+    case K_RESET:
+        bind_reset(st.dev);
+        settings_save_later();
+        say(st.dev ? "Gamepad bindings reset to the defaults" : "Keyboard bindings reset to the defaults");
+        CallSystemSe(0, 3);
+        return 0;
+    case K_BACK: CallSystemSe(0, 0); return 1;
+    case K_SET:
+        if (settings_locked(s)) { CallSystemSe(0, 1); say(settings_locked(s)); return 0; }
+        if (s->flags & SET_ACTION) {
+            if (s->flags & SET_NOW) settings_act(s);
+            else { st.pending[r->idx] = 1; st.any_pending = 1; say("Done when you leave the menu"); }
+            CallSystemSe(0, 3);
+            return 0;
+        }
+        if (settings_is_bool(s) || s->names || s->name) { settings_step(s, 1); CallSystemSe(0, 2); }
+        else CallSystemSe(0, 1);   /* numbers: left/right */
+        return 0;
+    }
+    return 0;
+}
+
+static void capture_end(int code)
+{
+    int row = st.capture - 1;
+    char nm[64];
+    st.capture = 0;
+    st.wait_release = 1;
+    if (code == -2) { CallSystemSe(0, 0); say("Not changed"); return; }
+    bind_set(row, st.dev, st.slot, code == -3 ? 0 : code);
+    settings_save_later();
+    CallSystemSe(0, 3);
+    if (bind_swapped()) { snprintf(nm, sizeof(nm), "Swapped with %s", bind_swapped()); say(nm); }
+    host_log("options: %s %s slot %d = %s\n", st.dev ? "pad" : "key", bind_rows[row].ini, st.slot + 1, bind_code_name(st.dev, code < 0 ? 0 : code, nm, sizeof(nm)));
+}
+
+/* ---------------------------------------------------------------- layout */
+static float row_y(int i) { return Y_ROW0 + (i - st.top) * ROW_H; }
+
+static int row_at(float x, float y)
+{
+    if (x < 30 || x > 610) return -1;
+    if (y >= 150 && y < 174) return 0;   /* the page row */
+    for (int i = st.top; i < nrows && i < st.top + VISIBLE; i++)
+        if (i > 0 && y >= row_y(i) - 3 && y < row_y(i) + ROW_H - 3) return rows[i].kind == K_HEAD ? -1 : i;
+    return -1;
+}
+
+static void scroll_to_sel(void)
+{
+    if (st.top < 1) st.top = 1;
+    if (st.sel > 0 && st.sel < st.top) st.top = st.sel;
+    if (st.sel >= st.top + VISIBLE) st.top = st.sel - VISIBLE + 1;
+    if (st.top > nrows - VISIBLE) st.top = nrows - VISIBLE;
+    if (st.top < 1) st.top = 1;
+}
+
+/* text no wider than w (long names get narrower) */
+static void text_fit(float x, float y, const char* s, float sc, float w, unsigned int col)
+{
+    float tw = pc_ui_text_w(s, sc), k = tw > w ? w / tw : 1.0f;
+    pc_ui_text(x, y + (1.0f - k) * 9.0f, s, sc * k, col);
+}
+
+static unsigned int pulse(void) { return ((unsigned int)AdvWork.FlushCount2 + 255) << 24 | 0xFFFFFF; }
+
+static void draw_row(int i, int sel)
+{
+    const Row* r = &rows[i];
+    const Setting* s = row_set(r);
+    float y = i ? row_y(i) : 152.0f;
+    unsigned int dim = 0xFFA0A0A0, col = sel ? pulse() : dim;
+    char label[128], val[128];
+    const char* lock = s ? settings_locked(s) : NULL;
+    if (lock) col = sel ? 0xFF909090 : 0xFF686868;
+    if (sel) pc_ui_rect(36, y - 3, 604, y + ROW_H - 4, st.capture ? 0x50FFC040 : 0x40FFFFFF, Z_HI);
+    switch (r->kind) {
+    case K_PAGE: {
+        char t[48];
+        float w;
+        snprintf(t, sizeof(t), "%s", settings_pages[st.page]);
+        w = pc_ui_text_w(t, 0.72f);
+        pc_ui_text(320 - w / 2, y - 2, t, 0.72f, sel ? pulse() : 0xFFE8E0C0);
+        pc_ui_arrow(320 - w / 2 - 14, y + 9, -1, col);
+        pc_ui_arrow(320 + w / 2 + 14, y + 9, 1, col);
+        snprintf(t, sizeof(t), "%d/%d", st.page + 1, SP_COUNT);
+        pc_ui_text(560, y + 2, t, 0.45f, 0xFF909090);
+        pc_ui_text(48, y + 2, "L1  R1", 0.45f, 0xFF909090);
+        return;
+    }
+    case K_HEAD: {
+        char t[64];
+        if (r->idx == BG_GAME) snprintf(t, sizeof(t), "GAME (KEY CONFIG TYPE %c)", 'A' + pc_keytype());
+        else snprintf(t, sizeof(t), "%s", heads[r->idx]);
+        pc_ui_text(X_LABEL - 6, y + 2, t, 0.45f, 0xFFE0C080);
+        return;
+    }
+    case K_DEVICE:
+        pc_ui_text(X_LABEL, y, "DEVICE", SC_ROW, col);
+        snprintf(val, sizeof(val), "%s", st.dev ? "Gamepad" : "Keyboard and mouse");
+        break;
+    case K_RESET: pc_ui_text(X_LABEL, y, "RESET TO DEFAULTS", SC_ROW, col); return;
+    case K_BACK: pc_ui_text(X_LABEL, y, "BACK", SC_ROW, col); return;
+    case K_BIND: {
+        int conflict = bind_conflict(r->idx, st.dev);
+        text_fit(X_LABEL, y, bind_row_label(r->idx, label, sizeof(label)), SC_ROW, 300, col);
+        for (int k = 0; k < BIND_SLOTS; k++) {
+            float x = 360 + k * 124;
+            unsigned int c = conflict ? 0xFFFF6060 : k == st.slot && sel ? col : dim;
+            const char* nm = st.capture == r->idx + 1 && k == st.slot ? "..." : bind_code_name(st.dev, bind_get(r->idx, st.dev, k), val, sizeof(val));
+            if (sel && k == st.slot) pc_ui_rect(x - 4, y - 2, x + 116, y + ROW_H - 5, 0x40FFFFFF, Z_HI + 0.01f);
+            text_fit(x, y, nm, SC_ROW, 110, c);
+        }
+        return;
+    }
+    case K_SET:
+        snprintf(label, sizeof(label), "%s%s", s->label, (s->flags & SET_RESTART) ? " (next start)" : "");
+        text_fit(X_LABEL, y, label, SC_ROW, 296, col);
+        if (s->flags & SET_ACTION) {
+            if (st.pending[r->idx]) pc_ui_text(X_VALUE, y, "(when you leave)", 0.5f, 0xFFE0C080);
+            return;
+        }
+        settings_value(s, val, sizeof(val));
+        break;
+    }
+    {   /* a value between arrows */
+        float w = pc_ui_text_w(val, SC_ROW);
+        if (w > 210) w = 210;
+        if (!lock) { pc_ui_arrow(X_VALUE - 6, y + 9, -1, col); pc_ui_arrow(X_VALUE + 12 + w + 8, y + 9, 1, col); }
+        text_fit(X_VALUE + 6, y, val, SC_ROW, 210, col);
+    }
+}
+
+static void draw_help(void)
+{
+    const Row* r = &rows[st.sel];
+    const Setting* s = row_set(r);
+    char t[256], nm[64];
+    float y = 340;
+    unsigned int col = 0xFFC0C0C0;
+    t[0] = 0;
+    if (st.capture) {
+        snprintf(t, sizeof(t), "Press a %s for %s ... (Esc cancels, Delete clears, %d s)", st.dev ? "gamepad button" : "key or mouse button",
+                 bind_rows[st.capture - 1].name, (bind_capture_left_ms() + 999) / 1000);
+        col = 0xFFFFE080;
+    } else if (st.msg_t > 0) { st.msg_t--; snprintf(t, sizeof(t), "%s", st.msg); col = 0xFFFFE080; }
+    else switch (r->kind) {
+    case K_PAGE: snprintf(t, sizeof(t), "Left/right or L1/R1 change the page. Changes are saved at once, and F1 shows the same settings."); break;
+    case K_DEVICE: snprintf(t, sizeof(t), "%s", st.dev ? bind_pad_desc() : "The game's buttons, third-person keys and hotkeys."); break;
+    case K_RESET: snprintf(t, sizeof(t), "All %s bindings back to the defaults.", st.dev ? "gamepad" : "keyboard and mouse"); break;
+    case K_BIND: {
+        int c = bind_conflict(r->idx, st.dev);
+        if (c) { snprintf(t, sizeof(t), "Also bound to: %s. Bind one of them to something else.", bind_rows[c - 1].name); col = 0xFFFF8080; }
+        else if (r->idx == B_QUICKTURN || r->idx == B_TPS_QUICKTURN) snprintf(t, sizeof(t), "Tap it: holds back, then presses run, as the game's own quick turn.");
+        else snprintf(t, sizeof(t), "Confirm: change. Left/right: first or second binding (%s).", bind_code_name(st.dev, bind_get(r->idx, st.dev, st.slot), nm, sizeof(nm)));
+        break;
+    }
+    case K_SET: {
+        const char* lock = settings_locked(s);
+        snprintf(t, sizeof(t), "%s%s%s%s", lock ? lock : "", lock ? " " : "", (s->flags & SET_RESTART) ? "Takes effect at the next start. " : "", s->help ? s->help : "");
+        if (lock) col = 0xFFFFC060;
+        if (s->flags & SET_ACTION && !lock && !(s->flags & SET_NOW)) snprintf(t + strlen(t), sizeof(t) - strlen(t), "%sRuns when you leave the menu.", s->help ? " " : "");
+        break;
+    }
+    }
+    pc_ui_text_wrap(X_LABEL - 4, y, 560, t, 0.45f, col, 2);
+}
+
+static void draw(void)
+{
+    QUAD* q = &Qtex[1];
+    SetQuadPos(96.0f, 96.0f, 448.0f, 48.0f, q);   /* the OPTION title, as level 0 */
+    SetQuadUv2(0, 320.0f, 448.0f, 48.0f, 2, q);
+    AdvEasyDrawTexture(1, -1, q, 0.05f, 1);
+    FlushPlate();
+    pc_ui_rect(28, 146, 612, 384, 0xA0000000, Z_PANEL);
+    pc_ui_rect(36, 176, 604, 177, 0x60FFFFFF, Z_PANEL + 0.001f);
+    pc_ui_rect(36, 336, 604, 337, 0x60FFFFFF, Z_PANEL + 0.001f);
+    draw_row(0, st.sel == 0);
+    for (int i = st.top; i < nrows && i < st.top + VISIBLE; i++) draw_row(i, i == st.sel);
+    if (st.top > 1) {   /* more above / below */
+        NJS_POLYGON_VTX v[3] = { { 594, 187, 0.3f, 0xFFA0A0A0 }, { 606, 187, 0.3f, 0xFFA0A0A0 }, { 600, 180, 0.3f, 0xFFA0A0A0 } };
+        njDrawPolygon(v, 3, 1);
+    }
+    if (nrows > st.top + VISIBLE) {
+        NJS_POLYGON_VTX v[3] = { { 594, 326, 0.3f, 0xFFA0A0A0 }, { 606, 326, 0.3f, 0xFFA0A0A0 }, { 600, 333, 0.3f, 0xFFA0A0A0 } };
+        njDrawPolygon(v, 3, 1);
+    }
+    draw_help();
+    AdvEasySetTextureList(0);   /* the option screen's textures again (the font set its own) */
+}
+
+/* 0 stay, 1 back */
+static int input(int port)
+{
+    unsigned int press = Pad[port].press, rept = Pad[port].Rept;
+    unsigned int ok = ok_button() | P_START, cancel = cancel_button() | P_SELECT;
+    int hit;
+    menu_mouse_take(&mt);
+    if (st.capture) {
+        int c = bind_capture_poll();
+        if (c != -1) capture_end(c);
+        return 0;
+    }
+    if (st.wait_release) {
+        if (bind_any_down() || g_menu_mouse.held) return 0;
+        st.wait_release = 0;
+    }
+    hit = row_at(mt.x, mt.y);
+    if (hit >= 0 && (mt.moved || mt.left) && hit != st.sel) { st.sel = hit; CallSystemSe(0, 2); }
+    if (rows[st.sel].kind == K_BIND && hit == st.sel && (mt.moved || mt.left)) st.slot = mt.x >= 360 + 120;
+    if (mt.wheel) {
+        const Row* r = &rows[hit >= 0 ? hit : st.sel];
+        if (r->kind == K_SET || r->kind == K_PAGE) change(r, mt.wheel > 0 ? 1 : -1);
+        else { st.top -= mt.wheel; if (st.top < 1) st.top = 1; if (st.top > nrows - VISIBLE) st.top = nrows - VISIBLE; }
+    }
+    if (mt.left && hit >= 0) {
+        const Row* r = &rows[hit];
+        if (r->kind == K_PAGE) change(r, mt.x < 320 ? -1 : 1);
+        else if ((r->kind == K_SET && !(g_settings[r->idx].flags & SET_ACTION)) || r->kind == K_DEVICE) {
+            if (mt.x >= X_VALUE - 16) change(r, mt.x < X_VALUE + 4 ? -1 : 1);   /* the "<" arrow: back */
+            else activate(r);
+        } else return activate(r);
+        return 0;
+    }
+    if (mt.right) { CallSystemSe(0, 0); return 1; }
+    if (press & P_L1) set_page(st.page - 1);
+    else if (press & P_R1) set_page(st.page + 1);
+    else if (rept & P_UP) move_sel(-1);
+    else if (rept & P_DOWN) move_sel(1);
+    else if (rept & P_LEFT) change(&rows[st.sel], -1);
+    else if (rept & P_RIGHT) change(&rows[st.sel], 1);
+    else if (press & ok) return activate(&rows[st.sel]);
+    else if (press & cancel) { CallSystemSe(0, 0); return 1; }
+    return 0;
+}
+
+/* DisplayOptionPlate level 4: returns the next level (4 stay, 0 back) */
+int pc_options_pc(int port, int flag)
+{
+    int back = 0;
+    build_rows();
+    if (flag) back = input(port);
+    build_rows();
+    scroll_to_sel();
+    draw();
+    if (back) { st.capture = 0; st.wait_release = 0; }
+    return back ? 0 : 4;
+}
+
+/* Adv_GameOptionScreen ends: the actions chosen run now (the game is back in control), the
+   cursor goes */
+void pc_options_close(void)
+{
+    if (st.any_pending)
+        for (int i = 0; i < g_settings_n && i < (int)sizeof(st.pending); i++)
+            if (st.pending[i]) { st.pending[i] = 0; settings_act(&g_settings[i]); }
+    st.any_pending = 0;
+    st.capture = 0;
+    g_menu_mouse.active = 0;
+}

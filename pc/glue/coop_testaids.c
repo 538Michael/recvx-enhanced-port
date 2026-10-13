@@ -1,0 +1,108 @@
+/* Co-op test aids of coop_frame (headless runs, docs/COOP.md "Test aids"), apart from the session
+ * code: each reads its environment variable once and does nothing without it. coop_glue.c calls
+ * coop_test_aids once per frame, at its start, with what they need of the session (CoopTest).
+ * Frames are the host's (test_clock: the guest takes them from the host's pose).
+ */
+#include "../../decomp/include/ps2/veronica/prog/types.h"
+#include "../../decomp/include/ps2/veronica/prog/main.h"
+#include "../src/host/coop.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+
+void host_log(const char* fmt, ...);
+
+void coop_test_aids(CoopTest* t)
+{
+    {   /* test aid: RECVX_COOP_REJOIN="frame[,frame...]" joins again (a new session, as Disconnect + Join) */
+        static const char* rj = (const char*)-1;
+        if (rj == (const char*)-1) rj = getenv("RECVX_COOP_REJOIN");
+        if (rj && *rj && !t->host && t->on && t->clock >= (unsigned)atoi(rj)) { rj = strchr(rj, ',') ? strchr(rj, ',') + 1 : NULL; t->req = COOP_REQ_JOIN; host_log("coop: test: joining again\n"); }
+    }
+    {   /* test aid: RECVX_COOP_KICK="frame" presses "Remove stuck player" at that frame (host) */
+        static const char* kk = (const char*)-1;
+        if (kk == (const char*)-1) kk = getenv("RECVX_COOP_KICK");
+        if (kk && *kk && t->host && t->on && t->frame >= (unsigned)atoi(kk)) { kk = NULL; t->req = COOP_REQ_KICK; host_log("coop: test: remove the partner\n"); }
+    }
+    {   /* test aid: RECVX_COOP_BYE_GRABBED="n" (guest): Disconnect (a goodbye) n frames into a zombie grab our game runs */
+        static const char* bg = (const char*)-1;
+        static int in;
+        int k, held = 0;
+        if (bg == (const char*)-1) bg = getenv("RECVX_COOP_BYE_GRABBED");
+        for (k = 0; bg && !t->host && t->on && k < 128; k++) held |= t->owned[k];
+        in = held ? in + 1 : 0;
+        if (bg && in > atoi(bg)) { bg = NULL; t->req = COOP_REQ_STOP; host_log("coop: test: disconnect while grabbed\n"); }
+    }
+    if (!t->on || t->echo) return;
+    {   /* test aid: RECVX_COOP_KILL="hostframe:slot[,...]": a lethal hit on our enemy in that slot, as a
+           shot leaves it (a puppet's goes to the host as EV_ENE_HIT, like our weapon's) */
+        static const char* kl = (const char*)-1;
+        unsigned int f;
+        int k, n;
+        if (kl == (const char*)-1) kl = getenv("RECVX_COOP_KILL");
+        if (kl && sys && plp && t->in_game && sscanf(kl, "%u:%d%n", &f, &k, &n) == 2 && t->clock >= f) {
+            if (k >= 0 && k < 128 && (ene[k].flg & 0x1) && ene[k].mlwP) {
+                ene[k].dam[1] += 1000;   /* (bhEne_CalcDamage skips joint 0) */
+                ene[k].flg |= 0x4;
+                ene[k].djnt_no = 1;
+                ene[k].wpnr_no = 3;      /* the handgun */
+                ene[k].dpx = ene[k].px; ene[k].dpy = ene[k].py + 10; ene[k].dpz = ene[k].pz;
+            }
+            host_log("coop: test: lethal hit on enemy %d (hp %d, owned %d) at host frame %u\n", k, k >= 0 && k < 128 ? ene[k].hp : 0, k >= 0 && k < 128 ? t->owned[k] : 0, t->clock);
+            kl = kl[n] == ',' ? kl + n + 1 : NULL;
+        }
+    }
+    {   /* test aid: RECVX_COOP_WARP="hostframe:x:z[,...]": both players at once (host frames) */
+        static const char* wp = (const char*)-1;
+        unsigned int f;
+        float x, z;
+        int n;
+        if (wp == (const char*)-1) wp = getenv("RECVX_COOP_WARP");
+        if (wp && sys && plp && t->in_game && sscanf(wp, "%u:%f:%f%n", &f, &x, &z, &n) == 3 && t->clock >= f) {
+            t->move(x, z);
+            host_log("coop: test: warp to (%.1f %.1f) at host frame %u\n", x, z, t->clock);
+            wp = wp[n] == ',' ? wp + n + 1 : NULL;
+        }
+    }
+    {   /* test aid: RECVX_COOP_VOMIT="hostframe,...": the zombie nearest the partner vomits (en01 MV09, effect 350) */
+        static const char* vomit = (const char*)-1;
+        unsigned int vf;
+        int i, best = -1;
+        float bd = 1e9f;
+        if (vomit == (const char*)-1) vomit = getenv("RECVX_COOP_VOMIT");
+        if (vomit && t->host && sys && t->proxy_ok && sscanf(vomit, "%u", &vf) == 1 && t->frame >= vf) {
+            for (i = 0; i < (int)sys->ewk_n && i < 128; i++) {
+                float dx = ene[i].px - t->partner->px, dz = ene[i].pz - t->partner->pz;
+                if ((ene[i].flg & 0x1) && ene[i].id == 1 && ene[i].type < 16 && (0xFC33 >> ene[i].type & 1) && ene[i].mode0 == 1 && !(ene[i].flg & 0x80) && ene[i].exp0 && !t->owned[i] && dx * dx + dz * dz < bd) { bd = dx * dx + dz * dz; best = i; }
+            }
+            if (best >= 0) {
+                ene[best].mode1 = 0; ene[best].mode2 = 9; ene[best].mode3 = 0;
+                host_log("coop: test: enemy %d vomits (%.0f units from the partner)\n", best, sqrtf(bd));
+            }
+            vomit = strchr(vomit, ',') ? strchr(vomit, ',') + 1 : NULL;
+        }
+    }
+    {   /* test aid: RECVX_TRADE_TRACE: the room's enemies every 10 frames (the trade screen's freeze) */
+        static int tt = -1;
+        if (tt < 0) tt = getenv("RECVX_TRADE_TRACE") != NULL;
+        if (tt && sys && plp && t->frame % 10 == 0 && sys->ewk_n) {
+            unsigned int h = 0;
+            int i, f, n = 0, near_i = 0;
+            float nd = 1e9f;
+            for (i = 0; i < (int)sys->ewk_n && i < 128; i++)
+                if (ene[i].flg & 0x1) {
+                    unsigned int v[5] = { 0, 0, (unsigned int)ene[i].mtn_no, (unsigned int)ene[i].frm_no, (unsigned int)ene[i].ay };
+                    float dx = ene[i].px - plp->px, dz = ene[i].pz - plp->pz;
+                    memcpy(&v[0], &ene[i].px, 4); memcpy(&v[1], &ene[i].pz, 4);
+                    for (n++, f = 0; f < 5; f++) h = h * 31 + v[f];
+                    if (ene[i].id == 1 && dx * dx + dz * dz < nd) { nd = dx * dx + dz * dz; near_i = i; }
+                }
+            if (t->frame % 300 == 0)
+                for (i = 0; i < (int)sys->ewk_n && i < 128; i++)
+                    if ((ene[i].flg & 0x1) && ene[i].id < 31) host_log("coop: trade trace: enemy %d id %d at (%.1f %.1f) mode %d\n", i, ene[i].id, ene[i].px, ene[i].pz, ene[i].mode0);
+            host_log("coop: trade trace: frozen %d, %d enemies, state hash %08x, nearest zombie %d at (%.2f %.2f) %.1f away, motion %d frame %d, us (%.1f %.1f) hp %d mode %d\n",
+                     t->frozen, n, h, near_i, ene[near_i].px, ene[near_i].pz, sqrtf(nd), ene[near_i].mtn_no, ene[near_i].frm_no >> 16, plp->px, plp->pz, plp->hp, plp->mode0);
+        }
+    }
+}
