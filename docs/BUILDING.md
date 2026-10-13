@@ -117,6 +117,44 @@ cmake --build build-server
 On Linux it is linked statically by default (`RECVX_SERVER_STATIC=ON`). A container build is
 in `pc/server/Dockerfile`, a systemd unit in `pc/server/recvx-server.service`.
 
+## Release packages
+
+`pc/tools/package.sh OUT_DIR [--linux build] [--windows build-win] [--server build-server]`
+packs finished builds into the release archives, named after the version in the top-level
+`CMakeLists.txt` (`project(recvx_pc VERSION ...)`):
+
+| Archive | Contents |
+|---|---|
+| `recvx-enhanced-recomp-VER-linux-i686.tar.gz` | `recvx` (stripped), `recvx.sh`, README, LICENSE, THIRD_PARTY_NOTICES, CHANGELOG, `docs/USER_GUIDE.md` |
+| `recvx-enhanced-recomp-VER-windows-x86.zip` | `recvx.exe` (stripped), `start.bat`, the same docs |
+| `recvx-server-VER-linux-x86_64.tar.gz` | `recvx-server` (static), `recvx-client`, example config, systemd unit, `docs/SERVER.md` |
+| `...-linux-i686-debug.tar.gz`, `...-windows-x86-debug.zip` | the unstripped binaries, for `addr2line` on crash-log addresses |
+
+It also writes `RELEASE_NOTES.md` (this version's CHANGELOG section, requirements and first start,
+the README's AI note) and `SHA256SUMS`. No disc image or game data goes into any archive.
+`recvx --version` and `recvx-server --version` print the version plus `git describe` as of the
+last CMake configure.
+
+## Continuous integration
+
+`.github/workflows/build.yml` runs on pushes to `main`, pull requests, `v*` tags and by hand:
+`linux-i686` (Ubuntu 24.04, GCC 13 multilib and the `:i386` SDL backend libraries; build, tests,
+package), `windows-x86` (cross build with Ubuntu's `mingw-w64` POSIX-thread GCC; package) and
+`server` (standalone build, `rdv_paths`/`rdv_nat`, package). A `v*` tag whose version matches
+`CMakeLists.txt` (`v0.1.0`, or `v0.1.0-rc1`) also creates a GitHub release with the archives,
+`SHA256SUMS` and the generated notes; `-rc` tags and 0.x versions are marked as pre-releases.
+
+The CI Windows build is not identical to the documented local one (Arch's `mingw-w64-gcc`):
+
+| | CI (Ubuntu 24.04) | Arch `mingw-w64-gcc` |
+|---|---|---|
+| GCC | 13 | 16 |
+| C runtime | `msvcrt.dll` | UCRT (`api-ms-win-crt-*`) |
+| Threads | POSIX (winpthreads, static) | POSIX (winpthreads, static) |
+
+Both link statically, keep the image base `0x30000000` and the same flags; only system DLLs are
+imported. The game is tested with the UCRT build: report problems that only the release build shows.
+
 ## CMake options
 
 | Option | Default | Meaning |

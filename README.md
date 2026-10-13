@@ -5,6 +5,8 @@
 
 # recvx-enhanced-recomp
 
+[![build](https://github.com/aikatore/recvx-enhanced-recomp/actions/workflows/build.yml/badge.svg)](https://github.com/aikatore/recvx-enhanced-recomp/actions/workflows/build.yml)
+
 A native PC port of *Resident Evil Code: Veronica X* (PS2) for Linux and Windows, built from the
 community decompilation [recvx-decomp](https://github.com/AshfordFamily/recvx-decomp). The
 original game code and its PS2 platform layer are compiled for the PC; the PS2 hardware
@@ -40,7 +42,14 @@ native paths replace the expensive parts. The game reads your own disc image in 
 - **Windows**: Windows 10 or later (32-bit executable, runs on 64-bit Windows).
 - A GPU with OpenGL 3.3.
 
-## Quick start
+## Download
+
+Prebuilt Linux and Windows builds and the co-op server are on the
+[Releases](https://github.com/aikatore/recvx-enhanced-recomp/releases) page (no game data
+included). Unpack and run `start.bat` (Windows) or `./recvx.sh` (Linux); see
+[docs/USER_GUIDE.md](docs/USER_GUIDE.md).
+
+## Building from source
 
 ```sh
 git clone --recursive https://github.com/aikatore/recvx-enhanced-recomp.git
