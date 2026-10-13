@@ -37,12 +37,14 @@ jobs:
           sudo dpkg --add-architecture i386
           sudo apt-get update
           # SDL is built from source and dlopen()s these at run time; the :i386 -dev packages give it
-          # the headers and sonames of the backends (X11, Wayland, ALSA, PulseAudio, PipeWire, ...)
+          # the headers and sonames of the backends (X11, Wayland, ALSA, PipeWire, ...); libpulse-dev:i386
+          # is left out: it pulls libglib2.0-dev:i386, which conflicts with the runner's amd64 GLib tools
+          # (PulseAudio systems still play through ALSA's pulse plugin)
           sudo apt-get install -y --no-install-recommends gcc-multilib g++-multilib ninja-build ccache nftables \
             libx11-dev:i386 libxext-dev:i386 libxcursor-dev:i386 libxi-dev:i386 libxfixes-dev:i386 \
             libxrandr-dev:i386 libxss-dev:i386 libxtst-dev:i386 libxkbcommon-dev:i386 \
             libwayland-dev:i386 libdecor-0-dev:i386 libgl-dev:i386 libegl-dev:i386 \
-            libasound2-dev:i386 libpulse-dev:i386 libpipewire-0.3-dev:i386 libudev-dev:i386 libdbus-1-dev:i386
+            libasound2-dev:i386 libpipewire-0.3-dev:i386 libudev-dev:i386 libdbus-1-dev:i386
       - uses: actions/cache@v6
         with:
           path: .ccache
@@ -52,7 +54,7 @@ jobs:
         run: |
           cmake -B build -G Ninja -DCMAKE_TOOLCHAIN_FILE=cmake/linux-i686.cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo | tee configure.log
           # a game without these would only open the dummy video/audio drivers
-          for b in 'Video drivers:.*wayland' 'Video drivers:.*x11' 'Audio drivers:.*alsa' 'Audio drivers:.*pulseaudio'; do
+          for b in 'Video drivers:.*wayland' 'Video drivers:.*x11' 'Audio drivers:.*alsa' 'Audio drivers:.*pipewire'; do
             grep -q "$b" configure.log || { echo "::error::SDL backend missing: $b"; exit 1; }
           done
       - name: Build
