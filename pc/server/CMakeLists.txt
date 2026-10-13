@@ -3,8 +3,12 @@
 #   cmake -S pc/server -B build-server -DCMAKE_BUILD_TYPE=Release && cmake --build build-server
 cmake_minimum_required(VERSION 3.20)
 if(NOT DEFINED PROJECT_NAME)
-    project(recvx_server C)
+    # standalone: the release version of the top-level CMakeLists.txt
+    file(STRINGS ${CMAKE_CURRENT_SOURCE_DIR}/../../CMakeLists.txt _v REGEX "^project\\(recvx_pc VERSION")
+    string(REGEX MATCH "[0-9]+\\.[0-9]+\\.[0-9]+" _v "${_v}")
+    project(recvx_server VERSION ${_v} LANGUAGES C)
     enable_testing()
+    include(${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/version.cmake)
 endif()
 
 # Monocypher (BSD-2-Clause / CC0): BLAKE2b, Argon2id, X25519, XChaCha20-Poly1305. Shared with the game.
@@ -25,6 +29,7 @@ target_link_libraries(recvx_server_core PUBLIC monocypher)
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     option(RECVX_SERVER_STATIC "Link recvx-server statically" ON)
     add_executable(recvx-server main.c)
+    set_property(SOURCE main.c APPEND PROPERTY COMPILE_DEFINITIONS "RECVX_VERSION=\"${RECVX_VERSION}\"")
     target_compile_options(recvx-server PRIVATE -std=gnu11 -Wall)
     target_link_libraries(recvx-server PRIVATE recvx_server_core)
     if(RECVX_SERVER_STATIC)

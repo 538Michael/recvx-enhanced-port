@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
-project(recvx_pc C CXX)
+project(recvx_pc VERSION 0.1.0 LANGUAGES C CXX)   # the release version (pc/server reads it from here too)
+include(cmake/version.cmake)
 
 # The decomp's data files and code assume the EE's 32-bit pointers. Phase 1
 # targets x86-32; a 64-bit build needs the 32-bit-window memory model first.

@@ -60,11 +60,12 @@ static void flush_log(void)
 
 static void usage(FILE* f)
 {
-    fprintf(f, "recvx-server: co-op rendezvous and relay server (docs/SERVER.md)\n"
+    fprintf(f, "recvx-server " RECVX_VERSION ": co-op rendezvous and relay server (docs/SERVER.md)\n"
                "usage: recvx-server [--config PATH] [-v] [--KEY VALUE ...]\n"
                "  --config PATH              the config file (default %s if it exists)\n"
                "  -v, --verbose              log requests, joins and relay changes too\n"
                "  -h, --help                 this text\n"
+               "  --version                  print the version\n"
                "Every config key is also a flag (flags override the file):\n", SRV_CONFIG_PATH);
     srv_config_help(f);
 }
@@ -145,7 +146,7 @@ static void describe(const SrvConfig* c, const char* path, const char* what)
     char total[64], stats[32];
     snprintf(total, sizeof(total), "%d KB/s and %d datagrams/s", c->total_kbps, c->total_pps);   /* 0: no limit */
     snprintf(stats, sizeof(stats), c->stats_s ? "every %d s" : "off", c->stats_s);
-    srv_logf("recvx-server: %s: protocol %d, config %s, listening on %s, up to %d rooms (%d per address), relay per player %d KB/s and %d "
+    srv_logf("recvx-server " RECVX_VERSION ": %s: protocol %d, config %s, listening on %s, up to %d rooms (%d per address), relay per player %d KB/s and %d "
              "datagrams/s, per address %d KB/s and %d datagrams/s, all relayed traffic %s (0 = no limit), %d requests/s and %d failed "
              "joins/min per address, room time-out %d s, member time-out %d s, code grace %d s, log %s, metrics line %s",
              what, RDV_VERSION, path ? path : "none", listen_str(c), c->max_rooms, c->rooms_per_ip, c->relay_kbps, c->relay_pps, c->ip_kbps,
@@ -177,6 +178,7 @@ int main(int argc, char** argv)
     uint64_t start = now_ms(), last_tick = 0, last_stats;
     for (i = 1; i < argc; i++)
         if (!strcmp(argv[i], "--help") || !strcmp(argv[i], "-h")) { usage(stdout); return 0; }
+        else if (!strcmp(argv[i], "--version")) { puts("recvx-server " RECVX_VERSION); return 0; }
     if (load(&c, argc, argv, &path)) { fprintf(stderr, "recvx-server: not started (configuration errors above)\n"); return 2; }
     if (!srv_init(&c, send_to)) { fprintf(stderr, "out of memory or no randomness\n"); return 1; }
     if (!open_sockets(&c)) return 1;

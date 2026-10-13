@@ -202,7 +202,7 @@ static void settings_window(void)
 
     ImGui::SetNextWindowPos(ImVec2(20, 20), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(ImVec2(460, 0), ImGuiCond_FirstUseEver);
-    if (!ImGui::Begin("Resident Evil Code: Veronica X  -  settings (F1)", &visible)) { ImGui::End(); return; }
+    if (!ImGui::Begin("Resident Evil Code: Veronica X  -  settings (F1)  -  " RECVX_VERSION, &visible)) { ImGui::End(); return; }
 
     if (ImGui::CollapsingHeader("Display", ImGuiTreeNodeFlags_DefaultOpen)) {
         changed |= settings_imgui(SP_DISPLAY);

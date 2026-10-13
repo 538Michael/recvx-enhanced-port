@@ -144,6 +144,7 @@ static void watchdog(int sig)
 static void usage(void)
 {
     fprintf(stderr,
+        "recvx-enhanced-recomp " RECVX_VERSION "\n"
         "usage: recvx [options] <game disc image (.iso)>\n"
         "  --save-dir <dir>   memory card directory (default: ./save)\n"
         "  --size WxH         window size (default 1280x960)\n"
@@ -157,6 +158,7 @@ static void usage(void)
         "  --coop-join HOST:PORT#CODE | ROOM  online co-op: join a host, or a room through the co-op server\n"
         "  --coop-server ADDR   co-op server (host or host:port, UDP 7141)  --coop-conn auto|direct|server  --coop-pw PASSWORD\n"
         "  --quiet\n"
+        "  --version          print the version and exit\n"
         "  --log[=file]       copy all output to a log file (default recvx.log), crash backtraces included\n"
         "  --profile[=file]   per-frame timing CSV (default recvx_profile.csv): logic, vu0, vu1, gs,\n"
         "                     interp, present, wait; also shown live in the F1 overlay\n"
@@ -196,6 +198,7 @@ static void parse_args(int argc, char** argv)
         else if (!strncmp(argv[i], "--profile", 9) && (argv[i][9] == 0 || argv[i][9] == '='))
             SDL_strlcpy(profile_path, argv[i][9] ? argv[i] + 10 : "recvx_profile.csv", sizeof(profile_path));
         else if (!strcmp(argv[i], "--help") || !strcmp(argv[i], "-h")) { usage(); exit(0); }
+        else if (!strcmp(argv[i], "--version")) { printf("recvx-enhanced-recomp " RECVX_VERSION "\n"); exit(0); }
         else if (argv[i][0] != '-') { SDL_strlcpy(g_config.iso_path, argv[i], sizeof(g_config.iso_path)); iso_given = 1; }
         else { usage(); exit(1); }
     }
@@ -241,6 +244,7 @@ int main(int argc, char** argv)
     argv = pc_utf8_argv(argc, argv);   /* paths are UTF-8 everywhere (fileio.h) */
     parse_args(argc, argv);
     if (log_path[0]) { extern void log_start(const char*); log_start(log_path); }
+    host_log("recvx-enhanced-recomp " RECVX_VERSION "\n");
     if (profile_path[0]) { extern void prof_open_csv(const char*); prof_open_csv(profile_path); }
 #ifndef _WIN32
     if (getenv("RECVX_WATCHDOG")) { signal(SIGALRM, watchdog); alarm((unsigned)atoi(getenv("RECVX_WATCHDOG"))); }
