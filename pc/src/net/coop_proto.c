@@ -387,11 +387,25 @@ void coop_atr_merge(AtrRec* rec, const AtrRec* in, int kind, int ix, const AtrSe
         }
 }
 
-int coop_pick_target(int cur, float d_us, float d_p, int busy_us, int busy_p, int committed)
+int coop_pick_target(int cur, const CoopTgtIn* in)
 {
-    float d_cur = cur ? d_p : d_us, d_oth = cur ? d_us : d_p;
-    int busy_cur = cur ? busy_p : busy_us, busy_oth = cur ? busy_us : busy_p;
-    if (committed || busy_oth) return cur;
-    if (busy_cur) return d_oth < COOP_TGT_REACH * COOP_TGT_REACH ? !cur : cur;
-    return d_oth * 1.5f < d_cur ? !cur : cur;
+    int oth = !cur;
+    cur = !!cur;
+    if (in->commit == COOP_TGT_HOLD || in->busy[oth]) return cur;
+    if (in->commit == COOP_TGT_ATTACK && in->d[cur] <= COOP_TGT_KEEP * COOP_TGT_KEEP) return cur;
+    if (in->busy[cur]) return in->d[oth] < COOP_TGT_REACH * COOP_TGT_REACH ? oth : cur;
+    if (in->front[cur]) return cur;
+    if (in->front[oth]) return oth;
+    return in->d[oth] * 1.5f < in->d[cur] ? oth : cur;
 }
+
+int coop_atk_note(CoopAtk* a, unsigned int now)
+{
+    if (!a->n || now - a->t0 > COOP_LOOP_WIN) { a->t0 = now; a->n = 0; }
+    if (++a->n < COOP_LOOP_N) return 0;
+    a->n = 0;
+    a->until = now + COOP_LOOP_COOL;
+    return 1;
+}
+
+int coop_atk_cooling(const CoopAtk* a, unsigned int now) { return (int)(a->until - now) > 0; }

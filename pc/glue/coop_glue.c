@@ -747,6 +747,7 @@ static EneSnap snap[MAX_SNAP];
 static int snap_n;
 static int proxy_ok;                    /* host: the partner is in our room, its model loaded */
 static unsigned char tgt[128];          /* host: the enemy targets the partner */
+static CoopAtk atk[128][2];             /* host, the loop guard (coop_atk_note): attacks each enemy started on [0] our player, [1] the partner */
 static unsigned int enemy_frame;
 static BH_PWORK* swap_plp;
 static BH_PWORK ply2_save;
@@ -895,15 +896,22 @@ static int holding(BH_PWORK* ep) { return ep->exp0 && (*(int*)(ep->exp0 + 0x40) 
    grab was refused here (eneset.c's one-holder rule) or froze (the watchdog): the enemy goes back
    to standing (en01 MV00: idle motion, then the chase), released, as at the end of a grab. Its
    linked lower body runs the same modes (en01 copies them at every change): it goes along. */
-void pc_enemy_unhold(BH_PWORK* ep)
+static void unhold(BH_PWORK* ep, int dead)
 {
     if (!ep->exp0 || ep->id != 1) return;
     *(int*)(ep->exp0 + 0x40) &= ~0xA4080;
-    *(int*)&ep->mode0 = 1;
-    ep->flg2 &= ~1;
-    ep->flg |= 0x40;   /* the player collides with it again (the grab cleared it, its end sets it) */
-    if (ene_slot(ep->exp1) < 128 && (((BH_PWORK*)ep->exp1)->flg & 0x80)) pc_enemy_unhold((BH_PWORK*)ep->exp1);
+    if (!dead) {
+        *(int*)&ep->mode0 = 1;
+        ep->flg2 &= ~1;
+        ep->flg |= 0x40;   /* the player collides with it again (the grab cleared it, its end sets it) */
+    }
+    if (ene_slot(ep->exp1) < 128 && (((BH_PWORK*)ep->exp1)->flg & 0x80)) unhold((BH_PWORK*)ep->exp1, dead);
 }
+/* A dead one only lets go, its death goes on: put back to standing, a crawler killed by the player's
+   stomp at the end of its leg grab (en01 NG02 sets hp -1 while the player still plays the stomp) walked
+   again with hp -1 and grabbed again - one grab after another, for good (the failsafe released it, the
+   grab started again, the failsafe released it ...). */
+void pc_enemy_unhold(BH_PWORK* ep) { unhold(ep, ep->hp < 0); }
 
 /* host: a grab the guest runs comes back here when the guest, sending, has not sent a snapshot of it
    for OWN_LOST of its frames (~10 s): its game never took the grab, lost it, or is not running it (the
@@ -1046,7 +1054,8 @@ static void grab_in(const Event* e)
 
 /* client, at the hand-off: a failsafe for our player in a grab state with no living enemy here
    holding it (the holder died, left, or stopped running here): after half a second it is let
-   go as en01 lets go. Also guards the position: when a grab ends, a player more than 2.5 m from
+   go as en01 lets go (after 5 s when the holder is a dying zombie that still holds: a crawler's leg
+   grab ends with the player stomping it dead and lets go at the end of the stomp). Also guards the position: when a grab ends, a player more than 2.5 m from
    where it was last in normal control is put back there (a grab only pushes a little).
    The host runs it too (without the position guard): its player on an enemy's motion set with no
    enemy holding it whose steps run against the host's player (not the partner's stand-in, not a grab
@@ -1082,7 +1091,7 @@ static struct { float x, y, z; int key, ok, held; } safe;
 static void grab_failsafe(void)
 {
     static int orphan;
-    int i, held = 0, grabbed;
+    int i, held = 0, dying = 0, grabbed;
     static const char* env = (const char*)-1;
     unsigned int f;
     if (env == (const char*)-1) env = getenv("RECVX_COOP_ORPHAN");   /* test aid "frame": a grab with no holder, 3 m off */
@@ -1114,9 +1123,12 @@ static void grab_failsafe(void)
     }
     safe.held = 1;
     for (i = 0; i < (int)sys->ewk_n && i < 128; i++)
-        if ((ene[i].flg & 0x1) && ene[i].hp >= 0 && grips_us(&ene[i]) && (!is_host || (!tgt[i] && !owned[i]))) held = 1;   /* hp 0 is alive: en01 sets a grabbing zombie shot below 0 to 0; on the host, a holder whose steps run on the partner's stand-in or the partner's game does not hold us */
+        if ((ene[i].flg & 0x1) && grips_us(&ene[i]) && (!is_host || (!tgt[i] && !owned[i]))) {   /* on the host, a holder whose steps run on the partner's stand-in or the partner's game does not hold us */
+            if (ene[i].hp >= 0) held = 1;   /* hp 0 is alive: en01 sets a grabbing zombie shot below 0 to 0 */
+            else dying = 1;   /* a crawler the player stomps to death (NG02): it lets go when the stomp ends */
+        }
     if (held || event_driven(plp) || (plp->mnwP == plp->mnwPb && plp->mode0 != 4 && plp->mode0 != 6)) { orphan = 0; return; }
-    if (++orphan < 15) return;
+    if (++orphan < (dying ? 150 : 15)) return;
     host_log("coop: our player was left in a grab (mode %d, no enemy holding it): let go\n", plp->mode0);
     for (i = 0; i < 128; i++)
         if (owned[i] && !(ene[i].flg & 0x80))
@@ -1161,7 +1173,7 @@ static void queue_event(Event* e)
    the retargeting. */
 static void enemy_epoch(void)
 {
-    if (frame_no - enemy_frame > 1) memset(tgt, 0, sizeof(tgt));
+    if (frame_no - enemy_frame > 1) { memset(tgt, 0, sizeof(tgt)); memset(atk, 0, sizeof(atk)); }
 }
 
 static int same_room(void) { return have_rx && (rx.flags & PF_IN_GAME) && rx.stg == sys->stg_no && rx.rom == sys->rom_no; }
@@ -1224,6 +1236,14 @@ static int partner_held(void)
 
 static int etr_lim;                     /* RECVX_ENEMY_TRACE (enemy_trace) */
 uint64_t gs_frame_count(void);
+static int h_mode0 = -1, h_flg4;        /* our player's mode before the enemy step (attacks on it); flg 4 set for the step */
+/* host: whether an enemy's attacks reach this free player now: within COOP_TGT_TOUCH and inside its front
+   quarter (ikou3: the turn it would still need, 0 within 45 degrees) */
+static int in_front(BH_PWORK* ep, const BH_PWORK* pl, float d2)
+{
+    NJS_POINT3 p = { pl->px, pl->py, pl->pz };
+    return d2 < COOP_TGT_TOUCH * COOP_TGT_TOUCH && ikou3(ep, &p, 0x2000) == 0;
+}
 /* bhControlEnemy, around bhJumpEnemy; 1 = the step is done (puppet) */
 int coop_enemy_begin(BH_PWORK* ep)
 {
@@ -1236,27 +1256,47 @@ int coop_enemy_begin(BH_PWORK* ep)
     if (frozen && ep->mode0) return puppet_step(ep);
     if (owned[i]) return is_host ? puppet_step(ep) : 0;   /* a grab the client runs */
     if (is_host) {
-        float dx1, dz1, dx2, dz2, d1, d2;
-        int held;
+        int held = proxy_ok && partner_held(), cool_p = coop_atk_cooling(&atk[i][1], frame_no), k = ene_slot(ep->lkwkp);
         if (ep->mode0) fx_begin(1);   /* what its step starts goes to the guest (EV_FX); not its initialising step */
-        if (!proxy_ok) { tgt[i] = 0; return 0; }
-        dx1 = ep->px - plp->px; dz1 = ep->pz - plp->pz;
-        dx2 = ep->px - ply2.px; dz2 = ep->pz - ply2.pz;
-        d1 = dx1 * dx1 + dz1 * dz1; d2 = dx2 * dx2 + dz2 * dz2;
-        /* one victim per attack: an enemy past its idle/chase state (grab, bite, hit, death; a zombie still
-           holding) keeps its target - before, a flip mid-attack ran the rest of a grab on the other player
-           (the first left in the grab motion, the second given the release) */
-        held = partner_held();
-        tgt[i] = coop_pick_target(tgt[i], d1, d2, ply_busy(plp), held || ply_busy(&ply2), ep->mode0 > 1 || (ep->id == 1 && holding(ep)));
+        h_mode0 = plp->mode0;
+        if (!proxy_ok) tgt[i] = 0;
+        else if ((ep->flg & 0x80) && k < 128) tgt[i] = tgt[k];   /* a linked part goes for its parent's victim */
+        else {
+            CoopTgtIn in = { { 0 } };
+            BH_PWORK* vic = tgt[i] ? &ply2 : plp;
+            float dx1 = ep->px - plp->px, dz1 = ep->pz - plp->pz, dx2 = ep->px - ply2.px, dz2 = ep->pz - ply2.pz;
+            in.d[0] = dx1 * dx1 + dz1 * dz1;
+            in.d[1] = dx2 * dx2 + dz2 * dz2;
+            in.busy[0] = ply_busy(plp) || coop_atk_cooling(&atk[i][0], frame_no);
+            in.busy[1] = held || ply_busy(&ply2) || cool_p;
+            in.front[0] = !in.busy[0] && in_front(ep, plp, in.d[0]);
+            in.front[1] = !in.busy[1] && in_front(ep, &ply2, in.d[1]);
+            /* enemies attack only on their own floor: a player on another one counts as twice as far */
+            if (plp->flr_no != ep->flr_no) in.d[0] *= 4.0f;
+            if (ply2.flr_no != ep->flr_no) in.d[1] *= 4.0f;
+            /* one victim per attack: a zombie holding, or an enemy whose motions its victim plays, keeps it
+               (before, a flip mid-grab ran the rest of the grab on the other player: the first left in the
+               grab motion, the second given the release); in its grab/bite state it keeps a victim within
+               reach. Its hit and death states commit to nobody (before, a staggering enemy kept a victim
+               that was not near any more). */
+            in.commit = (ep->id == 1 ? ep->exp0 && holding(ep) : ep->mode0 >= 2 && vic->mnwP == ep->mnwP && vic->mnwP != vic->mnwPb && vic->mnwP != sys->rmthp) ? COOP_TGT_HOLD :
+                        ep->mode0 == 2 ? COOP_TGT_ATTACK : COOP_TGT_FREE;
+            tgt[i] = coop_pick_target(tgt[i], &in);
+        }
         if (tgt[i]) {
             swap_plp = plp;
             ply2_save = ply2;
             memcpy(exp_save, p2.plexw, 128);
             memcpy(exp_save + 128, p2.plhdw, 128);
             plp = &ply2;
-            if (held) ply2.flg |= 4;   /* held in the partner's game: enemies see it busy and wait (put back after the step) */
+            /* held in the partner's game, or this enemy's loop guard: it sees the partner busy and waits (put
+               back after the step) */
+            if (held || cool_p) ply2.flg |= 4;
             /* the zombie picks its and the player's grab motions by sys->ply_id: the partner's */
             if (ep->id == 1 && rx.mfile >= 0) { swap_pid = sys->ply_id; sys->ply_id = rx.mfile & 3; }
+        } else if (coop_atk_cooling(&atk[i][0], frame_no) && !(plp->flg & 4)) {
+            plp->flg |= 4;   /* its loop guard on our player: busy for this step only */
+            h_flg4 = 1;
         }
         return 0;
     }
@@ -1276,6 +1316,9 @@ void coop_enemy_end(BH_PWORK* ep)
         if (etr_lim > 0 && (grab || dh > 0 || (ply2.mode0 == 2 && a->mode0 != 2)))
             fprintf(stderr, "atk g=%u s=%d id=%d ty=%d to=P %s dh=%d m=%d.%d.%d.%d\n", (unsigned)gs_frame_count(), i, ep->id, ep->type, grab ? "grab" : "hit", dh,
                     ep->mode0, ep->mode1, ep->mode2, ep->mode3);
+        if ((grab || (ply2.mode0 == 2 && a->mode0 != 2)) && coop_atk_note(&atk[i][1], frame_no))
+            host_log("coop: loop guard: enemy %d (id %d) started %d attacks on the partner within %u frames: it leaves the partner alone for %u frames\n",
+                     i, ep->id, COOP_LOOP_N, COOP_LOOP_WIN, COOP_LOOP_COOL);
         if (grab && ep->id == 1 && !(ep->flg & 0x80) && ep->exp0 && holding(ep) && have_peer)
             grab_out(i, ep);   /* the client's game runs the grab */
         else if (dh > 0 || (ply2.mode0 == 2 && a->mode0 != 2) || grab) {
@@ -1302,7 +1345,14 @@ void coop_enemy_end(BH_PWORK* ep)
         memcpy(p2.plhdw, exp_save + 128, 128);
         plp = swap_plp;
         swap_plp = NULL;
+    } else if (is_host && h_mode0 >= 0) {   /* its step on our player: a hit reaction or a grab it started */
+        if (h_flg4) plp->flg &= ~4;
+        if ((plp->mode0 == 2 || plp->mode0 == 4) && h_mode0 != 2 && h_mode0 != 4 && h_mode0 != 6 && coop_atk_note(&atk[i][0], frame_no))
+            host_log("coop: loop guard: enemy %d (id %d) started %d attacks on our player within %u frames: it leaves us alone for %u frames\n",
+                     i, ep->id, COOP_LOOP_N, COOP_LOOP_WIN, COOP_LOOP_COOL);
     }
+    h_mode0 = -1;
+    h_flg4 = 0;
 }
 
 /* ---------------------------------------------------------------- effects (protocol 12, EV_FX) */
@@ -1622,11 +1672,11 @@ int coop_fx_step(int i, int after)
 #define WATCH_STEPS 150
 static struct { int sig[6], still; } watch[128];
 /* Test aid RECVX_ENEMY_TRACE=dist: one line per step of every living enemy (not parts) within dist
-   units (10 = 1 m) of our player or the partner: its target (H our player, P the partner's
-   stand-in, - single player / guest), distances, modes, motion, hp.mode0 of both players, a
-   zombie's exp0 flag word (0x20000 holding), run here or puppet, the enemy's and our position.
-   Only reads. */
-uint64_t gs_frame_count(void);
+   units (10 = 1 m) of our player or the partner: its type, target (H our player, h ours because the
+   partner is no target now, P the partner's stand-in, - single player / guest), distances, modes,
+   motion, hp.mode0 of both players, whether each counts as busy for the target rule, a zombie's exp0
+   flag word (0x20000 holding), run here or puppet, the enemy's and our position. Only reads.
+   Attacks on the partner's stand-in: "atk" lines (coop_enemy_end). */
 static int etr_lim = -1;
 static void enemy_trace(BH_PWORK* ep, int i, int ran)
 {
@@ -1638,7 +1688,7 @@ static void enemy_trace(BH_PWORK* ep, int i, int ran)
         dp = sqrtf((ep->px - ply2.px) * (ep->px - ply2.px) + (ep->pz - ply2.pz) * (ep->pz - ply2.pz));
     if (dh > lim && (dp < 0 || dp > lim)) return;
     fprintf(stderr, "etr g=%u s=%d id=%d ty=%d t=%c dH=%.1f dP=%.1f m=%d.%d.%d.%d mtn=%u f=%d hp=%d pH=%d.%d pP=%d.%d bH=%d bP=%d x=%x %s e=%.0f,%.0f h=%.0f,%.0f\n", (unsigned)gs_frame_count(), i, ep->id, ep->type,
-            !coop_on || !is_host ? '-' : tgt[i] ? 'P' : 'H', dh, dp, ep->mode0, ep->mode1, ep->mode2, ep->mode3, ep->mtn_no, ep->frm_no >> 16,
+            !coop_on || !is_host ? '-' : tgt[i] ? 'P' : proxy_ok ? 'H' : 'h', dh, dp, ep->mode0, ep->mode1, ep->mode2, ep->mode3, ep->mtn_no, ep->frm_no >> 16,
             ep->hp, plp->hp, plp->mode0, dp < 0 ? 0 : ply2.hp, dp < 0 ? 0 : ply2.mode0, ply_busy(plp), dp < 0 ? 0 : ply_busy(&ply2) || partner_held(),
             ep->id == 1 && ep->exp0 ? *(int*)(ep->exp0 + 0x40) : 0, ran ? "run" : "pup", ep->px, ep->pz, plp->px, plp->pz);
 }

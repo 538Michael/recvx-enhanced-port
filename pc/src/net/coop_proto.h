@@ -303,14 +303,37 @@ void coop_xfer_reset(CoopXfer* x);
 int coop_xfer_chunk(CoopXfer* x, int tid, int total, int off, int len, const uint8_t* data);
 
 /* Which player an enemy of the host goes for (coop_glue.c coop_enemy_begin): 0 the host's, 1 the
-   partner's stand-in. cur: its target until now; d_us, d_p: squared XZ distances; busy_*: that player
-   is being hit or held by another enemy, or dying; committed: the enemy is in the middle of an
-   attack (grab, bite, its hit or death states): it keeps its victim, so one attack never reaches
-   both players. Otherwise a busy target is left for a free player within reach, never the other
-   way round, and the nearer player wins only by a margin (1.5 x squared distance), so near-equal
-   distances do not flip it. */
+   partner's stand-in. Per player ([0] the host's, [1] the partner's): d squared XZ distance (the
+   caller weighs a player on another floor, which the enemy cannot attack, as twice as far); busy:
+   being hit or held, dying, or left alone by this enemy for a while (the loop guard); front: free,
+   within COOP_TGT_TOUCH and inside the enemy's front quarter - what its attacks reach.
+   In order:
+   1. commit HOLD (it drives its victim: a zombie's hold, or the victim plays its motions): the
+      victim stays, so one attack never reaches both players.
+   2. a busy player is never chosen.
+   3. commit ATTACK (its grab/bite/throw state): the victim stays while within COOP_TGT_KEEP;
+      a victim farther away is not what it is attacking.
+   4. a busy target is left for the free player within COOP_TGT_REACH (else it waits its turn).
+   5. a target right in front stays; 6. the other player right in front is taken instead (no enemy
+      walks into a player without going for it).
+   7. the nearer player, only by a margin (1.5 x squared distance), so near-equal distances do not
+      flip it. */
 #define COOP_TGT_REACH 40.0f            /* 4 m: how far an enemy goes for the free player */
-int coop_pick_target(int cur, float d_us, float d_p, int busy_us, int busy_p, int committed);
+#define COOP_TGT_KEEP 30.0f             /* 3 m: a victim mid-attack farther than this is let go */
+#define COOP_TGT_TOUCH 15.0f            /* 1.5 m: "right in front" */
+enum { COOP_TGT_FREE, COOP_TGT_ATTACK, COOP_TGT_HOLD };
+typedef struct CoopTgtIn { float d[2]; unsigned char busy[2], front[2], commit; } CoopTgtIn;
+int coop_pick_target(int cur, const CoopTgtIn* in);
+/* The loop guard: attacks one enemy starts on one player (a hit reaction or a grab). The
+   COOP_LOOP_N-th within COOP_LOOP_WIN frames is a loop - nothing in retail attacks that fast (a grab
+   alone lasts longer) - and coop_atk_note returns 1: the enemy then leaves that player alone (busy for
+   it) for COOP_LOOP_COOL frames. */
+#define COOP_LOOP_N 3
+#define COOP_LOOP_WIN 90u
+#define COOP_LOOP_COOL 60u
+typedef struct CoopAtk { unsigned int t0, until; unsigned char n; } CoopAtk;
+int coop_atk_note(CoopAtk* a, unsigned int now);
+int coop_atk_cooling(const CoopAtk* a, unsigned int now);
 
 /* room scripts (docs/modding/ROOM_FORMAT.md "Event scripts") */
 int coop_insn_len_raw(const uint8_t* p);    /* bytes of the instruction at p, 0 unknown */
