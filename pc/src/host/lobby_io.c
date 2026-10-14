@@ -1,9 +1,10 @@
 /* Host side of the co-op lobby screen (pc/glue/lobby_glue.c): keyboard text for its text
-   fields, the clipboard, recvx.ini and the memory card's save files. Main thread except
+   fields, the clipboard, recvx.ini and the save files (memory card or native). Main thread except
    lobby_read_save / lobby_settings_changed. */
 #include "ps2_platform.h"
 #include "lobby.h"
 #include "settings.h"
+#include "savestore.h"
 #include <SDL3/SDL.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -83,14 +84,47 @@ void lobby_io_frame(void* window)
     scripted();
 }
 
+/* ---------------------------------------------------------------- saves (lobby.h) */
+int save_native(void) { return g_config.save_system == 0; }
+
+const char* save_native_dir(void)
+{
+    static char dir[1100];
+    if (!dir[0]) {
+        snprintf(dir, sizeof(dir), "%s/saves", g_config.save_dir);
+        if (!SDL_GetPathInfo(dir, NULL)) {   /* the first native start: the memory card's saves come along (copies) */
+            int n;
+            SDL_CreateDirectory(dir);
+            n = savestore_import_card(g_config.save_dir, dir);
+            if (n) host_log("saves: native save files in %s; copied %d memory card save%s (card0 keeps them)\n", dir, n, n == 1 ? "" : "s");
+            else host_log("saves: native save files in %s\n", dir);
+        }
+    }
+    return dir;
+}
+
+static void card_path(char* p, int n, int slot) { SDL_snprintf(p, n, "%s/card0/BASLUS-20184/SAVEDATA-%02d", g_config.save_dir, slot); }
+
+/* native: the file of save number slot + 1 */
+static int native_path(char* p, int n, int slot)
+{
+    char file[256];
+    if (slot < 0 || slot >= 999999999 || !savestore_find(save_native_dir(), slot + 1, file, sizeof(file))) return 0;
+    SDL_snprintf(p, n, "%s/%s", save_native_dir(), file);
+    return 1;
+}
+
+int lobby_save_slots(void) { return save_native() ? savestore_highest(save_native_dir()) : 15; }
+
 int lobby_read_save(int slot, unsigned char* out)
 {
     char p[1200];
     FILE* f;
     unsigned int sum = 0, ck;
     int i, n;
+    if (save_native()) return native_path(p, sizeof(p), slot) && savestore_read(p, out);   /* ponytail: a folder scan per call; keep a list if hundreds of saves make the lobby slow */
     if (slot < 0 || slot > 14) return 0;
-    SDL_snprintf(p, sizeof(p), "%s/card0/BASLUS-20184/SAVEDATA-%02d", g_config.save_dir, slot);
+    card_path(p, sizeof(p), slot);
     if (!(f = pc_fopen(p, "rb"))) return 0;
     n = (int)fread(out, 1, LOBBY_SAVE_BYTES, f);
     fclose(f);
@@ -107,30 +141,44 @@ int lobby_write_save(int slot, const void* region, int size)
     char p[1200];
     FILE* f;
     int i, ok;
-    if (slot < 0 || slot > 14 || size != LOBBY_SAVE_BYTES - 4) return 0;
+    if (slot < 0 || slot > (save_native() ? 999999998 : 14) || size != LOBBY_SAVE_BYTES - 4) return 0;
     memcpy(b, region, size);
     for (i = 0; i < size; i++) sum += b[i];
     memcpy(b + size, &sum, 4);
+    if (save_native()) {
+        char file[256];
+        return savestore_write(save_native_dir(), slot + 1, b, savestore_find(save_native_dir(), slot + 1, file, sizeof(file)) ? file : NULL) != 0;
+    }
     SDL_snprintf(p, sizeof(p), "%s/card0/BASLUS-20184", g_config.save_dir);
     SDL_CreateDirectory(p);
-    SDL_snprintf(p, sizeof(p), "%s/card0/BASLUS-20184/SAVEDATA-%02d", g_config.save_dir, slot);
+    card_path(p, sizeof(p), slot);
     if (!(f = pc_fopen(p, "wb"))) return 0;
     ok = fwrite(b, 1, sizeof(b), f) == sizeof(b);
     fclose(f);
     return ok;
 }
 
-/* co-op: the partners' saved items that go with save slot `slot` (docs/COOP.md "Saved partner
-   inventories"): <save_dir>/coop-partners-nn.bin, outside the card directory (the game lists it) */
-static void partners_path(char* p, int n, int slot) { SDL_snprintf(p, n, "%s/coop-partners-%02d.bin", g_config.save_dir, slot); }
+/* co-op: the partners' saved items that go with save `slot` (docs/COOP.md "Saved partner
+   inventories"): <save_dir>/coop-partners-nn.bin, outside the card directory (the game lists it);
+   native: <save_dir>/saves/NNN.coop-partners.bin */
+static int partners_path(char* p, int n, int slot)
+{
+    if (save_native()) {
+        if (slot < 0 || slot >= 999999999) return 0;
+        SDL_snprintf(p, n, "%s/" SAVE_PARTNERS_FMT, save_native_dir(), slot + 1);
+        return 1;
+    }
+    if (slot < 0 || slot > 14) return 0;
+    SDL_snprintf(p, n, "%s/coop-partners-%02d.bin", g_config.save_dir, slot);
+    return 1;
+}
 
 int lobby_read_partners(int slot, void* buf, int cap)
 {
     char p[1200];
     FILE* f;
     int n;
-    if (slot < 0 || slot > 14) return 0;
-    partners_path(p, sizeof(p), slot);
+    if (!partners_path(p, sizeof(p), slot)) return 0;
     if (!(f = pc_fopen(p, "rb"))) return 0;
     n = (int)fread(buf, 1, cap, f);
     fclose(f);
@@ -144,8 +192,7 @@ int lobby_write_partners(int slot, const void* buf, int n)
 {
     char p[1200];
     Blob x = { buf, n };
-    if (slot < 0 || slot > 14) return 0;
-    partners_path(p, sizeof(p), slot);
+    if (!partners_path(p, sizeof(p), slot)) return 0;
     if (n <= 0) { SDL_RemovePath(p); return 1; }   /* none: no stale file next to a new save */
     return pc_save_file(p, "wb", put_blob, &x) == 0;
 }

@@ -173,6 +173,19 @@ void  pc_options_mouse0(int port);               /* DisplayOptionPlateLevel0: ho
 void  pc_options_mouse_back(int port, int level);/* levels 1-3: right click goes back */
 int   pc_options_pc(int port, int flag);         /* DisplayOptionPlate level 4 */
 
+/* native saves (pc/glue/save_glue.c, docs/ARCHITECTURE.md "Save system"): the save and load
+   screens list save files instead of memory card slots and skip the card screens */
+struct SELECTFILEWINDOW;
+struct MEMORYCARDSTATE;
+struct SYSLOAD_SCREEN;
+struct SYSSAVE_SCREEN;
+int   pc_saves_native(int state);                /* the open save/load screen uses native saves; its state 0 takes the setting, -1 asks */
+int   pc_save_card(struct MEMORYCARDSTATE* mc);  /* native, instead of ExecuteMemoryCard: its queued read or write done with the save files; 100 */
+void  pc_save_list(struct SELECTFILEWINDOW* win, struct MEMORYCARDSTATE* mc, int saving);   /* the window's rows: the saves (+ a new one) */
+void  pc_save_move(struct SELECTFILEWINDOW* win, short* cursor, int dir);   /* the cursor up/down through any number of rows */
+int   pc_sysload_native(struct SYSLOAD_SCREEN* p);   /* the system file: 0 memory card, else the screen's result (1 none, 2 read) */
+int   pc_syssave_native(struct SYSSAVE_SCREEN* p);   /* 0 memory card, else the screen's result (1 failed, 2 written) */
+
 /* mouse in the inventory screens (pc/glue/menu_glue.c) */
 unsigned int menu_pad(unsigned int pad);
 /* the co-op trade screen (pc/glue/trade_glue.c, docs/COOP.md "Trade screen") */

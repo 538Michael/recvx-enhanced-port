@@ -52,7 +52,8 @@ static void ensure_card(void)
     SDL_CreateDirectory(p);   /* SDL: UTF-8 paths on Windows too, parents included */
 }
 
-int sceMcInit(void) { ensure_card(); return 0; }
+int save_native(void);   /* lobby.h: native save files, the card folder is made only when the game uses it */
+int sceMcInit(void) { if (!save_native()) ensure_card(); return 0; }
 
 int sceMcGetInfo(int port, int slot, int* type, int* free_, int* format)
 { MC_BUSY();

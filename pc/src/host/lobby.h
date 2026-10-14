@@ -23,13 +23,21 @@ extern LobbyIO g_lobby_io;
 void lobby_io_event(const void* sdl_event);
 void lobby_io_frame(void* window);      /* per presented frame: text input on/off, clipboard, test script */
 
-/* any thread: memory card save slot 0..14 (<save_dir>/card0/BASLUS-20184/SAVEDATA-nn, the game's
-   SAVEFILE: the save region sys->version..save_end, then a byte-sum checksum). 1 = valid. */
+/* The save system (ini save_system, docs/USER_GUIDE.md "Saves"): native files (default) or the
+   memory card. Any thread. */
+int  save_native(void);
+const char* save_native_dir(void);      /* <save_dir>/saves; the first use creates it and copies the card's saves in */
+/* any thread: save `slot` of the active save system, the game's SAVEFILE (the save region
+   sys->version..save_end, then a byte-sum checksum). Slots are 0 .. lobby_save_slots() - 1: the
+   memory card's 0..14 (<save_dir>/card0/BASLUS-20184/SAVEDATA-nn), or native save number - 1
+   (a memory card slot's save keeps its number when copied over). read: 1 = valid. */
 #define LOBBY_SAVE_BYTES 0x838
+int  lobby_save_slots(void);
 int  lobby_read_save(int slot, unsigned char* out);
 int  lobby_write_save(int slot, const void* region, int size);   /* test aid: region + checksum; 1 = written */
-/* co-op, any thread: the host's saved partner inventories that go with save slot 0..14
-   (<save_dir>/coop-partners-nn.bin). read: bytes read (0 none); write: n 0 removes the file; 1 = done */
+/* co-op, any thread: the host's saved partner inventories that go with save `slot`
+   (<save_dir>/coop-partners-nn.bin, native: <save_dir>/saves/NNN.coop-partners.bin).
+   read: bytes read (0 none); write: n 0 removes the file; 1 = done */
 int  lobby_read_partners(int slot, void* buf, int cap);
 int  lobby_write_partners(int slot, const void* buf, int n);
 void lobby_frame(void);                 /* game thread, frame hand-off: test aids */

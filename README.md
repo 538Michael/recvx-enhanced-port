@@ -27,6 +27,8 @@ native paths replace the expensive parts. The game reads your own disc image in 
   doubles.
 - **Enemy options**: extra enemies, rearranged placements, a seeded randomizer, and an enemy
   spawner.
+- **Save files**: every save its own file, as many as you like, in the game's own save screens
+  without the memory card screens (the emulated memory card stays available).
 - **PC settings** in the game's own OPTION menu and an F1 overlay; full rebinding of keyboard,
   mouse and gamepad; per-window input source for local co-op on one PC.
 - **Cheats and debug tools** (F2), co-op window (F3).

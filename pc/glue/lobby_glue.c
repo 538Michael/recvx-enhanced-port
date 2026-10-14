@@ -441,7 +441,8 @@ void pc_lobby_textures_released(void)
 
 /* ---------------------------------------------------------------- saves */
 typedef struct SaveInfo { int valid, ply_id, stg, rom, gm_mode, count; } SaveInfo;
-static SaveInfo saves[15];
+static SaveInfo* saves;   /* by slot (lobby.h: the card's 0..14 or native save number - 1) */
+static int n_saves;
 static unsigned char save_buf[LOBBY_SAVE_BYTES];   /* the host's chosen save, read when the game starts */
 
 /* read when the lobby opens (and when a chosen save cannot be read): no save is written at the title */
@@ -449,7 +450,10 @@ static void scan_saves(void)
 {
     static unsigned char b[LOBBY_SAVE_BYTES];
     int i;
-    for (i = 0; i < 15; i++) {
+    n_saves = lobby_save_slots();
+    saves = realloc(saves, sizeof(SaveInfo) * (n_saves ? n_saves : 1));
+    memset(saves, 0, sizeof(SaveInfo) * (n_saves ? n_saves : 1));
+    for (i = 0; i < n_saves; i++) {
         const SAVEFILE* sf = (const SAVEFILE*)b;
         SaveInfo* s = &saves[i];
         s->valid = lobby_read_save(i, b);
@@ -467,8 +471,8 @@ static void save_label(char* out, int n, int slot)
 }
 
 /* the choices as lists: host START WITH: 0..2 new game, 3 + slot; joining ITEMS FROM: saved with the host, new, slot */
-static int start_valid(int v) { return v >= 0 && (v < 3 || (v - 3 < 15 && saves[v - 3].valid)); }
-static int items_valid(int v) { return v == COOP_ITEMS_HOST || v == COOP_ITEMS_NEW || (v >= 0 && v < 15 && saves[v].valid); }
+static int start_valid(int v) { return v >= 0 && (v < 3 || (v - 3 < n_saves && saves[v - 3].valid)); }
+static int items_valid(int v) { return v == COOP_ITEMS_HOST || v == COOP_ITEMS_NEW || (v >= 0 && v < n_saves && saves[v].valid); }
 
 static int step_choice(int v, int dir, int lo, int hi, int (*valid)(int))
 {
@@ -724,8 +728,8 @@ static void change(int r, int dir)
     case R_CHAR: g_coop.chr = appear_step(g_coop.chr, dir); break;   /* the list without event doubles (actors.c) */
     case R_LOOT: g_coop.loot ^= 1; break;
     case R_TFREEZE: g_coop.trade_freeze ^= 1; break;
-    case R_START: g_coop.start = step_choice(g_coop.start, dir, 0, 17, start_valid); break;
-    case R_ITEMS: g_coop.items = step_choice(g_coop.items, dir, COOP_ITEMS_HOST, 14, items_valid); break;
+    case R_START: g_coop.start = step_choice(g_coop.start, dir, 0, n_saves + 2, start_valid); break;
+    case R_ITEMS: g_coop.items = step_choice(g_coop.items, dir, COOP_ITEMS_HOST, n_saves - 1, items_valid); break;
     case R_FOLLOW: g_coop.follow ^= 1; break;   /* the joining player's own choice, also during a session */
     case R_EXTRA: settings_step(eset(&g_enemy_opts.extra), dir); break;
     case R_PLACE: settings_step(eset(&g_enemy_opts.place), dir); break;
@@ -983,7 +987,7 @@ static const char* row_help(int r)
     case R_RELAY: return "Only if needed: a direct connection first (about 2 s), then the server's relay. Always: everything goes through the relay (slower, predictable).";
     case R_NAME: return "What your partner sees above your head and in the lobby. Type it, or change the letter at the caret with up/down.";
     case R_CHAR: return "The model you appear as: your partner sees it, and so do you.";
-    case R_START: return "What the game starts from: a new game (normal, easy, very easy) or one of your memory card saves.";
+    case R_START: return "What the game starts from: a new game (normal, easy, very easy) or one of your saves.";
     case R_ITEMS: return "The inventory you join with: the one the host kept for you from your last visit, a new inventory, or that of one of your saves.";
     case R_FOLLOW: return eset(&g_coop.follow)->help;
     case R_RULES: return host ? "Loot, enemies freezing while you trade, and the enemy options (extra enemies, rearranged, randomizer, seed)."
@@ -1115,7 +1119,7 @@ static void draw_previews(void)
 {
     int partner = g_coop.state == COOP_CONNECTED && !g_coop.peer_in_game, k;
     float sx[2] = { partner ? 92.0f : 120.0f, 222.0f };
-    int played = g_coop.start >= 3 && lb.role == 0 && saves[g_coop.start - 3].valid ? saves[g_coop.start - 3].ply_id : 0;
+    int played = g_coop.start >= 3 && lb.role == 0 && start_valid(g_coop.start) ? saves[g_coop.start - 3].ply_id : 0;
     /* the chosen model loads once it has stayed for a few frames (cycling through the list) */
     if (g_coop.chr != lb.want_chr) { lb.want_chr = g_coop.chr; lb.chr_stable = 0; }
     if (++lb.chr_stable >= 8 || pv[0].chr < 0) pv_set(0, lb.want_chr, played);

@@ -59,8 +59,9 @@ drawn in the game's own style; your model turns in a 3D preview on the left. It 
 * **NAME**: what your partner sees above your head and in the lobby. Up to 15 characters: letters,
   digits, space and `-_.!?'()+`. Default: your login name.
 * **MODEL** ("You appear as"): see "You appear as".
-* **START** (host): a new game (normal, easy, very easy) or one of your memory card saves
-  ("Save nn: character stage-room").
+* **START** (host): a new game (normal, easy, very easy) or one of your saves
+  ("Save nn: character stage-room"; nn is the save's number, or the memory card slot with the
+  Memory card save system, [USER_GUIDE.md](USER_GUIDE.md#saves)).
 * **ITEMS** (joiner): what you bring, see "Saved partner inventories".
 * **FOLLOW** (joiner): see "Follow host".
 * **RELAY**: *Only if needed* (Automatic) or *Always* (Via server), see "Connection modes".
@@ -123,7 +124,7 @@ at the title is pulled into that game.
 | `--coop-server ADDR` | The co-op server (`host` or `host:port`, UDP 7141 implied). |
 | `--coop-conn auto\|direct\|server` | Connection mode. |
 | `--coop-pw PASSWORD` | Room password. |
-| `--save-dir DIR` | Memory card and `recvx.ini` folder (two instances on one PC). |
+| `--save-dir DIR` | Saves and `recvx.ini` folder (two instances on one PC). |
 
 ## Connection modes
 
@@ -285,7 +286,7 @@ when joining", ini `coop_items`):
 |---|---|---|
 | *Saved with the host* (default) | -2 | What the host kept for you from your last visit; none: a new inventory. In the host's lobby the row says "(available)", "(none)" or "(host: off)". |
 | *New inventory* | -1 | The new-game inventory of the session's game mode. |
-| A save slot | 0..14 | The items of that memory card save. |
+| A save | 0.. | The items of that save: save number - 1 (native save files), or memory card slot 0..14. |
 | *My current game* (F3 only) | -3 | Joining from your own running game keeps its items. |
 
 ### Shared item box
@@ -366,8 +367,9 @@ status) per player, with its saves:
   `recvx.ini` (`coop_player_id`, `coop_player_key`). Keep them and do not give the key away. Separate
   save folders are separate players.
 * While you play in the host's game, your items are sent to the host as they change (at most once a
-  second). When the host saves to slot n, `<save dir>/coop-partners-nn.bin` is written next to it
-  (removed when there are none). A game started from that save has them again; a new game has none.
+  second). When the host saves, the records are written next to the save (removed when there are
+  none): `<save dir>/saves/NNN.coop-partners.bin` for save file NNN, or
+  `<save dir>/coop-partners-nn.bin` for memory card slot nn. A game started from that save has them again; a new game has none.
   Up to 16 players per playthrough (the oldest goes first).
 * Joining with *Saved with the host*: "Restored your saved items from the host"; none: "No saved
   items at the host - starting with a new inventory". A new inventory or a save chosen explicitly
@@ -429,7 +431,7 @@ behaviour: [ACTORS.md](ACTORS.md).
 
 Two copies of the game side by side, one hosting, one joining over localhost:
 
-1. Start each with its own save folder (its own `recvx.ini`, memory card and player id):
+1. Start each with its own save folder (its own `recvx.ini`, saves and player id):
    `recvx --save-dir save1 game.iso` and `recvx --save-dir save2 game.iso`.
 2. One hosts (MULTIPLAYER or F3, port e.g. 7140; or `--coop-host 7140`), the other joins
    `127.0.0.1:7140#CODE` with the host's join code (or `--coop-join 127.0.0.1:7140#CODE`).
@@ -460,8 +462,8 @@ only on the host; "locked" ones cannot change during a session.
 | Show ping (DISPLAY page) | `show_ping` | 0/1 (1) |
 
 Kept in `recvx.ini` without a menu row of their own: `coop_join` (last address or room code),
-`coop_server`, `coop_name`, `coop_items` (-3..14), `coop_start` (0..2 new game normal/easy/very
-easy, 3 + n save slot n), `coop_player_id`, `coop_player_key`. The room password is never saved.
+`coop_server`, `coop_name`, `coop_items` (-3.., a save as in the ITEMS table), `coop_start` (0..2
+new game normal/easy/very easy, 3 + n save n: native number - 1 or card slot), `coop_player_id`, `coop_player_key`. The room password is never saved.
 
 ---
 
@@ -483,7 +485,7 @@ easy, 3 + n save slot n), `coop_player_id`, `coop_player_key`. The room password
 | `pc/src/net/rendezvous.c`, `rdv_proto.h` | Co-op server client: rooms, hole punching, relay, encryption ([SERVER.md](SERVER.md)). |
 | `pc/src/host/coop.h` | `CoopState g_coop` (settings, requests, published status). |
 | `pc/src/host/overlay.cpp` | F3 window, name tags, ping. |
-| `pc/src/host/lobby_io.c` | Lobby text input, clipboard, save listing, partners files. |
+| `pc/src/host/lobby_io.c` | Lobby text input, clipboard, save listing and partners files of the active save system (`lobby.h`). |
 
 There is no network thread. `coop_frame()` runs once per game frame at the frame hand-off
 (`pc/src/ps2/libgraph.c`, the 30 Hz tick boundary on the game thread): it takes overlay requests,
@@ -658,7 +660,8 @@ floor or trigger, "Yes" chosen, an item used) hold only where the player did it.
 * `EV_OWN` (joiner -> host): the joiner's own items (`COOP_OWN_SIZE` 1564 bytes: item words, status
   flags, weapons, health) as changed 64-byte chunks, at most once a second, the last chunk of a
   change marked. The host keeps up to 16 records per player id and writes them to
-  `coop-partners-nn.bin` with its save (`mc.c` -> `coop_save_written`).
+  `saves/NNN.coop-partners.bin` / `coop-partners-nn.bin` with its save (`save_glue.c` / `mc.c` ->
+  `coop_save_written`).
 * The host answers in its `PoseExt.rec` whether it has a record (for the lobby's ITEMS row) and puts
   the record into the first `EV_BLOB` it sends that joiner (chunks with `pad` 1).
 * **Rejoin**: `PoseExt.pid` and `PoseExt.tag` (`rdv_rejoin_tag`: BLAKE2b keyed with the secret over
