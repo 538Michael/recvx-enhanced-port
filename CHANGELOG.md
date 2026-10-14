@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased
+
+### Saves
+
+- Native save files, the new default (**Save system: Native files**, ini `save_system = 0`): every
+  save is its own file in `save/saves` (`001_Claire_Prison-front.sav`, ...), numbered without
+  limit. The typewriter's save screen and LOAD GAME look as before but list the files, scroll
+  through any number of them and offer a new save at the end; the memory card screens (slot
+  selection, "checking memory card", creating save data) are gone. The system data (options,
+  extras, best times) is `save/saves/system.dat`.
+- A save file is the memory card's save with a 64-byte header (game, time, play time, character,
+  room); invalid files are skipped. Writes are atomic; a save is only replaced when you overwrite
+  it.
+- The first start with native files copies the memory card's saves, system data and co-op partner
+  files into `save/saves` (the card is kept); F1 / PC SETTINGS "Import memory card saves" does it
+  again later.
+- **Memory card (original)** (`save_system = 1`) keeps the emulated card exactly as before
+  (frame-identical).
+- The co-op lobby's START list, the joiner's ITEMS choice and the host's saved partner inventories
+  (`save/saves/NNN.coop-partners.bin`) follow the active save system.
+- Test aid `RECVX_TEST_TYPEWRITER`; `pc/tools/layout_check.sh` takes extra ini lines (`INI`).
+
 ## 0.1.0 (2026-10-13)
 
 First release. Native Linux and Windows (32-bit, i686) port of Resident Evil Code: Veronica X

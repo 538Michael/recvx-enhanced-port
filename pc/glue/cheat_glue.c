@@ -200,6 +200,15 @@ static void scripted(unsigned int* inv)
             rt = strchr(rt, ',') ? strchr(rt, ',') + 1 : NULL;
         }
     }
+    {   /* RECVX_TEST_TYPEWRITER="frame,...": the typewriter's save screen at that game frame (as its ink ribbon question's yes) */
+        static const char* tw = (const char*)-1;
+        if (tw == (const char*)-1) tw = getenv("RECVX_TEST_TYPEWRITER");
+        if (tw && *tw && clock >= atoi(tw) && !(sys->cb_flg & 0x1)) {
+            sys->cb_flg |= 0x200000;
+            printf("test: typewriter in %d/%d at game frame %d\n", sys->stg_no, sys->rom_no, clock);
+            tw = strchr(tw, ',') ? strchr(tw, ',') + 1 : NULL;
+        }
+    }
     {   /* RECVX_HP="frame:hp,...": our health set at that game frame (a quick game over) */
         static const char* hp = (const char*)-1;
         if (hp == (const char*)-1) hp = getenv("RECVX_HP");

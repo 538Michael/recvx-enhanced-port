@@ -30,6 +30,7 @@ static const struct { const char* key; int* val; int lo, hi; } keys[] = {
     { "quick_knife", &g_config.quick_knife, 0, 1 },
     { "model_cull", &g_config.model_cull, 0, 1 },
     { "skip_intro", &g_config.skip_intro, 0, 1 },
+    { "save_system", &g_config.save_system, 0, 1 },     /* 0 native files, 1 memory card */
     { "native_3d", &g_config.native_3d, 0, 1 },
     { "native_tex", &g_config.native_tex, 0, 1 },
     { "interpolate", &g_config.interpolate, 0, 1 },
@@ -44,9 +45,9 @@ static const struct { const char* key; int* val; int lo, hi; } keys[] = {
     { "coop_conn", &g_coop.conn, 0, 2 },                 /* COOP_CONN_*: Automatic, Direct, Via server */
     { "coop_nametag", &g_coop.nametag, 0, 1 },
     { "coop_trade_freeze", &g_coop.trade_freeze, 0, 1 },  /* host: enemies stand still while both trade */
-    { "coop_items", &g_coop.items, COOP_ITEMS_CURRENT, 14 },   /* COOP_ITEMS_*, 0..14 a save slot */
+    { "coop_items", &g_coop.items, COOP_ITEMS_CURRENT, 999999 },   /* COOP_ITEMS_*, else a save (lobby.h: card slot, native number - 1) */
     { "coop_remember", &g_coop.remember, 0, 1 },          /* host: saved partner inventories */
-    { "coop_start", &g_coop.start, 0, 17 },
+    { "coop_start", &g_coop.start, 0, 1000002 },
     { "menu_mouse", (int*)&g_menu_mouse.on, 0, 1 },
     { "input_source", &g_input_source, 0, 2 },            /* INPUT_*: Auto, Keyboard/mouse only, Gamepad only */
     { "input_pad", &g_input_pad, 0, 4 },                  /* 0 any gamepad, n player n's (bindings.c) */

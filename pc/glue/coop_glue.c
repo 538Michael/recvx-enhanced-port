@@ -2320,7 +2320,7 @@ int coop_items_apply(void)
 static int items_wire(void)
 {
     int v = items_applied;
-    return v == COOP_ITEMS_HOST ? ITEMS_HOST : v == COOP_ITEMS_CURRENT ? ITEMS_CURRENT : v >= 0 && v < 15 ? ITEMS_SAVE : ITEMS_NEW;
+    return v == COOP_ITEMS_HOST ? ITEMS_HOST : v == COOP_ITEMS_CURRENT ? ITEMS_CURRENT : v >= 0 ? ITEMS_SAVE : ITEMS_NEW;
 }
 
 /* the memory card wrote save `slot` (mc.c): our partners' items go next to it; none removes a
@@ -2360,10 +2360,10 @@ static void records_resolve(void)
     const int itm = (int)((char*)&sys->itm - (char*)&sys->version), stg = (int)((char*)&sys->stg_no - (char*)&sys->version),
               rno = (int)((char*)&sys->rom_no - (char*)&sys->version);
     unsigned int h[3];
-    int slot, n;
+    int slot, n, slots;
     if (!rec_pending) return;
     rec_pending = 0;
-    for (slot = 0; slot < 15; slot++) {
+    for (slot = 0, slots = lobby_save_slots(); slot < slots; slot++) {
         if ((n = lobby_read_partners(slot, f, sizeof(f))) < 12 || !lobby_read_save(slot, b)) continue;
         if (memcmp(b + itm, game_itm, sizeof(game_itm)) || memcmp(b + stg, &game_stg, sizeof(game_stg)) || memcmp(b + rno, &game_rom, sizeof(game_rom))) continue;
         memcpy(h, f, 12);

@@ -220,6 +220,12 @@ add_executable(test_fileio tests/test_fileio.c src/host/fileio.c)
 target_compile_options(test_fileio PRIVATE -std=gnu11)
 add_test(NAME fileio COMMAND test_fileio)
 
+# native save files (pc/src/host/savestore.c)
+add_executable(test_savestore tests/test_savestore.c src/host/savestore.c src/host/fileio.c)
+target_compile_options(test_savestore PRIVATE -std=gnu11)
+target_link_libraries(test_savestore PRIVATE SDL3::SDL3)
+add_test(NAME savestore COMMAND test_savestore)
+
 # co-op server protocol and server core (src/net/rdv_proto.c, server/server.c): messages, malformed
 # input and fuzz, the end-to-end encryption, room codes (unique, collisions, grace period), hijacks,
 # CREATE retries, passwords, relay limits

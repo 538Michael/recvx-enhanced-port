@@ -24,7 +24,7 @@ nothing is extracted or copied.
 
 | Option | Effect |
 |---|---|
-| `--save-dir DIR` | where memory card saves and `recvx.ini` go (default `./save`) |
+| `--save-dir DIR` | where saves and `recvx.ini` go (default `./save`) |
 | `--size WxH` | window size (default 1280x960) |
 | `--fullscreen` | start in fullscreen |
 | `--enhanced` / `--vanilla` | display-rate frames on / off |
@@ -46,12 +46,39 @@ or `--save-dir`):
 
 | Path | Contents |
 |---|---|
-| `save/card0/` | memory card slot 1 (the game's own save files); slot 2 is empty |
+| `save/saves/` | your saves as files (the default save system, see below) |
+| `save/saves/system.dat` | the game's system data: OPTION settings, unlocked extras, best times |
+| `save/card0/` | memory card slot 1 (the game's own save files, used by the Memory card save system); slot 2 is empty |
 | `save/recvx.ini` | all settings, key bindings, the disc image path and your co-op identity |
 
-`recvx.ini` is plain `key = value` text and is written atomically (a crash never leaves a
-half-written file). Two copies of the game with different save directories keep separate
-settings and saves; this is how local co-op on one PC works ([COOP.md](COOP.md)).
+`recvx.ini` and the saves are written atomically (a crash never leaves a half-written file). Two
+copies of the game with different save directories keep separate settings and saves; this is how
+local co-op on one PC works ([COOP.md](COOP.md)).
+
+### Saves
+
+The typewriter's save screen and LOAD GAME look as on the PS2, but by default (**Save system:
+Native files**) they list save files instead of the memory card's 15 slots, without the memory
+card screens ("which memory card slot", "checking memory card", "not enough space"):
+
+- Each save is its own file in `save/saves`, named by its number and what the menu shows, e.g.
+  `001_Claire_Prison-front.sav`, `002_Chris_Ant-Base-CR.sav`, ... `1000_...` There is no limit.
+  The list scrolls through all of them; saving offers an empty entry with the next number at the
+  end of the list (the cursor starts there), or you overwrite an existing save as before. Loading
+  starts on the save written last.
+- The file name is only for you: renaming the part after the number does no harm. Deleting a file
+  deletes that save. Back them up by copying the folder.
+- A file is the memory card's save file with a 64-byte header in front (game, time, play time,
+  character, room), so a save can be turned back into a card save by dropping the first 64 bytes
+  ([ARCHITECTURE.md](ARCHITECTURE.md#save-system)).
+- **First start with native files**: your memory card saves are copied into `save/saves` (slot n
+  becomes save number n) together with the system data and co-op partner files; the log says how
+  many. The memory card files are kept as they are.
+- **Save system: Memory card (original)** (`save_system = 1`) brings back the emulated memory card
+  with its screens and 15 slots, using `save/card0` exactly as before. The setting applies from the
+  next save or load screen. Saves made in one system are not seen by the other; **Import memory
+  card saves** (F1 / PC SETTINGS GAMEPLAY) copies the card's saves into the save files again (ones
+  already there are skipped).
 
 ## Settings
 
@@ -100,6 +127,8 @@ Turn these off for a presentation closer to the PS2.
 | Quick knife | `quick_knife` | on: hold the quick-knife key to draw the combat knife without opening the inventory; release to get the previous weapon back |
 | Skip door animations | `skip_doors` | on: room transitions use the game's load screen instead of the door/stairs/ladder animation |
 | Rearranged enemies, Enemy randomizer, Enemy seed | `enemy_place`, `enemy_random`, `enemy_seed` | optional enemy changes; story, cutscene and boss enemies stay as they are ([ENEMIES.md](ENEMIES.md#enemy-options)) |
+| Save system | `save_system` | **Native files** (0): every save a file in `save/saves`, no limit, no memory card screens; Memory card (original) (1): see [Saves](#saves) |
+| Import memory card saves | (action) | copies the memory card's saves into the save files |
 | Skip intro | `skip_intro` | on: boot straight into the title menu (next start) |
 
 Extra enemies per room (`enemy_extra`, up to 3) are on the CO-OP page; they also work in single

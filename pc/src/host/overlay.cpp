@@ -18,6 +18,7 @@ extern "C" {
 #include "menu_mouse.h"
 #include "bindings.h"
 #include "settings.h"
+#include "lobby.h"
 #include <SDL3/SDL.h>
 #include <imgui.h>
 #include <imgui_impl_sdl3.h>
@@ -446,7 +447,7 @@ static void coop_window(void)
         label(v, cur, sizeof(cur));
         ImGui::BeginDisabled(cs.state != COOP_OFF && cs.host);
         if (ImGui::BeginCombo("Items when joining", cur)) {
-            for (int i = COOP_ITEMS_CURRENT; i < 15; i++) {
+            for (int i = COOP_ITEMS_CURRENT, slots = lobby_save_slots(); i < slots; i++) {
                 label(i, lab, sizeof(lab));
                 if (ImGui::Selectable(lab, i == v)) { c->items = i; changed = true; }
             }

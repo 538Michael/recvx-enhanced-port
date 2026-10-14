@@ -34,13 +34,13 @@ settings menus) hook into the game through small glue functions.
 |---|---|
 | `decomp/` | the decomp as a submodule (fork, branch `pc-port`). PC changes are inside `#ifdef TARGET_PC` blocks: asm replacements, PS2-address idioms, hooks into the glue, and fixes of undefined behaviour, with the PS2 original kept under `#else` |
 | `pc/include/` | `pc_prelude.h` (force-included into every decomp file: host headers, `long` as 64-bit, declarations of all PC hooks) and replacement SDK headers (`sdk/`) |
-| `pc/glue/` | PC code that needs the decomp's types: co-op, lobby, trade screen, third person, model swaps, cheats, enemy options and spawner, native renderer hooks, PC SETTINGS menu, mouse in menus, quick knife |
+| `pc/glue/` | PC code that needs the decomp's types: co-op, lobby, trade screen, third person, model swaps, cheats, enemy options and spawner, native renderer hooks, PC SETTINGS menu, mouse in menus, quick knife, native saves |
 | `pc/src/ps2/` | EE/IOP layer: kernel, DMA, VIF1, VU0/VU1 (static microcode and interpreter), libcdvd, libpad, libmc, SIF, the address window |
 | `pc/src/gs/` | GS emulation (GIF parser, register file, local memory), the OpenGL rasterizer, the frame stream, native textures, in-between frames |
 | `pc/src/audio/` | CRI ADX (ADXF/ADXT), SDL audio output, the TSNDDRV sound driver (high-level emulation) and its synthesizer |
 | `pc/src/movie/` | PSS demuxer, MPEG-2 decoder, movie player |
 | `pc/src/input/` | DualShock 2 emulation (`pad.c`), bindings, third-person input, mouse in menus |
-| `pc/src/host/` | entry point (`host.c`), render loop, settings table and `recvx.ini`, F1/F2/F3 overlay (Dear ImGui), logging, profilers, model catalogue |
+| `pc/src/host/` | entry point (`host.c`), render loop, settings table and `recvx.ini`, native save files (`savestore.c`), F1/F2/F3 overlay (Dear ImGui), logging, profilers, model catalogue |
 | `pc/src/net/` | co-op UDP, packet formats, port mapping, rendezvous client and protocol |
 | `pc/server/` | `recvx-server` and the `recvx-client` test tool |
 | `pc/tests/` | ctest programs |
@@ -308,6 +308,64 @@ plain ASCII the font has (no `&`, `*`, `#`, `@`).
 | `SET_ACTION` (+ `.apply`) | a command, not a value; the native menu runs it when it closes |
 | `SET_NOW` | an action the native menu runs at once |
 
+## Save system
+
+Two save systems, chosen by `save_system` (F1 / PC SETTINGS GAMEPLAY "Save system"):
+
+- **Native files** (0, default): `<save dir>/saves/NNN_<label>.sav`, one file per save, no limit
+  (`pc/src/host/savestore.c`, tested by `pc/tests/test_savestore.c`).
+- **Memory card** (1): the PS2 card as before, `pc/src/ps2/mc.c` (libmc on a folder,
+  `<save dir>/card0`, 15 save slots plus the system file).
+
+**File format.** A 64-byte header followed by the game's save exactly as the card holds it
+(`SAVEFILE`, 0x838 bytes: `sys->version .. save_end` and the game's byte-sum checksum), so a native
+save and a card save convert into each other by adding or dropping the header. Header
+(little-endian): `"RECVXSAV"`, version 1, data size 0x838, `"SLUS-20184"`, a reserved word, the
+time written (64-bit seconds since 1970), play time, save count and difficulty (32-bit each),
+character, stage and room (bytes), padding and the header's byte sum. A file counts as a save
+only if the header, its sum, the size, the game's checksum and the header's copies of the data's
+fields all agree; anything else in the folder is skipped (and logged). The **number** `NNN` is the
+save's identity: three digits, more past 999 (`1000_...`), a new save takes the highest number in
+the folder plus one (invalid files included, so nothing is ever overwritten by a new save). The
+**label** (`Claire_Prison-front`: character and the save menu's room name, made safe for any file
+system, UTF-8 kept, at most 64 bytes) is for people and never parsed. Writes go through
+`pc_save_file` (temporary file, flush, rename); overwriting a save in another room writes the new
+name first and then removes the old file. The system file (`CONFIGFILE`: options, clear flags, best
+times; the card's `BASLUS-20184`) is `saves/system.dat`, byte for byte.
+
+**The game's screens.** The typewriter's save screen and LOAD GAME (`ps2_SaveScreen.c`,
+`ps2_LoadScreen.c`) keep their states, drawing and messages; `pc/glue/save_glue.c` changes only
+where the rows come from and who does the I/O:
+
+| Hook (decomp, `TARGET_PC`) | Native files |
+|---|---|
+| `ExecuteSaveScreen` / `ExecuteLoadScreen`: `ExecuteMemoryCard` | `pc_saves_native(state)` takes the setting while the screen is in its first state; then `pc_save_card` replaces `ExecuteMemoryCard`: no card polling, and a read or write the screen queued on `McState` (by `ReadMemoryCard` / `WriteMemoryCard` from `mcReadStartSaveFile` / `mcWriteStartSaveFile`, which keep the game's own save logic: save count, ink ribbon, checksum) is done on the chosen row's file, ending in the card's end states (9 read, 10 written) or its error codes |
+| `ExecuteState*AwarenessCard` | `pc_save_list` fills the file window (`SELECTFILEWINDOW.pRecordTop`, `lRecordMax`) with the saves in number order, plus an empty row with the next number when saving; straight to the list (no card check, card selection or "checking memory card") |
+| `ExecuteState*SelectFile` | `pc_save_move`: up/down through any number of rows, wrapping as the card's 15 do; cancel leaves the screen instead of going back to the card selection |
+| `ExecuteState*Save` / `*Load` | the row index can be past the card's 15 file names: file name 0 is passed and `pc_save_card` uses the row |
+| `mcDispFileNumber` | numbers past 99 are drawn narrower, ending where two digits end |
+| `ExecuteSysLoadScreen` / `ExecuteSysSaveScreen` | `pc_sysload_native` / `pc_syssave_native`: `system.dat` read at boot, merged (`SysSaveHikaku`) and written by OPTION and the ranking, in one frame without the card screens |
+
+With the memory card these hooks call the original code; `pc/tools/layout_check.sh` with
+`INI="save_system = 1"` and a scripted card save and load give byte-identical frames to the build
+before the native system.
+
+**Rows and cursor.** Saving: the cursor starts on the new row (last); loading: on the save written
+last. An empty row looks like the card's empty slot ("NO_DATA"); loading with no saves shows one.
+
+**Migration.** The first time native files are used (`save_native_dir()` finds no `saves` folder)
+the card's saves are copied in (`savestore_import_card`): slot nn becomes save number nn + 1 when
+free, with `coop-partners-nn.bin` as `saves/NNN.coop-partners.bin`, and the card's system file as
+`system.dat`; the card is never changed. "Import memory card saves" does the same later (saves
+whose bytes are already there are skipped).
+
+**Other readers** go through `pc/src/host/lobby.h`, which follows the active system: save "slots"
+are the card's 0..14 or the native number - 1 (so a migrated slot keeps its meaning in `coop_start`
+and `coop_items`), `lobby_save_slots()` is their count. The co-op lobby's START list, the joiner's
+ITEMS choice, `RECVX_TEST_SAVE`, the host's partner records (`coop-partners-nn.bin` /
+`saves/NNN.coop-partners.bin`, written after each save by `coop_save_written`) use it. Game over
+"continue" and the retry points live in memory and never touch a save.
+
 ## Fidelity notes
 
 - Game logic is compiled unchanged. Where the decomp relied on MWCC behaviour standard C does
@@ -346,7 +404,8 @@ while zombies change motions) in vanilla and enhanced mode (in-between images at
 `RECVX_INTERP_T=0.5`), dumps every 10th frame up to 1800 and compares them byte for byte; exit
 status 1 on any difference. For a second layout configure another build tree with
 `-DRECVX_LAYOUT_PAD=20500` (unused bytes before all code, data and bss). Run to run: pass the same
-binary twice. It needs the disc image and a GPU, so it is not a ctest.
+binary twice. `INI="key = value"` adds lines to the runs' `recvx.ini` (e.g. `save_system = 1`).
+It needs the disc image and a GPU, so it is not a ctest.
 
 Retail bugs fixed because they made frames depend on the layout:
 
@@ -423,6 +482,7 @@ and game frames for game-state aids, as noted. Co-op test aids (`RECVX_COOP_*`,
 | `RECVX_WARP="stg:rom:f:x:z:angle,..."` | move the player to x/z f frames after entering that room |
 | `RECVX_EQUIP="f:item:count[;f:item:count]"` | equip a weapon at game frame f (again later after `;`) |
 | `RECVX_HP="f:hp,..."`, `RECVX_RETRY="f,..."` | set health / set a retry point (Continue resumes in that room) at game frame f |
+| `RECVX_TEST_TYPEWRITER="f,..."` | open the typewriter's save screen at game frame f (as its ink ribbon question's "yes"; no ribbon needed) |
 | `RECVX_FLAGS="set:bit,..."` | set story flags at the first game frame (1 `ev_flg`, 2 `ky_flg`, 3 `ed_flg`, 7 `it_flg`, 8 `mp_flg`) |
 | `RECVX_INF_AMMO=1`, `RECVX_INF_HEALTH=1` | infinite ammo / health cheats on |
 | `RECVX_NOCLIP="f:mode,..."` | noclip mode 0/1/2 from game frame f, logs position every 15 frames |

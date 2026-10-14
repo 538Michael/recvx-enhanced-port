@@ -10,6 +10,8 @@
 #include "menu_mouse.h"
 #include "bindings.h"
 #include "enemies.h"
+#include "lobby.h"
+#include "savestore.h"
 #include "../audio/audio.h"
 #include <SDL3/SDL.h>
 #include <stdio.h>
@@ -56,6 +58,12 @@ static const char* tenths(int v, char* b, int n) { snprintf(b, n, "%d.%d", v / 1
 static int chr_get(void) { return appear_pos(g_coop.chr); }
 static void chr_set(int v) { g_coop.chr = appear_at(v); }
 static const char* chr_name(int v, char* b, int n) { snprintf(b, n, "%s", appear_name(appear_at(v))); return b; }
+/* saves: the memory card's copied into the native folder (as the first native start does) */
+static void import_card(void)
+{
+    int n = savestore_import_card(g_config.save_dir, save_native_dir());
+    host_log("saves: imported %d memory card save%s into %s (the card keeps them)\n", n, n == 1 ? "" : "s", save_native_dir());
+}
 static const char* in_session(void) { return g_coop.state != COOP_OFF ? "Not during a co-op session." : NULL; }
 
 /* cheats (F2): the request bits are taken by the game thread at the frame hand-off */
@@ -84,6 +92,7 @@ static const char* const onoff_auto[] = { "Auto", "Off", "On" };
 static const char* const modes3[] = { "Original (4:3)", "Stretch to width", "Off" };
 static const char* const fps_limits[] = { "Off (display rate)", "30", "60", "90", "120", "144" };   /* render.c present_hz */
 static const char* const aspects[] = { "4:3 (original)", "Stretch to window", "Widescreen (hor+)" };
+static const char* const save_systems[] = { "Native files", "Memory card (original)" };
 static const char* const loots[] = { "Shared", "Individual" };
 static const char* const conns[] = { "Automatic", "Direct (P2P)", "Via server" };
 static const char* const atmos_names[] = { "Per cut (original)", "Smooth" };
@@ -117,6 +126,10 @@ const Setting g_settings[] = {
     { SP_GAMEPLAY, "Rearranged enemies", V(g_enemy_opts.place), 0, 1, 1, .flags = SET_F1, .help = "Free-roaming enemies start elsewhere in their room (from the seed). Story, cutscene and boss enemies stay. Next room." },
     { SP_GAMEPLAY, "Enemy randomizer", V(g_enemy_opts.rand), 0, 1, 1, .flags = SET_F1, .help = "Free-roaming enemies become other types (from the seed), within each room's limits. Story, cutscene and boss enemies stay. Next room." },
     { SP_GAMEPLAY, "Enemy seed", V(g_enemy_opts.seed), 0, 99999, 1, .fmt = "%d", .flags = SET_F1, .help = "Placements and randomizer: the same seed gives the same rooms. In co-op both use the host's." },
+    { SP_GAMEPLAY, "Save system", V(g_config.save_system), 0, 1, 1, save_systems,
+      .help = "Native files: each save is its own file in the saves folder, as many as you like, no memory card screens. Memory card: the original 15 slots. From the next save screen." },
+    { SP_GAMEPLAY, "Import memory card saves", NULL, .flags = SET_ACTION, .apply = import_card,
+      .help = "Copies the memory card's saves into the saves folder as new files (ones already there are skipped). The card keeps them." },
     { SP_GAMEPLAY, "Skip intro", V(g_config.skip_intro), 0, 1, 1, .flags = SET_RESTART, .help = "Boot straight into the title menu: no warning screen, logos or intro movie." },
 
     { SP_ENHANCED, "Display-rate frames", V(g_config.interpolate), 0, 1, 1, .help = "In-between frames blended from the last two game frames. The game still runs at 30 FPS; half a frame of latency." },

@@ -11,7 +11,8 @@
 #           -DCMAKE_BUILD_TYPE=RelWithDebInfo -DRECVX_LAYOUT_PAD=20500 && ninja -C build-pad recvx
 #     pc/tools/layout_check.sh build/pc/recvx build-pad/pc/recvx scratch/layout
 #   Run to run: the same binary twice.
-# Env: LAST (default 1800), MODES (default "vanilla enhanced"), MAX_SECS per run (default 600).
+# Env: LAST (default 1800), MODES (default "vanilla enhanced"), MAX_SECS per run (default 600),
+#      INI (extra recvx.ini lines, e.g. "save_system = 1" for the memory card).
 # Dumps are 640x480 BMPs (~1.2 MB, ~300 per run); OUTDIR is removed first. Never commit it.
 set -u
 A=$(realpath "$1"); B=$(realpath "$2"); OUT=$(realpath -m "$3")
@@ -22,7 +23,7 @@ newgame="100:down,103:-,110:cross,113:-,160:cross,163:-,200:cross,203:-,240:cros
 walk="400:up,520:up+right,560:up,640:up+circle,760:left,800:up+circle,900:down,960:-,1000:r1,1020:r1+cross,1024:r1,1040:r1+cross,1044:r1,1060:-,1100:up+left,1200:up,1300:-"
 run() { # BIN DIR MODE
   mkdir -p "$2/save" "$2/frames" "$2/mods"
-  echo "show_fps = 0" > "$2/save/recvx.ini"   # the counter is drawn into the in-between dumps
+  { echo "show_fps = 0"; [ -n "${INI:-}" ] && printf "%s\n" "$INI"; } > "$2/save/recvx.ini"   # the counter is drawn into the in-between dumps; INI: more lines
   SDL_VIDEO_DRIVER=offscreen SDL_AUDIO_DRIVER=dummy RECVX_SKIP_MOVIES=1 RECVX_MODS="$2/mods" \
   RECVX_TELEPORT=1:0:6:0 RECVX_EQUIP=20:5:60 RECVX_INF_AMMO=1 RECVX_INPUT="$newgame,$walk" \
   RECVX_INTERP_T=0.5 RECVX_DUMP_FRAMES="$2/frames" RECVX_DUMP_EVERY=10 RECVX_DUMP_FROM=300 \
