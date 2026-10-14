@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Third person
+
+- Free aim hits zombies lying or crawling on the ground (and a knocked-down Hunter) with every
+  weapon. The game only lets those take damage from a shot aimed down, and free aim always told
+  it "straight": it now passes the aim height of where the crosshair shot goes (down below knee
+  height or 22.5 degrees, up above 22.5 degrees) to the enemies, while the weapon keeps its
+  straight motions.
+- "Game auto-aim": W / S aim up / down while the weapon is raised, as the original's up / down
+  (before, only the arrow keys and the gamepad did).
+- Test aid: `RECVX_TPS_TRACE=2` keeps aiming at the locked enemy, `RECVX_TPS_AIM_AT=f` at a point
+  along its hit capsule; the trace logs the aim height.
+
 ### Settings
 
 - The OPTION menu's PC SETTINGS is now **ENHANCED SETTINGS**, right of EXIT as before, reached

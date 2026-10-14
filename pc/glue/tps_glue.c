@@ -29,6 +29,7 @@ static int mouse_moved;           /* the mouse moved this frame (pc_input_active
 static float clip_near, clip_far; /* the game's clip range while we draw with ours */
 static int trace;                 /* RECVX_TPS_TRACE=1: log the free aim */
 static NJS_POINT3 aim_t;          /* free aim: the crosshair target (tps_calc_model) */
+static int aim_h;                 /* free aim: the aim height bit given to the game (at_flg 4 up, 8 down), 0: none */
 static float bend_a;   /* the last free-aim bend (radians per node), 0: none */
 static int no_cam_walls;          /* test aid (RECVX_TPS_ORBIT): the eye goes through walls */
 static unsigned move_keys;        /* camera A (g_tps.free_cam): the WASD keys held, walked relative to the camera */
@@ -57,9 +58,18 @@ static int camera_allowed(void)
 
 static void atmos_off(void);
 
+/* player.c bhControlPlayer, before the mode handler (and when third person stops): the weapon
+   modes pick motions by the aim height, so they keep the straight one free aim plays */
+void tps_player_mode(void)
+{
+    if (aim_h && plp && (plp->at_flg & 0xE) == aim_h) plp->at_flg = (plp->at_flg & ~0xE) | 2;
+    aim_h = 0;
+}
+
 static void deactivate(void)
 {
     atmos_off();
+    tps_player_mode();
     if (!tps_cam_active) return;
     tps_cam_active = g_tps.cam_active = g_tps.aiming = 0;
     /* the room camera resumes: the game's own re-initialisation of the current cut */
@@ -443,8 +453,8 @@ unsigned int tps_pad(unsigned int pad)
         if (!!(move_keys & TPS_K_FWD) != !!(move_keys & TPS_K_BACK) || !!(move_keys & TPS_K_LEFT) != !!(move_keys & TPS_K_RIGHT))
             pad |= 0x1;
     }
-    if (k & TPS_K_FWD) pad |= 0x1;
-    if (k & TPS_K_BACK) pad |= 0x2;
+    if (k & TPS_K_FWD) pad |= 0x21;   /* as the d-pad: also aim up/down (game auto-aim) */
+    if (k & TPS_K_BACK) pad |= 0x42;
     if (k & TPS_K_LEFT) pad |= 0x4;
     if (k & TPS_K_RIGHT) pad |= 0x8;
     if (k & TPS_K_AIM) pad |= 0x10;
@@ -521,6 +531,16 @@ static void aim_at_crosshair(void)
     plp->ay += (short)(ay - plp->ay);
     plp->wax = plp->waxp = (short)(int)(atan2f(t.y - o.y, h) * (32768.0f / 3.14159265f));
     aim_t = t;
+    /* the game's aim height for what the shot goes at, read by the enemies until the next mode
+       handler (tps_player_mode): zombies and the anatomist on the ground, a knocked-down Hunter,
+       Cerberus and Bandersnatch in one of their states take no damage from a straight shot; a
+       shotgun blows a zombie's head only aimed up. Up/down beyond 22.5 degrees (half the original
+       aim's 45), and down at anything below knee height. */
+    if (plp->at_flg & 0xE) {
+        aim_h = plp->wax > 4096 ? 4 : plp->wax < -4096 || t.y - plp->py < 6.0f ? 8 : 2;
+        plp->at_flg = (plp->at_flg & ~0xE) | aim_h;
+        if (aim_h == 2) aim_h = 0;
+    }
     if (trace) {   /* check: the game's shot direction Rx(wax) Ry(ay) (0, 0, -l) from o reaches t */
         NJS_MATRIX m;
         NJS_VECTOR v, w;
@@ -530,10 +550,10 @@ static void aim_at_crosshair(void)
         v.x = v.y = 0; v.z = -l;
         njCalcVector(&m, &v, &w);
         for (int i = 0; i < sys->ewk_n; i++) if (ene[i].flg & 1) hp += ene[i].hp;
-        printf("tps: mode %d/%d wpn %d ammo %u: aim yaw %.1f pitch %.1f -> ay %.1f wax %.1f, target %.1f away, shot misses it by %.2f, enemy hp %.0f, eye (%.1f %.1f %.1f)\n",
+        printf("tps: mode %d/%d wpn %d ammo %u: aim yaw %.1f pitch %.1f -> ay %.1f wax %.1f, target %.1f away (aim height %d), shot misses it by %.2f, enemy hp %.0f, eye (%.1f %.1f %.1f)\n",
                plp->mode2, plp->mode3, plp->wpnr_no, sys->itm[sys->ply_id * 16 + (sys->itm[sys->ply_id * 16] & 15)] & 0xFFFF,
                yaw * (360.0f / 65536.0f), pitch * (360.0f / 65536.0f), (short)plp->ay * (360.0f / 65536.0f),
-               plp->wax * (360.0f / 65536.0f), dist,
+               plp->wax * (360.0f / 65536.0f), dist, plp->at_flg & 0xE,
                sqrtf((o.x + w.x - t.x) * (o.x + w.x - t.x) + (o.y + w.y - t.y) * (o.y + w.y - t.y) + (o.z + w.z - t.z) * (o.z + w.z - t.z)), hp, eye.x, eye.y, eye.z);
     }
 }
@@ -626,14 +646,17 @@ void tps_player(void)
         yaw = wrap(yaw - mouse_dx * TURN_PER_PIXEL * g_tps.sens_x / 100.0f * g_tps.aim_sens / 100.0f);
         mouse_dx = 0;
         look(g_tps.aim_sens / 100.0f);
-        if (trace > 1 && (plp->flg & 0x100000)) {   /* test aid (RECVX_TPS_TRACE=2): look at the locked enemy */
-            NJS_CAPSULE* c = &ene[plp->src_no].watr;
+        static int lock = -1;   /* test aid (RECVX_TPS_TRACE=2): follow the enemy the game locked on to */
+        if (plp->flg & 0x100000) lock = plp->src_no;
+        if (trace > 1 && lock >= 0 && (ene[lock].flg & 3) == 1) {   /* at RECVX_TPS_AIM_AT along its hit capsule (0 c1 .. 1 c2) */
+            NJS_CAPSULE* c = &ene[lock].watr;
             NJS_POINT3 eye, dir, sh;
-            float dx, dy, dz;
+            float dx, dy, dz, f = getenv("RECVX_TPS_AIM_AT") ? (float)atof(getenv("RECVX_TPS_AIM_AT")) : 0.5f;
             view(&eye, &dir, &sh);
-            dx = (c->c1.x + c->c2.x) / 2 - sh.x; dy = (c->c1.y + c->c2.y) / 2 - sh.y; dz = (c->c1.z + c->c2.z) / 2 - sh.z;
+            dx = c->c1.x + (c->c2.x - c->c1.x) * f - sh.x; dy = c->c1.y + (c->c2.y - c->c1.y) * f - sh.y; dz = c->c1.z + (c->c2.z - c->c1.z) * f - sh.z;
             yaw = atan2f(-dx, -dz) * (32768.0f / 3.14159265f);
             pitch = atan2f(dy, sqrtf(dx * dx + dz * dz)) * (32768.0f / 3.14159265f);
+            look(0);   /* within the mouse's pitch range */
         }
         if (plp->flg & 0x100000) {   /* no lock-on turn (bhCPM2_act_suw / next target) */
             plp->flg &= ~0x100000;
