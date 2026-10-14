@@ -121,11 +121,13 @@ typedef struct AtrRec {                 /* a room record (ATR_WORK, 0x24 bytes) 
     uint8_t prm[4];
 } AtrRec;
 
+#define COOP_HIT_AIM 0x1000u            /* EV_ENE_HIT flg: bits 0xE00 hold the shooter's aim height */
 typedef struct Event {
     uint32_t id;
     uint8_t type, idx, stg, rom;        /* enemy slot; events for another room are dropped */
     union {
-        struct {                        /* our shot hit a puppet enemy: the weapon code's output */
+        struct {                        /* our shot hit a puppet enemy: the weapon code's output; flg: the hit
+                                           bit 4, and COOP_HIT_AIM with the shooter's aim height (at_flg 0xE) << 8 */
             int8_t jnt[6];
             int16_t djnt_no, wpnr_no;
             int32_t dam[6];

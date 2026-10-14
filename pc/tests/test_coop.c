@@ -71,6 +71,9 @@ static void test_events(void)
     BAD(EV_ENE_HIT, 0, e->u.eh.dam[0] = 1 << 30);
     BAD(EV_ENE_HIT, 0, e->u.eh.dam[1] = 5);              /* damage on an absent joint */
     BAD(EV_ENE_HIT, 0, e->u.eh.flg = 0x80);
+    BAD(EV_ENE_HIT, 0, e->u.eh.flg = 4 | COOP_HIT_AIM | 0x100);   /* the aim height is at_flg 0xE << 8, nothing else */
+    BAD(EV_ENE_HIT, 0, e->u.eh.flg = 4 | 0x2000);
+    { Event e = ev(EV_ENE_HIT); e.u.eh.flg = 4 | COOP_HIT_AIM | 0xE00; CHECK(coop_check_event(&e, 0) == COOP_OK); }
     BAD(EV_ENE_HIT, 0, e->u.eh.comb_flg = 0x81);
     BAD(EV_ENE_HIT, 0, e->u.eh.wpnr_no = 23);
     BAD(EV_ENE_HIT, 0, e->u.eh.djnt_no = 64);

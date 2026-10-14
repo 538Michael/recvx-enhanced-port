@@ -1237,6 +1237,29 @@ static int partner_held(void)
 static int etr_lim;                     /* RECVX_ENEMY_TRACE (enemy_trace) */
 uint64_t gs_frame_count(void);
 static int h_mode0 = -1, h_flg4;        /* our player's mode before the enemy step (attacks on it); flg 4 set for the step */
+/* The shooter's aim height (at_flg 2 straight, 4 up, 8 down: free aim sets it from the shot, tps_glue.c).
+   Enemies read it from plp in their damage code - lying zombies, the anatomist, knocked-down Hunters,
+   Cerberus and Bandersnatch in some states take no damage from a shot aimed straight (en01.c
+   bhEne01_DmgCheck: plp->at_flg & 2) - so for the enemy's step plp carries the aim of who shot it:
+   the partner's from its EV_ENE_HIT (hit_aim, until that enemy's next step), else ours (when plp is the
+   partner's stand-in, which has no aim of its own). */
+static unsigned char hit_aim[128];      /* 0x80 | the partner's aim height of a hit that came in */
+static BH_PWORK* aim_pl;                /* the player whose aim height the step borrows, and what it had */
+static int aim_was, aim_set;
+static void aim_for_step(BH_PWORK* ep, int i)
+{
+    int a = hit_aim[i] ? hit_aim[i] & 0xE : swap_plp ? swap_plp->at_flg & 0xE : -1;
+    hit_aim[i] = 0;
+    if (a < 0 || !plp || (plp->at_flg & 0xE) == a) return;
+    aim_pl = plp;
+    aim_was = plp->at_flg;
+    plp->at_flg = aim_set = (plp->at_flg & ~0xE) | a;
+}
+static void aim_restore(void)
+{
+    if (aim_pl && aim_pl->at_flg == aim_set) aim_pl->at_flg = aim_was;   /* unless the step changed it (a grab clears it) */
+    aim_pl = NULL;
+}
 /* host: whether an enemy's attacks reach this free player now: within COOP_TGT_TOUCH and inside its front
    quarter (ikou3: the turn it would still need, 0 within 45 degrees) */
 static int in_front(BH_PWORK* ep, const BH_PWORK* pl, float d2)
@@ -1245,7 +1268,14 @@ static int in_front(BH_PWORK* ep, const BH_PWORK* pl, float d2)
     return d2 < COOP_TGT_TOUCH * COOP_TGT_TOUCH && ikou3(ep, &p, 0x2000) == 0;
 }
 /* bhControlEnemy, around bhJumpEnemy; 1 = the step is done (puppet) */
+static int enemy_begin(BH_PWORK* ep);
 int coop_enemy_begin(BH_PWORK* ep)
+{
+    int i = ep - ene, r = enemy_begin(ep);
+    if (!r && i >= 0 && i < 128 && !echo_delay) aim_for_step(ep, i);   /* its step runs here */
+    return r;
+}
+static int enemy_begin(BH_PWORK* ep)
 {
     int i = ep - ene;
     if (i < 0 || i >= 128 || echo_delay) return 0;
@@ -1309,6 +1339,7 @@ void coop_enemy_end(BH_PWORK* ep)
     int i = ep - ene;
     if (i < 0 || i >= 128) return;
     if (fx_open == 1) { fx_end(ep, 0); fx_arm(ep); }
+    aim_restore();
     if (swap_plp) {
         BH_PWORK* a = &ply2_save;
         int dh = a->hp - ply2.hp, grab = ply2.mode0 == 4 && a->mode0 != 4 && a->mode0 != 6;
@@ -1768,7 +1799,8 @@ static void capture_hits(void)
         for (; n < 6; n++) e.u.eh.jnt[n] = -1;
         e.type = EV_ENE_HIT;
         e.idx = i;
-        e.u.eh.flg = ep->flg & 0x4; e.u.eh.flg2 = ep->flg2 & 0x4; e.u.eh.comb_flg = ep->comb_flg & 0x70;
+        e.u.eh.flg = (ep->flg & 0x4) | (plp->at_flg & 0xE) << 8 | COOP_HIT_AIM;   /* with the shooter's aim height */
+        e.u.eh.flg2 = ep->flg2 & 0x4; e.u.eh.comb_flg = ep->comb_flg & 0x70;
         e.u.eh.djnt_no = ep->djnt_no; e.u.eh.wpnr_no = ep->wpnr_no;
         e.u.eh.dp[0] = ep->dpx; e.u.eh.dp[1] = ep->dpy; e.u.eh.dp[2] = ep->dpz;
         e.u.eh.dv[0] = ep->dvx; e.u.eh.dv[1] = ep->dvy; e.u.eh.dv[2] = ep->dvz;
@@ -4867,7 +4899,8 @@ static int apply_event(const Event* e)
             if (e->u.eh.jnt[n] >= (int)ep->mlwP->obj_num) return 1;
         for (n = 0; n < 6; n++)
             if (e->u.eh.jnt[n] >= 0 && ep->dam[(int)e->u.eh.jnt[n]] < 100000) ep->dam[(int)e->u.eh.jnt[n]] += e->u.eh.dam[n];
-        ep->flg |= e->u.eh.flg; ep->flg2 |= e->u.eh.flg2; ep->comb_flg |= e->u.eh.comb_flg;
+        ep->flg |= e->u.eh.flg & 0x4; ep->flg2 |= e->u.eh.flg2; ep->comb_flg |= e->u.eh.comb_flg;
+        if (e->u.eh.flg & COOP_HIT_AIM) hit_aim[e->idx] = 0x80 | ((e->u.eh.flg >> 8) & 0xE);
         ep->djnt_no = e->u.eh.djnt_no; ep->wpnr_no = e->u.eh.wpnr_no;
         ep->dpx = e->u.eh.dp[0]; ep->dpy = e->u.eh.dp[1]; ep->dpz = e->u.eh.dp[2];
         ep->dvx = e->u.eh.dv[0]; ep->dvy = e->u.eh.dv[1]; ep->dvz = e->u.eh.dv[2];
