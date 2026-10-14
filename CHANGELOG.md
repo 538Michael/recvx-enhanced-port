@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### Settings
+
+- The OPTION menu's PC SETTINGS is now **ENHANCED SETTINGS**, right of EXIT as before, reached
+  with left/right from EXIT (like STEREO / MONO) instead of down; up from it goes to DEFAULT, down
+  wraps to the top. Mouse hover and click areas match.
+- Pages in a new order, the same in F1: DISPLAY (window, picture, renderer: the former ENHANCED
+  page is part of it), GAMEPLAY (also saves, ink ribbons and all enemy options, Extra enemies
+  included), CONTROLS (also Mouse in menus), THIRD PERSON, AUDIO, CO-OP (also Show ping), EXTRAS.
+  Headings group the rows of a page in both menus.
+- ENHANCED SETTINGS shows 9 rows and three help lines (the Input source help was cut off); the
+  mouse wheel moves the selection as in the game's menus instead of changing the hovered value.
+- ctest `settings`: every `recvx.ini` key needs a row in the settings table (so both menus show
+  it) or an entry in `pc/tests/check_settings.cmake` saying where it is set.
+
 ### Saves
 
 - Native save files, the new default (**Save system: Native files**, ini `save_system = 0`): every
@@ -14,26 +28,26 @@
   room); invalid files are skipped. Writes are atomic; a save is only replaced when you overwrite
   it.
 - The first start with native files copies the memory card's saves, system data and co-op partner
-  files into `save/saves` (the card is kept); F1 / PC SETTINGS "Import memory card saves" does it
+  files into `save/saves` (the card is kept); F1 / ENHANCED SETTINGS "Import memory card saves" does it
   again later.
 - **Memory card (original)** (`save_system = 1`) keeps the emulated card exactly as before
   (frame-identical).
 - The co-op lobby's START list, the joiner's ITEMS choice and the host's saved partner inventories
   (`save/saves/NNN.coop-partners.bin`) follow the active save system.
 - Test aid `RECVX_TEST_TYPEWRITER`; `pc/tools/layout_check.sh` takes extra ini lines (`INI`).
-- **No ink ribbons needed** (F1 / PC SETTINGS GAMEPLAY, ini `no_ink_ribbon`, default off; in co-op
+- **No ink ribbons needed** (F1 / ENHANCED SETTINGS GAMEPLAY, ini `no_ink_ribbon`, default off; in co-op
   the host's lobby rule INK RIBBONS): typewriters save without an ink ribbon and use none up.
 
 ### Co-op
 
 Co-op protocol version 19 (both players need this build).
 
-- Game rule **Important items for both** (shared loot only; lobby IMPORTANT ITEMS, F3, PC SETTINGS
+- Game rule **Important items for both** (shared loot only; lobby IMPORTANT ITEMS, F3, ENHANCED SETTINGS
   CO-OP; ini `coop_important`, default off): weapons and ink ribbons are each player's own to take;
   one player's pickup leaves the partner's copy where it lies. Ammo, herbs and other supplies stay
   shared, key items stay shared. Each player's own pickups go with its items (saves, the host's
   saved partner inventories).
-- Game rule **Synchronized cutscene skip** (lobby CUTSCENE SKIP, F3, PC SETTINGS CO-OP; ini
+- Game rule **Synchronized cutscene skip** (lobby CUTSCENE SKIP, F3, ENHANCED SETTINGS CO-OP; ini
   `coop_skip_sync`, default on): a cutscene both players watch is skipped once both pressed skip;
   "Waiting for <partner> to skip..." / "<partner> wants to skip - press <button> to skip" at the
   top of the screen. Both scenes end together and leave both players where the scene puts them.

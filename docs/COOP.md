@@ -190,7 +190,7 @@ enter its address.
 
 1. Both: lobby **CONNECT** *Via server*, HOST A GAME or JOIN A GAME, **SERVER** the server's
    address (`host` or `host:port`). Without a server address, opening or joining is refused
-   ("Enter the co-op server's address first"). Or F3 / F1 / OPTION > PC SETTINGS > CO-OP.
+   ("Enter the co-op server's address first"). Or F3 / F1 / OPTION > ENHANCED SETTINGS > CO-OP.
 2. Host: **OPEN THE LOBBY**. The room code appears in the info lines and F3 (`ROOM CODE XXXX-XXXX`);
    copy it with COPY ROOM CODE / Copy room code. Optional PASSWORD before opening.
 3. Joiner: **CODE** the room code (case and dash do not matter), the PASSWORD if one is set, **JOIN**.
@@ -214,7 +214,7 @@ the co-op server ..." (name lookup, at most 5 s, never stalls the game), "The ho
 
 ### Follow host
 
-The joining player's choice (lobby FOLLOW, F3, F1 / PC SETTINGS CO-OP "Follow host (joining
+The joining player's choice (lobby FOLLOW, F3, F1 / ENHANCED SETTINGS CO-OP "Follow host (joining
 player)", ini `coop_follow`, default on; the host's value has no effect). It can change at any time.
 
 * **On**: you go through every door the host takes.
@@ -252,7 +252,7 @@ A cutscene runs in each player's own game: the triggering player's, and the part
 the same room (it replays the world event, see "The shared world"). The skip button (the game's
 own, by default **Backspace** / **Back**: SELECT) skips it to its end, where the scene puts the player.
 
-With **Co-op: synchronized cutscene skip** (lobby CUTSCENE SKIP *Together*, F3, PC SETTINGS CO-OP
+With **Co-op: synchronized cutscene skip** (lobby CUTSCENE SKIP *Together*, F3, ENHANCED SETTINGS CO-OP
 "Synchronized cutscene skip (host)"; ini `coop_skip_sync`, default on; the host's choice counts)
 a cutscene both of you are watching in the same room is skipped only when **both** pressed skip:
 
@@ -273,12 +273,12 @@ a cutscene both of you are watching in the same room is skipped only when **both
 
 The partner's name floats above its head while it is in your room and in view; out of view (behind
 the camera or another angle) a marker at the screen edge points at it. Option "Show the partner's
-name above its head" (F3; F1 / PC SETTINGS CO-OP "Partner's name tag"; ini `coop_nametag`, default
+name above its head" (F3; F1 / ENHANCED SETTINGS CO-OP "Partner's name tag"; ini `coop_nametag`, default
 on). The tag scales with the window height and follows the head in enhanced (interpolated) mode.
 
 ### Ping display
 
-**Show ping** (F1 / PC SETTINGS DISPLAY; ini `show_ping`, default on): while connected, "ping N ms"
+**Show ping** (F1 / ENHANCED SETTINGS CO-OP; ini `show_ping`, default on): while connected, "ping N ms"
 next to the frame-rate counter (alone when the counter is off). F3 and the lobby status line show
 it too. The ping is the real network round trip (receive timestamps), not rounded to game frames.
 
@@ -304,7 +304,7 @@ Key items and story progress are shared in both modes. A key used up in a lock (
 it) is removed from the partner's inventory too.
 
 **Important items for both** (shared loot only; lobby IMPORTANT ITEMS *For both*, F3 "Shared loot:
-important items for both (host)", PC SETTINGS CO-OP "Important items for both (host)"; ini
+important items for both (host)", ENHANCED SETTINGS CO-OP "Important items for both (host)"; ini
 `coop_important`, default off; locked during a session): **weapons** (the guns, launchers, bow gun,
 the combat knife when it lies somewhere) and **ink ribbons** are each player's own to take, as with
 individual loot: taking one does not give the partner a copy and does not take the partner's. It
@@ -348,7 +348,7 @@ and key items still go to both; other consumables stay with the triggering playe
 ### Saving without ink ribbons
 
 **No ink ribbons needed** (lobby INK RIBBONS *Not needed*, F3 "No ink ribbons needed (host)",
-F1 / PC SETTINGS GAMEPLAY "No ink ribbons needed"; ini `no_ink_ribbon`, default off): a typewriter
+F1 / ENHANCED SETTINGS GAMEPLAY "No ink ribbons needed"; ini `no_ink_ribbon`, default off): a typewriter
 offers to save without an ink ribbon ("Use an ink ribbon? Yes" opens the save screen) and saving
 uses none up; ribbons you carry stay. In single player it is your own setting; in co-op the host's
 counts for both players.
@@ -420,7 +420,7 @@ status) per player, with its saves:
 * Joining with *Saved with the host*: "Restored your saved items from the host"; none: "No saved
   items at the host - starting with a new inventory". A new inventory or a save chosen explicitly
   wins over the record and becomes the new record. With shared loot the item box stays the host's.
-* Setting **Remember partner inventories (host)** (F1 / PC SETTINGS CO-OP, F3; ini `coop_remember`,
+* Setting **Remember partner inventories (host)** (F1 / ENHANCED SETTINGS CO-OP, F3; ini `coop_remember`,
   default on). Off: "The host keeps no saved items - ...".
 * Trust: the records are the host's data on the host's disk; the joiner trusts its host (as it
   must anyway). Someone who knows your player id and the host's join code could claim your saved
@@ -460,14 +460,14 @@ grabbed by is released on the host, an unanswered trade item returns to its owne
 
 ## Enemy options in co-op
 
-The host's enemy options (EXTRA ENEMIES, REARRANGED, RANDOMIZER, SEED; F1 / PC SETTINGS GAMEPLAY and
-CO-OP, lobby GAME RULES) count for both. The joiner's lobby shows them (read-only) before the game
+The host's enemy options (EXTRA ENEMIES, REARRANGED, RANDOMIZER, SEED; F1 / ENHANCED SETTINGS GAMEPLAY,
+lobby GAME RULES) count for both. The joiner's lobby shows them (read-only) before the game
 starts; changes in game take effect at the next room load on both sides. Enemies the host adds
 appear in the joiner's game in the same slots. Details: [ENEMIES.md](ENEMIES.md).
 
 ## You appear as
 
-"You appear as" (lobby MODEL, F3, F1 / PC SETTINGS CO-OP; ini `coop_char`) chooses your model: the
+"You appear as" (lobby MODEL, F3, F1 / ENHANCED SETTINGS CO-OP; ini `coop_char`) chooses your model: the
 character you play, Claire, Chris, Steve, Wesker, Claire's second costume, or a story-cast, creature
 or zombie model. Your partner sees you as that model, and so do you (also in single player). The
 partner's voice follows its model. Both players need the same build. Models, voices and cutscene
@@ -490,25 +490,25 @@ More on input sources: [USER_GUIDE.md](USER_GUIDE.md).
 
 ## Settings
 
-CO-OP page of OPTION > PC SETTINGS and F1 (plus F3 and the lobby). Settings marked "host" count
+CO-OP page of OPTION > ENHANCED SETTINGS and F1 (plus F3 and the lobby). Settings marked "host" count
 only on the host; "locked" ones cannot change during a session.
 
 | Label | ini key | Values (default) |
 |---|---|---|
 | You appear as | `coop_char` | model index (0: as played) |
 | Partner's name tag | `coop_nametag` | 0/1 (1) |
+| Show ping | `show_ping` | 0/1 (1) |
 | Follow host (joining player) | `coop_follow` | 0/1 (1) |
 | Loot (host), locked | `coop_loot` | 0 Shared, 1 Individual (0) |
-| Remember partner inventories (host) | `coop_remember` | 0/1 (1) |
-| Freeze enemies while trading (host) | `coop_trade_freeze` | 0/1 (1) |
 | Important items for both (host), locked | `coop_important` | 0/1 (0); shared loot only |
 | Synchronized cutscene skip (host) | `coop_skip_sync` | 0/1 (1) |
-| No ink ribbons needed (GAMEPLAY page; co-op: host) | `no_ink_ribbon` | 0/1 (0) |
-| Extra enemies (host) | `enemy_extra` | 0..3 (0); see [ENEMIES.md](ENEMIES.md) |
-| Host port, locked | `coop_port` | 1..65535 (7140) |
+| Freeze enemies while trading (host) | `coop_trade_freeze` | 0/1 (1) |
+| Remember partner inventories (host) | `coop_remember` | 0/1 (1) |
 | Connection, locked | `coop_conn` | 0 Automatic, 1 Direct (P2P), 2 Via server (0) |
+| Host port, locked | `coop_port` | 1..65535 (7140) |
 | Open port (UPnP), locked | `coop_upnp` | 0/1 (1) |
-| Show ping (DISPLAY page) | `show_ping` | 0/1 (1) |
+| No ink ribbons needed (GAMEPLAY page; co-op: host) | `no_ink_ribbon` | 0/1 (0) |
+| Extra enemies (GAMEPLAY page; co-op: host) | `enemy_extra` | 0..3 (0); see [ENEMIES.md](ENEMIES.md) |
 
 Kept in `recvx.ini` without a menu row of their own: `coop_join` (last address or room code),
 `coop_server`, `coop_name`, `coop_items` (-3.., a save as in the ITEMS table), `coop_start` (0..2

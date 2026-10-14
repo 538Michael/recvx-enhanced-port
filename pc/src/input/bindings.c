@@ -359,7 +359,7 @@ void bind_ini_write(void* fp)
 {
     FILE* f = (FILE*)fp;
     char b[64];
-    fprintf(f, "# controls (F1 -> Controls, OPTION -> PC SETTINGS -> CONTROLS): key_* keyboard/mouse, pad_* gamepad;\n"
+    fprintf(f, "# controls (F1 -> Controls, OPTION -> ENHANCED SETTINGS -> CONTROLS): key_* keyboard/mouse, pad_* gamepad;\n"
                "# the game rows are DS2 buttons, which the game's KEY CONFIG type turns into actions.\n"
                "# Keys as SDL names them (Z, Return, Left Shift, Mouse Right); gamepad: south/east/west/north\n"
                "# (Xbox A/B/X/Y, PlayStation Cross/Circle/Square/Triangle), back, start, leftshoulder, dpup, ...,\n"

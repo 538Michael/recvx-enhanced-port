@@ -1,5 +1,5 @@
-/* PC SETTINGS in the game's OPTION menu (docs/ARCHITECTURE.md "Settings"): an eighth row on the
- * option screen, set in the screen's own lettering, opens pages of the port's settings drawn
+/* ENHANCED SETTINGS in the game's OPTION menu (docs/ARCHITECTURE.md "Settings"): an eighth item on
+ * the option screen, right of EXIT, set in the screen's own lettering, opens pages of the port's settings drawn
  * like the co-op lobby (the game's font, the option screen's background and title, its cursor
  * sounds). Game thread, from adv.c (Adv_GameOptionScreen and DisplayOptionPlate*): option
  * level 4 is ours. Values come from the shared settings table (pc/src/host/settings.c) and the
@@ -54,22 +54,28 @@ static unsigned int cancel_button(void) { return (sys->keytype & 3) < 3 ? AdvGet
 /* Adv_GameOptionScreen, every frame: the OS cursor shows while the option screen is up */
 void pc_options_frame(void) { g_menu_mouse.active = 1; }
 
-/* ---------------------------------------------------------------- level 0: the PC SETTINGS row */
-#define ROW8_X 336.0f
+/* ---------------------------------------------------------------- level 0: ENHANCED SETTINGS
+   On EXIT's row, at the right, like STEREO / MONO and ON / OFF: left/right move between EXIT and
+   it (adv.c DisplayOptionPlateLevel0), up goes to DEFAULT, down wraps to the top as from EXIT. */
 #define ROW8_Y 352.0f
-/* "PC SETTINGS" from the row labels' own letters (texture 0: AUDIO SETUP at v 0, KEY CONFIG 32,
-   SCREEN SETUP 64, EXIT 192, SETUP 224; u = left edge, w = width, measured from the texture) */
-static const struct { short u, v, w; } row8[] = {
-    { 73, 224, 17 }, { 70, 32, 17 }, { -1, 0, 12 },                     /* P (SETUP) C (CONFIG) space */
-    { 0, 224, 15 }, { 16, 224, 16 }, { 33, 224, 18 }, { 33, 224, 18 }, /* S E T T (SETUP) */
-    { 38, 192, 11 }, { 88, 64, 19 }, { 158, 32, 19 }, { 0, 224, 15 },  /* I (EXIT) N (SCREEN) G (CONFIG) S */
+#define ROW8_RIGHT 584.0f
+/* "ENHANCED SETTINGS" from the row labels' own letters (texture 0: AUDIO SETUP at v 0, KEY CONFIG
+   32, SCREEN SETUP 64, DEFAULT 160, EXIT 192, SETUP 224; the only H is in the narrower key config
+   caption CHANGE AIM at 256, drawn wider). u = left edge, w = width (measured from the texture),
+   dw = drawn width. */
+static const struct { short u, v, w, dw; } row8[] = {
+    { 16, 224, 16, 16 }, { 88, 64, 19, 19 }, { 302, 256, 13, 18 }, { 0, 0, 18, 18 },   /* E (SETUP) N (SCREEN) H (CHANGE) A (AUDIO) */
+    { 88, 64, 19, 19 }, { 70, 32, 17, 17 }, { 16, 224, 16, 16 }, { 0, 160, 18, 18 },  /* N C (CONFIG) E D (DEFAULT) */
+    { -1, 0, 12, 12 },                                                                  /* space */
+    { 0, 224, 15, 15 }, { 16, 224, 16, 16 }, { 33, 224, 18, 18 }, { 33, 224, 18, 18 }, /* S E T T (SETUP) */
+    { 38, 192, 11, 11 }, { 88, 64, 19, 19 }, { 158, 32, 19, 19 }, { 0, 224, 15, 15 },  /* I (EXIT) N G (CONFIG) S */
 };
 
-static float row8_w(void)
+static float row8_x(void)   /* right-aligned with the values */
 {
     float w = 0;
-    for (int i = 0; i < (int)(sizeof(row8) / sizeof(row8[0])); i++) w += row8[i].w + 1;
-    return w;
+    for (int i = 0; i < (int)(sizeof(row8) / sizeof(row8[0])); i++) w += row8[i].dw + 1;
+    return ROW8_RIGHT - w;
 }
 
 /* DisplayOptionPlateLevel0, with the other rows: drawn as they are (dim, or pulsing when selected) */
@@ -77,15 +83,15 @@ void pc_options_row8(int selected)
 {
     ADV_WORK* ap = &AdvWork;
     unsigned int col = selected ? (((unsigned int)ap->FlushCount2 + 255) << 24) | 0xFFFFFF : 0x7FAFAFAF;
-    float x = ROW8_X;
+    float x = row8_x();
     QUAD* q = &Qtex[15];
     for (int i = 0; i < (int)(sizeof(row8) / sizeof(row8[0])); i++) {
         if (row8[i].u >= 0) {
-            SetQuadPos(x, ROW8_Y, row8[i].w, 32.0f, q);
+            SetQuadPos(x, ROW8_Y, row8[i].dw, 32.0f, q);
             SetQuadUv2(row8[i].u, row8[i].v, row8[i].w, 32.0f, 0, q);
             AdvEasyDrawTexture(0, col, q, 0.05f, 1);
         }
-        x += row8[i].w + 1;
+        x += row8[i].dw + 1;
     }
 }
 
@@ -98,7 +104,7 @@ void pc_options_mouse0(int port)
     menu_mouse_take(&mt);
     if (mt.x >= 32 && mt.x < 608 && mt.y >= 160 && mt.y < 384) {   /* rows 32 px apart, their values on the right */
         hit = (int)(mt.y - 160) / 32;
-        if (hit == 6 && mt.x >= ROW8_X) hit = mt.x < ROW8_X + row8_w() ? 7 : -1;
+        if (hit == 6 && mt.x >= row8_x() - 4) hit = 7;   /* EXIT's row: ENHANCED SETTINGS on the right */
         else if (mt.x >= 320 && hit != 0 && hit != 4 && hit != 1) hit = -1;
     }
     if (hit >= 0 && (mt.moved || mt.left) && hit != ap->OptIndex) { ap->OptIndex = hit; CallSystemSe(0, 2); }
@@ -116,15 +122,18 @@ void pc_options_mouse_back(int port, int level)
 }
 
 /* ---------------------------------------------------------------- the pages */
-enum { K_PAGE, K_SET, K_DEVICE, K_BIND, K_HEAD, K_RESET, K_BACK };
+enum { K_PAGE, K_SET, K_DEVICE, K_BIND, K_HEAD, K_GROUP, K_RESET, K_BACK };   /* K_HEAD, K_GROUP: headings */
 typedef struct Row { int kind, idx; } Row;
 
 #define MAX_ROWS 80
-#define VISIBLE 7
+#define VISIBLE 9                         /* rows shown below the page row; more scroll */
 #define X_LABEL 44.0f
 #define X_VALUE 360.0f
 #define Y_ROW0 184.0f
-#define ROW_H 22.0f
+#define ROW_H 21.0f
+#define Y_HELP (Y_ROW0 + VISIBLE * ROW_H + 6)   /* the help lines, below a rule */
+#define HELP_LINES 3
+#define Y_BOTTOM (Y_HELP + HELP_LINES * 14 + 4)
 #define SC_ROW 0.55f
 #define Z_PANEL 0.02f
 #define Z_HI 0.3f
@@ -144,14 +153,23 @@ static int nrows;
 
 static const char* const heads[] = { "", "THIRD PERSON (KEYBOARD AND MOUSE)", "HOTKEYS" };
 
+/* every row of the page (none is left out: what F1 shows of a page, this shows too), headings first */
+static void page_rows(void)
+{
+    for (int i = 0; i < g_settings_n && nrows < MAX_ROWS - 3; i++)
+        if (g_settings[i].page == st.page) {
+            if (g_settings[i].group) rows[nrows++] = (Row){ K_GROUP, i };
+            rows[nrows++] = (Row){ K_SET, i };
+        }
+}
+
 static void build_rows(void)
 {
     nrows = 0;
     rows[nrows++] = (Row){ K_PAGE, 0 };
-    if (st.page == SP_CONTROLS) {
+    page_rows();
+    if (st.page == SP_CONTROLS) {   /* then the bindings */
         int last = -1;
-        for (int i = 0; i < g_settings_n; i++)   /* input source, which gamepad */
-            if (g_settings[i].page == SP_CONTROLS) rows[nrows++] = (Row){ K_SET, i };
         rows[nrows++] = (Row){ K_DEVICE, 0 };
         for (int i = 0; i < B_COUNT && nrows < MAX_ROWS - 3; i++) {
             int r = bind_order[i], g = bind_rows[r].group;
@@ -160,9 +178,7 @@ static void build_rows(void)
             rows[nrows++] = (Row){ K_BIND, r };
         }
         rows[nrows++] = (Row){ K_RESET, 0 };
-    } else
-        for (int i = 0; i < g_settings_n && nrows < MAX_ROWS - 2; i++)
-            if (g_settings[i].page == st.page) rows[nrows++] = (Row){ K_SET, i };
+    }
     rows[nrows++] = (Row){ K_BACK, 0 };
     if (st.sel >= nrows) st.sel = nrows - 1;
 }
@@ -173,7 +189,7 @@ static void move_sel(int dir)
 {
     for (int k = 0; k < nrows; k++) {
         st.sel = (st.sel + dir + nrows) % nrows;
-        if (rows[st.sel].kind != K_HEAD) break;
+        if (rows[st.sel].kind != K_HEAD && rows[st.sel].kind != K_GROUP) break;
     }
     CallSystemSe(0, 2);
 }
@@ -263,14 +279,16 @@ static int row_at(float x, float y)
     if (x < 30 || x > 610) return -1;
     if (y >= 150 && y < 174) return 0;   /* the page row */
     for (int i = st.top; i < nrows && i < st.top + VISIBLE; i++)
-        if (i > 0 && y >= row_y(i) - 3 && y < row_y(i) + ROW_H - 3) return rows[i].kind == K_HEAD ? -1 : i;
+        if (i > 0 && y >= row_y(i) - 3 && y < row_y(i) + ROW_H - 3) return rows[i].kind == K_HEAD || rows[i].kind == K_GROUP ? -1 : i;
     return -1;
 }
 
 static void scroll_to_sel(void)
 {
+    int want = st.sel;
+    if (want > 1 && (rows[want - 1].kind == K_HEAD || rows[want - 1].kind == K_GROUP)) want--;   /* with its heading */
     if (st.top < 1) st.top = 1;
-    if (st.sel > 0 && st.sel < st.top) st.top = st.sel;
+    if (want > 0 && want < st.top) st.top = want;
     if (st.sel >= st.top + VISIBLE) st.top = st.sel - VISIBLE + 1;
     if (st.top > nrows - VISIBLE) st.top = nrows - VISIBLE;
     if (st.top < 1) st.top = 1;
@@ -309,6 +327,7 @@ static void draw_row(int i, int sel)
         pc_ui_text(48, y + 2, "L1  R1", 0.45f, 0xFF909090);
         return;
     }
+    case K_GROUP: pc_ui_text(X_LABEL - 6, y + 2, g_settings[r->idx].group, 0.45f, 0xFFE0C080); return;
     case K_HEAD: {
         char t[64];
         if (r->idx == BG_GAME) snprintf(t, sizeof(t), "GAME (KEY CONFIG TYPE %c)", 'A' + pc_keytype());
@@ -356,8 +375,8 @@ static void draw_help(void)
 {
     const Row* r = &rows[st.sel];
     const Setting* s = row_set(r);
-    char t[256], nm[64];
-    float y = 340;
+    char t[512], nm[64];
+    float y = Y_HELP;
     unsigned int col = 0xFFC0C0C0;
     t[0] = 0;
     if (st.capture) {
@@ -366,9 +385,10 @@ static void draw_help(void)
         col = 0xFFFFE080;
     } else if (st.msg_t > 0) { st.msg_t--; snprintf(t, sizeof(t), "%s", st.msg); col = 0xFFFFE080; }
     else switch (r->kind) {
-    case K_PAGE: snprintf(t, sizeof(t), "Left/right or L1/R1 change the page. Changes are saved at once, and F1 shows the same settings."); break;
+    case K_PAGE: snprintf(t, sizeof(t), "Left/right or L1/R1 change the page, up/down choose a setting. Changes are saved at once; F1 shows the same settings."); break;
     case K_DEVICE: snprintf(t, sizeof(t), "%s", st.dev ? bind_pad_desc() : "The game's buttons, third-person keys and hotkeys."); break;
     case K_RESET: snprintf(t, sizeof(t), "All %s bindings back to the defaults.", st.dev ? "gamepad" : "keyboard and mouse"); break;
+    case K_BACK: snprintf(t, sizeof(t), "Back to the OPTION screen (also cancel or a right click)."); break;
     case K_BIND: {
         int c = bind_conflict(r->idx, st.dev);
         if (c) { snprintf(t, sizeof(t), "Also bound to: %s. Bind one of them to something else.", bind_rows[c - 1].name); col = 0xFFFF8080; }
@@ -384,7 +404,7 @@ static void draw_help(void)
         break;
     }
     }
-    pc_ui_text_wrap(X_LABEL - 4, y, 560, t, 0.45f, col, 2);
+    pc_ui_text_wrap(X_LABEL - 4, y, 560, t, 0.45f, col, HELP_LINES);
 }
 
 static void draw(void)
@@ -394,9 +414,9 @@ static void draw(void)
     SetQuadUv2(0, 320.0f, 448.0f, 48.0f, 2, q);
     AdvEasyDrawTexture(1, -1, q, 0.05f, 1);
     FlushPlate();
-    pc_ui_rect(28, 146, 612, 384, 0xA0000000, Z_PANEL);
+    pc_ui_rect(28, 146, 612, Y_BOTTOM, 0xA0000000, Z_PANEL);
     pc_ui_rect(36, 176, 604, 177, 0x60FFFFFF, Z_PANEL + 0.001f);
-    pc_ui_rect(36, 336, 604, 337, 0x60FFFFFF, Z_PANEL + 0.001f);
+    pc_ui_rect(36, Y_HELP - 4, 604, Y_HELP - 3, 0x60FFFFFF, Z_PANEL + 0.001f);
     draw_row(0, st.sel == 0);
     for (int i = st.top; i < nrows && i < st.top + VISIBLE; i++) draw_row(i, i == st.sel);
     if (st.top > 1) {   /* more above / below */
@@ -404,7 +424,7 @@ static void draw(void)
         njDrawPolygon(v, 3, 1);
     }
     if (nrows > st.top + VISIBLE) {
-        NJS_POLYGON_VTX v[3] = { { 594, 326, 0.3f, 0xFFA0A0A0 }, { 606, 326, 0.3f, 0xFFA0A0A0 }, { 600, 333, 0.3f, 0xFFA0A0A0 } };
+        NJS_POLYGON_VTX v[3] = { { 594, Y_HELP - 14, 0.3f, 0xFFA0A0A0 }, { 606, Y_HELP - 14, 0.3f, 0xFFA0A0A0 }, { 600, Y_HELP - 7, 0.3f, 0xFFA0A0A0 } };
         njDrawPolygon(v, 3, 1);
     }
     draw_help();
@@ -430,11 +450,7 @@ static int input(int port)
     hit = row_at(mt.x, mt.y);
     if (hit >= 0 && (mt.moved || mt.left) && hit != st.sel) { st.sel = hit; CallSystemSe(0, 2); }
     if (rows[st.sel].kind == K_BIND && hit == st.sel && (mt.moved || mt.left)) st.slot = mt.x >= 360 + 120;
-    if (mt.wheel) {
-        const Row* r = &rows[hit >= 0 ? hit : st.sel];
-        if (r->kind == K_SET || r->kind == K_PAGE) change(r, mt.wheel > 0 ? 1 : -1);
-        else { st.top -= mt.wheel; if (st.top < 1) st.top = 1; if (st.top > nrows - VISIBLE) st.top = nrows - VISIBLE; }
-    }
+    if (mt.wheel) move_sel(mt.wheel > 0 ? -1 : 1);   /* as the d-pad, like the game's menus */
     if (mt.left && hit >= 0) {
         const Row* r = &rows[hit];
         if (r->kind == K_PAGE) change(r, mt.x < 320 ? -1 : 1);

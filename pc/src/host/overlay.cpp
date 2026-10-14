@@ -86,6 +86,7 @@ static bool settings_imgui(int page, bool all = true)
     for (int i = 0; i < g_settings_n; i++) {
         const Setting* s = &g_settings[i];
         if (s->page != page || !(all || (s->flags & SET_F1))) continue;
+        if (s->group && all) ImGui::SeparatorText(s->group);
         const char* lock = settings_locked(s);
         char label[96], val[96];
         int v = settings_get(s), hi = settings_hi(s), st = s->step > 0 ? s->step : 1;
@@ -192,7 +193,7 @@ static void controls_section(void)
         ImGui::EndTable();
     }
     if (ImGui::Button(dev ? "Reset gamepad to defaults" : "Reset keyboard / mouse to defaults")) { bind_reset(dev); settings_save_later(); msg[0] = 0; }
-    ImGui::TextDisabled("Also in the game's OPTION menu: PC SETTINGS -> CONTROLS.");
+    ImGui::TextDisabled("Also in the game's OPTION menu: ENHANCED SETTINGS -> CONTROLS.");
 }
 
 static void settings_window(void)
@@ -209,8 +210,8 @@ static void settings_window(void)
         changed |= settings_imgui(SP_DISPLAY);
         ImGui::TextDisabled("Output %d x %d, %.1f fps presented", ww, wh, ImGui::GetIO().Framerate);
     }
-    if (ImGui::CollapsingHeader("Enhanced", ImGuiTreeNodeFlags_DefaultOpen)) changed |= settings_imgui(SP_ENHANCED);
     if (ImGui::CollapsingHeader("Gameplay", ImGuiTreeNodeFlags_DefaultOpen)) changed |= settings_imgui(SP_GAMEPLAY);
+    if (ImGui::CollapsingHeader("Controls")) controls_section();
     if (ImGui::CollapsingHeader("Third person", ImGuiTreeNodeFlags_DefaultOpen)) {
         changed |= settings_imgui(SP_TPS);
         char key[96];
@@ -251,8 +252,6 @@ static void settings_window(void)
             ImGui::TextDisabled("'wait' is idle time; run with --profile for a CSV.");
         }
     }
-
-    if (ImGui::CollapsingHeader("Controls")) controls_section();
     ImGui::End();
     if (changed) settings_save_later();
 }

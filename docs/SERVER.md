@@ -21,7 +21,7 @@ so someone in your group has to run one (below) and both players enter its addre
 |---|---|
 | Lobby (co-op screen) | mode **VIA SERVER** / **DIRECT (P2P)**, row **SERVER**, **PASSWORD**, **RELAY** (*Only if needed* / *Always*), **COPY ROOM CODE** |
 | F3 window | **Connection**, **Co-op server**, **Room code** / **Join address** |
-| PC SETTINGS > CO-OP (F1) | **Connection** (Automatic, Direct, Via server) |
+| ENHANCED SETTINGS > CO-OP (F1) | **Connection** (Automatic, Direct, Via server) |
 | recvx.ini | `coop_conn` (0 Automatic, 1 Direct, 2 Via server), `coop_server` (`host` or `host:port`; empty = no server) |
 | command line | `--coop-server ADDR`, `--coop-conn auto\|direct\|server`, `--coop-pw PASSWORD`, `--coop-join ROOMCODE` |
 

@@ -198,6 +198,9 @@ target_compile_options(test_bindings PRIVATE $<$<COMPILE_LANGUAGE:C>:-std=gnu11>
 target_link_libraries(test_bindings PRIVATE SDL3::SDL3)
 add_test(NAME bindings COMMAND test_bindings)
 
+# every recvx.ini key has a row in the settings table (F1 and OPTION > ENHANCED SETTINGS) or is listed
+add_test(NAME settings COMMAND ${CMAKE_COMMAND} -DSRC=${CMAKE_CURRENT_SOURCE_DIR} -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_settings.cmake)
+
 # "You appear as" list (pc/src/host/actors.c): event doubles hidden, indices kept
 add_executable(test_appear tests/test_appear.c src/host/actors.c)
 add_test(NAME appear COMMAND test_appear)

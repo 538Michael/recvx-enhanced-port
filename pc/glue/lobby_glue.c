@@ -1011,7 +1011,7 @@ static const char* row_help(int r)
     case R_TFREEZE: return eset(&g_coop.trade_freeze)->help;
     case R_IMP: return "For both: weapons and ink ribbons are each player's own to take - one taking it leaves the partner's copy. Ammo, herbs and other supplies stay shared.";
     case R_SKIPS: return "Together: a cutscene both of you watch is skipped when both press skip; the partner sees that you want to. Each alone: as in single player.";
-    case R_RIBBON: return "Not needed: typewriters save without an ink ribbon and use none up (for both players; also in single player, PC SETTINGS GAMEPLAY).";
+    case R_RIBBON: return "Not needed: typewriters save without an ink ribbon and use none up (for both players; also in single player, ENHANCED SETTINGS GAMEPLAY).";
     case R_EXTRA: return eset(&g_enemy_opts.extra)->help;
     case R_PLACE: return eset(&g_enemy_opts.place)->help;
     case R_RAND: return eset(&g_enemy_opts.rand)->help;
@@ -1318,7 +1318,7 @@ void lobby_frame(void)
     env = strchr(env, ',') ? strchr(env, ',') + 1 : NULL;   /* "f:slot,f:slot,..." */
 }
 
-/* the lobby's drawing helpers for the PC SETTINGS pages of the OPTION menu (pc/glue/options_glue.c) */
+/* the lobby's drawing helpers for the ENHANCED SETTINGS pages of the OPTION menu (pc/glue/options_glue.c) */
 void pc_ui_text(float x, float y, const char* s, float sc, unsigned int argb) { font_ok = (sys->ss_flg & 0x40) != 0; text(x, y, s, sc, argb); }
 float pc_ui_text_w(const char* s, float sc) { return text_w(s, sc); }
 int pc_ui_text_wrap(float x, float y, float w, const char* s, float sc, unsigned int argb, int max_lines)
