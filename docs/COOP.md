@@ -619,11 +619,29 @@ partner's weapon's arms sound bank is loaded beside ours (programs `0x40 + n`).
 
 ### Enemies: host authority and puppets
 
-* **Targeting (host)**: per enemy the nearer player (XZ, 1.5x squared-distance hysteresis) is the
-  target (`coop_pick_target`). An enemy in the middle of an attack (grab, bite, hit, death) keeps
-  its victim; a busy target (being hit or held, dying) is left for a free player within 4 m; a busy
-  player is never chosen. For the partner, `plp` points at `ply2` for that enemy's step; `ply2`
-  carries the partner's position, angles, hp, flags, floor and a hit capsule from its model.
+* **Targeting (host)**: each enemy goes for one player at a time (`coop_pick_target`, re-decided at
+  every step; a linked part goes for its parent's). In order:
+  1. **One victim per attack**: a zombie holding, or an enemy whose motions its victim plays, keeps
+     the victim. In its grab/bite/throw state (`mode0` 2) it keeps a victim within 3 m. Its hit and
+     death states keep nobody.
+  2. A **busy** player (being hit or held, dying, or kept away by the loop guard) is never chosen; a
+     busy target is left for a free player within 4 m (else the enemy waits its turn).
+  3. **Right in front**: a free player within 1.5 m inside the enemy's front quarter stays its
+     target (unless the other is at less than half its distance), or becomes it (unless the target
+     is at less than two thirds of its distance) - no enemy walks into a player without going for it.
+  4. The **nearer** player, by a margin (1.5x squared distance), so near-equal distances do not flip
+     it. A player on another floor than the enemy (which attacks only on its own) counts as twice
+     as far.
+
+  For the partner, `plp` points at `ply2` for that enemy's step; `ply2` carries the partner's
+  position, angles, hp, flags, floor and a hit capsule from its model. For the step `plp` also
+  carries the aim height (`at_flg`) of whoever shot the enemy: some enemies take no damage from a
+  shot aimed straight (a lying zombie, `en01.c bhEne01_DmgCheck`) and read it from `plp`, so the
+  partner's shots bring theirs in `EV_ENE_HIT`, and the stand-in, which has no aim of its own,
+  carries the host's.
+* **Loop guard (host)**: an enemy that starts its third attack (hit reaction or grab) on the same
+  player within 90 frames is in a loop - nothing in the game attacks that fast - and leaves that
+  player alone for 60 frames (logged: `loop guard: enemy N ... started 3 attacks`).
 * **Damage to the partner**: what the enemy step did to `ply2` is diffed. An hp loss or a hit
   reaction becomes `EV_PLY_HIT`; everything else is undone. Grabs other than the zombie's arrive as
   a hit.
@@ -642,7 +660,10 @@ partner's weapon's arms sound bank is loaded beside ours (programs `0x40 + n`).
   The host takes a slot back after 300 joiner frames without snapshots, and when the partner
   leaves. A grab started while the joiner's enemy ran its own AI keeps running locally until it
   lets go.
-* **Safety nets**: a player in a grab state with no enemy holding it for 15 frames is let go; after
+* **Safety nets**: a player in a grab state with no enemy holding it for 15 frames is let go (150
+  frames when the holder is a dying zombie still holding it: a crawler's leg grab ends with the
+  player stomping it dead and lets go at the end of the stomp); a zombie let go this way, or by any
+  other release, is put back to standing only when alive - a dead one stays dead; after
   a grab, a player more than 2.5 m from its last free position in that room is put back; a watchdog
   logs any living enemy whose state has not changed for 5 s and, in co-op or rooms with added
   enemies, releases a zombie stuck in a grab state.
@@ -795,8 +816,8 @@ look at the game protocol. Version history in short: 11 join code, 1200-byte dat
 events, `EV_ATR`; 12 `EV_FX`; 13 `EV_GRANT`; 14 `EV_TSCREEN`; 15 `EV_GONE`; 16 player id and rejoin
 tag, `EV_OWN`; 17 trade requests; 18 voices; 19 the game rules `OPT_IMPORTANT`, `OPT_NO_RIBBON`,
 `OPT_SKIP_SYNC`, the cutscene flags `PF_CINE` / `PF_SKIP` and `EV_SKIP` (synchronized cutscene skip),
-shared loot as one pool (`EV_PICKUP` gives the partner only items for both; `undo`), unknown flag and
-option bits refused. `Pose.pflg` and `Pose.flr` were added inside protocol 18
+shared loot as one pool (`EV_PICKUP` gives the partner only items for both; `undo`), the shooter's
+aim height in `EV_ENE_HIT`, unknown flag and option bits refused. `Pose.pflg` and `Pose.flr` were added inside protocol 18
 (0 means "not sent", and receivers fall back).
 
 All structures are little-endian, packed as the compiler lays them out on x86 (pinned by
@@ -863,7 +884,7 @@ Slot, `mode[4]`, model index (`mlwP` as index into the enemy's `mdl[]`, -1..15),
 
 | Type | Id | Direction | Payload |
 |---|---|---|---|
-| `EV_ENE_HIT` | 1 | either | Our shot hit a puppet: joints, damage, hit bits, hit point/direction, weapon |
+| `EV_ENE_HIT` | 1 | either | Our shot hit a puppet: joints, damage, hit bits, hit point/direction, weapon; `flg` also carries the shooter's aim height (`at_flg & 0xE` << 8, with `COOP_HIT_AIM`) |
 | `EV_PLY_HIT` | 2 | host | A host enemy hit the partner's stand-in: hp delta, flag bits, modes, direction |
 | `EV_BLOB` | 3 | host | Game state chunk (save region; `pad` 1: its items are the joiner's saved ones) |
 | `EV_FLAGS` | 4 | either | 1..6 changed flag words: set and cleared bits, base event id |
@@ -1040,6 +1061,7 @@ Environment variables for headless and scripted runs. Frames are co-op frames un
 | `RECVX_COOP_KILL="hostframe:slot,..."` | A lethal hit on our enemy in that slot. |
 | `RECVX_COOP_WARP="hostframe:x:z,..."` | Both players to x/z at that host frame. |
 | `RECVX_COOP_VOMIT="hostframe,..."` | Host: the walking zombie nearest the partner vomits. |
+| `RECVX_COOP_CRAWL="hostframe,..."` | Host: its walking zombies become crawlers (as a knock-down with little health left), which crawl towards their target and grab its legs. |
 | `RECVX_COOP_ORPHAN=frame` | Put our player in a grab with no holder, 3 m off (failsafe test). |
 | `RECVX_COOP_FX=0` | Send no `EV_FX`. |
 | `RECVX_COOP_GOTO="hostframe:x:z:angle,..."` | Our player alone to x/z, facing angle (0..65535), at that host frame. |
@@ -1052,7 +1074,7 @@ Environment variables for headless and scripted runs. Frames are co-op frames un
 | `RECVX_COOP_TSCREEN="hostframe:act,..."` | Trade screen actions: `k` trade key, `s<cell>` select, `r` confirm, `l` leave, `d` Disconnect, `i` log inventory, `c<cell>` / `cp<cell>` cursor ours / partner's, `a` confirm on cursor, `b` cancel, `w<cell>` request (`w-1` withdraw), `o` offer the requested, `x<cell>` wrong request, `P<hex>` pad presses, `M<x>/<y>[l\|r]` mouse. |
 | `RECVX_COOP_TS_LOSE="s<n>"` / `"d<n>"` | Host's n-th `TS_SWAP` / joiner's n-th `TS_DONE` not sent. |
 | `RECVX_TRADE_TRACE=1` | Every 10 frames: enemies frozen?, a hash of their state. |
-| `RECVX_ENEMY_TRACE=dist` | One line per step of every living enemy within `dist` units of a player: target, distances, modes, motion. |
+| `RECVX_ENEMY_TRACE=dist` | One line per step of every living enemy within `dist` units of a player: type, target (`H`, `h` while the partner is no target, `P`), distances, modes, motion, whether each player counts as busy; on the host also an `atk` line per attack on the partner. |
 | `RECVX_TEST_JOIN="n,..."` / `RECVX_TEST_STOP="n,..."` | F3 Join / Disconnect at the n-th frame hand-off. |
 | `RECVX_TEST_TITLE=n` | Back to the title from a game (as game over "No"). |
 | `RECVX_TEST_SAVE="gameframe:slot,..."` | Write the game in progress as a save (with the partners file). |
@@ -1069,6 +1091,6 @@ General test aids used with these (`RECVX_TELEPORT`, `RECVX_WARP`, `RECVX_EQUIP`
 ctest `coop` (`pc/tests/test_coop.c`) checks every event type from the side that sends it and
 refused from the other, malformed variants of each (`EV_SKIP`: its op, its room, from the joiner), pose
 flags and game rules this protocol does not have, datagram headers and proofs, transfers, the event
-ring, join address parsing, world event actions, record merging and the target rule, then fuzzes
+ring, join address parsing, world event actions, record merging, the target rule and the loop guard, then fuzzes
 200000 random and mutated datagrams. ctest `net` covers the socket (busy port, oversized datagrams,
 receive timestamps) and port mapping start/stop cycles.

@@ -108,6 +108,33 @@ void coop_test_aids(CoopTest* t)
             vomit = strchr(vomit, ',') ? strchr(vomit, ',') + 1 : NULL;
         }
     }
+    {   /* test aid: RECVX_COOP_CRAWL="hostframe,...": the host's walking zombies become crawlers, as en01's
+           knock-down makes one with hp below 15 (DG case 3: type 2, or 3 from type 1; idle, then the chase) */
+        static const char* cr = (const char*)-1;
+        unsigned int cf;
+        int i, n = 0;
+        if (cr == (const char*)-1) cr = getenv("RECVX_COOP_CRAWL");
+        if (cr && t->host && sys && t->in_game && sscanf(cr, "%u", &cf) == 1 && t->frame >= cf) {
+            for (i = 0; i < (int)sys->ewk_n && i < 128; i++) {
+                BH_PWORK* ep = &ene[i];
+                BH_PWORK* c = (BH_PWORK*)ep->exp1;
+                if (!(ep->flg & 0x1) || ep->id != 1 || (ep->flg & 0x80) || !ep->exp0 || ep->mode0 != 1 || ep->hp < 0 || t->owned[i] ||
+                    ep->type == 2 || ep->type == 3 || ep->type == 6 || ep->type == 7 || ep->type == 9) continue;
+                *(int*)&ep->mode0 = 0x00000101;   /* mode0 1, mode1 1, mode2 0, mode3 0 */
+                ep->flg2 &= ~1;
+                *(int*)(ep->exp0 + 0x40) &= ~0x240240;
+                *(int*)(ep->exp0 + 0x48) = 0;
+                *(int*)(ep->exp0 + 0x44) &= ~0x10;   /* (a type 11's "stays put": MV10 would never start the crawl) */
+                ep->type = ep->type == 1 ? 3 : 2;
+                ep->mtn_add = 0;
+                if (ep->hp > 15) ep->hp = 15;
+                if (c >= ene && c < ene + 128) { *(int*)&c->mode0 = *(int*)&ep->mode0; c->mtn_add = 0; c->type = ep->type; }
+                n++;
+            }
+            host_log("coop: test: %d zombies crawl now (host frame %u)\n", n, t->frame);
+            cr = strchr(cr, ',') ? strchr(cr, ',') + 1 : NULL;
+        }
+    }
     {   /* test aid: RECVX_TRADE_TRACE: the room's enemies every 10 frames (the trade screen's freeze) */
         static int tt = -1;
         if (tt < 0) tt = getenv("RECVX_TRADE_TRACE") != NULL;

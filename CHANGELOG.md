@@ -79,6 +79,20 @@ Co-op protocol version 19 (both players need this build).
   covers them.
 - Test aids `RECVX_COOP_GOTO` (our player alone to a spot) and `RECVX_COOP_PAD` (game pad presses at
   a host frame).
+- Fixed: a crawling zombie's leg grab could repeat without end (the grabbed player in the attacked
+  animation with the damage sound over and over). The grab ends with the player stomping the
+  crawler dead; the grab failsafe let the player go mid-stomp and put the dead zombie back to
+  standing, so it crawled on with no health and grabbed again. Now a dead zombie stays dead, the
+  failsafe waits for the stomp, and a loop guard makes an enemy that attacks the same player three
+  times within 90 frames leave it alone for 60 (logged).
+- Enemy targets: the player right in front of an enemy (within 1.5 m, in its front quarter) is its
+  target; only a grab or bite keeps a victim (one within 3 m), no longer an enemy's own hit or death
+  states; a player on another floor counts as twice as far; a zombie's parts go for its victim.
+- The shooter's aim height counts for hits in co-op: lying zombies and other enemies that ignore a
+  shot aimed straight judged the shot by the aim of the player they chase (the partner's stand-in
+  has none). The partner's hits carry their aim height (`EV_ENE_HIT`, protocol 19).
+- `RECVX_ENEMY_TRACE` shows type, busy state and attacks on the partner; test aid
+  `RECVX_COOP_CRAWL` (the host's zombies crawl).
 
 ## 0.1.0 (2026-10-13)
 

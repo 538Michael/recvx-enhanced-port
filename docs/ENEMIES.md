@@ -184,9 +184,11 @@ Details in [COOP.md](COOP.md); what matters for enemies:
   state, on change) and replace the guest's. Placements and the randomizer depend only on the room
   file and the seed, so both sides make the same records in the same slots. The guest never spawns
   (F2 refuses there).
-* **Targets** (host, `coop_proto.c coop_pick_target`): each enemy goes for one player at a time,
-  the nearer by a margin, kept through an attack; a busy target is left for a free player within
-  4 m. The partner's stand-in carries what the AI reads of a player (position, angles, modes, hp,
+* **Targets** (host, `coop_proto.c coop_pick_target`): each enemy goes for one player at a time:
+  kept through its grab or bite, never a busy one, the one right in front, else the nearer by a
+  margin (another floor counts as twice as far); a busy target is left for a free player within
+  4 m. A loop guard makes an enemy that attacks the same player three times within 90 frames
+  leave it alone for 60 (COOP.md). The partner's stand-in carries what the AI reads of a player (position, angles, modes, hp,
   `stflg`, hit capsule `watr`, floor, busy bits); attacks on it reach the guest as `EV_PLY_HIT` or
   `EV_GRAB`. A zombie grab on the guest makes the slot the guest's until handed back (~10 s
   timeout).

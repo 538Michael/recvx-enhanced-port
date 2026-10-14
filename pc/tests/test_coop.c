@@ -71,6 +71,9 @@ static void test_events(void)
     BAD(EV_ENE_HIT, 0, e->u.eh.dam[0] = 1 << 30);
     BAD(EV_ENE_HIT, 0, e->u.eh.dam[1] = 5);              /* damage on an absent joint */
     BAD(EV_ENE_HIT, 0, e->u.eh.flg = 0x80);
+    BAD(EV_ENE_HIT, 0, e->u.eh.flg = 4 | COOP_HIT_AIM | 0x100);   /* the aim height is at_flg 0xE << 8, nothing else */
+    BAD(EV_ENE_HIT, 0, e->u.eh.flg = 4 | 0x2000);
+    { Event e = ev(EV_ENE_HIT); e.u.eh.flg = 4 | COOP_HIT_AIM | 0xE00; CHECK(coop_check_event(&e, 0) == COOP_OK); }
     BAD(EV_ENE_HIT, 0, e->u.eh.comb_flg = 0x81);
     BAD(EV_ENE_HIT, 0, e->u.eh.wpnr_no = 23);
     BAD(EV_ENE_HIT, 0, e->u.eh.djnt_no = 64);
@@ -605,27 +608,67 @@ static void fuzz(int iters)
 }
 
 /* ---------------------------------------------------------------- enemy targets (coop_pick_target) */
+static int pick(int cur, float d0, float d1, int b0, int b1, int f0, int f1, int commit)
+{
+    CoopTgtIn in = { { d0, d1 }, { b0, b1 }, { f0, f1 }, commit };
+    return coop_pick_target(cur, &in);
+}
 static void test_target(void)
 {
     float n = 10.0f * 10.0f, f = 13.0f * 13.0f;   /* 1 m and 1.3 m, squared */
+    enum { F = COOP_TGT_FREE, A = COOP_TGT_ATTACK, HOLD = COOP_TGT_HOLD };
     /* nearer player wins only by the margin: 1.0 vs 1.1 m keeps the target either way */
-    CHECK(coop_pick_target(0, n, 11.0f * 11.0f, 0, 0, 0) == 0);
-    CHECK(coop_pick_target(1, 11.0f * 11.0f, n, 0, 0, 0) == 1);
-    CHECK(coop_pick_target(0, f, n, 0, 0, 0) == 1);
-    CHECK(coop_pick_target(1, n, f, 0, 0, 0) == 0);
+    CHECK(pick(0, n, 11.0f * 11.0f, 0, 0, 0, 0, F) == 0);
+    CHECK(pick(1, 11.0f * 11.0f, n, 0, 0, 0, 0, F) == 1);
+    CHECK(pick(0, f, n, 0, 0, 0, 0, F) == 1);
+    CHECK(pick(1, n, f, 0, 0, 0, 0, F) == 0);
     /* no flipping back and forth around equal distances */
-    { int t = 0, k; for (k = 0; k < 100; k++) t = coop_pick_target(t, k & 1 ? n : n * 1.2f, k & 1 ? n * 1.2f : n, 0, 0, 0); CHECK(t == 0); }
-    /* mid-attack: the victim stays, whatever the distances or who is busy */
-    CHECK(coop_pick_target(0, 30.0f * 30.0f, 1.0f, 0, 0, 1) == 0);
-    CHECK(coop_pick_target(1, 1.0f, 30.0f * 30.0f, 0, 1, 1) == 1);
-    CHECK(coop_pick_target(0, n, n, 1, 0, 1) == 0);
+    { int t = 0, k; for (k = 0; k < 100; k++) t = pick(t, k & 1 ? n : n * 1.2f, k & 1 ? n * 1.2f : n, 0, 0, 0, 0, F); CHECK(t == 0); }
+    /* holding (or driving its victim's motions): the victim stays, whatever the distances or who is busy */
+    CHECK(pick(0, 30.0f * 30.0f, 1.0f, 0, 0, 0, 1, HOLD) == 0);
+    CHECK(pick(0, 90.0f * 90.0f, 1.0f, 0, 0, 0, 1, HOLD) == 0);
+    CHECK(pick(1, 1.0f, 30.0f * 30.0f, 0, 1, 1, 0, HOLD) == 1);
+    CHECK(pick(0, n, n, 1, 0, 0, 0, HOLD) == 0);
+    /* its grab/bite state: the victim stays while within 3 m, not when it is farther */
+    CHECK(pick(0, 30.0f * 30.0f, 1.0f, 0, 0, 0, 1, A) == 0);
+    CHECK(pick(1, 1.0f, 30.0f * 30.0f, 0, 1, 0, 0, A) == 1);
+    CHECK(pick(0, n, n, 1, 0, 0, 0, A) == 0);
+    CHECK(pick(0, 50.0f * 50.0f, n, 0, 0, 0, 0, A) == 1);
+    CHECK(pick(0, 50.0f * 50.0f, n, 0, 1, 0, 0, A) == 0);   /* (not to a busy one) */
+    /* its hit and death states commit to nobody: a staggering enemy takes the nearer player */
+    CHECK(pick(0, 50.0f * 50.0f, n, 0, 0, 0, 0, F) == 1);
     /* a busy target is left for the free player within reach, not beyond it */
-    CHECK(coop_pick_target(0, n, f, 1, 0, 0) == 1);
-    CHECK(coop_pick_target(1, f, n, 0, 1, 0) == 0);
-    CHECK(coop_pick_target(0, n, 50.0f * 50.0f, 1, 0, 0) == 0);
-    /* never to a busy player, however near */
-    CHECK(coop_pick_target(0, f * 4.0f, 1.0f, 0, 1, 0) == 0);
-    CHECK(coop_pick_target(0, n, n, 1, 1, 0) == 0);
+    CHECK(pick(0, n, f, 1, 0, 0, 0, F) == 1);
+    CHECK(pick(1, f, n, 0, 1, 0, 0, F) == 0);
+    CHECK(pick(0, n, 50.0f * 50.0f, 1, 0, 0, 0, F) == 0);
+    /* never to a busy player, however near (also one the loop guard keeps it away from) */
+    CHECK(pick(0, f * 4.0f, 1.0f, 0, 1, 0, 0, F) == 0);
+    CHECK(pick(0, n, n, 1, 1, 0, 0, F) == 0);
+    /* right in front: the player it would walk into is its target, before the distance rule */
+    CHECK(pick(0, 12.0f * 12.0f, 11.0f * 11.0f, 0, 0, 0, 1, F) == 1);   /* 1.1 m in front vs 1.2 m behind */
+    CHECK(pick(0, 10.0f * 10.0f, 14.0f * 14.0f, 0, 0, 0, 1, F) == 1);   /* also when the other is a little nearer, behind it */
+    CHECK(pick(1, 10.0f * 10.0f, 14.0f * 14.0f, 0, 0, 0, 1, F) == 1);   /* and it stays (no flip back to the nearer) */
+    CHECK(pick(0, 5.0f * 5.0f, 14.0f * 14.0f, 0, 0, 0, 1, F) == 0);     /* not over a target at less than half the distance */
+    CHECK(pick(1, 5.0f * 5.0f, 14.0f * 14.0f, 0, 0, 0, 1, F) == 0);     /* (which it turns to) */
+    CHECK(pick(0, 4.5f * 4.5f, 14.0f * 14.0f, 0, 0, 1, 0, F) == 0);     /* and then keeps */
+    CHECK(pick(0, 14.0f * 14.0f, 10.0f * 10.0f, 0, 0, 1, 1, F) == 0);   /* both in front: it keeps its target */
+    CHECK(pick(1, 10.0f * 10.0f, 14.0f * 14.0f, 0, 0, 1, 1, F) == 1);
+    CHECK(pick(0, 14.0f * 14.0f, 5.0f * 5.0f, 0, 0, 1, 1, F) == 1);     /* (or the one at less than half the distance) */
+    CHECK(pick(0, 12.0f * 12.0f, 11.0f * 11.0f, 0, 0, 0, 1, A) == 0);   /* mid-attack it keeps its victim */
+    /* the anti flip-flop holds with the front rule: two players crossing in front alternately keep one target */
+    { int t = 0, k, flips = 0; for (k = 0; k < 100; k++) { int u = pick(t, n, n, 0, 0, 1, 1, F); flips += u != t; t = u; } CHECK(flips == 0); }
+    /* the loop guard: the third attack within the window trips it, then the enemy cools down */
+    {
+        CoopAtk a = { 0 };
+        CHECK(!coop_atk_note(&a, 1000) && !coop_atk_note(&a, 1025));
+        CHECK(coop_atk_note(&a, 1050));
+        CHECK(coop_atk_cooling(&a, 1051) && coop_atk_cooling(&a, 1050 + COOP_LOOP_COOL - 1) && !coop_atk_cooling(&a, 1050 + COOP_LOOP_COOL));
+        /* attacks spread wider than the window never trip it (a retail pace: a grab, then another) */
+        memset(&a, 0, sizeof(a));
+        { unsigned int t; int hit = 0; for (t = 100; t < 5000; t += COOP_LOOP_WIN / 2 + 1) hit |= coop_atk_note(&a, t); CHECK(!hit); }
+        memset(&a, 0, sizeof(a));
+        CHECK(!coop_atk_cooling(&a, 0) && !coop_atk_cooling(&a, 12345));
+    }
 }
 
 int main(int argc, char** argv)
