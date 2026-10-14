@@ -54,18 +54,28 @@
 
 Co-op protocol version 19 (both players need this build).
 
-- Game rule **Important items for both** (shared loot only; lobby IMPORTANT ITEMS, F3, ENHANCED SETTINGS
-  CO-OP; ini `coop_important`, default off): weapons and ink ribbons are each player's own to take;
-  one player's pickup leaves the partner's copy where it lies. Ammo, herbs and other supplies stay
-  shared, key items stay shared. Each player's own pickups go with its items (saves, the host's
-  saved partner inventories).
+- **Shared loot is one pool** (lobby LOOT *Shared (one pickup)*): each item lies there once and
+  whoever takes it has it; the spot is gone for both and the partner gets nothing, so the players
+  split ammo, herbs and other supplies. Before, both got a copy of everything either took. Key items
+  and the lighter still go to both (a used-up key still goes for both), as do items from events that
+  are for both (key items, the lighter; weapons and ink ribbons with the rule below); supplies an
+  event hands over stay with the triggering player. If both take the same item at about the same
+  moment, exactly one keeps it (the host when both happened within one round trip); the other's copy
+  goes back ("the partner took ... first"). Decomp hook `coop_item_late` in `bhItmCk`. Individual
+  loot is unchanged.
+- Game rule **Important items for both** (shared loot only; lobby IMPORTANT ITEMS *For both* /
+  *Shared*, F3, ENHANCED SETTINGS CO-OP; ini `coop_important`, default on): weapons and ink ribbons
+  lie there for each player; one player's pickup leaves the partner's copy where it lies. Off, they
+  are pool items like the rest. Each player's own pickups go with its items (saves, the host's saved
+  partner inventories).
 - Game rule **Synchronized cutscene skip** (lobby CUTSCENE SKIP, F3, ENHANCED SETTINGS CO-OP; ini
   `coop_skip_sync`, default on): a cutscene both players watch is skipped once both pressed skip;
   "Waiting for <partner> to skip..." / "<partner> wants to skip - press <button> to skip" at the
   top of the screen. Both scenes end together and leave both players where the scene puts them.
 - The lobby's GAME RULES also set INK RIBBONS for the session.
 - Protocol 19: game rules `OPT_IMPORTANT`, `OPT_NO_RIBBON`, `OPT_SKIP_SYNC`; pose flags `PF_CINE`,
-  `PF_SKIP`; event `EV_SKIP` (host only); unknown pose flag and rule bits are refused. ctest `coop`
+  `PF_SKIP`; event `EV_SKIP` (host only); `EV_PICKUP` carries an item only for items both get, and
+  `undo` (host only) for a spot both took; unknown pose flag and rule bits are refused. ctest `coop`
   covers them.
 - Test aids `RECVX_COOP_GOTO` (our player alone to a spot) and `RECVX_COOP_PAD` (game pad presses at
   a host frame).

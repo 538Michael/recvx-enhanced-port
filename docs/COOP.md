@@ -66,8 +66,8 @@ drawn in the game's own style; your model turns in a 3D preview on the left. It 
 * **FOLLOW** (joiner): see "Follow host".
 * **RELAY**: *Only if needed* (Automatic) or *Always* (Via server), see "Connection modes".
 
-**Step 3: GAME RULES** (host): **LOOT** (Shared / Individual), **IMPORTANT ITEMS** (For both /
-Shared; only with shared loot, see "Loot modes"), **FREEZE ON TRADE**, **CUTSCENE SKIP** (Together /
+**Step 3: GAME RULES** (host): **LOOT** (Shared (one pickup) / Individual (each their own)),
+**IMPORTANT ITEMS** (For both / Shared; only with shared loot, see "Loot modes"), **FREEZE ON TRADE**, **CUTSCENE SKIP** (Together /
 Each alone, see "Cutscenes"), **INK RIBBONS** (Needed / Not needed, see "Saving without ink
 ribbons"), and the enemy options **EXTRA ENEMIES**, **REARRANGED**, **RANDOMIZER**, **SEED**, **NEW
 RANDOM SEED**. The joiner
@@ -297,23 +297,40 @@ before the session):
 
 | Mode | Pickups | Item box |
 |---|---|---|
-| **Shared** (0, default) | An item either player takes goes to both (weapons and ink ribbons: each takes its own, see "Important items for both" below). A partner with a full inventory leaves its copy lying in its room. | One box for both. |
-| **Individual** (1) | Each player finds and takes their own copy. | Each has their own box. |
+| **Shared** (0, default; lobby *Shared (one pickup)*) | One pool: each item lies there once. Whoever takes it has it, the spot is gone for both and the partner gets nothing, so the two of you split the ammo, herbs and other supplies (hand them over on the trade screen). Exceptions: key items and the lighter go to both; weapons and ink ribbons with "Important items for both" (below). | One box for both. |
+| **Individual** (1; lobby *Individual (each their own)*) | Each player finds and takes their own copy. | Each has their own box. |
 
 Key items and story progress are shared in both modes. A key used up in a lock (the game removes
 it) is removed from the partner's inventory too.
 
-**Important items for both** (shared loot only; lobby IMPORTANT ITEMS *For both*, F3 "Shared loot:
-important items for both (host)", ENHANCED SETTINGS CO-OP "Important items for both (host)"; ini
-`coop_important`, default off; locked during a session): **weapons** (the guns, launchers, bow gun,
-the combat knife when it lies somewhere) and **ink ribbons** are each player's own to take, as with
-individual loot: taking one does not give the partner a copy and does not take the partner's. It
-stays lying in the partner's game until the partner takes it. Ammunition, herbs, sprays and every
-other item stay shared (one takes it, both get it); key items stay shared as in both modes. Each
-player's own pickups of these items are kept with that player's items: in its saves, and at the
-host in its saved partner inventory (a guest joining again with *Saved with the host* finds the
-weapons it took gone and the others still there). Pickups made outside a session are not known as
-such (see "Known limits").
+**Important items for both** (shared loot only; lobby IMPORTANT ITEMS *For both* / *Shared*, F3
+"Shared loot: important items for both (host)", ENHANCED SETTINGS CO-OP "Important items for both
+(host)"; ini `coop_important`, default on; locked during a session): **weapons** (the guns,
+launchers, bow gun, the combat knife when it lies somewhere) and **ink ribbons** lie there for each
+player, as with individual loot: taking one does not give the partner a copy and does not take the
+partner's; it stays lying in the partner's game until the partner takes it. Off (*Shared*), they are
+pool items like ammunition: one copy, whoever takes it has it. Each player's own pickups of these
+items are kept with that player's items: in its saves, and at the host in its saved partner
+inventory (a guest joining again with *Saved with the host* finds the weapons it took gone and the
+others still there). Pickups made outside a session are not known as such (see "Known limits").
+
+What goes where:
+
+| Item | Shared, important items *For both* (default) | Shared, important items *Shared* | Individual |
+|---|---|---|---|
+| Ammunition, herbs, sprays, other supplies and every other non-key item | the taker's alone; gone for both | the taker's alone; gone for both | each their own copy |
+| Weapons (with the combat knife), ink ribbons | each their own copy | the taker's alone; gone for both | each their own copy |
+| Key items (the game's key item kind: keys, emblems, plates, cards, jewels, ...) | both get it | both get it | both get it |
+| The lighter | both | both | both |
+| Files, maps | as before: the spot goes for both; maps are story progress | same | each their own; maps shared |
+| Items an event hands over | see "Items from events" | | |
+
+A partner with a full inventory leaves its copy of a key item lying in its room (it takes it later
+like any pickup). If both of you take the same item at about the same moment, exactly one keeps it: the one whose
+pickup reached the other first, and the host when both happened within one round trip. The other
+one's copy leaves its inventory again as soon as it is back in control ("the partner took <item>
+first"). Each player's inventory is its own in every mode, so saves, saved partner
+inventories, room changes and rejoins keep exactly what each player took.
 
 ### Items when joining
 
@@ -336,14 +353,25 @@ took ... first"). Saves keep the box as the player's own game has it.
 ### Items from events
 
 Some cutscenes end by handing the player an item (Claire's handgun in the courtyard, the Gold
-Lugers, key items such as the Music Box Plate or the jewels). A partner who missed the event gets
-the item **on the floor** of that room, where the other player stood, as a normal pickup ("Take the
-Handgun? Yes / No"). Only that partner sees it. It is kept with the partner's game (saved with it,
-kept across disconnects) until taken. Nothing is given twice: a partner who was in the event, or
-already holds the item (not for stackable items), gets nothing.
+Lugers, the lighter, key items such as the Music Box Plate or the jewels). Which of them the partner
+gets too follows the loot mode:
 
-Shared loot: every event item goes to both this way. Individual loot: weapons (with the lighter)
-and key items still go to both; other consumables stay with the triggering player.
+| Item from an event | Shared, important items *For both* (default) | Shared, important items *Shared* | Individual |
+|---|---|---|---|
+| Key items, the lighter | both | both | both |
+| Weapons, ink ribbons | both | the triggering player's alone | both |
+| Ammunition, herbs and other supplies | the triggering player's alone | the triggering player's alone | the triggering player's alone |
+
+An item that goes to both: a partner who watched the event in the same room gets it from the event
+itself, as the triggering player. A partner who missed it gets the item **on the floor** of that
+room, where the other player stood, as a normal pickup ("Take the Handgun? Yes / No"). Only that
+partner sees it. It is kept with the partner's game (saved with it, kept across disconnects) until
+taken. Nothing is given twice: a partner who was in the event, or already holds the item (not for
+stackable items), gets nothing.
+
+An item that is the triggering player's alone: nothing goes on the partner's floor; with shared
+loot a partner who watched the event and got one too gives it back at once ("... from the partner's
+event is the partner's").
 
 ### Saving without ink ribbons
 
@@ -500,7 +528,7 @@ only on the host; "locked" ones cannot change during a session.
 | Show ping | `show_ping` | 0/1 (1) |
 | Follow host (joining player) | `coop_follow` | 0/1 (1) |
 | Loot (host), locked | `coop_loot` | 0 Shared, 1 Individual (0) |
-| Important items for both (host), locked | `coop_important` | 0/1 (0); shared loot only |
+| Important items for both (host), locked | `coop_important` | 0/1 (1); shared loot only |
 | Synchronized cutscene skip (host) | `coop_skip_sync` | 0/1 (1) |
 | Freeze enemies while trading (host) | `coop_trade_freeze` | 0/1 (1) |
 | Remember partner inventories (host) | `coop_remember` | 0/1 (1) |
@@ -652,9 +680,27 @@ floor or trigger, "Yes" chosen, an item used) hold only where the player did it.
   a joiner's bits in words it changed itself since the joiner's base. Individual loot leaves the item
   words (`it_flg`, `ic_flg`) out. Not synced: `rm_flg st_flg sp_flg`.
 * **Pickups** (`EV_PICKUP`): an item flag set and the examined spot's object hidden within 30 frames
-  is a pickup; the partner adds the item with `GetItem` (stacking, capacity check) and hides the
-  object in the same room. Key items (`itemdata[].type & 0x40`) are shared in both loot modes.
+  is a pickup; the partner hides the object in the same room (the flag came with `EV_FLAGS`). The
+  event's `item` is what the partner gets too (0: nothing): with shared loot only the kinds of
+  `for_both` (`coop_glue.c`: key items, `itemdata[].type & 0x40`; the lighter, item 55; with
+  `OPT_IMPORTANT` the important kinds, which are not sent at all, below), which the partner adds with
+  `GetItem` (stacking, capacity check; no room: the flag is cleared again there and the item stays
+  lying). Every other pickup is the taker's alone (one pool). Individual loot: key items only.
   `EV_LOST` removes a key the partner used up in a lock.
+* **Both took one pool item** (shared loot): exactly one keeps it.
+  * The partner's flag came while our "Will you take it?" was open: the game adds the item and
+    finds the flag set, so it sets none and hides nothing. `bhItmCk` reports that
+    (`coop_item_late`, decomp hook) and ours goes back: the partner was first.
+  * Both games set the flag within a round trip: the host's pickup stands. Host: the `it_flg` bits
+    of a joiner's `EV_FLAGS` that `mask_host_changes` dropped (the host took that spot since the
+    joiner's base), or that the host had set but not sent yet (it was still in the status screen),
+    are `raced`; the joiner's `EV_PICKUP` of such a spot gives the host nothing and goes back as
+    `EV_PICKUP` with `undo` 1 and the spot's bit, and the joiner gives back the item it remembers
+    for that spot (`mine`). Joiner: the host's flag for a spot it had set but not sent yet means
+    the same at once.
+  * Giving back (`give_back`) waits until that player is in control (not in a menu or the status
+    screen) and takes out the amount a pickup of that item adds (`getbulletmax`); "the partner took
+    <item> first". Key items are not given back (both get them anyway).
 * **Important items for both** (shared loot, `OPT_IMPORTANT`): the kinds in `important_kinds[]`
   (`coop_glue.c`: weapons, `itemdata[].type & 0x1`; ink ribbons, item 31). `bhItmCk` reports each pickup
   (`coop_item_taken`: its `it_flg` bit and trigger); one of those kinds marks the bit in
@@ -671,8 +717,10 @@ floor or trigger, "Yes" chosen, an item used) hold only where the player did it.
   then puts its own items, box (individual loot), health, weapon and status back (`own_restore`).
 * **Regroups**: the host counts story cutscenes (15 s or longer) and character switches in the pose;
   a new count pulls the joiner (`bhSetDoorDemo` to the host's entry point).
-* **Event items** (`EV_GRANT`): `GetItem` reports an add made by an event without asking; the item,
-  count, room and position go to the partner, which keeps it pending in unused save-region words
+* **Event items** (`EV_GRANT`): `GetItem` reports an add made by an event without asking; an item
+  for the partner too (`grant_for_partner`: individual loot weapons, the lighter and key items;
+  shared loot `for_both`) goes with count, room and position to the partner (the receiver checks
+  the same rule), which keeps it pending in unused save-region words
   (`sys->itm` 320..359, 8 entries) and shows it on the floor of that room with a pickup trigger. A
   room without a record of the item gets the item's display model for the visit.
 * **Item box** (`EV_BOX`, `EV_BOXFIX`): with shared loot, what was taken out and put in when the box
@@ -747,7 +795,8 @@ look at the game protocol. Version history in short: 11 join code, 1200-byte dat
 events, `EV_ATR`; 12 `EV_FX`; 13 `EV_GRANT`; 14 `EV_TSCREEN`; 15 `EV_GONE`; 16 player id and rejoin
 tag, `EV_OWN`; 17 trade requests; 18 voices; 19 the game rules `OPT_IMPORTANT`, `OPT_NO_RIBBON`,
 `OPT_SKIP_SYNC`, the cutscene flags `PF_CINE` / `PF_SKIP` and `EV_SKIP` (synchronized cutscene skip),
-unknown flag and option bits refused. `Pose.pflg` and `Pose.flr` were added inside protocol 18
+shared loot as one pool (`EV_PICKUP` gives the partner only items for both; `undo`), unknown flag and
+option bits refused. `Pose.pflg` and `Pose.flr` were added inside protocol 18
 (0 means "not sent", and receivers fall back).
 
 All structures are little-endian, packed as the compiler lays them out on x86 (pinned by
@@ -818,7 +867,7 @@ Slot, `mode[4]`, model index (`mlwP` as index into the enemy's `mdl[]`, -1..15),
 | `EV_PLY_HIT` | 2 | host | A host enemy hit the partner's stand-in: hp delta, flag bits, modes, direction |
 | `EV_BLOB` | 3 | host | Game state chunk (save region; `pad` 1: its items are the joiner's saved ones) |
 | `EV_FLAGS` | 4 | either | 1..6 changed flag words: set and cleared bits, base event id |
-| `EV_PICKUP` | 5 | either | Item taken: item (0: spot only), spot, its `it_flg` bit |
+| `EV_PICKUP` | 5 | either | Item taken: item for the partner too (0: spot only), spot, its `it_flg` bit; `undo` 1 (host only, bit given): both took that spot, the joiner's pickup goes back |
 | `EV_LOST` | 6 | either | A key item used up |
 | `EV_ESTATE` | 7 | either | Grab state chunk (enemy work, `exp0`, linked child, the player) |
 | `EV_GRAB` | 8 | host | A zombie grab handed to the joiner: child slot, model/set indices, the stand-in's flag changes, the `EV_ESTATE` transfer id |
@@ -949,7 +998,13 @@ the session's code. A takeover needs a non-zero tag that matches.
 * A cutscene the joiner triggers alone plays only for the joiner (its flags reach the host).
 * Of a world event's results that depend on local state (per-room flags, timing), only collision
   and object placement are synced afterwards.
-* If both take the same spot within one round trip with shared loot, both get a copy.
+* Both taking one pool item (shared loot): the player who gives it back gives the amount a pickup
+  of that item adds (`getbulletmax`); an equipped weapon, or a stack used up meanwhile, is not taken
+  back (logged). Which player keeps it follows the order the flags arrive, not the order of the
+  "Yes" presses: a player still in the status screen after taking has not sent its pickup yet.
+* Shared loot, a pool item from the partner's event that this game replayed: given back by amount as
+  above, only while the replay's window is open.
+* A key item both take at the same moment may end up twice in the joiner's inventory.
 * A key put into the item box is not "used up" for the partner.
 * Two voices of the partner within one lost datagram's frames play only the last.
 * Enemy options changed in game: a joiner that loads a room before the change arrives builds that

@@ -164,8 +164,9 @@ Music and voice (`music_volume`) and Sound effects (`sfx_volume`), 0-100%.
 
 The CO-OP page (also in F3) holds your appearance ("You appear as", see
 [ACTORS.md](ACTORS.md)), name tags, the ping display, follow host; the host's game rules: loot
-mode, "Important items for both" (with shared loot, weapons and ink ribbons stay each player's own
-to take), "Synchronized cutscene skip" (a cutscene both watch is skipped once both pressed skip),
+mode (Shared: each item lies there once and whoever takes it has it, so you split the supplies; key
+items go to both. Individual: each player takes their own copy), "Important items for both" (with
+shared loot, on by default: weapons and ink ribbons lie there for each player), "Synchronized cutscene skip" (a cutscene both watch is skipped once both pressed skip),
 freezing enemies while trading, remembering partner inventories; and the connection: mode, host
 port and UPnP. See [COOP.md](COOP.md#settings). The address, room code, server, name, password
 and the save to start from or join with are chosen in the lobby (MULTIPLAYER) or F3.

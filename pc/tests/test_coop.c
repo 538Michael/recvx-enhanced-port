@@ -98,6 +98,10 @@ static void test_events(void)
     BAD(EV_PICKUP, 0, e->u.pk.item = 156);
     BAD(EV_PICKUP, 0, e->u.pk.bit = 512);
     BAD(EV_PICKUP, 0, e->u.pk.bit = -2);
+    BAD(EV_PICKUP, 0, e->u.pk.undo = 1);                  /* only the host settles a spot both took */
+    BAD(EV_PICKUP, 1, e->u.pk.undo = 2);
+    BAD(EV_PICKUP, 1, (e->u.pk.undo = 1, e->u.pk.bit = -1));
+    { Event u = ev(EV_PICKUP); u.u.pk.undo = 1; u.u.pk.item = 0; CHECK(coop_check_event(&u, 1) == COOP_OK); }
     BAD(EV_LOST, 0, e->u.lost.item = 0);
     BAD(EV_LOST, 0, e->u.lost.item = 200);
     /* B3: grabs */
@@ -533,6 +537,7 @@ static int sane(const Event* e)
     int k;
     if (e->type == 0 || e->type >= EV_TYPES) return 0;
     if (e->type == EV_ENE_HIT) for (k = 0; k < 6; k++) if (e->u.eh.jnt[k] < -1 || e->u.eh.jnt[k] > 63) return 0;
+    if (e->type == EV_PICKUP && (e->u.pk.undo > 1 || e->u.pk.bit < -1 || e->u.pk.bit >= 512)) return 0;
     if (e->type == EV_FLAGS) { if (e->u.fl.n > 6) return 0; for (k = 0; k < e->u.fl.n; k++) if (e->u.fl.word[k] >= 120) return 0; }
     if (e->type == EV_BLOB || e->type == EV_ESTATE || e->type == EV_OWN) if (e->u.blob.len > 64 || e->u.blob.off + e->u.blob.len > e->u.blob.total || e->u.blob.pad > 1) return 0;
     if (e->type == EV_OWN && e->u.blob.total != COOP_OWN_SIZE) return 0;

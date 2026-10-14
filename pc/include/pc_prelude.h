@@ -111,6 +111,7 @@ void  coop_fx_player(void);                    /* game.c, before bhControlPlayer
 int   coop_fx_step(int i, int after);          /* effect.c bhControlEffect, around effect i's step (1 before: call after) */
 void  coop_item_granted(int item);            /* sub1.c GetItem: an event gave us this item without asking */
 void  coop_item_taken(int bit, int etc);      /* event.c bhItmCk: we took the item of trigger etc, its it_flg bit */
+void  coop_item_late(int bit);                /* event.c bhItmCk: we took an item whose it_flg bit was set already (the partner was first) */
 int   pc_no_ink_ribbon(void);                 /* typewriters save without an ink ribbon (setting; in co-op the host's rule) */
 void  coop_fx_particle(struct BH_PWORK* ewP, int lnk, const void* offP, const void* dirP, unsigned int col, unsigned int dst, int typ, int mk2);   /* effsub3.c bhSetEffParticle(Mk2) */
 /* "You appear as" (pc/glue/actor_glue.c): another model drawn in place of the player / of the

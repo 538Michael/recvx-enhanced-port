@@ -103,8 +103,9 @@ int coop_check_event(const Event* e, int from_host)
         for (k = 0; k < e->u.fl.n; k++)
             if (e->u.fl.word[k] >= 120) return COOP_BAD_FIELD;
         return COOP_OK;
-    case EV_PICKUP:
-        return e->u.pk.item < 156 && e->u.pk.bit >= -1 && e->u.pk.bit < 512 ? COOP_OK : COOP_BAD_FIELD;
+    case EV_PICKUP:   /* undo: the host settles a spot both took (shared loot) */
+        if (e->u.pk.undo && !from_host) return COOP_BAD_DIR;
+        return e->u.pk.item < 156 && e->u.pk.bit >= -1 && e->u.pk.bit < 512 && e->u.pk.undo <= 1 && (!e->u.pk.undo || e->u.pk.bit >= 0) ? COOP_OK : COOP_BAD_FIELD;
     case EV_LOST:
         return e->u.lost.item > 0 && e->u.lost.item < 156 ? COOP_OK : COOP_BAD_FIELD;
     case EV_GRAB:
