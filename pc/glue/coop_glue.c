@@ -1222,6 +1222,8 @@ static int partner_held(void)
     return 0;
 }
 
+static int etr_lim;                     /* RECVX_ENEMY_TRACE (enemy_trace) */
+uint64_t gs_frame_count(void);
 /* bhControlEnemy, around bhJumpEnemy; 1 = the step is done (puppet) */
 int coop_enemy_begin(BH_PWORK* ep)
 {
@@ -1271,6 +1273,9 @@ void coop_enemy_end(BH_PWORK* ep)
         BH_PWORK* a = &ply2_save;
         int dh = a->hp - ply2.hp, grab = ply2.mode0 == 4 && a->mode0 != 4 && a->mode0 != 6;
         if (swap_pid >= 0) { sys->ply_id = swap_pid; swap_pid = -1; }
+        if (etr_lim > 0 && (grab || dh > 0 || (ply2.mode0 == 2 && a->mode0 != 2)))
+            fprintf(stderr, "atk g=%u s=%d id=%d ty=%d to=P %s dh=%d m=%d.%d.%d.%d\n", (unsigned)gs_frame_count(), i, ep->id, ep->type, grab ? "grab" : "hit", dh,
+                    ep->mode0, ep->mode1, ep->mode2, ep->mode3);
         if (grab && ep->id == 1 && !(ep->flg & 0x80) && ep->exp0 && holding(ep) && have_peer)
             grab_out(i, ep);   /* the client's game runs the grab */
         else if (dh > 0 || (ply2.mode0 == 2 && a->mode0 != 2) || grab) {
@@ -1622,20 +1627,20 @@ static struct { int sig[6], still; } watch[128];
    zombie's exp0 flag word (0x20000 holding), run here or puppet, the enemy's and our position.
    Only reads. */
 uint64_t gs_frame_count(void);
+static int etr_lim = -1;
 static void enemy_trace(BH_PWORK* ep, int i, int ran)
 {
-    static int lim = -1;
+    int lim = etr_lim < 0 ? (etr_lim = getenv("RECVX_ENEMY_TRACE") ? atoi(getenv("RECVX_ENEMY_TRACE")) : 0) : etr_lim;
     float dh, dp = -1.0f;
-    if (lim < 0) lim = getenv("RECVX_ENEMY_TRACE") ? atoi(getenv("RECVX_ENEMY_TRACE")) : 0;
     if (!lim || !sys || !plp || (ep->flg & 0x80) || !ep->mode0 || ep->hp < 0 || ep->id >= 31) return;
     dh = sqrtf((ep->px - plp->px) * (ep->px - plp->px) + (ep->pz - plp->pz) * (ep->pz - plp->pz));
     if (coop_on && p2_seen_room == coop_room_key())
         dp = sqrtf((ep->px - ply2.px) * (ep->px - ply2.px) + (ep->pz - ply2.pz) * (ep->pz - ply2.pz));
     if (dh > lim && (dp < 0 || dp > lim)) return;
-    fprintf(stderr, "etr g=%u s=%d id=%d t=%c dH=%.1f dP=%.1f m=%d.%d.%d.%d mtn=%u f=%d hp=%d pH=%d.%d pP=%d.%d x=%x %s e=%.0f,%.0f h=%.0f,%.0f\n", (unsigned)gs_frame_count(), i, ep->id,
+    fprintf(stderr, "etr g=%u s=%d id=%d ty=%d t=%c dH=%.1f dP=%.1f m=%d.%d.%d.%d mtn=%u f=%d hp=%d pH=%d.%d pP=%d.%d bH=%d bP=%d x=%x %s e=%.0f,%.0f h=%.0f,%.0f\n", (unsigned)gs_frame_count(), i, ep->id, ep->type,
             !coop_on || !is_host ? '-' : tgt[i] ? 'P' : 'H', dh, dp, ep->mode0, ep->mode1, ep->mode2, ep->mode3, ep->mtn_no, ep->frm_no >> 16,
-            ep->hp, plp->hp, plp->mode0, dp < 0 ? 0 : ply2.hp, dp < 0 ? 0 : ply2.mode0, ep->id == 1 && ep->exp0 ? *(int*)(ep->exp0 + 0x40) : 0, ran ? "run" : "pup",
-            ep->px, ep->pz, plp->px, plp->pz);
+            ep->hp, plp->hp, plp->mode0, dp < 0 ? 0 : ply2.hp, dp < 0 ? 0 : ply2.mode0, ply_busy(plp), dp < 0 ? 0 : ply_busy(&ply2) || partner_held(),
+            ep->id == 1 && ep->exp0 ? *(int*)(ep->exp0 + 0x40) : 0, ran ? "run" : "pup", ep->px, ep->pz, plp->px, plp->pz);
 }
 
 void pc_enemy_watch(BH_PWORK* ep, int i, int ran)
