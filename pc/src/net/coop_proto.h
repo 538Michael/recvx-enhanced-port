@@ -1,4 +1,4 @@
-/* Online co-op wire format (protocol 18, docs/COOP.md "Protocol 18" and "Security") and
+/* Online co-op wire format (protocol 19, docs/COOP.md "Protocol 19" and "Security") and
    the checks every received packet passes before it may change anything. No game state here:
    pc/glue/coop_glue.c applies what passes; pc/tests/test_coop.c feeds malformed packets. */
 #ifndef RECVX_COOP_PROTO_H
@@ -11,11 +11,13 @@ extern "C" {
 #endif
 
 #define COOP_MAGIC 0x504F4F43u          /* "COOP" */
-#define COOP_VERSION 18                 /* 11: join code, datagrams <= 1200 bytes, checked events, EV_ATR; 12: EV_FX; 13: EV_GRANT;
+#define COOP_VERSION 19                 /* 11: join code, datagrams <= 1200 bytes, checked events, EV_ATR; 12: EV_FX; 13: EV_GRANT;
                                            14: EV_TSCREEN, BUSY_TRADE, OPT_TRADE_FREEZE; 15: EV_GONE;
                                            16: player id and rejoin tag in PoseExt, EV_OWN, saved inventories (EV_BLOB pad);
                                            17: TS_WANT, TS_DECLINE (trade screen item requests);
-                                           18: Pose.voice_n/voice (the sender's player voices) */
+                                           18: Pose.voice_n/voice (the sender's player voices);
+                                           19: game rules OPT_IMPORTANT, OPT_NO_RIBBON, OPT_SKIP_SYNC; PF_CINE, PF_SKIP and
+                                               EV_SKIP (synchronized cutscene skip); unknown flag and option bits refused */
 #define COOP_DGRAM_MAX 1200             /* bytes per datagram (below every internet path MTU) */
 #define COOP_EV_FRAME 16                /* events per frame (over the frame's datagrams) */
 #define COOP_SNAP_FRAME 48              /* enemy snapshots per frame */
@@ -24,8 +26,15 @@ extern "C" {
 #define COOP_CODE_LEN 8                 /* join code: 8 of the 32 characters below (40 bits) */
 
 enum { PKT_POSE = 1, PKT_BYE = 2, PKT_REJECT = 3 };
-enum { PF_IN_GAME = 1, PF_VISIBLE = 2, PF_ROOM_MTN = 4, PF_WANT_BLOB = 8, PF_EXT = 16 };
-enum { OPT_INDIVIDUAL = 1, OPT_TRADE_FREEZE = 2 };   /* Pose.opts: the host's session options */
+enum { PF_IN_GAME = 1, PF_VISIBLE = 2, PF_ROOM_MTN = 4, PF_WANT_BLOB = 8, PF_EXT = 16,
+       PF_CINE = 32,                    /* in a cutscene its skip button could skip now */
+       PF_SKIP = 64,                    /* ... and we pressed it: we wait for the partner (synchronized skip) */
+       PF_ALL = 127 };
+enum { OPT_INDIVIDUAL = 1, OPT_TRADE_FREEZE = 2,   /* Pose.opts: the host's session options (its game rules) */
+       OPT_IMPORTANT = 4,               /* shared loot: important items (weapons, ink ribbons) are each player's own to take */
+       OPT_NO_RIBBON = 8,               /* typewriters save without an ink ribbon */
+       OPT_SKIP_SYNC = 16,              /* a cutscene both play is skipped once both pressed skip */
+       OPT_ALL = 31 };
 enum { BUSY_NONE, BUSY_EVENT, BUSY_MENU, BUSY_BOX, BUSY_TRADE };
 enum { MSET_OWN = -1, MSET_ROOM = -2, MSET_NONE = -3 };
 #define MNW_ROOM 0x7FFE
@@ -83,7 +92,9 @@ enum { REC_UNKNOWN, REC_NONE, REC_HAVE, REC_OFF };   /* PoseExt.rec: not known y
 
 enum { EV_ENE_HIT = 1, EV_PLY_HIT = 2, EV_BLOB = 3, EV_FLAGS = 4, EV_PICKUP = 5, EV_LOST = 6,
        EV_ESTATE = 7, EV_GRAB = 8, EV_UNGRAB = 9, EV_TRIG = 10, EV_TRADE = 11, EV_BOX = 12, EV_BOXFIX = 13,
-       EV_SPAWN = 14, EV_EOPTS = 15, EV_ATR = 16, EV_FX = 17, EV_GRANT = 18, EV_TSCREEN = 19, EV_GONE = 20, EV_OWN = 21, EV_TYPES };
+       EV_SPAWN = 14, EV_EOPTS = 15, EV_ATR = 16, EV_FX = 17, EV_GRANT = 18, EV_TSCREEN = 19, EV_GONE = 20, EV_OWN = 21,
+       EV_SKIP = 22, EV_TYPES };
+#define SKIP_GO 1                       /* EV_SKIP: both pressed skip, the cutscene ends now (host -> guest) */
 enum { TD_OFFER = 1, TD_ANSWER = 2, TD_CANCEL = 3, TD_QUERY = 4 };
 /* EV_TSCREEN (protocol 14), the trade screen: REQ asks, CANCEL withdraws the request, OPEN accepts it
    (both open the screen), CLOSE leaves it; STATE is a player's side (grid, selection, ready); the host
@@ -145,6 +156,7 @@ typedef struct Event {
             int16_t bit;                /* the spot's it_flg bit, -1 when not seen */
         } pk;
         struct { uint8_t item; } lost;  /* a key item of ours was used up */
+        struct { uint8_t op; } sk;      /* EV_SKIP: SKIP_GO; Event.stg/rom: the host's room (the cutscene's) */
         struct {                        /* a grab changes hands; the states came before as EV_ESTATE */
             uint8_t child, state, pset; /* child slot (255 none); state: the transfer holds them */
             int8_t mdl, cmdl;

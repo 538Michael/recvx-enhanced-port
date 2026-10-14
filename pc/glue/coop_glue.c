@@ -56,7 +56,8 @@ extern const char PlyFlip[23];
 extern const int WpnAngTab[21][3];
 extern NJS_POINT3 PlayerPos;            /* sdfunc.c: where CallPlayerVoice plays */
 
-CoopState g_coop = { .port = COOP_DEFAULT_PORT, .join = "127.0.0.1:7140", .follow = 1, .upnp = 1, .nametag = 1, .items = COOP_ITEMS_HOST, .server = COOP_DEFAULT_SERVER, .trade_freeze = 1, .remember = 1, .peer_rec = -1 };
+CoopState g_coop = { .port = COOP_DEFAULT_PORT, .join = "127.0.0.1:7140", .follow = 1, .upnp = 1, .nametag = 1, .items = COOP_ITEMS_HOST, .server = COOP_DEFAULT_SERVER, .trade_freeze = 1, .remember = 1, .peer_rec = -1,
+                    .important = 1, .skip_sync = 1 };
 int coop_on;
 int appear_on;                          /* co-op off, "You appear as" in use: our-player hooks only */
 
@@ -1866,6 +1867,16 @@ static void apply_snapshots(void)
 #define NFLAG 120                       /* ev_flg it_flg ic_flg ed_flg ky_flg mp_flg: 0x90..0x270 */
 #define IT_FLG 32                       /* first it_flg word in the block */
 #define ITWP_N (int)(39936 / sizeof(O_WRK))   /* sys->itwp, as bhFirstGameStart allocates it */
+/* Shared loot, "important items for both" (OPT_IMPORTANT, important_kinds below): each player's own pickups of
+   those items live in save-region words no game code uses (the item boxes end at sys->itm[255], GRANT0 below
+   starts at 320), so they go wherever the player's items go: its saves, the host's game state,
+   EV_OWN and the host's saved partner inventories. IMP_SPOTS: the it_flg bits of important item spots, as learnt
+   when one was taken in a session; IMP_TAKEN: which of them this player took (its it_flg bits there). Those bits
+   are left out of EV_FLAGS both ways, and a guest loading the host's game state keeps its own (imp_restore). */
+#define IMP_SPOTS 256                   /* 16 words: it_flg bits */
+#define IMP_TAKEN 272                   /* 16 words */
+static int own_copies(void);
+static void imp_restore(const unsigned int* host);
 static unsigned char blob[0x900], blob_in[0x900];   /* the game state to load; as it arrives */
 _Static_assert(offsetof(SYS_WORK, save_end) - offsetof(SYS_WORK, version) == 0x834 && 0x834 <= sizeof(blob), "EV_BLOB: the save region as the 32-bit game has it");
 static CoopXfer blob_x;
@@ -1980,11 +1991,12 @@ void coop_own_from_save(const void* save)
 /* after bhPopGameData put the host's state in place (the game reads it at the restart) */
 static void own_restore(void)
 {
-    unsigned int box[160], ic = sys->ic_flg[15];
+    unsigned int box[160], ic = sys->ic_flg[15], spots[16];
     /* our saved items came with the state (the host's record of us): requested, or a rejoin after
        our game ended without a goodbye - not over the game we are playing (a resync) */
     int i, rec = blob_rec && (want_rec || own_fixed || !own_valid);
     memcpy(box, &sys->itm[64], sizeof(box));   /* the host's: with shared loot, the one box both use */
+    memcpy(spots, &sys->itm[IMP_SPOTS], sizeof(spots));   /* the important item spots the host's game knows */
     own_fixed = 0;   /* a given source applies to this join; from now on our game state */
     if (rec) note("Restored your saved items from the host");   /* already in place: the host put them into the state */
     else if (own_valid) {
@@ -2008,6 +2020,7 @@ static void own_restore(void)
     for (i = 0; i < 4; i++)   /* we died (joining again after the game over): full health, as a new game - else we died again at once, in a loop */
         if (sys->ply_hp[i] < 0) sys->ply_hp[i] = sys->gm_mode == 2 ? 320 : 160;
     if (!(rx.opts & OPT_INDIVIDUAL)) memcpy(&sys->itm[64], box, sizeof(box));
+    if (own_copies()) imp_restore(spots);
     blob_rec = want_rec = 0;   /* this join's; later states (a story switch, a host restart) keep our own */
 }
 
@@ -2249,6 +2262,11 @@ static int blob_record(unsigned char* b)
     if (!(rx_ext.items == ITEMS_HOST || id_rejoin) || !(r = rec_find(id_pid))) return 0;
     memcpy(box, b + BO(itm) + 64 * 4, sizeof(box));
     memcpy(b + BO(itm), r->own + OO(itm), sizeof(own.itm));
+    {   /* the important item spots both games know (the guest keeps its own pickups of them: imp_restore) */
+        unsigned int* spots = (unsigned int*)(b + BO(itm)) + IMP_SPOTS;
+        int k;
+        for (k = 0; k < 16; k++) spots[k] |= sys->itm[IMP_SPOTS + k];
+    }
     if (!g_coop.loot) memcpy(b + BO(itm) + 64 * 4, box, sizeof(box));   /* shared loot: one item box, ours */
     memcpy(b + BO(ply_stflg), r->own + OO(stflg), sizeof(own.stflg));
     memcpy(b + BO(ply_wno), r->own + OO(wno), sizeof(own.wno));
@@ -2388,6 +2406,71 @@ static int individual(void) { return is_host ? g_coop.loot : peer_opts >= 0 && (
 static int key_item(int id) { return id > 0 && id < 156 && (itemdata[id].type & 0x40); }
 static int item_word(int w) { return w >= IT_FLG && w < IT_FLG + 32; }
 
+/* The host's game rules of protocol 19 (Pose.opts) as this session has them: the host's settings; the guest
+   follows the host's last pose (OPT_IMPORTANT, OPT_SKIP_SYNC) */
+static int rule(int opt)
+{
+    if (is_host) return opt == OPT_IMPORTANT ? g_coop.important : opt == OPT_SKIP_SYNC && g_coop.skip_sync;
+    return peer_opts >= 0 && (peer_opts & opt);
+}
+
+/* event.c bhPlItemCheck, ps2_McSaveFile.c mcWriteStartSaveFile: typewriters save without an ink ribbon and use none.
+   The setting (single player, and the host); a guest plays by the host's rule once it knows it. */
+int pc_cfg_no_ink_ribbon(void);         /* host.c: the GAMEPLAY setting */
+int pc_no_ink_ribbon(void)
+{
+    if (coop_on && !is_host && !echo_delay && peer_opts >= 0) return (peer_opts & OPT_NO_RIBBON) != 0;
+    return pc_cfg_no_ink_ribbon();
+}
+
+/* Shared loot, "important items for both" (OPT_IMPORTANT, docs/COOP.md "Loot modes"): the item kinds each player
+   takes for itself, as individual loot does for every item - one taking it leaves the partner's copy lying. Every
+   other item stays shared: ammo, herbs, sprays, other supplies; key items stay shared in both modes (story
+   progress, a used-up key goes for both); files and maps are progress flags. */
+static const struct { const char* kind; unsigned int type_bits; int id; } important_kinds[] = {
+    { "weapons (guns, launchers, bow gun, knife)", 0x1, 0 },   /* itemdata[].type 0x1: the game's weapon items */
+    { "ink ribbons",                               0,   31 },
+};
+static int important_item(int id)
+{
+    unsigned int k;
+    if (id <= 0 || id >= 156) return 0;
+    for (k = 0; k < sizeof(important_kinds) / sizeof(important_kinds[0]); k++)
+        if ((itemdata[id].type & important_kinds[k].type_bits) || id == important_kinds[k].id) return 1;
+    return 0;
+}
+static int own_copies(void) { return !individual() && rule(OPT_IMPORTANT); }
+static unsigned int imp_spots(int w) { return sys->itm[IMP_SPOTS + ((w - IT_FLG) & 15)]; }   /* of an item word (it_flg or ic_flg) */
+
+/* event.c bhItmCk: we took the item of trigger `etc`, its it_flg bit `bit` (0..511) */
+void coop_item_taken(int bit, int etc)
+{
+    int id;
+    if (!sys || !rom || !sys->itwp || etc >= rom->etc_n || rom->etcp[etc].prm0 >= ITWP_N || !own_copies()) return;
+    id = sys->itwp[rom->etcp[etc].prm0].id;
+    if (!important_item(id == 130 ? 35 : id)) return;   /* (130 is 35, as GetItem) */
+    sys->itm[IMP_SPOTS + (bit >> 5)] |= 0x80000000u >> (bit & 31);
+    host_log("coop: took item %d (flag %d): important items for both, the partner's copy stays\n", id, bit);
+}
+
+/* guest, after the host's game state was loaded and our items put back (own_restore): the important item spots as
+   we took them, the others as the host's game has them. `host`: the state's IMP_SPOTS (the host's, and those of our
+   saved record with it) */
+static void imp_restore(const unsigned int* host)
+{
+    int k, spots = 0, taken = 0;
+    for (k = 0; k < 16; k++) {
+        unsigned int m = sys->itm[IMP_SPOTS + k] | host[k], t = sys->itm[IMP_TAKEN + k] & m;
+        spots += __builtin_popcount(m);
+        taken += __builtin_popcount(t);
+        sys->itm[IMP_SPOTS + k] = m;
+        sys->itm[IMP_TAKEN + k] = t;
+        sys->it_flg[k] = (sys->it_flg[k] & ~m) | t;
+        sys->ic_flg[k] &= ~(m & ~t);   /* not examined either */
+    }
+    if (spots) host_log("coop: important items for both: %d spots known, %d of them taken by us\n", spots, taken);
+}
+
 /* the partner took item `item`: the game's own GetItem adds it like a pickup of ours would
    (stacking ammo); 0 when a full inventory has no room for it */
 static int give_item(int item)
@@ -2454,10 +2537,11 @@ static void diff_flags(void)
     unsigned int* inv = &sys->itm[sys->ply_id * 16];
     unsigned char keys[156] = { 0 };
     Event e = { 0 };
-    int w, i, ind = individual();
+    int w, i, ind = individual(), own = own_copies();
     e.type = EV_FLAGS;
     e.u.fl.base = in_last;
     tick++;
+    if (own) for (w = 0; w < 16; w++) sys->itm[IMP_TAKEN + w] = sys->it_flg[w] & sys->itm[IMP_SPOTS + w];   /* goes with our items */
     if (tick - flag_at >= 30) memset(it_new, 0, sizeof(it_new));
     for (w = 0; w < NFLAG; w++) {
         unsigned int set = f[w] & ~last[w], clr = last[w] & ~f[w];
@@ -2467,6 +2551,8 @@ static void diff_flags(void)
         if (!item_word(w)) prog_at = tick;
         if (trace && w >= 64 && w < 96) fprintf(stderr, "coop: ed_flg word %d set %08x clr %08x (ours, room %d/%d)\n", w - 64, set, clr, sys->stg_no, sys->rom_no);
         if (!have_peer || (ind && item_word(w))) continue;
+        if (own && item_word(w) && !((set | clr) & ~imp_spots(w))) continue;   /* only our own important item spots changed */
+        if (own && item_word(w)) { set &= ~imp_spots(w); clr &= ~imp_spots(w); }
         e.u.fl.word[e.u.fl.n] = w; e.u.fl.set[e.u.fl.n] = set; e.u.fl.clr[e.u.fl.n] = clr;
         if (++e.u.fl.n == 6) { queue_event(&e); e.u.fl.n = 0; }
     }
@@ -2500,6 +2586,8 @@ static void diff_flags(void)
             host_log("coop: took item %d (etc %d), the one the partner left for us\n", p.u.pk.item, sys->etc_idx);
         } else if (ind && !key_item(p.u.pk.item)) {
             host_log("coop: took item %d (etc %d), individual loot\n", p.u.pk.item, sys->etc_idx);
+        } else if (own && (p.u.pk.bit >= 0 ? (sys->itm[IMP_SPOTS + (p.u.pk.bit >> 5)] << (p.u.pk.bit & 31)) >> 31 : important_item(p.u.pk.item))) {
+            host_log("coop: took item %d (etc %d), our own copy (important items for both)\n", p.u.pk.item, sys->etc_idx);
         } else {
             if (p.u.pk.item && event_gave(p.u.pk.item)) {   /* an event's item: it goes as EV_GRANT, to the floor */
                 host_log("coop: item %d came from an event: the partner gets its spot only\n", p.u.pk.item);
@@ -2586,6 +2674,7 @@ static int apply_session_event(const Event* e)
             if (trace && w >= 64 && w < 96)
                 fprintf(stderr, "coop: ed_flg word %d set %08x clr %08x (the partner's, as sent %08x %08x)\n", w - 64, c.u.fl.set[j], c.u.fl.clr[j], e->u.fl.set[j], e->u.fl.clr[j]);
             if (is_host && item_word(w) && individual()) continue;   /* individual loot: the guest's item words are its own */
+            if (item_word(w) && own_copies()) { c.u.fl.set[j] &= ~imp_spots(w); c.u.fl.clr[j] &= ~imp_spots(w); }   /* ours (important items) */
             f[w] = (f[w] | c.u.fl.set[j]) & ~c.u.fl.clr[j];
             last[w] = (last[w] | c.u.fl.set[j]) & ~c.u.fl.clr[j];
         }
@@ -4160,12 +4249,21 @@ static void escrow_taken(unsigned int w)
     else host_log("coop: trade: %08x was taken after all, our copy was used meanwhile: it stays\n", w);
 }
 
+/* "T / Left stick press": what presses binding row `row` (keyboard, gamepad), for hints */
+static const char* binding_names(int row, char* out, int n)
+{
+    char k1[24], k2[24];
+    int kb = bind_get(row, 0, 0), kp = bind_get(row, 1, 0);
+    snprintf(out, n, "%s%s%s", kb ? bind_code_name(0, kb, k1, sizeof(k1)) : "", kb && kp ? " / " : "", kp ? bind_code_name(1, kp, k2, sizeof(k2)) : "");
+    return out;
+}
+
 /* at the hand-off, after trade_frame */
 static void ts_frame(void)
 {
     unsigned int now = net_ms();
-    int key = pad_trade_held(), press = key && !ts.key_was, me, partner, near, kb = bind_get(B_TRADE, 0, 0), kp = bind_get(B_TRADE, 1, 0);
-    char m[96], k1[24], k2[24];
+    int key = pad_trade_held(), press = key && !ts.key_was, me, partner, near;
+    char m[96];
     static const char* env = (const char*)-1;
     ts.key_was = key;
     {   /* test aid RECVX_COOP_TSCREEN="hostframe:act,...": k the trade key, s<cell> select, r ready, l leave, d disconnect, i log the inventory,
@@ -4200,8 +4298,7 @@ static void ts_frame(void)
         }
     }
     snprintf(g_trade.name, sizeof(g_trade.name), "%.15s", rx_ext.name[0] ? rx_ext.name : "Partner");
-    snprintf(g_trade.key, sizeof(g_trade.key), "%s%s%s", kb ? bind_code_name(0, kb, k1, sizeof(k1)) : "", kb && kp ? " / " : "",
-             kp ? bind_code_name(1, kp, k2, sizeof(k2)) : "");
+    binding_names(B_TRADE, g_trade.key, sizeof(g_trade.key));
     host_swap_frame();
     me = tx_in_game && local_visible() && plp->mode0 == 1 && plp->mnwP == plp->mnwPb && plp->hp >= 0;
     if (is_host) { int i; for (i = 0; i < 128 && me; i++) if (owned[i]) me = 0; }   /* the partner runs a grab of one of ours */
@@ -4574,6 +4671,87 @@ static void grant_frame(void)
     t->prm0 = gslot;
 }
 
+/* ---------------------------------------------------------------- synchronized cutscene skip (protocol 19, OPT_SKIP_SYNC)
+   docs/COOP.md "Cutscenes". Each game plays a cutscene of the room itself (the triggering player's script, the
+   partner's replay of its world event), and its skip button jumps that script to its end, which places the player
+   where the scene leaves it. Skipped on one side only, that player walked off while the partner still watched.
+   Now, while the partner plays a cutscene in our room too, the skip button (pad.c, coop_skip_pad) does not skip:
+   it asks (PF_SKIP in our pose), both see who waits (coop_skip_hint), and once both asked the host skips its
+   own and sends EV_SKIP; the guest skips on it. Each script then ends the scene as a skip does in single player,
+   on both sides at the same time. A request ends with the cutscene; a partner who is not (or no longer) in a
+   cutscene in our room does not hold a skip up. */
+char coop_skip_hint[96];
+static int skip_want;                   /* we pressed skip in this cutscene: waiting for the partner */
+static unsigned int pad_test;           /* test aid (RECVX_COOP_PAD, coop_testaids.c): presses for the next pad read */
+#define PAD_SKIP 0x10000                /* the game's skip button (pad.c pad_type entry 16, system.c bhSysCallGame) */
+extern unsigned int* pad_type[4];       /* pad.c: the key types' button tables */
+
+/* the skip button would skip the cutscene we are in now (bhSysCallGame's test) */
+static int cine_now(void)
+{
+    return sys && (sys->tk_flg & 0x80) && (sys->cb_flg & 0x4) && !(sys->cb_flg & 0x10000000) && !(sys->st_flg & 0x1C040008) &&
+           !(sys->ss_flg & 0x80000000);
+}
+/* the partner plays a cutscene in our room too: a skip waits for both */
+static int skip_together(void)
+{
+    return coop_on && have_peer && !echo_delay && rule(OPT_SKIP_SYNC) && have_rx && (rx.flags & PF_CINE) && rx.stg == sys->stg_no &&
+           rx.rom == sys->rom_no;
+}
+static void skip_now(const char* why)
+{
+    sys->cb_flg |= 0x10000000;   /* as the skip button (bhSysCallGame) */
+    skip_want = 0;
+    host_log("coop: cutscene skipped in %d/%d (%s)\n", sys->stg_no, sys->rom_no, why);
+}
+
+/* pad.c bhSetPad (via trade_pad): the skip button while the partner plays a cutscene with us asks instead */
+unsigned int coop_skip_pad(unsigned int pad)
+{
+    static unsigned int prev;
+    int press;
+    pad |= pad_test;
+    pad_test = 0;
+    press = (pad & ~prev & PAD_SKIP) != 0;
+    prev = pad;
+    if (!coop_on || !cine_now() || !skip_together()) return pad;
+    if (press && !skip_want) {
+        skip_want = 1;
+        CallSystemSe(0, 3);
+        host_log("coop: we want to skip the cutscene in %d/%d: waiting for the partner\n", sys->stg_no, sys->rom_no);
+    }
+    return pad & ~PAD_SKIP;
+}
+
+/* every frame in a session, before our pose goes out */
+static void skip_frame(void)
+{
+    static int partner_asked;
+    int cine = cine_now(), together = cine && skip_together(), asked = together && (rx.flags & PF_SKIP);
+    char key[48];
+    if (!cine) {
+        if (skip_want) host_log("coop: the cutscene ended: our skip request is over\n");
+        skip_want = 0;
+    } else if (skip_want && !together) skip_now("the partner is not in it (any more)");
+    else if (skip_want && asked && is_host) {
+        Event e = { 0 };
+        e.type = EV_SKIP;
+        e.u.sk.op = SKIP_GO;
+        queue_event(&e);
+        skip_now("both asked: the partner skips with us");
+    }
+    if (asked && !partner_asked && !skip_want) CallSystemSe(0, 2);   /* the partner asks us */
+    partner_asked = asked;
+    tx.flags = (tx.flags & ~(PF_CINE | PF_SKIP)) | (cine ? PF_CINE : 0) | (cine && skip_want ? PF_SKIP : 0);
+    coop_skip_hint[0] = 0;
+    if (together && skip_want) snprintf(coop_skip_hint, sizeof(coop_skip_hint), "Waiting for %s to skip...", g_trade.name);   /* (its name as ts_frame shows it) */
+    else if (asked) {
+        unsigned int raw = pad_type[sys->keytype & 3][16];   /* the DS2 button of the skip action: binding row in report order */
+        int row = raw >= 0x100 ? __builtin_ctz(raw) - 8 : raw ? __builtin_ctz(raw) + 8 : B_SELECT;
+        snprintf(coop_skip_hint, sizeof(coop_skip_hint), "%s wants to skip - press %s to skip", g_trade.name, binding_names(row, key, sizeof(key)));
+    }
+}
+
 static int apply_event(const Event* e)
 {
     if (e->type == EV_EOPTS) { if (!is_host) enemy_opts_from_host(&e->u.eo); return 1; }   /* before the blob it precedes */
@@ -4589,6 +4767,10 @@ static int apply_event(const Event* e)
         return 1;
     }
     if (e->type == EV_TRIG) return sys ? apply_trig(e) : 1;
+    if (e->type == EV_SKIP) {   /* both asked to skip: the host skipped, we too (only while we still ask, in its room) */
+        if (!is_host && sys && skip_want && cine_now() && e->stg == sys->stg_no && e->rom == sys->rom_no) skip_now("the host skips with us");
+        return 1;
+    }
     if (e->type == EV_TRADE) return apply_trade(e);
     if (e->type == EV_TSCREEN) return apply_tscreen(e);
     if (e->type == EV_BOX || e->type == EV_BOXFIX)   /* one box for both only with shared loot */
@@ -5317,6 +5499,7 @@ void coop_frame(void)
         CoopTest t = { req, is_host, coop_on, echo_delay, tx_in_game, proxy_ok, frozen, test_clock(), frame_no, owned, &ply2, move_player };
         coop_test_aids(&t);
         req = t.req;
+        pad_test |= t.pad;
     }
     if (req == COOP_REQ_STOP) stop();
     else if (req == COOP_REQ_KICK) kick();
@@ -5361,7 +5544,8 @@ void coop_frame(void)
     tx_ext.lobby = g_coop.lobby;
     if (!is_host) { memcpy(tx_ext.pid, g_coop.pid, 16); memcpy(tx_ext.tag, my_tag, 16); tx_ext.items = (uint8_t)items_wire(); }
     else tx_ext.rec = !g_coop.remember ? REC_OFF : !id_ok ? REC_UNKNOWN : rec_have(id_pid) ? REC_HAVE : REC_NONE;
-    tx.opts = is_host ? (g_coop.loot ? OPT_INDIVIDUAL : 0) | (g_coop.trade_freeze ? OPT_TRADE_FREEZE : 0) : 0;
+    tx.opts = is_host ? (g_coop.loot ? OPT_INDIVIDUAL : 0) | (g_coop.trade_freeze ? OPT_TRADE_FREEZE : 0) | (g_coop.important ? OPT_IMPORTANT : 0) |
+                        (pc_cfg_no_ink_ribbon() ? OPT_NO_RIBBON : 0) | (g_coop.skip_sync ? OPT_SKIP_SYNC : 0) : 0;
     tx.regroup = regroups;
     tx.seq = frame_no;
     if (echo_delay) {
@@ -5428,6 +5612,7 @@ void coop_frame(void)
         }
         if (sys && (sys->tk_flg & 0x28)) atr_key = -1;   /* continue, game over, load in the same room: its windows and records start again */
         if (sys && plp && rom && tx_in_game && in_session_game()) world_sync();
+        if (sys) skip_frame();
         if (ring.overflow) resync();
         if (have_peer && !join_dns) send_frame();
     }

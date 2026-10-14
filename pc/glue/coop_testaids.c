@@ -65,6 +65,31 @@ void coop_test_aids(CoopTest* t)
             wp = wp[n] == ',' ? wp + n + 1 : NULL;
         }
     }
+    {   /* test aid: RECVX_COOP_GOTO="hostframe:x:z:angle[,...]": our player alone to x/z, facing angle (0..65535) */
+        static const char* gt = (const char*)-1;
+        unsigned int f;
+        float x, z;
+        int a, n;
+        if (gt == (const char*)-1) gt = getenv("RECVX_COOP_GOTO");
+        if (gt && sys && plp && t->in_game && sscanf(gt, "%u:%f:%f:%d%n", &f, &x, &z, &a, &n) == 4 && t->clock >= f) {
+            t->move(x, z);
+            plp->ay = a;
+            host_log("coop: test: to (%.1f %.1f) facing %d at host frame %u\n", x, z, a, t->clock);
+            gt = gt[n] == ',' ? gt + n + 1 : NULL;
+        }
+    }
+    {   /* test aid: RECVX_COOP_PAD="hostframe:hex[,...]": these game pad bits pressed for one frame (pad.c bhSetPad: 0xB00
+           confirm/Cross, 0x10000 the cutscene skip button under every key type) */
+        static const char* pd = (const char*)-1;
+        unsigned int f, bits;
+        int n;
+        if (pd == (const char*)-1) pd = getenv("RECVX_COOP_PAD");
+        if (pd && sys && sscanf(pd, "%u:%x%n", &f, &bits, &n) == 2 && t->clock >= f) {
+            t->pad |= bits;
+            host_log("coop: test: pad %x at host frame %u\n", bits, t->clock);
+            pd = pd[n] == ',' ? pd + n + 1 : NULL;
+        }
+    }
     {   /* test aid: RECVX_COOP_VOMIT="hostframe,...": the zombie nearest the partner vomits (en01 MV09, effect 350) */
         static const char* vomit = (const char*)-1;
         unsigned int vf;

@@ -39,12 +39,13 @@ static Event ev(int type)
                      e.u.ts.give = 12 << 16 | 15; e.u.ts.inv[0] = 0x1005 << 16 | 6; e.u.ts.inv[2] = 12 << 16 | 15; break;
     case EV_OWN: e.u.blob.total = COOP_OWN_SIZE; e.u.blob.off = 1536; e.u.blob.len = 28; e.u.blob.pad = 1; break;
     case EV_GONE: e.u.gn.n = 2; e.u.gn.slot[0] = 3; e.u.gn.id[0] = 1; e.u.gn.slot[1] = 30; e.u.gn.id[1] = 1; break;
+    case EV_SKIP: e.stg = 0; e.rom = 2; e.u.sk.op = SKIP_GO; break;
     case EV_FX: e.idx = FX_NONE; e.u.fx.id = 350; e.u.fx.owner = 4; e.u.fx.txp = 0; e.u.fx.mlw = -1; e.u.fx.exp0 = FX_NONE; e.u.fx.s[0] = 896; break;
     }
     return e;
 }
 static int host_sends(int t) { return t != EV_UNGRAB && t != EV_GONE && t != EV_OWN; }
-static int guest_sends(int t) { return t != EV_PLY_HIT && t != EV_BLOB && t != EV_GRAB && t != EV_BOXFIX && t != EV_SPAWN && t != EV_EOPTS; }
+static int guest_sends(int t) { return t != EV_PLY_HIT && t != EV_BLOB && t != EV_GRAB && t != EV_BOXFIX && t != EV_SPAWN && t != EV_EOPTS && t != EV_SKIP; }
 
 /* a malformed variant of a valid event must be rejected */
 #define BAD(type, from_host, stmt) do { Event e_ = ev(type); Event* e = &e_; stmt; CHECK(coop_check_event(e, from_host) != COOP_OK); } while (0)
@@ -137,6 +138,12 @@ static void test_events(void)
     BAD(EV_BLOB, 1, e->u.blob.pad = 2);
     BAD(EV_ESTATE, 1, e->u.blob.pad = 1);
     { Event e = ev(EV_BLOB); e.u.blob.pad = 1; CHECK(coop_check_event(&e, 1) == COOP_OK); }
+    /* EV_SKIP (protocol 19): the host's "skip now", SKIP_GO only, in a room of the save format */
+    BAD(EV_SKIP, 1, e->u.sk.op = 0);
+    BAD(EV_SKIP, 1, e->u.sk.op = SKIP_GO + 1);
+    BAD(EV_SKIP, 1, e->stg = 10);
+    BAD(EV_SKIP, 1, e->rom = 100);
+    BAD(EV_SKIP, 0, (void)0);                            /* the guest never decides */
     /* EV_GONE: 1..COOP_GONE_MAX enemy slots below 128, a room case */
     BAD(EV_GONE, 0, e->u.gn.n = 0);
     BAD(EV_GONE, 0, e->u.gn.n = COOP_GONE_MAX + 1);
@@ -322,6 +329,11 @@ static void test_dgrams(void)
     BADP(q.flr = 255, COOP_BAD_FIELD);
     BADP(q.flr = 32, COOP_OK);                    /* floors -2..29, 0 = not sent */
     BADP(q.flr = 1, COOP_OK);
+    BADP(q.flags |= PF_CINE | PF_SKIP, COOP_OK);   /* protocol 19: in a cutscene, wants to skip it */
+    BADP(q.flags |= 128, COOP_BAD_FIELD);         /* a flag this protocol does not have */
+    BADP(q.opts = OPT_ALL, COOP_OK);              /* every game rule */
+    BADP(q.opts = OPT_ALL + 1, COOP_BAD_FIELD);
+    BADP(q.opts = 0x80, COOP_BAD_FIELD);
     {   /* the PoseExt's enumerations (protocol 16) */
         PoseExt x;
         memset(&x, 0, sizeof(x));

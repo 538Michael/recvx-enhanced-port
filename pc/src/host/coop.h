@@ -69,6 +69,9 @@ typedef struct CoopState {
     unsigned char pkey[32];         /* our secret (ini coop_player_key): rejoin tags, never sent */
     int remember;                   /* host: keep the partners' items per player id with our saves (ini coop_remember) */
     int peer_rec;                   /* game thread, joining: whether the host keeps saved items for us (REC_NONE / REC_HAVE / REC_OFF of coop_proto.h), -1 not known yet */
+    /* game rules of protocol 19 (host; the guest follows the host's, Pose.opts). No ink ribbons is g_config.no_ink_ribbon. */
+    int important;                  /* shared loot: weapons and ink ribbons stay each player's own to take (ini coop_important) */
+    int skip_sync;                  /* a cutscene both play is skipped when both pressed skip (ini coop_skip_sync) */
 } CoopState;
 /* joining: where our inventory comes from (g_coop.items; 0..14 is a save slot) */
 enum { COOP_ITEMS_CURRENT = -3,     /* our game in progress (F3 in game); at the title the new-game items */
@@ -120,6 +123,8 @@ typedef struct TradeView {
     char key[48];                   /* the trade request binding(s), for hints */
 } TradeView;
 extern TradeView g_trade;
+extern char coop_skip_hint[96];         /* synchronized cutscene skip: the line at the top of the screen, "" none (trade_glue.c draws it) */
+unsigned int coop_skip_pad(unsigned int pad);   /* pad.c bhSetPad (via trade_pad): the skip button in a cutscene both play asks first */
 void coop_trade_select(int cell);   /* offer our cell (an empty one: only take) */
 void coop_trade_cursor(int side, int cell);
 void coop_trade_activate(void);     /* confirm on the cursor: our cell offered (again: ready), the partner's requested (again: withdrawn) */
@@ -154,6 +159,7 @@ typedef struct CoopTest {
     const unsigned char* owned;         /* [128]: the partner's game runs that enemy (a grab) */
     const struct BH_PWORK* partner;     /* the partner's stand-in (ply2) */
     void (*move)(float x, float z);     /* our player to x/z, its collision points along */
+    unsigned int pad;                   /* out: game pad bits pressed at the next pad read (RECVX_COOP_PAD) */
 } CoopTest;
 void coop_test_aids(CoopTest* t);
 int coop_room_key(void);            /* game thread: the room we are in, sys->stg_no * 256 + sys->rom_no (any case) */

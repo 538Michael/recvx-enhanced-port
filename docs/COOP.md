@@ -5,7 +5,7 @@ over the internet or a LAN (UDP). Co-op is an optional addon: with it off the ga
 as without it (every hook is `#ifdef TARGET_PC` and `if (coop_on)`).
 
 Part 1 is for players: how to host, join and play. Part 2 is the reference: architecture,
-protocol 18, security and limits. Related: [SERVER.md](SERVER.md) (the optional co-op server),
+protocol 19, security and limits. Related: [SERVER.md](SERVER.md) (the optional co-op server),
 [USER_GUIDE.md](USER_GUIDE.md) (settings, controls), [ACTORS.md](ACTORS.md) (models and voices),
 [ENEMIES.md](ENEMIES.md) (enemy options), [ARCHITECTURE.md](ARCHITECTURE.md),
 [BUILDING.md](BUILDING.md).
@@ -66,8 +66,11 @@ drawn in the game's own style; your model turns in a 3D preview on the left. It 
 * **FOLLOW** (joiner): see "Follow host".
 * **RELAY**: *Only if needed* (Automatic) or *Always* (Via server), see "Connection modes".
 
-**Step 3: GAME RULES** (host): **LOOT** (Shared / Individual), **FREEZE ON TRADE**, and the enemy
-options **EXTRA ENEMIES**, **REARRANGED**, **RANDOMIZER**, **SEED**, **NEW RANDOM SEED**. The joiner
+**Step 3: GAME RULES** (host): **LOOT** (Shared / Individual), **IMPORTANT ITEMS** (For both /
+Shared; only with shared loot, see "Loot modes"), **FREEZE ON TRADE**, **CUTSCENE SKIP** (Together /
+Each alone, see "Cutscenes"), **INK RIBBONS** (Needed / Not needed, see "Saving without ink
+ribbons"), and the enemy options **EXTRA ENEMIES**, **REARRANGED**, **RANDOMIZER**, **SEED**, **NEW
+RANDOM SEED**. The joiner
 sees the host's values read-only (THE HOST'S RULES) once connected.
 
 Both players then see each other in the lobby, with model, name and what the other chose. The
@@ -205,7 +208,7 @@ the co-op server ..." (name lookup, at most 5 s, never stalls the game), "The ho
   direct session goes on, a relayed one ends.
 * The server frees a vanished joiner's place after `member_timeout` (default 10 s); see also
   "Rejoin after a crash".
-* Game and server must speak the same server protocol (3); the game protocol (18) is end to end.
+* Game and server must speak the same server protocol (3); the game protocol (19) is end to end.
 
 ## In the game
 
@@ -243,6 +246,29 @@ with a label above its head ("cutscene", "menu", "item box", "trading"). Enemies
 meanwhile, as the paused game does in single player. A busy host pauses its own game; the joiner's
 enemies then run on its own game and target only the joiner.
 
+### Cutscenes
+
+A cutscene runs in each player's own game: the triggering player's, and the partner's when it is in
+the same room (it replays the world event, see "The shared world"). The skip button (the game's
+own, by default **Backspace** / **Back**: SELECT) skips it to its end, where the scene puts the player.
+
+With **Co-op: synchronized cutscene skip** (lobby CUTSCENE SKIP *Together*, F3, PC SETTINGS CO-OP
+"Synchronized cutscene skip (host)"; ini `coop_skip_sync`, default on; the host's choice counts)
+a cutscene both of you are watching in the same room is skipped only when **both** pressed skip:
+
+* The first to press does not skip yet: "Waiting for <partner> to skip..." at the top of the
+  screen. The partner hears a chime and reads "<name> wants to skip - press <skip button> to skip".
+* When the second presses, the host skips its scene and tells the joiner's game, which skips at
+  once: both scenes end together, and each script puts its player where the scene leaves it (the
+  same place on both screens). Without it, the one who skipped alone was already walking around
+  while the other still watched.
+* The request ends with the cutscene: a scene that ends by itself clears it.
+* A partner who is not in a cutscene in your room (another room, already back in control) does not
+  hold anything up: the button skips at once, as in single player. If the partner's scene ends
+  while you wait, yours is skipped then.
+
+*Each alone* (`coop_skip_sync = 0`): the button skips your own scene at once, as before.
+
 ### Name tags
 
 The partner's name floats above its head while it is in your room and in view; out of view (behind
@@ -271,11 +297,23 @@ before the session):
 
 | Mode | Pickups | Item box |
 |---|---|---|
-| **Shared** (0, default) | An item either player takes goes to both. A partner with a full inventory leaves its copy lying in its room. | One box for both. |
+| **Shared** (0, default) | An item either player takes goes to both (weapons and ink ribbons: each takes its own, see "Important items for both" below). A partner with a full inventory leaves its copy lying in its room. | One box for both. |
 | **Individual** (1) | Each player finds and takes their own copy. | Each has their own box. |
 
 Key items and story progress are shared in both modes. A key used up in a lock (the game removes
 it) is removed from the partner's inventory too.
+
+**Important items for both** (shared loot only; lobby IMPORTANT ITEMS *For both*, F3 "Shared loot:
+important items for both (host)", PC SETTINGS CO-OP "Important items for both (host)"; ini
+`coop_important`, default on; locked during a session): **weapons** (the guns, launchers, bow gun,
+the combat knife when it lies somewhere) and **ink ribbons** are each player's own to take, as with
+individual loot: taking one does not give the partner a copy and does not take the partner's. It
+stays lying in the partner's game until the partner takes it. Ammunition, herbs, sprays and every
+other item stay shared (one takes it, both get it); key items stay shared as in both modes. Each
+player's own pickups of these items are kept with that player's items: in its saves, and at the
+host in its saved partner inventory (a guest joining again with *Saved with the host* finds the
+weapons it took gone and the others still there). Pickups made outside a session are not known as
+such (see "Known limits").
 
 ### Items when joining
 
@@ -306,6 +344,14 @@ already holds the item (not for stackable items), gets nothing.
 
 Shared loot: every event item goes to both this way. Individual loot: weapons (with the lighter)
 and key items still go to both; other consumables stay with the triggering player.
+
+### Saving without ink ribbons
+
+**No ink ribbons needed** (lobby INK RIBBONS *Not needed*, F3 "No ink ribbons needed (host)",
+F1 / PC SETTINGS GAMEPLAY "No ink ribbons needed"; ini `no_ink_ribbon`, default off): a typewriter
+offers to save without an ink ribbon ("Use an ink ribbon? Yes" opens the save screen) and saving
+uses none up; ribbons you carry stay. In single player it is your own setting; in co-op the host's
+counts for both players.
 
 ## Trade screen
 
@@ -455,6 +501,9 @@ only on the host; "locked" ones cannot change during a session.
 | Loot (host), locked | `coop_loot` | 0 Shared, 1 Individual (0) |
 | Remember partner inventories (host) | `coop_remember` | 0/1 (1) |
 | Freeze enemies while trading (host) | `coop_trade_freeze` | 0/1 (1) |
+| Important items for both (host), locked | `coop_important` | 0/1 (1); shared loot only |
+| Synchronized cutscene skip (host) | `coop_skip_sync` | 0/1 (1) |
+| No ink ribbons needed (GAMEPLAY page; co-op: host) | `no_ink_ribbon` | 0/1 (0) |
 | Extra enemies (host) | `enemy_extra` | 0..3 (0); see [ENEMIES.md](ENEMIES.md) |
 | Host port, locked | `coop_port` | 1..65535 (7140) |
 | Connection, locked | `coop_conn` | 0 Automatic, 1 Direct (P2P), 2 Via server (0) |
@@ -497,9 +546,12 @@ Decomp hooks (all `#ifdef TARGET_PC` + `if (coop_on)`): `game.c bhMainSequence` 
 drawing (trade screen), `game.c bhAllDrawModel` (`coop_draw_remote`), `eneset.c bhControlEnemy`
 around `bhJumpEnemy` (`coop_enemy_begin/end`), `event.c bhControlEvent` (`coop_scd1` in place of
 `bhScenarioCheck(scd1)`), `effect.c` / `effsub3.c` (effect mirroring), `sub1.c GetItem`
-(`coop_item_granted`), `pad.c bhSetPad` (trade input), `sdfunc.c` (the partner's voice bank),
+(`coop_item_granted`), `event.c bhItmCk` (`coop_item_taken`: a pickup, for important items),
+`pad.c bhSetPad` (trade input; `coop_skip_pad`: the skip button), `sdfunc.c` (the partner's voice bank),
 `ps2_NaTextureFunction.c njReleaseTextureAll` (`coop_textures_released`), and the title menu in
-`adv.c` / `system.c` (the MULTIPLAYER row and the lobby mode).
+`adv.c` / `system.c` (the MULTIPLAYER row and the lobby mode). Not co-op only: `event.c
+bhPlItemCheck` and `ps2_McSaveFile.c mcWriteStartSaveFile` ask `pc_no_ink_ribbon()` (the setting,
+in co-op the host's rule) whether a typewriter needs and uses an ink ribbon.
 
 ### How the game represents the player
 
@@ -603,6 +655,16 @@ floor or trigger, "Yes" chosen, an item used) hold only where the player did it.
   is a pickup; the partner adds the item with `GetItem` (stacking, capacity check) and hides the
   object in the same room. Key items (`itemdata[].type & 0x40`) are shared in both loot modes.
   `EV_LOST` removes a key the partner used up in a lock.
+* **Important items for both** (shared loot, `OPT_IMPORTANT`): the kinds in `important_kinds[]`
+  (`coop_glue.c`: weapons, `itemdata[].type & 0x1`; ink ribbons, item 31). `bhItmCk` reports each pickup
+  (`coop_item_taken`: its `it_flg` bit and trigger); one of those kinds marks the bit in
+  `sys->itm[256..271]` ("important spots", save-region words no game code uses: the item boxes end at
+  255). Those bits of `it_flg` / `ic_flg` are left out of `EV_FLAGS` both ways (sending and applying),
+  and the pickup sends no `EV_PICKUP`: each game keeps its own. `sys->itm[272..287]` mirrors the
+  player's own bits there every frame, so they travel with its items: saves, the host's game state,
+  `EV_OWN` and the saved partner records. A guest loading the host's game state (`own_restore`)
+  takes the union of both games' important spots and its own bits for them (`imp_restore`); the
+  host puts its spots into a record it sends (`blob_record`). A new inventory starts with none taken.
 * **Game state** (`EV_BLOB`): the host's save region (`sys->version..save_end`, 0x834 bytes) in
   64-byte chunks, when a joiner appears, when the host's game (re)starts, at a story character
   switch, and when the joiner asks. The joiner loads it through `bhPopGameData` (the continue path),
@@ -677,13 +739,15 @@ send time minus the echoed datagram's arrival. Sample = arrival - our clock - th
 smoothed (EWMA 0.1). The name tag's point goes with the recorded frame (`stream_point`) and is
 interpolated with the in-between frames; it snaps on camera cuts and in vanilla mode.
 
-## Protocol 18
+## Protocol 19
 
-`COOP_VERSION` is **18**; both players need builds with the same version (a mismatch is reported,
-e.g. "the host runs co-op protocol 17, we 18: both need the same build"). The co-op server does not
+`COOP_VERSION` is **19**; both players need builds with the same version (a mismatch is reported,
+e.g. "the host runs co-op protocol 18, we 19: both need the same build"). The co-op server does not
 look at the game protocol. Version history in short: 11 join code, 1200-byte datagrams, checked
 events, `EV_ATR`; 12 `EV_FX`; 13 `EV_GRANT`; 14 `EV_TSCREEN`; 15 `EV_GONE`; 16 player id and rejoin
-tag, `EV_OWN`; 17 trade requests; 18 voices. `Pose.pflg` and `Pose.flr` were added inside protocol 18
+tag, `EV_OWN`; 17 trade requests; 18 voices; 19 the game rules `OPT_IMPORTANT`, `OPT_NO_RIBBON`,
+`OPT_SKIP_SYNC`, the cutscene flags `PF_CINE` / `PF_SKIP` and `EV_SKIP` (synchronized cutscene skip),
+unknown flag and option bits refused. `Pose.pflg` and `Pose.flr` were added inside protocol 18
 (0 means "not sent", and receivers fall back).
 
 All structures are little-endian, packed as the compiler lays them out on x86 (pinned by
@@ -714,12 +778,22 @@ over its datagrams.
 |---|---|
 | 0-15 | `magic` "COOP" (0x504F4F43), `version` u16, `type` u8, `flags` u8, `sid` (sender's session), `auth` (`coop_auth(join code, sid)`): all a relay needs |
 | 16-31 | `seq` (sender's frame counter; older poses dropped), `t_ms`, `echo_ms`, `echo_age` (ping) |
-| 32-39 | `chr`, `costume`, `stg`, `rom`, `pos` (room entry point), `opts` (host: `OPT_INDIVIDUAL` 1, `OPT_TRADE_FREEZE` 2), `regroup` (host counter), `mfile` (sender's own part file - 10) |
+| 32-39 | `chr`, `costume`, `stg`, `rom`, `pos` (room entry point), `opts` (host's game rules: `OPT_INDIVIDUAL` 1, `OPT_TRADE_FREEZE` 2, `OPT_IMPORTANT` 4, `OPT_NO_RIBBON` 8, `OPT_SKIP_SYNC` 16), `regroup` (host counter), `mfile` (sender's own part file - 10) |
 | 40-91 | position (3 floats), angles (3 ints), `mtn_no`, `frm_no`, `mtn_md`, `hokan_count`, `hokan_rate`, `wpnr_no`, `hp`, `mode0`, `mode1`, `nev`, `nene` |
 | 92-107 | `stflg`, `ev_ack` (highest event id applied from the peer), `mset` (`MSET_OWN` -1, `MSET_ROOM` -2, `MSET_NONE` -3, or an enemy slot), `busy` (`BUSY_NONE/EVENT/MENU/BOX/TRADE`), `reject`, `voice_n`, `voice`, `pflg` (`flg & 6`: hit / held), `flr` (`flr_no + 3`, 0 not sent) |
 
 `flags`: `PF_IN_GAME` 1, `PF_VISIBLE` 2, `PF_ROOM_MTN` 4, `PF_WANT_BLOB` 8 (joiner asks for the
-game state), `PF_EXT` 16 (a `PoseExt` follows).
+game state), `PF_EXT` 16 (a `PoseExt` follows), `PF_CINE` 32 (in a cutscene its skip button could
+skip now), `PF_SKIP` 64 (pressed skip in it: waits for the partner).
+
+**Synchronized cutscene skip** (`OPT_SKIP_SYNC`): the skip button reaches the game as pad bit
+`0x10000` (`pad.c bhSetPad`; `system.c bhSysCallGame` sets `cb_flg 0x10000000`, which the room
+script's skip branch tests). `coop_skip_pad` (called from `trade_pad`) withholds it while the partner's
+pose says `PF_CINE` in our room, and notes the press (`PF_SKIP` in our pose from then on). The host,
+in a cutscene with `PF_SKIP` of its own and the partner's, sets `cb_flg 0x10000000` and sends
+`EV_SKIP`; the guest applies it only while it still asks in a skippable cutscene of that room. A
+request ends with the cutscene; while the partner is no longer in one in our room, a pending request
+skips at once.
 
 ### PoseExt (92 bytes)
 
@@ -761,6 +835,7 @@ Slot, `mode[4]`, model index (`mlwP` as index into the enemy's `mdl[]`, -1..15),
 | `EV_TSCREEN` | 19 | either | Trade screen op (below) |
 | `EV_GONE` | 20 | joiner | Dead enemies (up to 26: slot, type, model version) |
 | `EV_OWN` | 21 | joiner | The joiner's own items, chunk of 1564 bytes total |
+| `EV_SKIP` | 22 | host | Both pressed skip: the cutscene ends now (`op` `SKIP_GO` 1; `stg`/`rom` the host's room) |
 
 Transfers (`EV_BLOB`, `EV_ESTATE`, `EV_OWN`) carry a transfer id, total size, offset (a multiple of
 64) and length (64, the last chunk less); a transfer is complete only when every chunk of that id
@@ -803,13 +878,15 @@ stream or game):
 
 * Header: size at least a `Pose`, magic, version, type; the join-code proof (`auth`); for a pose,
   `nev <= 16`, `nene <= 48`, and the size exactly what the counts say; `PoseExt` enumerations in range.
-* Pose: finite floats (and below 1e7), `busy`, `mset` and `flr` in range.
+* Pose: finite floats (and below 1e7), `busy`, `mset` and `flr` in range, no `flags` or `opts` bit
+  this protocol does not have.
 * Every event within range for its type and **direction** (host-only: `EV_PLY_HIT`, `EV_BLOB`,
-  `EV_GRAB`, `EV_BOXFIX`, `EV_SPAWN`, `EV_EOPTS`, `TS_SWAP`, `TS_QUERY`; joiner-only: `EV_UNGRAB`,
+  `EV_GRAB`, `EV_BOXFIX`, `EV_SPAWN`, `EV_EOPTS`, `EV_SKIP`, `TS_SWAP`, `TS_QUERY`; joiner-only: `EV_UNGRAB`,
   `EV_GONE`, `EV_OWN`, `TS_DONE`). Examples: joints -1..63, damage 0..10000 and none on an absent
   joint, only the hit bits, weapon < 23; flag words < 120; item words id 1..155, count <= 999; enemy
   slots < 128; transfer chunks aligned and inside the total; effect ids < 400, references an enemy
-  slot or `FX_*`; world-record objects in slots 4..31; grant positions within the save format.
+  slot or `FX_*`; world-record objects in slots 4..31; grant positions within the save format;
+  `EV_SKIP` only `SKIP_GO` in a room 0..9 / 0..99.
 * Every snapshot: slot < 128, model index -1..15, motion set and motion < 512, finite floats.
 
 Then, when applying:
@@ -880,6 +957,13 @@ the session's code. A takeover needs a non-zero tag that matches.
 * Items held in escrow live in memory until the session ends; closing the game while one is held
   loses it with the unsaved state.
 * Through a server, a relayed session ends if the server restarts.
+* Important items for both: a pickup is known as one only when it happens in a session with the
+  rule on. A weapon the host took while playing alone (or before this build) is gone for a joining
+  partner too; one a guest took in its own game before joining can be taken again.
+* Synchronized skip: the skip waits for the partner's pose (one way trip) and, when the joiner asked
+  second, its skip comes one round trip after its press. A scene the partner has not started yet
+  (it replays it a moment later) does not hold the first press.
+* The joiner's lobby shows the host's enemy options, not its loot, skip and ink ribbon rules.
 
 ## Test aids
 
@@ -903,6 +987,8 @@ Environment variables for headless and scripted runs. Frames are co-op frames un
 | `RECVX_COOP_VOMIT="hostframe,..."` | Host: the walking zombie nearest the partner vomits. |
 | `RECVX_COOP_ORPHAN=frame` | Put our player in a grab with no holder, 3 m off (failsafe test). |
 | `RECVX_COOP_FX=0` | Send no `EV_FX`. |
+| `RECVX_COOP_GOTO="hostframe:x:z:angle,..."` | Our player alone to x/z, facing angle (0..65535), at that host frame. |
+| `RECVX_COOP_PAD="hostframe:hex,..."` | These game pad bits pressed for one frame (`b00` confirm/Cross, `10000` the cutscene skip button). |
 | `RECVX_COOP_TEST_KILL="frames:levelmask"` | End the replayed world event's tasks of those levels that many frames into a replay. |
 | `RECVX_COOP_GRANT="item:stage:room[:floor:x:y:z],..."` | As if the partner got these items from events there. |
 | `RECVX_COOP_TAKE=n` | Walk onto a shown event item and take it. |
@@ -926,7 +1012,8 @@ General test aids used with these (`RECVX_TELEPORT`, `RECVX_WARP`, `RECVX_EQUIP`
 `RECVX_TRACE_SND`, `RECVX_DUMP_*`) are listed in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ctest `coop` (`pc/tests/test_coop.c`) checks every event type from the side that sends it and
-refused from the other, malformed variants of each, datagram headers and proofs, transfers, the event
+refused from the other, malformed variants of each (`EV_SKIP`: its op, its room, from the joiner), pose
+flags and game rules this protocol does not have, datagram headers and proofs, transfers, the event
 ring, join address parsing, world event actions, record merging and the target rule, then fuzzes
 200000 random and mutated datagrams. ctest `net` covers the socket (busy port, oversized datagrams,
 receive timestamps) and port mapping start/stop cycles.

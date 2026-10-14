@@ -24,6 +24,7 @@ int coop_check_pose(const Pose* p)
     if (!fin(p->px) || !fin(p->py) || !fin(p->pz)) return COOP_BAD_FLOAT;
     if (p->busy > BUSY_TRADE || p->mset < MSET_NONE || p->mset >= 128) return COOP_BAD_FIELD;
     if (p->flr > 32) return COOP_BAD_FIELD;   /* flr_no + 3: rooms have floors -2..29 (rom->grand[2 + flr_no], 32 entries); 0 not sent */
+    if ((p->flags & ~PF_ALL) || (p->opts & ~OPT_ALL)) return COOP_BAD_FIELD;   /* only the flags and game rules this protocol has */
     return COOP_OK;
 }
 
@@ -71,7 +72,7 @@ static int fx_ref(int r) { return r < 128 || r >= FX_RECEIVER; }   /* an enemy s
 static int atr_ok(const AtrRec* r, int kind, int ix) { return fins(r->p, 6) && (kind != ATR_WAL || r->type < 8) && (kind != ATR_OBJ || (ix >= 4 && ix < 32)); }
 
 /* events only the host sends (it runs the session and the enemies), and those only a guest sends */
-static int host_only(int t) { return t == EV_PLY_HIT || t == EV_BLOB || t == EV_GRAB || t == EV_BOXFIX || t == EV_SPAWN || t == EV_EOPTS; }
+static int host_only(int t) { return t == EV_PLY_HIT || t == EV_BLOB || t == EV_GRAB || t == EV_BOXFIX || t == EV_SPAWN || t == EV_EOPTS || t == EV_SKIP; }
 static int guest_only(int t) { return t == EV_UNGRAB || t == EV_GONE || t == EV_OWN; }
 
 int coop_check_event(const Event* e, int from_host)
@@ -168,6 +169,8 @@ int coop_check_event(const Event* e, int from_host)
         for (k = 0; k < 3; k++)   /* kept in the save region as 1/100 units in 16 bits */
             if (fabsf(e->u.gt.p[k]) > 320) return COOP_BAD_FIELD;
         return COOP_OK;
+    case EV_SKIP:   /* the host's decision, in a room that exists in a save */
+        return e->u.sk.op == SKIP_GO && e->stg <= 9 && e->rom <= 99 ? COOP_OK : COOP_BAD_FIELD;
     case EV_GONE:
         if (e->u.gn.n < 1 || e->u.gn.n > COOP_GONE_MAX || e->idx > 9) return COOP_BAD_COUNT;
         for (k = 0; k < e->u.gn.n; k++)

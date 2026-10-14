@@ -129,6 +129,7 @@ Turn these off for a presentation closer to the PS2.
 | Rearranged enemies, Enemy randomizer, Enemy seed | `enemy_place`, `enemy_random`, `enemy_seed` | optional enemy changes; story, cutscene and boss enemies stay as they are ([ENEMIES.md](ENEMIES.md#enemy-options)) |
 | Save system | `save_system` | **Native files** (0): every save a file in `save/saves`, no limit, no memory card screens; Memory card (original) (1): see [Saves](#saves) |
 | Import memory card saves | (action) | copies the memory card's saves into the save files |
+| No ink ribbons needed | `no_ink_ribbon` | off (original); on: typewriters save without an ink ribbon and use none up. In co-op the host's setting counts for both ([COOP.md](COOP.md#saving-without-ink-ribbons)) |
 | Skip intro | `skip_intro` | on: boot straight into the title menu (next start) |
 
 Extra enemies per room (`enemy_extra`, up to 3) are on the CO-OP page; they also work in single
@@ -155,8 +156,10 @@ Music and voice (`music_volume`) and Sound effects (`sfx_volume`), 0-100%.
 ### Co-op
 
 The CO-OP page (also in F3) holds your appearance ("You appear as", see
-[ACTORS.md](ACTORS.md)), name tags, follow host, loot mode, the host port, the connection mode
-and UPnP. See [COOP.md](COOP.md).
+[ACTORS.md](ACTORS.md)), name tags, follow host, loot mode and "Important items for both" (with
+shared loot, weapons and ink ribbons stay each player's own to take), "Synchronized cutscene skip"
+(a cutscene both watch is skipped once both pressed skip), the host port, the connection mode and
+UPnP. See [COOP.md](COOP.md).
 
 ## Controls
 
