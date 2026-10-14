@@ -529,7 +529,7 @@ and game frames for game-state aids, as noted. Co-op test aids (`RECVX_COOP_*`,
 | `RECVX_VU_CHECK=1`, `RECVX_VU_INTERP=1` | compare static VU code with the interpreter on every call / use the interpreter |
 | `RECVX_DUMP_CALCPOINT=n`, `RECVX_DUMP_VU1=n` | dump VU0/VU1 state at the n-th call |
 | `RECVX_EFF_TRACE=1` | log live effects each frame |
-| `RECVX_TPS_TRACE=1/2`, `RECVX_TPS_ORBIT=deg`, `RECVX_ATMOS_TRACE=1` | third person: log free aim; turn the view about the player; log light and fog ([THIRDPERSON.md](THIRDPERSON.md)) |
+| `RECVX_TPS_TRACE=1/2`, `RECVX_TPS_AIM_AT=f`, `RECVX_TPS_ORBIT=deg`, `RECVX_ATMOS_TRACE=1` | third person: log free aim (`=2`: aim at the locked enemy, `f` along its hit capsule); turn the view about the player; log light and fog ([THIRDPERSON.md](THIRDPERSON.md)) |
 
 ### Other traces
 

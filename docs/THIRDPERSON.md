@@ -13,7 +13,7 @@ While it is on the mouse is captured (F1/F2/F3 free it).
 
 | Key | Action |
 |---|---|
-| W / S | walk forward / back (back + Shift = quick turn, as in the original) |
+| W / S | walk forward / back (back + Shift = quick turn, as in the original); with "Game auto-aim" also aim up / down while the weapon is raised, as the original's up / down |
 | A / D | turn |
 | Shift | run |
 | mouse | X turns the character, Y looks up/down |
@@ -81,7 +81,7 @@ unit (the character is about 17 units tall).
 | Env var | Effect |
 |---|---|
 | `RECVX_TPS_MOUSE="frame:dx:dy,..."` | moves the mouse dx/dy counts per game frame from that presented frame on |
-| `RECVX_TPS_TRACE=1` | logs the free aim per frame, each shot's direction and wall hit against the crosshair target ("SHOT"), the drawn weapon's barrel with "You appear as", the camera ("tps: cam A\|B"); `=2` also turns the camera to the enemy the game would lock on to |
+| `RECVX_TPS_TRACE=1` | logs the free aim per frame, each shot's direction and wall hit against the crosshair target ("SHOT"), the drawn weapon's barrel with "You appear as", the camera ("tps: cam A\|B"), the aim height given to the game; `=2` also keeps the camera on the enemy the game locked on to (the middle of its hit capsule, or `RECVX_TPS_AIM_AT=f` along it: 0 = `c1`, for a zombie the head, 1 = `c2`, its legs) |
 | `RECVX_TPS_ORBIT=degrees` | turns only the view about the player (side views; aim unchanged, camera ignores walls) |
 | `RECVX_ATMOS_TRACE=1` | logs each game frame's cut, the game's fog, lights and filter and what "smooth" shows |
 | `RECVX_EFF_TRACE=1` | logs effects spawned and queued |
@@ -113,7 +113,8 @@ unit (the character is about 17 units tall).
 * `player.c bhControlPlayer` runs tank controls; turning adds a fixed rate to `plp->ay`
   (65536 = 360 degrees; forward = `(-sin ay, 0, -cos ay)`).
 * Raising a weapon calls `bhSearchNearEnemy` (auto-aim: `plp->ayp`, `flg |= 0x100000`, `ay` turns
-  to it over `yrct` frames). Aim pitch is three-way (45 degrees). Firing casts a ray from
+  to it over `yrct` frames). Aim pitch is three-way (45 degrees; `at_flg` 2 straight, 4 up,
+  8 down), and enemies read it when they take damage ("Aim height" below). Firing casts a ray from
   `(px, py + 11, pz) + forward * (3 + r)` along `Rx(wax) Ry(ay)` against enemy capsules
   (`weapon.c bhCheckGunAtari`); the wall test (`bhCheckL2Wall`) uses the same direction from the
   muzzle on hand node 9 (about 3 units higher). Setting `ay` and `wax` towards the crosshair target
@@ -224,12 +225,40 @@ Room ambient and lights 0..3 (muzzle flash, lighter, ...) do not change per cut.
   (`actor_hands_back`).
 * Sniper rifle and linear launcher switch to the game's scope (first person); no bend.
 
+### Aim height
+
+The enemies' damage code reads the player's aim height (`plp->at_flg & 0xE`), not only where
+the shot went: zombies and the anatomist lying on the ground (`en01.c`/`en26.c`, `exp0 + 0x44 &
+0x40`), a knocked-down Hunter (`en05.c`, motions 37/38) and Cerberus and Bandersnatch in one of
+their states (`en04.c`, `en09.c`) take no damage from a straight shot (the bow gun and the
+grenade, rocket and linear launchers excepted); a shotgun or grenade launcher blows a zombie's
+head only aimed up at close range. In the original you aim down at a crawling zombie. Free aim
+kept the straight pose and with it the straight aim height, so its hits on lying or crawling
+zombies were thrown away.
+
+* `aim_at_crosshair` sets the aim height from the free aim after the mode handler: up when the
+  shot rises more than 22.5 degrees (half the original's 45), down when it drops more than that or
+  goes at anything lower than 6 units above the player's floor (a crawling zombie, legs, the
+  floor), else straight. The enemies read it on their next step (`bhControlEnemy` runs before
+  `bhControlPlayer`).
+* `tps_player_mode` (a hook before the mode handler in `bhControlPlayer`, and when third person
+  stops) puts it back to straight, so the weapon modes keep the straight motions and the shot
+  (`bhCheckGunAtari` copies `at_flg`) keeps the straight test; an enemy that cleared `at_flg`
+  meanwhile (grabs) is left alone.
+* With "Game auto-aim" the game's own aim height plays: W / S press the up/down bits as the
+  d-pad does (`0x21` / `0x42`).
+
 ## Limits
 
 * **Room geometry**: some corners have no wall, ceiling or back side; looking there shows the
   clear colour. With the back to a wall the camera slides forward up to the shoulder, so the
   character can leave the picture (view and aim stay put).
 * Aim poses: free aim bends the straight pose up to 60 degrees of pitch. No laser sight.
+* The crosshair goes down to 60 degrees: from the shoulder (16.5 units up) it meets the floor
+  about 9.5 units ahead, so a crawling zombie nearer than that cannot be put under it (the shot
+  goes at the floor behind it; the game's wide hit test may still reach it).
+* Co-op: enemies judge a hit with the aim height of the player they are after; the partner's
+  stand-in carries none, so every hit counts on an enemy after the partner.
 * Near walls: a wall closer than 40 units on the crosshair ray counts as 40 units away for the
   character's yaw/pitch (else the shoulder offset would turn it by tens of degrees); the shot
   then hits a little beside the crosshair. Enemies, and walls farther away, are hit exactly.
