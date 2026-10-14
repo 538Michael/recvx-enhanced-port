@@ -30,6 +30,7 @@ void gs_renderer_init(void);
 int pc_screen_filter_mode(void) { return g_config.screen_filter; }
 int pc_skip_door_demo(void) { return g_config.skip_doors; }
 int pc_quick_knife_on(void) { return g_config.quick_knife; }
+int pc_cfg_no_ink_ribbon(void) { return g_config.no_ink_ribbon; }   /* in co-op the host's counts (coop_glue.c pc_no_ink_ribbon) */
 /* the game tests a few joints of a model against the screen; with a wide or moving free
    camera that drops models that are partly visible, so third person never culls */
 extern int tps_cam_active;

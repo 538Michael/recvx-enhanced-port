@@ -424,6 +424,11 @@ static void coop_window(void)
     if (ImGui::IsItemHovered())
         ImGui::SetTooltip("Shared: an item one player takes goes to both. Individual: each player takes their own\n"
                           "copy; key items, locks and story flags stay shared. The host's choice applies.");
+    bool important = c->important != 0;
+    if (ImGui::Checkbox("Shared loot: important items for both (host)", &important)) { c->important = important; changed = true; }
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("With shared loot: weapons and ink ribbons are each player's own to take (taking one leaves the\n"
+                          "partner's where it lies); ammo, herbs and other supplies stay shared. The host's choice applies.");
     bool upnp = c->upnp != 0;
     if (ImGui::Checkbox("Open port automatically (UPnP)", &upnp)) { c->upnp = upnp; changed = true; }
     if (ImGui::IsItemHovered())
@@ -464,6 +469,16 @@ static void coop_window(void)
     if (ImGui::IsItemHovered())
         ImGui::SetTooltip("While both players are in the trade screen (trade request key, T / left stick click by default)\n"
                           "the room's enemies stand still. The host's choice applies.");
+    bool skipsync = c->skip_sync != 0;   /* also during a session */
+    if (ImGui::Checkbox("Co-op: synchronized cutscene skip (host)", &skipsync)) { c->skip_sync = skipsync; changed = true; }
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("A cutscene both players watch is skipped once both pressed skip; the partner sees that you want to.\n"
+                          "The host's choice applies.");
+    bool noribbon = g_config.no_ink_ribbon != 0;   /* the GAMEPLAY setting; in co-op the host's counts */
+    if (ImGui::Checkbox("No ink ribbons needed (host)", &noribbon)) { g_config.no_ink_ribbon = noribbon; changed = true; }
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Typewriters save without an ink ribbon and use none up (also F1 Gameplay, in single player).\n"
+                          "The host's choice applies.");
     if (ImGui::InputText("Your name", c->name, sizeof(c->name), ImGuiInputTextFlags_CallbackCharFilter,
                          [](ImGuiInputTextCallbackData* d) -> int { return !(d->EventChar >= 32 && d->EventChar < 127 && (isalnum(d->EventChar) || strchr(" -_.!?'()+", d->EventChar))); }))
         changed = true;

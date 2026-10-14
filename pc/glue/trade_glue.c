@@ -277,14 +277,14 @@ static void draw_screen(void)
 /* the request line (asking, asked) and the last notice, at the top of the view */
 static void draw_hint(void)
 {
-    const char* s = g_trade.hint[0] ? g_trade.hint : net_ms() < g_trade.msg_until ? g_trade.msg : NULL;
+    const char* s = coop_skip_hint[0] ? coop_skip_hint : g_trade.hint[0] ? g_trade.hint : net_ms() < g_trade.msg_until ? g_trade.msg : NULL;
     float w;
     if (!s || !(sys->tk_flg & 0x80)) return;
     w = pc_ui_text_w(s, 0.6f);
     njColorBlendingMode(0, 8);
     njColorBlendingMode(1, 6);
     pc_ui_rect(320 - w / 2 - 10, 20, 320 + w / 2 + 10, 46, 0xA0000000, Z_UI);
-    text_c(320, 24, s, 0.6f, g_trade.phase == TRADE_ASKED ? pulse(0xFFE060) | 0xC0000000 : 0xFFFFFFFF);
+    text_c(320, 24, s, 0.6f, g_trade.phase == TRADE_ASKED || s == coop_skip_hint ? pulse(0xFFE060) | 0xC0000000 : 0xFFFFFFFF);
 }
 
 void trade_draw(void)
@@ -348,6 +348,7 @@ unsigned int trade_pad(unsigned int pad)
     unsigned int press;
     int left, right, c, side;
     float mx, my;
+    pad = coop_skip_pad(pad);   /* co-op: the skip button in a cutscene both play asks first (coop_glue.c) */
     if (!pc_trade_screen()) {
         if (mask) { mask &= pad; pad &= ~mask; }
         prev = 0;

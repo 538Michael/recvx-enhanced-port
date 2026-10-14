@@ -21,6 +21,28 @@
 - The co-op lobby's START list, the joiner's ITEMS choice and the host's saved partner inventories
   (`save/saves/NNN.coop-partners.bin`) follow the active save system.
 - Test aid `RECVX_TEST_TYPEWRITER`; `pc/tools/layout_check.sh` takes extra ini lines (`INI`).
+- **No ink ribbons needed** (F1 / PC SETTINGS GAMEPLAY, ini `no_ink_ribbon`, default off; in co-op
+  the host's lobby rule INK RIBBONS): typewriters save without an ink ribbon and use none up.
+
+### Co-op
+
+Co-op protocol version 19 (both players need this build).
+
+- Game rule **Important items for both** (shared loot only; lobby IMPORTANT ITEMS, F3, PC SETTINGS
+  CO-OP; ini `coop_important`, default on): weapons and ink ribbons are each player's own to take;
+  one player's pickup leaves the partner's copy where it lies. Ammo, herbs and other supplies stay
+  shared, key items stay shared. Each player's own pickups go with its items (saves, the host's
+  saved partner inventories).
+- Game rule **Synchronized cutscene skip** (lobby CUTSCENE SKIP, F3, PC SETTINGS CO-OP; ini
+  `coop_skip_sync`, default on): a cutscene both players watch is skipped once both pressed skip;
+  "Waiting for <partner> to skip..." / "<partner> wants to skip - press <button> to skip" at the
+  top of the screen. Both scenes end together and leave both players where the scene puts them.
+- The lobby's GAME RULES also set INK RIBBONS for the session.
+- Protocol 19: game rules `OPT_IMPORTANT`, `OPT_NO_RIBBON`, `OPT_SKIP_SYNC`; pose flags `PF_CINE`,
+  `PF_SKIP`; event `EV_SKIP` (host only); unknown pose flag and rule bits are refused. ctest `coop`
+  covers them.
+- Test aids `RECVX_COOP_GOTO` (our player alone to a spot) and `RECVX_COOP_PAD` (game pad presses at
+  a host frame).
 
 ## 0.1.0 (2026-10-13)
 
