@@ -13,6 +13,9 @@ original game code and its PS2 platform layer are compiled for the PC; the PS2 h
 underneath (GS, VU, DMA, sound driver, disc, memory card, pad) is emulated at its boundaries, and
 native paths replace the expensive parts. The game reads your own disc image in place.
 
+[![Resident Evil Code: Veronica X (PS2) | PC recompilation with online co-op and Third-Person](https://img.youtube.com/vi/0sW1BHgIMXs/maxresdefault.jpg)](https://www.youtube.com/watch?v=0sW1BHgIMXs)
+
+*Click the image to watch the video on YouTube.*
 
 ## Features
 
