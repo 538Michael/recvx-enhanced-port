@@ -14,9 +14,6 @@ underneath (GS, VU, DMA, sound driver, disc, memory card, pad) is emulated at it
 native paths replace the expensive parts. The game reads your own disc image in place.
 
 
-<p align="center" width="100%">
-<video src="https://www.youtube.com/watch?v=0sW1BHgIMXs" width="80%" controls></video>
-</p>
 ## Features
 
 - **Enhanced renderer**: native 3D and textures on the GPU, widescreen (hor+, up to ultrawide),
