@@ -937,7 +937,7 @@ static const char* heading(void)
 
 static void row_text(int r, char* label, char* val, int n)
 {
-    static const char* loots[] = { "Shared", "Individual" };
+    static const char* loots[] = { "Shared (one pickup)", "Individual (each their own)" };
     const EnemyOpts* eo = lb.role ? enemy_opts() : &g_enemy_opts;   /* joining: the host's (EV_EOPTS) */
     *val = 0;
     switch (r) {
@@ -1007,9 +1007,9 @@ static const char* row_help(int r)
     case R_FOLLOW: return eset(&g_coop.follow)->help;
     case R_RULES: return host ? "Loot, enemies freezing while you trade, cutscene skips, ink ribbons and the enemy options (extra enemies, rearranged, randomizer, seed)."
                               : "The host's enemy options (read-only).";
-    case R_LOOT: return "Shared: an item one takes goes to both, one item box. Individual: each takes their own copy and has their own box. Keys and story stay shared.";
+    case R_LOOT: return "Shared: each item lies there once - whoever takes it has it, so you split the supplies; one item box. Individual: each finds their own copy and has their own box. Keys and story go to both.";
     case R_TFREEZE: return eset(&g_coop.trade_freeze)->help;
-    case R_IMP: return "For both: weapons and ink ribbons are each player's own to take - one taking it leaves the partner's copy. Ammo, herbs and other supplies stay shared.";
+    case R_IMP: return "For both: weapons and ink ribbons lie there for each of you, each takes their own copy. Shared: they are one pickup like ammo and herbs - whoever takes it has it.";
     case R_SKIPS: return "Together: a cutscene both of you watch is skipped when both press skip; the partner sees that you want to. Each alone: as in single player.";
     case R_RIBBON: return "Not needed: typewriters save without an ink ribbon and use none up (for both players; also in single player, ENHANCED SETTINGS GAMEPLAY).";
     case R_EXTRA: return eset(&g_enemy_opts.extra)->help;
