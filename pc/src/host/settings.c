@@ -1,6 +1,7 @@
-/* The settings table shared by the native OPTION menu (PC SETTINGS) and the F1 overlay.
+/* The settings table shared by the native OPTION menu (ENHANCED SETTINGS) and the F1 overlay.
    docs/ARCHITECTURE.md "Settings": to add a setting, add its variable's ini key in config.c and
-   one entry here (F1 shows it too; SET_F1 on the CO-OP and EXTRAS pages). */
+   one entry here; both menus show it (F1 on the CO-OP and EXTRAS pages only with SET_F1). Rows
+   are in menu order, .group starts a heading. */
 #include "../ps2_platform.h"
 #include "settings.h"
 #include "coop.h"
@@ -20,7 +21,7 @@
 
 extern SDL_Window* g_window;
 
-const char* const settings_pages[SP_COUNT] = { "DISPLAY", "AUDIO", "GAMEPLAY", "ENHANCED", "THIRD PERSON", "CO-OP", "CONTROLS", "EXTRAS" };
+const char* const settings_pages[SP_COUNT] = { "DISPLAY", "GAMEPLAY", "CONTROLS", "THIRD PERSON", "AUDIO", "CO-OP", "EXTRAS" };
 
 /* ---------------------------------------------------------------- appliers (main thread) */
 void settings_apply_window(void)
@@ -103,43 +104,49 @@ static const char* const extras[] = { "Off", "Up to 1 per room", "Up to 2 per ro
 
 #define V(x) ((int*)&(x))
 const Setting g_settings[] = {
-    { SP_DISPLAY, "Fullscreen", V(g_config.fullscreen), 0, 1, 1, .help = "Also F11.", .apply = settings_apply_window },
+    { SP_DISPLAY, "Fullscreen", V(g_config.fullscreen), 0, 1, 1, .help = "Also F11.", .apply = settings_apply_window, .group = "WINDOW" },
     { SP_DISPLAY, "Window size", NULL, 0, 5, 1, .get = size_get, .set = size_set, .name = size_name, .locked = fullscreen_on, .apply = settings_apply_window },
     { SP_DISPLAY, "VSync", V(g_config.vsync), 0, 1, 1, .apply = apply_vsync },
     { SP_DISPLAY, "Frame rate limit", V(g_config.fps_limit), 0, 5, 1, fps_limits, .help = "Caps the images shown per second (enhanced in-between frames included) below the display rate, e.g. 60 on a 175 Hz monitor. The game itself always runs at 30." },
-    { SP_DISPLAY, "Aspect ratio", V(g_config.aspect), 0, 2, 1, aspects, .help = "Widescreen: 3D fills the window, 2D and menus stay 4:3 in the middle." },
-    { SP_DISPLAY, "Internal resolution", V(g_config.scale), 0, 8, 1, .name = scale_name, .help = "The resolution the game is drawn at; Auto follows the window." },
     { SP_DISPLAY, "Show frame rate", V(g_config.show_fps), 0, 1, 1 },
-    { SP_DISPLAY, "Show ping", V(g_config.show_ping), 0, 1, 1, .flags = SET_F1, .help = "In co-op, while connected: the round trip to the partner next to the frame rate." },
+    { SP_DISPLAY, "Aspect ratio", V(g_config.aspect), 0, 2, 1, aspects, .help = "Widescreen: 3D fills the window, 2D and menus stay 4:3 in the middle.", .group = "PICTURE" },
+    { SP_DISPLAY, "Internal resolution", V(g_config.scale), 0, 8, 1, .name = scale_name, .help = "The resolution the game is drawn at; Auto follows the window." },
+    { SP_DISPLAY, "Display-rate frames", V(g_config.interpolate), 0, 1, 1, .help = "In-between frames blended from the last two game frames. The game still runs at 30 FPS; half a frame of latency." },
+    { SP_DISPLAY, "Frame blend (trail)", V(g_config.frame_blend), -1, 1, 1, onoff_auto, .help = "As on the PS2: each frame mixed over the previous one. Auto: on in vanilla, off with display-rate frames." },
     { SP_DISPLAY, "Cutscene bars", V(g_config.cinema_bars), 0, 2, 1, modes3, .help = "Original keeps them 4:3 in widescreen; fades always fill the screen." },
     { SP_DISPLAY, "Camera vignette", V(g_config.screen_filter), 0, 2, 1, modes3, .help = "Original keeps it 4:3 in widescreen." },
     { SP_DISPLAY, "Screen effects", V(g_config.screen_effects), 0, 2, 1, modes3, .help = "Full-screen effect layers. Original keeps them 4:3 in widescreen." },
+    { SP_DISPLAY, "Native 3D renderer", V(g_config.native_3d), 0, 1, 1, .help = "3D models projected and clipped by the GPU instead of the emulated VU1 and GS.", .group = "RENDERER" },
+    { SP_DISPLAY, "Native textures", V(g_config.native_tex), 0, 1, 1, .help = "Textures uploaded once and bound afterwards instead of re-uploaded on every switch." },
+    { SP_DISPLAY, "Cull off-screen models", V(g_config.model_cull), 0, 1, 1, .help = "As on the PS2. Off: models no longer pop at the screen edges. Third person never culls." },
 
-    { SP_AUDIO, "Music and voice", V(g_config.music_volume), 0, 100, 5, .fmt = "%d%%", .apply = apply_volume },
-    { SP_AUDIO, "Sound effects", V(g_config.sfx_volume), 0, 100, 5, .fmt = "%d%%", .apply = apply_volume },
-
-    { SP_GAMEPLAY, "Cull off-screen models", V(g_config.model_cull), 0, 1, 1, .help = "As on the PS2. Off: models no longer pop at the screen edges. Third person never culls." },
-    { SP_GAMEPLAY, "Mouse in menus", V(g_menu_mouse.on), 0, 1, 1, .help = "Inventory, item box, map, files and these menus: point, left click selects, right click goes back." },
-    { SP_GAMEPLAY, "Quick knife", V(g_config.quick_knife), 0, 1, 1, .flags = SET_F1,
-      .help = "Hold the quick-knife key (Space, right trigger; see CONTROLS) to draw the knife without the inventory; release it for the weapon before." },
+    { SP_GAMEPLAY, "Skip intro", V(g_config.skip_intro), 0, 1, 1, .flags = SET_RESTART, .help = "Boot straight into the title menu: no warning screen, logos or intro movie.", .group = "GENERAL" },
     { SP_GAMEPLAY, "Skip door animations", V(g_config.skip_doors), 0, 1, 1, .help = "Room transitions use the game's load screen instead of the door, stairs or ladder animation." },
-    { SP_GAMEPLAY, "Rearranged enemies", V(g_enemy_opts.place), 0, 1, 1, .flags = SET_F1, .help = "Free-roaming enemies start elsewhere in their room (from the seed). Story, cutscene and boss enemies stay. Next room." },
-    { SP_GAMEPLAY, "Enemy randomizer", V(g_enemy_opts.rand), 0, 1, 1, .flags = SET_F1, .help = "Free-roaming enemies become other types (from the seed), within each room's limits. Story, cutscene and boss enemies stay. Next room." },
-    { SP_GAMEPLAY, "Enemy seed", V(g_enemy_opts.seed), 0, 99999, 1, .fmt = "%d", .flags = SET_F1, .help = "Placements and randomizer: the same seed gives the same rooms. In co-op both use the host's." },
-    { SP_GAMEPLAY, "No ink ribbons needed", V(g_config.no_ink_ribbon), 0, 1, 1,
-      .help = "Typewriters save without an ink ribbon and use none up. In co-op the host's setting counts (lobby GAME RULES)." },
+    { SP_GAMEPLAY, "Quick knife", V(g_config.quick_knife), 0, 1, 1,
+      .help = "Hold the quick-knife key (Space, right trigger; see CONTROLS) to draw the knife without the inventory; release it for the weapon before." },
     { SP_GAMEPLAY, "Save system", V(g_config.save_system), 0, 1, 1, save_systems,
-      .help = "Native files: each save is its own file in the saves folder, as many as you like, no memory card screens. Memory card: the original 15 slots. From the next save screen." },
+      .help = "Native files: each save is its own file in the saves folder, as many as you like, no memory card screens. Memory card: the original 15 slots. From the next save screen.", .group = "SAVES" },
     { SP_GAMEPLAY, "Import memory card saves", NULL, .flags = SET_ACTION, .apply = import_card,
       .help = "Copies the memory card's saves into the saves folder as new files (ones already there are skipped). The card keeps them." },
-    { SP_GAMEPLAY, "Skip intro", V(g_config.skip_intro), 0, 1, 1, .flags = SET_RESTART, .help = "Boot straight into the title menu: no warning screen, logos or intro movie." },
+    { SP_GAMEPLAY, "No ink ribbons needed", V(g_config.no_ink_ribbon), 0, 1, 1,
+      .help = "Typewriters save without an ink ribbon and use none up. In co-op the host's setting counts (lobby GAME RULES)." },
+    { SP_GAMEPLAY, "Extra enemies", V(g_enemy_opts.extra), 0, 3, 1, extras, .help = "More enemies of the types a room already has (also in single player). In co-op the host's setting counts. Next room.", .group = "ENEMIES" },
+    { SP_GAMEPLAY, "Rearranged enemies", V(g_enemy_opts.place), 0, 1, 1, .help = "Free-roaming enemies start elsewhere in their room (from the seed). Story, cutscene and boss enemies stay. Next room." },
+    { SP_GAMEPLAY, "Enemy randomizer", V(g_enemy_opts.rand), 0, 1, 1, .help = "Free-roaming enemies become other types (from the seed), within each room's limits. Story, cutscene and boss enemies stay. Next room." },
+    { SP_GAMEPLAY, "Enemy seed", V(g_enemy_opts.seed), 0, 99999, 1, .fmt = "%d", .help = "Placements and randomizer: the same seed gives the same rooms. In co-op both use the host's." },
 
-    { SP_ENHANCED, "Display-rate frames", V(g_config.interpolate), 0, 1, 1, .help = "In-between frames blended from the last two game frames. The game still runs at 30 FPS; half a frame of latency." },
-    { SP_ENHANCED, "Frame blend (trail)", V(g_config.frame_blend), -1, 1, 1, onoff_auto, .help = "As on the PS2: each frame mixed over the previous one. Auto: on in vanilla, off with display-rate frames." },
-    { SP_ENHANCED, "Native 3D renderer", V(g_config.native_3d), 0, 1, 1, .help = "3D models projected and clipped by the GPU instead of the emulated VU1 and GS." },
-    { SP_ENHANCED, "Native textures", V(g_config.native_tex), 0, 1, 1, .help = "Textures uploaded once and bound afterwards instead of re-uploaded on every switch." },
+    { SP_CONTROLS, "Input source", V(g_input_source), 0, 2, 1, sources, .apply = bind_apply_source,
+      .help = "Which devices play in this window. Auto: keyboard/mouse and gamepad, while the window has focus. Keyboard/mouse "
+              "only: no gamepads. Gamepad only: no keys or mouse (hotkeys still work), and the gamepad works without focus: two "
+              "windows side by side for local co-op." },
+    { SP_CONTROLS, "Gamepad", V(g_input_pad), 0, 4, 1, .name = bind_pad_choice,
+      .help = "Any: the first one connected. 1-4: the gamepad the system numbers so (Xbox: its slot / light, PlayStation and "
+              "Switch pads show it on their player lights); give each window its own number for local co-op." },
+    { SP_CONTROLS, "Mouse in menus", V(g_menu_mouse.on), 0, 1, 1, .help = "Inventory, item box, map, files and these menus: point, left click selects, right click goes back." },
 
-    { SP_TPS, "Over-the-shoulder camera", V(g_tps.on), 0, 1, 1, .help = "Third person: mouse/keyboard controls and free aim. Events, doors and menus keep the original camera." },
+    { SP_TPS, "Over-the-shoulder camera", V(g_tps.on), 0, 1, 1, .help = "Third person: mouse/keyboard controls and free aim. Events, doors and menus keep the original camera.", .group = "CAMERA" },
+    { SP_TPS, "Mouse/keyboard camera", V(g_tps.free_cam), 0, 1, 1, free_cam_names,
+      .help = "B: the camera stays behind the character, the mouse turns it. A: the mouse turns the camera around the character, WASD walk towards their direction on screen; aiming turns the character to the camera. Not the KEY CONFIG type." },
     { SP_TPS, "Field of view", V(g_tps.fov), 40, 120, 5, .fmt = "%d deg", .help = "Horizontal, over the 4:3 picture; widescreen shows more at the sides." },
     { SP_TPS, "Field of view aiming", V(g_tps.aim_fov), 30, 120, 5, .fmt = "%d deg" },
     { SP_TPS, "Camera distance", V(g_tps.dist), 0, 400, 5, .name = tenths },
@@ -147,56 +154,48 @@ const Setting g_settings[] = {
     { SP_TPS, "Camera height", V(g_tps.height), 0, 300, 5, .name = tenths },
     { SP_TPS, "Shoulder offset", V(g_tps.shoulder), 0, 150, 5, .name = tenths },
     { SP_TPS, "Left shoulder", V(g_tps.left), 0, 1, 1 },
-    { SP_TPS, "Mouse sensitivity X", V(g_tps.sens_x), 5, 400, 5, .fmt = "%d%%" },
+    { SP_TPS, "Light and fog", V(g_tps.atmos), 0, 1, 1, atmos_names,
+      .help = "Smooth: lights, fog and screen filter fade over a second when the room's camera cut changes, fog measured from your camera. Per cut: they switch with the cut, as the fixed cameras do." },
+    { SP_TPS, "Mouse sensitivity X", V(g_tps.sens_x), 5, 400, 5, .fmt = "%d%%", .group = "MOUSE AND AIM" },
     { SP_TPS, "Mouse sensitivity Y", V(g_tps.sens_y), 5, 400, 5, .fmt = "%d%%" },
     { SP_TPS, "Aiming sensitivity", V(g_tps.aim_sens), 10, 200, 5, .fmt = "%d%%", .help = "Mouse sensitivity while aiming, relative to the above." },
     { SP_TPS, "Invert Y", V(g_tps.invert_y), 0, 1, 1 },
     { SP_TPS, "Crosshair", V(g_tps.crosshair), 0, 1, 1 },
     { SP_TPS, "Game auto-aim", V(g_tps.auto_aim), 0, 1, 1, .help = "Off: free aim, the shot goes where the crosshair points. On: the game's lock-on." },
-    { SP_TPS, "Mouse/keyboard camera", V(g_tps.free_cam), 0, 1, 1, free_cam_names, .flags = SET_F1,
-      .help = "B: the camera stays behind the character, the mouse turns it. A: the mouse turns the camera around the character, WASD walk towards their direction on screen; aiming turns the character to the camera. Not the KEY CONFIG type." },
-    { SP_TPS, "Light and fog", V(g_tps.atmos), 0, 1, 1, atmos_names, .flags = SET_F1,
-      .help = "Smooth: lights, fog and screen filter fade over a second when the room's camera cut changes, fog measured from your camera. Per cut: they switch with the cut, as the fixed cameras do." },
 
-    { SP_COOP, "You appear as", NULL, 0, 0, 1, .get = chr_get, .set = chr_set, .name = chr_name, .count = appear_count, .help = "Your model, also in single player and cutscenes; in co-op your partner sees it too." },
+    { SP_AUDIO, "Music and voice", V(g_config.music_volume), 0, 100, 5, .fmt = "%d%%", .apply = apply_volume },
+    { SP_AUDIO, "Sound effects", V(g_config.sfx_volume), 0, 100, 5, .fmt = "%d%%", .apply = apply_volume },
+
+    { SP_COOP, "You appear as", NULL, 0, 0, 1, .get = chr_get, .set = chr_set, .name = chr_name, .count = appear_count, .help = "Your model, also in single player and cutscenes; in co-op your partner sees it too.", .group = "YOU" },
     { SP_COOP, "Use gender-matched animations", V(g_appear_anim), 0, 1, 1, .flags = SET_F1, .help = "A man shown while you play Claire walks, aims and fights with Chris's motions; a woman shown while you play a man, with Claire's." },
     { SP_COOP, "Talking faces in cutscenes (experimental)", V(g_appear_face), 0, 1, 1, .flags = SET_F1, .help = "Your model in cutscenes moves its mouth with the lines, with the story cast's own faces (a player file shown there becomes the same character's cutscene model). From the next room with a cutscene on." },
     { SP_COOP, "Partner's name tag", V(g_coop.nametag), 0, 1, 1, .help = "The partner's name above its head, or at the screen edge when it is out of view." },
+    { SP_COOP, "Show ping", V(g_config.show_ping), 0, 1, 1, .flags = SET_F1, .help = "In co-op, while connected: the round trip to the partner next to the frame rate." },
     { SP_COOP, "Follow host (joining player)", V(g_coop.follow), 0, 1, 1, .help = "The joining player's choice. On: you go through every door the host takes. Off: you stay and may explore other rooms; story cutscenes and character switches still bring you to the host." },
-    { SP_COOP, "Loot (host)", V(g_coop.loot), 0, 1, 1, loots, .locked = in_session, .help = "Individual: each player takes their own copy; key items stay shared." },
+    { SP_COOP, "Loot (host)", V(g_coop.loot), 0, 1, 1, loots, .locked = in_session, .help = "Individual: each player takes their own copy; key items stay shared.", .group = "GAME RULES (HOST)" },
     { SP_COOP, "Important items for both (host)", V(g_coop.important), 0, 1, 1, .locked = in_session,
       .help = "Shared loot: weapons and ink ribbons are each player's own to take (taking one leaves the partner's); ammo, herbs and other supplies stay shared." },
     { SP_COOP, "Synchronized cutscene skip (host)", V(g_coop.skip_sync), 0, 1, 1,
       .help = "A cutscene both of you watch is skipped once both pressed skip; the partner sees that you want to." },
+    { SP_COOP, "Freeze enemies while trading (host)", V(g_coop.trade_freeze), 0, 1, 1, .help = "While both players are in the trade screen the room's enemies stand still (the host's setting counts)." },
     { SP_COOP, "Remember partner inventories (host)", V(g_coop.remember), 0, 1, 1, .flags = SET_F1,
       .help = "Keep each partner's items when it leaves, kept with your saves: it can join again with them (ITEMS: Saved with the host), and gets them back after its game crashed." },
-    { SP_COOP, "Freeze enemies while trading (host)", V(g_coop.trade_freeze), 0, 1, 1, .help = "While both players are in the trade screen the room's enemies stand still (the host's setting counts)." },
-    { SP_COOP, "Extra enemies (host)", V(g_enemy_opts.extra), 0, 3, 1, extras, .flags = SET_F1, .help = "More enemies of the types a room already has (also in single player). In co-op the host's setting counts. Next room." },
-    { SP_COOP, "Host port", V(g_coop.port), 1, 65535, 1, .fmt = "%d", .locked = in_session, .help = "Hosting and joining: MULTIPLAYER in the title menu, or F3." },
     { SP_COOP, "Connection", V(g_coop.conn), 0, 2, 1, conns, .locked = in_session,
-      .help = "Automatic: with a co-op server set (F3 or the lobby), hosting also opens a room and joins by room code try a direct path first, then the server's relay; without a server, as Direct. Direct: address and join code only. Via server: always through the relay." },
+      .help = "Automatic: with a co-op server set (F3 or the lobby), hosting also opens a room and joins by room code try a direct path first, then the server's relay; without a server, as Direct. Direct: address and join code only. Via server: always through the relay.", .group = "CONNECTION" },
+    { SP_COOP, "Host port", V(g_coop.port), 1, 65535, 1, .fmt = "%d", .locked = in_session, .help = "Hosting and joining: MULTIPLAYER in the title menu, or F3." },
     { SP_COOP, "Open port (UPnP)", V(g_coop.upnp), 0, 1, 1, .locked = in_session, .help = "While you host, ask the router to forward the port so a friend can join over the internet." },
 
-    { SP_CONTROLS, "Input source", V(g_input_source), 0, 2, 1, sources, .flags = SET_F1, .apply = bind_apply_source,
-      .help = "Which devices play in this window. Auto: keyboard/mouse and gamepad, while the window has focus. Keyboard/mouse only: "
-              "gamepads are ignored; works only while the window has focus (the system sends keys and clicks to that window). "
-              "Gamepad only: keys and the mouse no longer play (F1, F2, F3, F5, F11 and these windows still work), the gamepad "
-              "keeps working while another window has focus: two copies of the game side by side for local co-op." },
-    { SP_CONTROLS, "Gamepad", V(g_input_pad), 0, 4, 1, .name = bind_pad_choice, .flags = SET_F1,
-      .help = "Any: the first one connected. 1-4: the gamepad the system numbers so (Xbox: its slot / light, PlayStation and "
-              "Switch pads show it on their player lights); give each window its own number for local co-op." },
-
-    { SP_EXTRAS, "Infinite health", V(g_cheat.inf_health), 0, 1, 1 },
+    { SP_EXTRAS, "Infinite health", V(g_cheat.inf_health), 0, 1, 1, .group = "CHEATS" },
     { SP_EXTRAS, "Infinite ammo", V(g_cheat.inf_ammo), 0, 1, 1 },
     { SP_EXTRAS, "Noclip", V(g_cheat.noclip), 0, 2, 1, noclips, .help = "Walls and enemies no longer block you. Fly: noclip up/down keys (R/F, Page Up/Down) or R2/L2." },
     { SP_EXTRAS, "Heal now", NULL, .flags = SET_ACTION | SET_GAME_ONLY, .apply = heal },
-    { SP_EXTRAS, "Item", NULL, 1, CHEAT_ITEMS - 1, 1, .get = item_get, .set = item_set, .name = item_name },
+    { SP_EXTRAS, "Item", NULL, 1, CHEAT_ITEMS - 1, 1, .get = item_get, .set = item_set, .name = item_name, .group = "ITEMS" },
     { SP_EXTRAS, "Count", V(g_cheat.give_count), 1, 999, 1, .fmt = "%d" },
     { SP_EXTRAS, "Add to inventory", NULL, .flags = SET_ACTION | SET_GAME_ONLY, .apply = give },
     { SP_EXTRAS, "Enemy", NULL, 0, 0, 1, .get = spawn_get, .set = spawn_set, .name = spawn_nm, .count = spawn_count,
-      .help = "Bosses and scripted enemies may not work outside their room; spawned enemies are gone after leaving it." },
+      .help = "Bosses and scripted enemies may not work outside their room; spawned enemies are gone after leaving it.", .group = "SPAWN" },
     { SP_EXTRAS, "Spawn in front of me", NULL, .flags = SET_ACTION | SET_GAME_ONLY, .apply = spawn },
-    { SP_EXTRAS, "Teleport stage", V(g_cheat.tp_stg), 0, 9, 1, .fmt = "%d", .help = "Uses the game's door transition; an invalid room or position may crash." },
+    { SP_EXTRAS, "Teleport stage", V(g_cheat.tp_stg), 0, 9, 1, .fmt = "%d", .help = "Uses the game's door transition; an invalid room or position may crash.", .group = "TELEPORT" },
     { SP_EXTRAS, "Teleport room", V(g_cheat.tp_rom), 0, 99, 1, .fmt = "%d" },
     { SP_EXTRAS, "Teleport position", V(g_cheat.tp_pos), 0, 31, 1, .fmt = "%d" },
     { SP_EXTRAS, "Current room", NULL, .flags = SET_ACTION | SET_GAME_ONLY | SET_NOW, .apply = here, .help = "Fills in the room you are in." },

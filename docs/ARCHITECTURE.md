@@ -34,7 +34,7 @@ settings menus) hook into the game through small glue functions.
 |---|---|
 | `decomp/` | the decomp as a submodule (fork, branch `pc-port`). PC changes are inside `#ifdef TARGET_PC` blocks: asm replacements, PS2-address idioms, hooks into the glue, and fixes of undefined behaviour, with the PS2 original kept under `#else` |
 | `pc/include/` | `pc_prelude.h` (force-included into every decomp file: host headers, `long` as 64-bit, declarations of all PC hooks) and replacement SDK headers (`sdk/`) |
-| `pc/glue/` | PC code that needs the decomp's types: co-op, lobby, trade screen, third person, model swaps, cheats, enemy options and spawner, native renderer hooks, PC SETTINGS menu, mouse in menus, quick knife, native saves |
+| `pc/glue/` | PC code that needs the decomp's types: co-op, lobby, trade screen, third person, model swaps, cheats, enemy options and spawner, native renderer hooks, ENHANCED SETTINGS menu, mouse in menus, quick knife, native saves |
 | `pc/src/ps2/` | EE/IOP layer: kernel, DMA, VIF1, VU0/VU1 (static microcode and interpreter), libcdvd, libpad, libmc, SIF, the address window |
 | `pc/src/gs/` | GS emulation (GIF parser, register file, local memory), the OpenGL rasterizer, the frame stream, native textures, in-between frames |
 | `pc/src/audio/` | CRI ADX (ADXF/ADXT), SDL audio output, the TSNDDRV sound driver (high-level emulation) and its synthesizer |
@@ -80,7 +80,7 @@ Windows `-mno-ms-bitfields`.
 | Thread | Owns |
 |---|---|
 | main (`main()`, `render_loop`) | SDL window and events, OpenGL, GS emulation and presentation, the F1/F2/F3 overlay, binding capture, lobby text input and clipboard, the setting appliers (window, vsync, volumes) and **every `recvx.ini` write** |
-| game (`game_thread`) | the decomp and `pc/glue` (PC SETTINGS menu, lobby, co-op incl. its UDP socket polled once per frame, cheats applied at the frame hand-off), disc reads, memory card, creating and destroying audio streams |
+| game (`game_thread`) | the decomp and `pc/glue` (ENHANCED SETTINGS menu, lobby, co-op incl. its UDP socket polled once per frame, cheats applied at the frame hand-off), disc reads, memory card, creating and destroying audio streams |
 | SDL audio | ADX decoding in the stream callbacks (own file handle per voice), the sound-effect synth mix |
 | portmap | UPnP/NAT-PMP while hosting (`net/portmap.c`) |
 | co-op arrival times (Windows) | waits on the co-op socket and notes when data arrived (`net_rx_us`) |
@@ -141,7 +141,7 @@ margins.
 ### Native paths
 
 The emulated pipeline (VU1 microprograms -> GIF -> GS -> OpenGL) is replaced by native paths
-where it pays off. Each is switchable at run time (F1 -> Enhanced, `RECVX_NATIVE3D`,
+where it pays off. Each is switchable at run time (F1 -> Display, `RECVX_NATIVE3D`,
 `RECVX_NATIVE_TEX`, `RECVX_NATIVE_RTEX`), and `pc/tools/compare_native.sh` diffs the paths
 headless.
 
@@ -274,7 +274,7 @@ Inline EE/VU0 assembly in the decomp is translated to C by `pc/tools/asm2c.py`.
   keyboard and gamepad work unchanged. Window positions map to the game's 640x480 2D space through
   the display rectangle (pillarbox, stretch and hor+ margins included). Covered: inventory, item
   commands, combine, examine (drag rotates, wheel zooms), item box, files, map, title menu, co-op
-  lobby, OPTION and PC SETTINGS, the trade screen. The OS cursor is hidden unless such a screen or
+  lobby, OPTION and ENHANCED SETTINGS, the trade screen. The OS cursor is hidden unless such a screen or
   an overlay is open; third person releases the captured mouse while a screen is open.
 - **Idle dimming**: the game's screen saver (`bhSysCallScreenSaver`, 50% black after 10800
   frames without pad input) only reads the PS2 pad. `pc_input_active` (`tps_glue.c`) also counts
@@ -283,34 +283,44 @@ Inline EE/VU0 assembly in the decomp is translated to C by `pc/tools/asm2c.py`.
 ## Settings
 
 One table, `g_settings[]` in `pc/src/host/settings.c`, drives both the F1 overlay and the
-in-game PC SETTINGS pages. Each entry has a page, label, variable (or get/set), range and step,
-value names or a printf format, flags, help text, an applier and a `locked()` reason.
-`recvx.ini` keys live in `keys[]` in `pc/src/host/config.c`.
+in-game ENHANCED SETTINGS pages. Each entry has a page, label, variable (or get/set), range and
+step, value names or a printf format, flags, help text, an applier, a `locked()` reason and an
+optional `.group` heading. Rows are in menu order; the pages (`SP_*`, `settings_pages[]`) are
+DISPLAY, GAMEPLAY, CONTROLS, THIRD PERSON, AUDIO, CO-OP, EXTRAS. `recvx.ini` keys live in `keys[]`
+in `pc/src/host/config.c`.
 
-PC SETTINGS is option level 4 of the game's OPTION screen (`pc/glue/options_glue.c`; hooks in
-`adv.c`: `OptionDef[8]`, the cursor wrap, `DisplayOptionPlate` and the fades treat it like KEY
-CONFIG). It uses the game's font, cursor sounds and highlight; labels and value names must be
-plain ASCII the font has (no `&`, `*`, `#`, `@`).
+ENHANCED SETTINGS is option level 4 of the game's OPTION screen (`pc/glue/options_glue.c`; hooks in
+`adv.c`: `OptionDef[8]`, `DisplayOptionPlate` and the fades treat it like KEY CONFIG). Its entry
+sits right of EXIT, lettered from the option texture's own glyphs: left/right move between EXIT
+and it, up from it goes to DEFAULT, down wraps to the top as from EXIT (`DisplayOptionPlateLevel0`,
+`pc_options_mouse0` for the mouse). The pages use the game's font, cursor sounds and highlight;
+labels and value names must be plain ASCII the font has (no `&`, `*`, `#`, `@`).
 
 **Adding a setting**: add the variable's ini key to `keys[]` in `config.c` and one entry to
 `g_settings[]`, for example
 
 ```c
-{ SP_GAMEPLAY, "Enemy difficulty", V(g_config.enemy_level), 0, 2, 1, levels, .flags = SET_F1,
+{ SP_GAMEPLAY, "Enemy difficulty", V(g_config.enemy_level), 0, 2, 1, levels,
   .help = "...", .locked = in_session },
 ```
+
+ENHANCED SETTINGS shows every row of its page; F1 shows every row too, except on the CO-OP and
+EXTRAS pages (their own windows are F3 and F2), where only `SET_F1` rows appear. ctest `settings`
+(`pc/tests/check_settings.cmake`) fails when an ini key in `config.c` has no row (by its variable),
+unless the key is listed there with where it is set instead (the lobby's per-session choices, the
+third-person key binding).
 
 | Flag | Meaning |
 |---|---|
 | `SET_F1` | a CO-OP or EXTRAS entry that F1 shows too (those pages otherwise live in F3/F2) |
-| `SET_RESTART` | takes effect at the next start |
+| `SET_RESTART` | takes effect at the next start; both menus add "(next start)" |
 | `SET_GAME_ONLY` | only while a game runs |
 | `SET_ACTION` (+ `.apply`) | a command, not a value; the native menu runs it when it closes |
 | `SET_NOW` | an action the native menu runs at once |
 
 ## Save system
 
-Two save systems, chosen by `save_system` (F1 / PC SETTINGS GAMEPLAY "Save system"):
+Two save systems, chosen by `save_system` (F1 / ENHANCED SETTINGS GAMEPLAY "Save system"):
 
 - **Native files** (0, default): `<save dir>/saves/NNN_<label>.sav`, one file per save, no limit
   (`pc/src/host/savestore.c`, tested by `pc/tests/test_savestore.c`).

@@ -77,63 +77,70 @@ card screens ("which memory card slot", "checking memory card", "not enough spac
 - **Save system: Memory card (original)** (`save_system = 1`) brings back the emulated memory card
   with its screens and 15 slots, using `save/card0` exactly as before. The setting applies from the
   next save or load screen. Saves made in one system are not seen by the other; **Import memory
-  card saves** (F1 / PC SETTINGS GAMEPLAY) copies the card's saves into the save files again (ones
+  card saves** (F1 / ENHANCED SETTINGS GAMEPLAY) copies the card's saves into the save files again (ones
   already there are skipped).
 
 ## Settings
 
 All PC settings are available in two places that edit the same values:
 
-- **F1**: the settings overlay (sections Display, Enhanced, Gameplay, Third person, Audio,
-  Performance, Controls).
-- **OPTION -> PC SETTINGS**: an extra row in the game's own OPTION screen (title menu or Select
-  in game), drawn in the game's style, with pages DISPLAY, AUDIO, GAMEPLAY, ENHANCED,
-  THIRD PERSON, CO-OP, CONTROLS and EXTRAS. L1/R1 switch pages; the bottom lines explain the
-  selected row or why it cannot change right now.
+- **OPTION -> ENHANCED SETTINGS**: in the game's own OPTION screen (title menu, or Select in
+  game) next to EXIT: select EXIT and press right (or click it). Drawn in the game's style, with
+  the pages DISPLAY, GAMEPLAY, CONTROLS, THIRD PERSON, AUDIO, CO-OP and EXTRAS. Left/right or
+  L1/R1 on the page row switch pages, up/down (or the mouse wheel) choose a setting, left/right
+  change it, cancel or a right click goes back. Long pages scroll; the bottom lines explain the
+  selected setting, or why it cannot change right now. "(next start)" marks a setting that takes
+  effect when the game starts again.
+- **F1**: the settings overlay, in the same order (sections Display, Gameplay, Controls, Third
+  person, Audio, Co-op, Performance). The co-op and cheat settings live in their own windows
+  (F3, F2); F1 shows a few of them.
 
-Changes apply at once and are saved shortly after. The defaults of a first start are the
-PC-friendly ones: enhanced mode, widescreen, native renderer, skipped intro and door animations.
-Turn these off for a presentation closer to the PS2.
+Every setting of the table below is in both. Changes apply at once and are saved shortly after.
+The defaults of a first start are the PC-friendly ones: enhanced mode, widescreen, native
+renderer, skipped intro and door animations. Turn these off for a presentation closer to the PS2.
 
 ### Display
 
 | Setting | ini key | Values (default in bold) |
 |---|---|---|
+| **Window** | | |
 | Fullscreen | `fullscreen` | also F11 |
 | Window size | `window_w`, `window_h` | presets 1280x960 to 3840x2160 (incl. 3440x1440), or any size by resizing the window |
 | VSync | `vsync` | **on**, off |
 | Frame rate limit | `fps_limit` | **Off (display rate)**, 30, 60, 90, 120, 144. Caps the images shown per second, in-between frames included; the game itself always runs at 30 |
+| Show frame rate | `show_fps` | **on**: counter at the top right |
+| **Picture** | | |
 | Aspect ratio | `aspect` | 4:3 (original), Stretch to window, **Widescreen (hor+)**: 3D fills the window, 2D and menus stay 4:3 in the middle |
 | Internal resolution | `scale` | **Auto** (follows the window) or 1x-8x of 640x448 |
-| Show frame rate | `show_fps` | **on**: counter at the top right |
-| Show ping | `show_ping` | **on**: the round trip to the co-op partner next to the frame rate |
+| Display-rate frames | `interpolate` | "Enhanced mode": in-between frames blended from the last two game frames, up to the display's refresh rate. The game logic stays at its original 30 FPS, so gameplay is unchanged. **On**; off is "vanilla" |
+| Frame blend (trail) | `frame_blend` | the PS2's motion trail (each frame mixed over the previous one). Auto, **Off**, On; Auto is on in vanilla and off with display-rate frames |
 | Cutscene bars, Camera vignette, Screen effects | `cinema_bars`, `screen_filter`, `screen_effects` | Original (4:3), **Stretch to width**, Off: how these full-screen layers behave in widescreen |
-
-### Enhanced (renderer)
-
-| Setting | ini key | Effect |
-|---|---|---|
-| Display-rate frames | `interpolate` | "Enhanced mode": in-between frames blended from the last two game frames, up to the display's refresh rate. The game logic stays at its original 30 FPS, so gameplay is unchanged. On by default; off is "vanilla" |
-| Frame blend (trail) | `frame_blend` | the PS2's motion trail (each frame mixed over the previous one). Auto, Off (default), On; Auto is on in vanilla and off with display-rate frames |
-| Native 3D renderer | `native_3d` | 3D models projected and clipped by the GPU instead of the emulated VU1/GS path (on by default) |
-| Native textures | `native_tex` | textures uploaded once instead of on every switch (on by default) |
+| **Renderer** | | |
+| Native 3D renderer | `native_3d` | **on**: 3D models projected and clipped by the GPU instead of the emulated VU1/GS path |
+| Native textures | `native_tex` | **on**: textures uploaded once instead of on every switch |
+| Cull off-screen models | `model_cull` | **on** (as on the PS2); off stops models popping at the screen edges |
 
 ### Gameplay
 
 | Setting | ini key | Effect |
 |---|---|---|
-| Cull off-screen models | `model_cull` | on (as on the PS2); off stops models popping at the screen edges |
-| Mouse in menus | `menu_mouse` | on: point and click in the inventory, item box, map, files, OPTION and these menus; right click goes back; drag to rotate and wheel to zoom when examining an item |
-| Quick knife | `quick_knife` | on: hold the quick-knife key to draw the combat knife without opening the inventory; release to get the previous weapon back |
+| Skip intro | `skip_intro` | on: boot straight into the title menu (next start) |
 | Skip door animations | `skip_doors` | on: room transitions use the game's load screen instead of the door/stairs/ladder animation |
-| Rearranged enemies, Enemy randomizer, Enemy seed | `enemy_place`, `enemy_random`, `enemy_seed` | optional enemy changes; story, cutscene and boss enemies stay as they are ([ENEMIES.md](ENEMIES.md#enemy-options)) |
+| Quick knife | `quick_knife` | on: hold the quick-knife key to draw the combat knife without opening the inventory; release to get the previous weapon back |
+| **Saves** | | |
 | Save system | `save_system` | **Native files** (0): every save a file in `save/saves`, no limit, no memory card screens; Memory card (original) (1): see [Saves](#saves) |
 | Import memory card saves | (action) | copies the memory card's saves into the save files |
-| No ink ribbons needed | `no_ink_ribbon` | off (original); on: typewriters save without an ink ribbon and use none up. In co-op the host's setting counts for both ([COOP.md](COOP.md#saving-without-ink-ribbons)) |
-| Skip intro | `skip_intro` | on: boot straight into the title menu (next start) |
+| No ink ribbons needed | `no_ink_ribbon` | **off** (original); on: typewriters save without an ink ribbon and use none up. In co-op the host's setting counts for both ([COOP.md](COOP.md#saving-without-ink-ribbons)) |
+| **Enemies** | | |
+| Extra enemies | `enemy_extra` | **Off**, up to 1-3 more per room, of the types the room already has; in co-op the host's |
+| Rearranged enemies, Enemy randomizer, Enemy seed | `enemy_place`, `enemy_random`, `enemy_seed` | optional enemy changes; story, cutscene and boss enemies stay as they are ([ENEMIES.md](ENEMIES.md#enemy-options)) |
 
-Extra enemies per room (`enemy_extra`, up to 3) are on the CO-OP page; they also work in single
-player.
+### Controls
+
+Input source and Gamepad (see [Input source](#input-source-per-window)), **Mouse in menus**
+(`menu_mouse`, **on**: point and click in the inventory, item box, map, files, OPTION and these
+menus; right click goes back; drag to rotate and wheel to zoom when examining an item), then the
+bindings ([Rebinding](#rebinding)).
 
 ### Third person
 
@@ -156,10 +163,12 @@ Music and voice (`music_volume`) and Sound effects (`sfx_volume`), 0-100%.
 ### Co-op
 
 The CO-OP page (also in F3) holds your appearance ("You appear as", see
-[ACTORS.md](ACTORS.md)), name tags, follow host, loot mode and "Important items for both" (with
-shared loot, weapons and ink ribbons stay each player's own to take), "Synchronized cutscene skip"
-(a cutscene both watch is skipped once both pressed skip), the host port, the connection mode and
-UPnP. See [COOP.md](COOP.md).
+[ACTORS.md](ACTORS.md)), name tags, the ping display, follow host; the host's game rules: loot
+mode, "Important items for both" (with shared loot, weapons and ink ribbons stay each player's own
+to take), "Synchronized cutscene skip" (a cutscene both watch is skipped once both pressed skip),
+freezing enemies while trading, remembering partner inventories; and the connection: mode, host
+port and UPnP. See [COOP.md](COOP.md#settings). The address, room code, server, name, password
+and the save to start from or join with are chosen in the lobby (MULTIPLAYER) or F3.
 
 ## Controls
 
@@ -197,7 +206,7 @@ Hotkeys:
 ### Rebinding
 
 F1 -> Controls (tabs Keyboard / mouse and Gamepad: click a binding, then press the key; right
-click clears) or OPTION -> PC SETTINGS -> CONTROLS (DEVICE picks the set). Each row has two
+click clears) or OPTION -> ENHANCED SETTINGS -> CONTROLS (DEVICE picks the set). Each row has two
 slots. While waiting for a key, Esc cancels and Delete clears. A key already used by another row
 is swapped to that row. Gamepad buttons are named after the connected pad (Xbox, PlayStation,
 Nintendo or generic).
@@ -224,7 +233,7 @@ hotkeys.
 
 ### Input source (per window)
 
-F1 -> Controls or PC SETTINGS -> CONTROLS:
+F1 -> Controls or ENHANCED SETTINGS -> CONTROLS:
 
 | Setting | ini key | Values |
 |---|---|---|
@@ -238,7 +247,7 @@ enabled, Steam may send its virtual pad only to the focused window: turn Steam I
 
 ## Cheats and debug tools (F2)
 
-The F2 window (also the EXTRAS page of PC SETTINGS) is meant for testing and fun:
+The F2 window (also the EXTRAS page of ENHANCED SETTINGS) is meant for testing and fun:
 
 - infinite health, heal now, infinite ammo;
 - noclip: Through walls, or Walls + fly (fly with the noclip keys, or R2/L2);
@@ -247,7 +256,7 @@ The F2 window (also the EXTRAS page of PC SETTINGS) is meant for testing and fun
 - teleport to a stage/room/entry position through the game's door transition (an invalid room
   or position may crash).
 
-In co-op, enemy spawning is host-only. Actions chosen in PC SETTINGS run when the menu closes.
+In co-op, enemy spawning is host-only. Actions chosen in ENHANCED SETTINGS run when the menu closes.
 
 ## Mods
 

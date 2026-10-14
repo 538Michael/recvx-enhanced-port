@@ -343,7 +343,7 @@ loader ([ENEMIES.md](ENEMIES.md) "Enemy spawner (F2)").
 
 ## You appear as
 
-"You appear as" (F3 window, the lobby's MODEL row, PC SETTINGS -> CO-OP; ini `coop_char`) shows
+"You appear as" (F3 window, the lobby's MODEL row, ENHANCED SETTINGS -> CO-OP; ini `coop_char`) shows
 our player as one of the player files or one of 62 models found in the room files: the story
 cast, the creatures, the zombie variants (`pc/src/host/actors.c`). It applies in single player and
 co-op (the partner sees it too) and in cutscenes to the event double of the character played.

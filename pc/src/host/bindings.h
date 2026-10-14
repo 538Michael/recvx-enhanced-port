@@ -62,7 +62,7 @@ const bool* bind_keys(void);           /* SDL keyboard state plus scripted keys 
 int  bind_quickturn(int which, int held);   /* which 0 game, 1 third person: 0 off, 1 hold back, 2 back + run (pad.c) */
 int  pad_quick_knife(void);            /* the quick-knife row is held (pad.c) */
 
-/* Input source of this window (F1 Controls, PC SETTINGS -> CONTROLS; ini input_source, input_pad;
+/* Input source of this window (F1 Controls, ENHANCED SETTINGS -> CONTROLS; ini input_source, input_pad;
    docs/USER_GUIDE.md "Input source (per window)"). Auto: keyboard/mouse and the gamepad, while focused. Gamepad only:
    keyboard/mouse no longer play (hotkeys, F1/F2/F3 windows and lobby text fields still work) and
    the gamepad keeps working in the background. */
