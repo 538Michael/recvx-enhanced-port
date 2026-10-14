@@ -211,6 +211,7 @@ struct O_WRK;
 int   tps_filter(struct O_WRK* op);
 unsigned int tps_pad(unsigned int pad);
 int   pc_input_active(void);   /* any PC-side input this frame (bhSysCallScreenSaver) */
+void  tps_player_mode(void);   /* before the player's mode handler: the straight aim height back (free aim) */
 void  tps_player(void);
 void  tps_calc_model(void);
 struct BH_PWORK;
