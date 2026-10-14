@@ -316,8 +316,9 @@ int coop_xfer_chunk(CoopXfer* x, int tid, int total, int off, int len, const uin
    3. commit ATTACK (its grab/bite/throw state): the victim stays while within COOP_TGT_KEEP;
       a victim farther away is not what it is attacking.
    4. a busy target is left for the free player within COOP_TGT_REACH (else it waits its turn).
-   5. a target right in front stays; 6. the other player right in front is taken instead (no enemy
-      walks into a player without going for it).
+   5. a target right in front stays, unless the other is at less than half its distance (behind it);
+      6. the other player right in front is taken instead, unless it is over 1.5 times as far as the
+      target (no enemy walks into a player without going for it).
    7. the nearer player, only by a margin (1.5 x squared distance), so near-equal distances do not
       flip it. */
 #define COOP_TGT_REACH 40.0f            /* 4 m: how far an enemy goes for the free player */

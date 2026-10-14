@@ -641,10 +641,14 @@ static void test_target(void)
     CHECK(pick(0, n, n, 1, 1, 0, 0, F) == 0);
     /* right in front: the player it would walk into is its target, before the distance rule */
     CHECK(pick(0, 12.0f * 12.0f, 11.0f * 11.0f, 0, 0, 0, 1, F) == 1);   /* 1.1 m in front vs 1.2 m behind */
-    CHECK(pick(0, 5.0f * 5.0f, 14.0f * 14.0f, 0, 0, 0, 1, F) == 1);     /* even when the other is nearer, behind it */
-    CHECK(pick(1, 5.0f * 5.0f, 14.0f * 14.0f, 0, 0, 0, 1, F) == 1);     /* and it stays (no flip back to the nearer) */
-    CHECK(pick(0, 14.0f * 14.0f, 5.0f * 5.0f, 0, 0, 1, 1, F) == 0);     /* both in front: it keeps its target */
-    CHECK(pick(1, 14.0f * 14.0f, 5.0f * 5.0f, 0, 0, 1, 1, F) == 1);
+    CHECK(pick(0, 10.0f * 10.0f, 14.0f * 14.0f, 0, 0, 0, 1, F) == 1);   /* also when the other is a little nearer, behind it */
+    CHECK(pick(1, 10.0f * 10.0f, 14.0f * 14.0f, 0, 0, 0, 1, F) == 1);   /* and it stays (no flip back to the nearer) */
+    CHECK(pick(0, 5.0f * 5.0f, 14.0f * 14.0f, 0, 0, 0, 1, F) == 0);     /* not over a target at less than half the distance */
+    CHECK(pick(1, 5.0f * 5.0f, 14.0f * 14.0f, 0, 0, 0, 1, F) == 0);     /* (which it turns to) */
+    CHECK(pick(0, 4.5f * 4.5f, 14.0f * 14.0f, 0, 0, 1, 0, F) == 0);     /* and then keeps */
+    CHECK(pick(0, 14.0f * 14.0f, 10.0f * 10.0f, 0, 0, 1, 1, F) == 0);   /* both in front: it keeps its target */
+    CHECK(pick(1, 10.0f * 10.0f, 14.0f * 14.0f, 0, 0, 1, 1, F) == 1);
+    CHECK(pick(0, 14.0f * 14.0f, 5.0f * 5.0f, 0, 0, 1, 1, F) == 1);     /* (or the one at less than half the distance) */
     CHECK(pick(0, 12.0f * 12.0f, 11.0f * 11.0f, 0, 0, 0, 1, A) == 0);   /* mid-attack it keeps its victim */
     /* the anti flip-flop holds with the front rule: two players crossing in front alternately keep one target */
     { int t = 0, k, flips = 0; for (k = 0; k < 100; k++) { int u = pick(t, n, n, 0, 0, 1, 1, F); flips += u != t; t = u; } CHECK(flips == 0); }

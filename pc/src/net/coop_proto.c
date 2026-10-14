@@ -394,8 +394,8 @@ int coop_pick_target(int cur, const CoopTgtIn* in)
     if (in->commit == COOP_TGT_HOLD || in->busy[oth]) return cur;
     if (in->commit == COOP_TGT_ATTACK && in->d[cur] <= COOP_TGT_KEEP * COOP_TGT_KEEP) return cur;
     if (in->busy[cur]) return in->d[oth] < COOP_TGT_REACH * COOP_TGT_REACH ? oth : cur;
-    if (in->front[cur]) return cur;
-    if (in->front[oth]) return oth;
+    if (in->front[cur] && in->d[oth] * 4.0f >= in->d[cur]) return cur;
+    if (in->front[oth] && in->d[oth] < in->d[cur] * 2.25f) return oth;
     return in->d[oth] * 1.5f < in->d[cur] ? oth : cur;
 }
 

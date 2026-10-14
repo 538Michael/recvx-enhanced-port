@@ -599,7 +599,8 @@ partner's weapon's arms sound bank is loaded beside ours (programs `0x40 + n`).
   2. A **busy** player (being hit or held, dying, or kept away by the loop guard) is never chosen; a
      busy target is left for a free player within 4 m (else the enemy waits its turn).
   3. **Right in front**: a free player within 1.5 m inside the enemy's front quarter stays its
-     target, or becomes it - no enemy walks into a player without going for it.
+     target (unless the other is at less than half its distance), or becomes it (unless the target
+     is at less than two thirds of its distance) - no enemy walks into a player without going for it.
   4. The **nearer** player, by a margin (1.5x squared distance), so near-equal distances do not flip
      it. A player on another floor than the enemy (which attacks only on its own) counts as twice
      as far.
