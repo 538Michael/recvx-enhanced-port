@@ -57,7 +57,7 @@ extern const int WpnAngTab[21][3];
 extern NJS_POINT3 PlayerPos;            /* sdfunc.c: where CallPlayerVoice plays */
 
 CoopState g_coop = { .port = COOP_DEFAULT_PORT, .join = "127.0.0.1:7140", .follow = 1, .upnp = 1, .nametag = 1, .items = COOP_ITEMS_HOST, .server = COOP_DEFAULT_SERVER, .trade_freeze = 1, .remember = 1, .peer_rec = -1,
-                    .important = 0, .skip_sync = 1 };
+                    .important = 1, .skip_sync = 1 };
 int coop_on;
 int appear_on;                          /* co-op off, "You appear as" in use: our-player hooks only */
 
@@ -1948,7 +1948,8 @@ static void apply_snapshots(void)
    (bhPopGameData). From then on both sides send the changes of the flag block as EV_FLAGS
    (bits set and cleared, so a flag the game clears again stays consistent); the host wins
    when both change the same word at once. A flag set by taking an item also sends
-   EV_PICKUP: the partner gets the item too and its copy in the room disappears. When the
+   EV_PICKUP: the partner's copy in the room disappears (and with shared loot the partner gets
+   the item too only if it is one for both: for_both). When the
    host's room changes, the client follows through the game's own door transition. */
 #define SAVE_SIZE ((int)((char*)&sys->save_end - (char*)&sys->version))
 #define NFLAG 120                       /* ev_flg it_flg ic_flg ed_flg ky_flg mp_flg: 0x90..0x270 */
@@ -2511,9 +2512,9 @@ int pc_no_ink_ribbon(void)
 }
 
 /* Shared loot, "important items for both" (OPT_IMPORTANT, docs/COOP.md "Loot modes"): the item kinds each player
-   takes for itself, as individual loot does for every item - one taking it leaves the partner's copy lying. Every
-   other item stays shared: ammo, herbs, sprays, other supplies; key items stay shared in both modes (story
-   progress, a used-up key goes for both); files and maps are progress flags. */
+   takes for itself, as individual loot does for every item - one taking it leaves the partner's copy lying. Without
+   the rule they are pool items as any other (for_both); key items go to both in both modes (story progress, a
+   used-up key goes for both); files and maps are progress flags. */
 static const struct { const char* kind; unsigned int type_bits; int id; } important_kinds[] = {
     { "weapons (guns, launchers, bow gun, knife)", 0x1, 0 },   /* itemdata[].type 0x1: the game's weapon items */
     { "ink ribbons",                               0,   31 },
@@ -2527,6 +2528,11 @@ static int important_item(int id)
     return 0;
 }
 static int own_copies(void) { return !individual() && rule(OPT_IMPORTANT); }
+#define LIGHTER 55                      /* the STANDARD slot's lighter: the story hands it out */
+/* Shared loot is one pool (docs/COOP.md "Loot modes"): an item is the taker's alone, its spot is gone for both.
+   Reaching the partner as well: key items (story progress) and the lighter; with "important items for both"
+   weapons and ink ribbons (each player's own copy: taken from the floor by each, from an event given to both). */
+static int for_both(int id) { return key_item(id) || id == LIGHTER || (own_copies() && important_item(id)); }
 static unsigned int imp_spots(int w) { return sys->itm[IMP_SPOTS + ((w - IT_FLG) & 15)]; }   /* of an item word (it_flg or ic_flg) */
 
 /* event.c bhItmCk: we took the item of trigger `etc`, its it_flg bit `bit` (0..511) */
@@ -2613,10 +2619,41 @@ static void take_item(int item)
 static unsigned int tick, flag_at, hide_at, prog_at, lost_at;   /* in-game frames of the last such change */
 static unsigned int it_new[16];         /* it_flg bits we set recently (the pickup's bit) */
 static unsigned int left_behind[16];    /* it_flg bits of partner pickups we had no room for */
+/* Shared loot, both take one pool item (docs/COOP.md "Loot modes"): exactly one keeps it.
+   - The partner's flag came while our "Will you take it?" was open: our game adds the item and sets no flag
+     (coop_item_late): ours goes back.
+   - Both games set the flag (within a round trip): the host's pickup stands (host authority, as the flag words).
+     Host: `raced` are the it_flg bits the guest set that mask_host_changes dropped (we had taken them since the
+     guest's base), or that we had set but not sent yet; the guest's EV_PICKUP of such a spot goes back as undo.
+     Guest: `mine` remembers our recent pickups by spot, so an undo takes exactly that item back out; the host's
+     flag for a spot we had set but not sent yet means the same at once.
+   What goes back leaves the inventory once we are in control (`back`, not inside a menu or the status screen). */
+static unsigned int raced[16];
+static struct { short bit; unsigned char item; } mine[8];
+static unsigned int mine_n;
+static struct { unsigned char item, why; } back[8];   /* why: BACK_FIRST, BACK_EVENT */
+static int back_n;
+enum { BACK_FIRST, BACK_EVENT };
+static void give_back(int item, int why) { if (back_n < 8) { back[back_n].item = item; back[back_n++].why = why; } }
 static uint64_t hid_prev;
 static int hid_room = -1, hide_obj = -1, lost_item;
 
 static int event_gave(int item);
+static int inv_remove(unsigned int w);
+static const char* item_name(unsigned int entry);
+static void trade_msg(const char* fmt, unsigned int entry);
+
+/* event.c bhItmCk: we said "yes" to an item whose spot flag the partner's pickup had set meanwhile (its EV_FLAGS
+   came while our "Will you take it?" was open): the game added ours anyway and sets no flag, so no pickup of ours
+   is seen. Shared loot: the partner was first, a pool item goes back out. Key items stay (the partner's EV_PICKUP
+   gives one to both anyway), as does an event's item (its flag came from the partner's copy of the event). */
+void coop_item_late(int bit)
+{
+    int item = sys ? (sys->sb_id == 130 ? 35 : sys->sb_id) : 0;
+    if (item <= 0 || item >= 156 || individual() || for_both(item) || event_gave(item)) return;
+    give_back(item, BACK_FIRST);
+    host_log("coop: took item %d of flag %d, but the partner had taken it first: ours goes back\n", item, bit);
+}
 
 static void diff_flags(void)
 {
@@ -2668,6 +2705,10 @@ static void diff_flags(void)
         p.u.pk.bit = -1;
         for (w = 0; w < 16; w++)
             if (it_new[w]) { p.u.pk.bit = w * 32 + __builtin_clz(it_new[w]); break; }
+        if (!is_host && !ind && p.u.pk.bit >= 0 && item > 0 && item < 156 && i < 10 && !for_both(item) && !event_gave(item)) {   /* the host may have been first */
+            mine[mine_n & 7].bit = p.u.pk.bit;
+            mine[mine_n++ & 7].item = item;
+        }
         if (p.u.pk.bit >= 0 && (left_behind[p.u.pk.bit >> 5] & (0x80000000u >> (p.u.pk.bit & 31)))) {
             left_behind[p.u.pk.bit >> 5] &= ~(0x80000000u >> (p.u.pk.bit & 31));   /* the partner has its copy */
             host_log("coop: took item %d (etc %d), the one the partner left for us\n", p.u.pk.item, sys->etc_idx);
@@ -2678,6 +2719,9 @@ static void diff_flags(void)
         } else {
             if (p.u.pk.item && event_gave(p.u.pk.item)) {   /* an event's item: it goes as EV_GRANT, to the floor */
                 host_log("coop: item %d came from an event: the partner gets its spot only\n", p.u.pk.item);
+                p.u.pk.item = 0;
+            } else if (p.u.pk.item && !for_both(item)) {   /* shared loot: one pool, the item is ours alone */
+                host_log("coop: item %d is ours alone (shared loot): the partner's spot goes\n", item);
                 p.u.pk.item = 0;
             }
             queue_event(&p);
@@ -2754,6 +2798,9 @@ static int apply_session_event(const Event* e)
                 return 1;
             }
             mask_host_changes(&c);
+            for (j = 0; j < c.u.fl.n && j < 6; j++)   /* item spots we took since the guest's base: both took them */
+                if (c.u.fl.word[j] >= IT_FLG && c.u.fl.word[j] < IT_FLG + 16 && !individual())
+                    raced[c.u.fl.word[j] - IT_FLG] |= e->u.fl.set[j] & ~c.u.fl.set[j];
         }
         for (j = 0; j < c.u.fl.n && j < 6; j++) {
             int w = c.u.fl.word[j];
@@ -2762,6 +2809,14 @@ static int apply_session_event(const Event* e)
                 fprintf(stderr, "coop: ed_flg word %d set %08x clr %08x (the partner's, as sent %08x %08x)\n", w - 64, c.u.fl.set[j], c.u.fl.clr[j], e->u.fl.set[j], e->u.fl.clr[j]);
             if (is_host && item_word(w) && individual()) continue;   /* individual loot: the guest's item words are its own */
             if (item_word(w) && own_copies()) { c.u.fl.set[j] &= ~imp_spots(w); c.u.fl.clr[j] &= ~imp_spots(w); }   /* ours (important items) */
+            if (w >= IT_FLG && w < IT_FLG + 16 && !individual() && (c.u.fl.set[j] & f[w] & ~last[w])) {   /* we took that spot too, not sent yet */
+                int item = sys->sb_id == 130 ? 35 : sys->sb_id;
+                if (is_host) raced[w - IT_FLG] |= c.u.fl.set[j] & f[w] & ~last[w];
+                else if (item > 0 && item < 156 && !for_both(item) && !event_gave(item)) {
+                    give_back(item, BACK_FIRST);
+                    host_log("coop: the host took item %d of flag word %d as we did: ours goes back\n", item, w);
+                }
+            }
             f[w] = (f[w] | c.u.fl.set[j]) & ~c.u.fl.clr[j];
             last[w] = (last[w] | c.u.fl.set[j]) & ~c.u.fl.clr[j];
         }
@@ -2773,9 +2828,28 @@ static int apply_session_event(const Event* e)
     }
     if (e->type == EV_PICKUP) {
         unsigned int* f = flag_block();
-        int b = e->u.pk.bit, w = IT_FLG + (b >> 5);
+        int b = e->u.pk.bit, w = IT_FLG + (b >> 5), i;
         unsigned int m = 0x80000000u >> (b & 31);
         if (!tx_in_game) return 0;   /* menus, loading: later */
+        if (e->u.pk.undo) {   /* from the host: it took spot b first, our pickup of it goes back */
+            for (i = 0; i < 8; i++)
+                if (mine[i].item && mine[i].bit == b) {
+                    host_log("coop: the host took item %d (flag %d) as we did: ours goes back\n", mine[i].item, b);
+                    give_back(mine[i].item, BACK_FIRST);
+                    mine[i].item = 0;
+                    return 1;
+                }
+            return 1;
+        }
+        if (is_host && b >= 0 && b < 512 && (raced[b >> 5] & m)) {   /* both took it: ours stands */
+            Event u = { 0 };
+            raced[b >> 5] &= ~m;
+            if (e->u.pk.item) { host_log("coop: both took item %d (flag %d): each keeps its own\n", e->u.pk.item, b); return 1; }   /* for both anyway */
+            u.type = EV_PICKUP; u.u.pk.undo = 1; u.u.pk.bit = b;
+            queue_event(&u);
+            host_log("coop: both took the spot of flag %d: ours stands, the partner's goes back\n", b);
+            return 1;
+        }
         if (is_host && individual() && e->u.pk.item && !key_item(e->u.pk.item)) {   /* individual loot: only key items are shared */
             host_log("coop: the partner's pickup of item %d ignored (individual loot)\n", e->u.pk.item);
             return 1;
@@ -2855,6 +2929,9 @@ static void session(void)
     if ((sys->tk_flg & 0x28) || popping || pop_pending) {   /* the inventory is replaced: not a used key */
         memset(keys_had, 0, sizeof(keys_had));
         memset(left_behind, 0, sizeof(left_behind));
+        memset(raced, 0, sizeof(raced));
+        memset(mine, 0, sizeof(mine));
+        back_n = 0;
         lost_at = prog_at = 0;
     }
     if (is_host) {
@@ -4458,8 +4535,10 @@ static void ts_frame(void)
    stood, with a pickup trigger of the game's own kind (sys->metcp, the movable objects' extra
    triggers), so taking it is the game's pickup (crouch, "Will you take it?", full inventory: it stays).
    Nothing is kept when the partner got that item from the same event in that room itself (it watched
-   it), or has it already (unless it stacks). Individual loot: ammo and other consumables from events
-   stay the triggering player's; weapons and key items go to both (the partner cannot run the event). */
+   it), or has it already (unless it stacks). Which items go to the partner (grant_for_partner): individual loot
+   weapons (with the lighter) and key items (the partner cannot run the event); shared loot (one pool) key items and
+   the lighter, weapons and ink ribbons only with "important items for both". The others stay the triggering
+   player's: with shared loot a partner that replayed the event here and got one too gives it back (give_back). */
 #define GRANT0 320                      /* GRANT_N entries of 5 words: flr << 24 | item << 16 | count, room, x y z */
 #define GRANT_N 8
 #define GRANT_NOWHERE 63                /* floor of a grant whose spot is unknown (the giver was hidden in its scene) */
@@ -4475,6 +4554,7 @@ static int g_item(int i) { return (gw(i)[0] >> 16) & 0xFF; }
 static float g_pos(int i, int k) { return (short)(gw(i)[2 + k] & 0xFFFF) / 100.0f; }
 static int stackable(int id) { return (itemdata[id].type & 0x200) != 0; }
 static int story_item(int id) { return (itemdata[id].type & 0x41) != 0; }   /* weapons (and the lighter), key items */
+static int grant_for_partner(int id) { return individual() ? story_item(id) : for_both(id); }
 
 /* what we hold of the item (the STANDARD slot too: the lighter): its amount if it stacks, else its slots */
 static int item_amount(int id)
@@ -4531,7 +4611,14 @@ void coop_item_granted(int item)
     gseen[gseen_n++ & 7].room = room;
     for (i = 0; i < GRANT_N; i++)   /* the partner's copy of it waits here: we got it ourselves now */
         if (g_item(i) == item && (int)gw(i)[1] == room) grant_drop(i, "we got it from the event ourselves");
-    if (individual() && !story_item(item)) { host_log("coop: an event gave us %s (individual loot: ours alone)\n", item_name(item << 16)); return; }
+    if (!grant_for_partner(item)) {
+        if (!individual() && win_rx.open && !win_tx.open) {   /* the partner's event, replayed here: its item */
+            give_back(item, BACK_EVENT);
+            return;
+        }
+        host_log("coop: an event gave us %s (%s loot: ours alone)\n", item_name(item << 16), individual() ? "individual" : "shared");
+        return;
+    }
     if (n == 4) return;
     gout[n].item = item;
     gout[n].count = 0;
@@ -4553,6 +4640,7 @@ static int apply_grant(const Event* e)
     int room = e->stg * 256 + e->rom, item = e->u.gt.item, i, k;
     unsigned int w = (unsigned)item << 16 | e->u.gt.count;
     if (!sys || !plp || !tx_in_game || !in_session_game() || (!is_host && (need_blob || pop_pending || popping))) return 0;   /* our own game first */
+    if (!grant_for_partner(item)) { host_log("coop: the partner got %s from an event: %s loot, the partner's alone\n", item_name(w), individual() ? "individual" : "shared"); return 1; }
     if (watched(item, room)) { host_log("coop: the partner got %s in room %d/%d too: we were in that event\n", item_name(w), e->stg, e->rom); return 1; }
     if (!stackable(item) && have_item(item)) { host_log("coop: the partner got %s from an event: we have one\n", item_name(w)); return 1; }
     for (i = 0; i < GRANT_N && g_item(i); i++) ;
@@ -4674,6 +4762,11 @@ static void grant_frame(void)
                      gout[i].room >> 8, gout[i].room & 0xFF, e.u.gt.p[0], e.u.gt.p[2]);
         }
         gout_n = 0;
+    }
+    for (; back_n && tx_in_game && local_visible(); back_n--) {   /* shared loot: pool items that are the partner's (raced) */
+        unsigned int w = (unsigned)back[back_n - 1].item << 16 | getbulletmax[back[back_n - 1].item][sys->gm_mode & 3];   /* a pickup's amount */
+        if (!inv_remove(w)) host_log("coop: %s is the partner's, but no longer here to give back\n", item_name(w));
+        else trade_msg(back[back_n - 1].why == BACK_EVENT ? "%s from the partner's event is the partner's (shared loot)" : "the partner took %s first", w);
     }
     if (!tx_in_game || !rom || !sys->itwp || (!is_host && (need_blob || pop_pending || popping))) return;
     {   /* test aid: RECVX_COOP_GRANT="item:stage:room[:floor:x:y:z][,...]": as if the partner got these from events there

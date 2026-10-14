@@ -421,13 +421,14 @@ static void coop_window(void)
                                       "For a room code (XXXX-XXXX) choose Automatic or Via server and set the co-op server.");
     if (ImGui::Combo("Loot (host)", &c->loot, loots, IM_ARRAYSIZE(loots))) changed = true;
     if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("Shared: an item one player takes goes to both. Individual: each player takes their own\n"
-                          "copy; key items, locks and story flags stay shared. The host's choice applies.");
+        ImGui::SetTooltip("Shared: each item lies there once - whoever takes it has it, so you split the supplies.\n"
+                          "Individual: each player takes their own copy. Key items, locks and story flags go to both.\n"
+                          "The host's choice applies.");
     bool important = c->important != 0;
     if (ImGui::Checkbox("Shared loot: important items for both (host)", &important)) { c->important = important; changed = true; }
     if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("With shared loot: weapons and ink ribbons are each player's own to take (taking one leaves the\n"
-                          "partner's where it lies); ammo, herbs and other supplies stay shared. The host's choice applies.");
+        ImGui::SetTooltip("With shared loot: weapons and ink ribbons lie there for each player (taking one leaves the\n"
+                          "partner's where it lies). Off: they are one pickup like ammo and herbs. The host's choice applies.");
     bool upnp = c->upnp != 0;
     if (ImGui::Checkbox("Open port automatically (UPnP)", &upnp)) { c->upnp = upnp; changed = true; }
     if (ImGui::IsItemHovered())

@@ -153,8 +153,9 @@ typedef struct Event {
             uint8_t n, word[6];
             uint32_t set[6], clr[6];
         } fl;
-        struct {                        /* we took an item: the partner gets one too */
+        struct {                        /* we took an item: its spot goes; `item` (0: none) is the partner's too */
             uint8_t item, etc, etc_on;
+            uint8_t undo;               /* host only, 1: both took spot `bit`, ours stands - the guest's pickup goes back */
             int16_t bit;                /* the spot's it_flg bit, -1 when not seen */
         } pk;
         struct { uint8_t item; } lost;  /* a key item of ours was used up */
