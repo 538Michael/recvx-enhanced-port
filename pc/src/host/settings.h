@@ -1,14 +1,16 @@
 /* The port's settings as one table (pc/src/host/settings.c), read by the native OPTION menu's
-   PC SETTINGS pages (pc/glue/options_glue.c, game thread) and by the F1 overlay (overlay.cpp
-   settings_imgui; of the CO-OP and EXTRAS pages only the entries flagged SET_F1). Both edit the same variables (g_config, g_tps, g_coop,
-   g_cheat, ...); recvx.ini keys stay in config.c. docs/ARCHITECTURE.md "Settings" says how to add one. */
+   ENHANCED SETTINGS pages (pc/glue/options_glue.c, game thread; every row) and by the F1 overlay
+   (overlay.cpp settings_imgui; of the CO-OP and EXTRAS pages only the entries flagged SET_F1).
+   Both edit the same variables (g_config, g_tps, g_coop, g_cheat, ...); recvx.ini keys stay in
+   config.c, and ctest "settings" fails for an ini key without a row here.
+   docs/ARCHITECTURE.md "Settings" says how to add one. */
 #ifndef RECVX_SETTINGS_H
 #define RECVX_SETTINGS_H
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-enum { SP_DISPLAY, SP_AUDIO, SP_GAMEPLAY, SP_ENHANCED, SP_TPS, SP_COOP, SP_CONTROLS, SP_EXTRAS, SP_COUNT };
+enum { SP_DISPLAY, SP_GAMEPLAY, SP_CONTROLS, SP_TPS, SP_AUDIO, SP_COOP, SP_EXTRAS, SP_COUNT };   /* in menu order */
 extern const char* const settings_pages[SP_COUNT];
 
 enum {
@@ -34,6 +36,7 @@ typedef struct Setting {
     void (*set)(int v);
     const char* (*name)(int v, char* buf, int n);   /* instead of names / fmt */
     int (*count)(void);               /* hi = count() - 1 (lists that load late) */
+    const char* group;                /* a heading above this row, in both menus */
 } Setting;
 
 extern const Setting g_settings[];

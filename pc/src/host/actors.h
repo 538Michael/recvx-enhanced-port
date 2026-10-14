@@ -48,7 +48,7 @@ int appear_grab_motion(int id, int mtn, int from, int to);
 #define COOP_CHR_ACTOR 6
 #define COOP_CHR_MAX (COOP_CHR_ACTOR + ACTOR_MODELS - 1)
 
-/* The list the menus show (F3, the lobby, PC SETTINGS): one entry per distinct look, the player
+/* The list the menus show (F3, the lobby, ENHANCED SETTINGS): one entry per distinct look, the player
    files first. Event and cutscene doubles of a listed look are left out of the list only: their
    chr values stay valid (co-op, recvx.ini) and appear_canon maps them to the listed one. */
 int appear_count(void);

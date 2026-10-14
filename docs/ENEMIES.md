@@ -304,7 +304,7 @@ count for both. Code: `pc/glue/enemyopt_glue.c`, one decomp hook at the end of
 
 | Setting (page) | ini key | Values | Test aid |
 |---|---|---|---|
-| "Extra enemies (host)" (CO-OP) | `enemy_extra` | 0 = Off, 1..3 = "Up to N per room" | `RECVX_ENEMY_EXTRA` |
+| "Extra enemies" (GAMEPLAY) | `enemy_extra` | 0 = Off, 1..3 = "Up to N per room" | `RECVX_ENEMY_EXTRA` |
 | "Rearranged enemies" (GAMEPLAY) | `enemy_place` | 0/1 | `RECVX_ENEMY_PLACE` |
 | "Enemy randomizer" (GAMEPLAY) | `enemy_random` | 0/1 | `RECVX_ENEMY_RANDOM` |
 | "Enemy seed" (GAMEPLAY) | `enemy_seed` | seed for placements and randomizer | `RECVX_ENEMY_SEED` |

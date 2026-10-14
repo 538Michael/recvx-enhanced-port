@@ -28,7 +28,7 @@ While it is on the mouse is captured (F1/F2/F3 free it).
 Arrows, Enter, Backspace, Z/X, 1/2 and gamepads keep working. Any key bound to a third-person
 row stops pressing its DualShock 2 button while third person is on (by default W/A/S/Q lose
 R1/Square/Triangle/L1). All third-person keys, a quick-turn key (unbound by default) and the
-toggle key can be rebound in F1 -> Controls or OPTION -> PC SETTINGS -> CONTROLS (ini
+toggle key can be rebound in F1 -> Controls or OPTION -> ENHANCED SETTINGS -> CONTROLS (ini
 `key_tps_*`: `tps_forward`, `tps_back`, `tps_left`, `tps_right`, `tps_run`, `tps_action`,
 `tps_cancel`, `tps_inventory`, `tps_map`, `tps_aim`, `tps_fire`, `tps_quickturn`,
 `tps_toggle`; the toggle key's first slot is also `tps_key`).
@@ -54,7 +54,7 @@ option's own letters, not the game's KEY CONFIG types. The gamepad has no third-
 
 ### Settings
 
-All on the THIRD PERSON page (F1 or OPTION -> PC SETTINGS). Lengths are in tenths of a game
+All on the THIRD PERSON page (F1 or OPTION -> ENHANCED SETTINGS). Lengths are in tenths of a game
 unit (the character is about 17 units tall).
 
 | Setting | ini key | Default |
