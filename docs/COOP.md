@@ -305,7 +305,7 @@ it) is removed from the partner's inventory too.
 
 **Important items for both** (shared loot only; lobby IMPORTANT ITEMS *For both*, F3 "Shared loot:
 important items for both (host)", PC SETTINGS CO-OP "Important items for both (host)"; ini
-`coop_important`, default on; locked during a session): **weapons** (the guns, launchers, bow gun,
+`coop_important`, default off; locked during a session): **weapons** (the guns, launchers, bow gun,
 the combat knife when it lies somewhere) and **ink ribbons** are each player's own to take, as with
 individual loot: taking one does not give the partner a copy and does not take the partner's. It
 stays lying in the partner's game until the partner takes it. Ammunition, herbs, sprays and every
@@ -501,7 +501,7 @@ only on the host; "locked" ones cannot change during a session.
 | Loot (host), locked | `coop_loot` | 0 Shared, 1 Individual (0) |
 | Remember partner inventories (host) | `coop_remember` | 0/1 (1) |
 | Freeze enemies while trading (host) | `coop_trade_freeze` | 0/1 (1) |
-| Important items for both (host), locked | `coop_important` | 0/1 (1); shared loot only |
+| Important items for both (host), locked | `coop_important` | 0/1 (0); shared loot only |
 | Synchronized cutscene skip (host) | `coop_skip_sync` | 0/1 (1) |
 | No ink ribbons needed (GAMEPLAY page; co-op: host) | `no_ink_ribbon` | 0/1 (0) |
 | Extra enemies (host) | `enemy_extra` | 0..3 (0); see [ENEMIES.md](ENEMIES.md) |

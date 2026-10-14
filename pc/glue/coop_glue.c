@@ -57,7 +57,7 @@ extern const int WpnAngTab[21][3];
 extern NJS_POINT3 PlayerPos;            /* sdfunc.c: where CallPlayerVoice plays */
 
 CoopState g_coop = { .port = COOP_DEFAULT_PORT, .join = "127.0.0.1:7140", .follow = 1, .upnp = 1, .nametag = 1, .items = COOP_ITEMS_HOST, .server = COOP_DEFAULT_SERVER, .trade_freeze = 1, .remember = 1, .peer_rec = -1,
-                    .important = 1, .skip_sync = 1 };
+                    .important = 0, .skip_sync = 1 };
 int coop_on;
 int appear_on;                          /* co-op off, "You appear as" in use: our-player hooks only */
 

@@ -29,7 +29,7 @@
 Co-op protocol version 19 (both players need this build).
 
 - Game rule **Important items for both** (shared loot only; lobby IMPORTANT ITEMS, F3, PC SETTINGS
-  CO-OP; ini `coop_important`, default on): weapons and ink ribbons are each player's own to take;
+  CO-OP; ini `coop_important`, default off): weapons and ink ribbons are each player's own to take;
   one player's pickup leaves the partner's copy where it lies. Ammo, herbs and other supplies stay
   shared, key items stay shared. Each player's own pickups go with its items (saves, the host's
   saved partner inventories).
