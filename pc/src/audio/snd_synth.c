@@ -170,7 +170,10 @@ static int next_sample(Voice* v, int16_t* out)
 static void key_on(const SndBlob* hd, const SndBlob* bd, MidiCh* m, int note, int vel)
 {
     uint32_t prog = hd_entry(hd, HD_PROG, m->prog);
-    if (!prog || !bd->size) return;
+    if (!prog || !bd->size) {
+        if (trace_snd()) printf("tsnd: key-on prog %d note %d dropped (%s)\n", m->prog, note, prog ? "no samples loaded" : "no such program");
+        return;
+    }
     for (int s = 0; s < rd8(hd, prog + 4); s++) {
         uint32_t split = prog + rd32(hd, prog) + s * rd8(hd, prog + 5);
         uint32_t sset;
@@ -187,6 +190,7 @@ static void key_on(const SndBlob* hd, const SndBlob* bd, MidiCh* m, int note, in
             if (!v) {   /* steal the oldest */
                 v = &voice[0];
                 for (int i = 1; i < VOICES; i++) if (voice[i].age < v->age) v = &voice[i];
+                if (trace_snd()) printf("tsnd: all %d voices busy, the oldest (prog %d) stopped\n", VOICES, v->chan ? v->chan->prog : -1);
             }
             memset(v, 0, sizeof(*v));
             v->on = 1; v->chan = m; v->note = note; v->bd = bd;
@@ -608,13 +612,13 @@ static void port_play(int port, int bank, int vol, int block)
     MidiPort* p;
     const SndBlob* sq;
     uint32_t chunk, max, ofs, blk;
-    if (port >= MIDI_PORTS || bank >= 4) return;
+    if (port >= MIDI_PORTS || bank >= 4) goto drop;
     sq = &g_snd_banks.sq[bank];
     chunk = rd32(sq, 0x24);                                  /* Sequ header: midiChunkAddr */
     max = rd32(sq, chunk + 12);
-    if (chunk == 0xFFFFFFFFu || max == 0xFFFFFFFFu || (uint32_t)block > max || !g_snd_banks.midi_hd[bank].size) return;
+    if (chunk == 0xFFFFFFFFu || max == 0xFFFFFFFFu || (uint32_t)block > max || !g_snd_banks.midi_hd[bank].size) goto drop;
     ofs = rd32(sq, chunk + 16 + block * 4);
-    if (ofs == 0xFFFFFFFFu) return;
+    if (ofs == 0xFFFFFFFFu) goto drop;
     port_stop(port);
     p = &mport[port];
     blk = chunk + ofs;
@@ -634,6 +638,9 @@ static void port_play(int port, int bank, int vol, int block)
     p->playing = 1;
     p->wait = read_delta(p);
     midi_bits |= 1u << port;
+    return;
+drop:
+    if (trace_snd()) printf("tsnd: MIDI port %d bank %d block %d dropped (no such port, bank or block)\n", port, bank, block);
 }
 
 /* run the driver's 240 Hz tick up to the current vblank (59.94 Hz -> 4.004 ticks) */
@@ -652,7 +659,10 @@ static void tq_request(int port, int tq, int ch, int vol, int pan, int pitch, in
 {
     TqSlot* t;
     if (port == 1 && !xb && tq >= SND_PARTNER_TQ && g_snd_banks.arms2_hd.size) xb = XB_PARTNER;
-    if (port >= SE_PORTS || ch >= 16 || !slot_hd(port, xb)->size) return;
+    if (port >= SE_PORTS || ch >= 16 || !slot_hd(port, xb)->size) {
+        if (trace_snd()) printf("tsnd: SE port %d ch %d prog %d dropped (bank not loaded)\n", port, ch, tq);
+        return;
+    }
     t = &slot[port][ch];
     t->xb = (uint8_t)xb;
     t->count = tq_length(slot_hd(port, xb), xb == XB_PARTNER ? tq - SND_PARTNER_TQ : tq);
