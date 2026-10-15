@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Renderer
+
+- Font: no more seams around the letters of messages, item names and "Now Loading..." at higher
+  internal resolutions. The glyph quads' texture coordinates reached a quarter texel into the
+  neighbouring glyph of the font texture; they now sit half a texel inside the glyph's cell on
+  every edge. Fix by fmil95 (decompilation team).
+
 ## 0.2.0 (2026-10-14)
 
 ### Third person
