@@ -223,13 +223,65 @@ hand-scheduled around them. The programs are compiled statically: `vu_step()` (o
 pair) is inlined into a switch with one case per micro address (`vu_static.inc`), so the C
 compiler folds every decoded field into straight-line code. Both paths share `vu_step()`.
 
-Two hot spots of chunk-model drawing have hand-written C with the same arithmetic and resulting
-VU state: `VU0_CALCPOINT` without point lights (`vu.c calcpoint_fast`, SSE2) and the strip clip
-test of `njCnkCsUvh/Uvn` (`vu_strip_clip`). `RECVX_VU_CHECK=1` runs every call both ways and
-compares the whole VU state; `RECVX_VU_INTERP=1` selects the interpreter; `pc/tests/test_vu.c`
-compares them on random states including overflow and denormal inputs.
-
 Inline EE/VU0 assembly in the decomp is translated to C by `pc/tools/asm2c.py`.
+
+The VU0 time is almost all `VU0_CALCPOINT` (one vertex of a chunk model per call, 97-99% of
+the microcode time in every scene) and the macro-mode ops of the translated asm (skinning,
+matrices, `Ps2AddPrim3DMod`). These run as native code with the same operations in the same
+order, the same clamping (`vu_clampf`: Inf/NaN -> +-FLT_MAX, denormals -> +-0), flags and
+resulting VU state:
+
+- `VU0_CALCPOINT` (`vu.c calcpoint_fast`): every light setup, directional and point lights. The
+  program has no loops and its stalls only delay, so its timing is resolved statically: which
+  DIV/RSQRT result each `MULq` reads (and Q at the end), which FMAC's MAC flags each `FMAND`
+  reads, the CLIP flags at `FCGET`. Work whose result the program overwrites is skipped.
+- Whole vertex runs (`vu0_calcpoint_n`, called by `njCnkCvVnPs2` through a `TARGET_PC` hook in
+  the decomp): four vertices per vector, one per lane, with the same operations per vertex;
+  only the last vertex runs through `calcpoint_fast`, which leaves the VU state of the
+  per-vertex calls (vi11 and the clip flags are folded over the run). On x86 this kernel is
+  also compiled for AVX and chosen at run time (`RECVX_VU_AVX=0`: SSE2).
+- Macro mode: `vu_upper` (`vu0.h`) is inline; at the asm2c call sites all its arguments are
+  constants, so each COP2 op folds to a few vector instructions. The strip clip test of
+  `njCnkCsUvh/Uvn` (`vu_strip_clip`) is the same ops in one loop.
+- The four-lane layer (`vu_simd.h`) is SSE2, or plain C with the same results
+  (`RECVX_VU_PORTABLE`, any non-x86 build).
+
+The other VU0 programs (`CLIP_VIEW_VOLUME_ALL`, `CALC_COLOR`, `CALCPOINT_INIT/END`, ...) take
+about 0.1 ms a frame and stay on the static path, as do the VU1 programs (unused while the
+native 3D paths are on).
+
+Exactness: `RECVX_VU_CHECK=1` runs every microprogram call and every CALCPOINT run both ways
+and compares the whole VU state (and the run's outputs); `RECVX_VU_INTERP=1` runs all
+microprograms (CALCPOINT runs too) through the interpreter. `pc/tests/test_vu.c` (ctest `vu`,
+`vu_portable`) compares CALCPOINT, the runs and every macro op (op, field mask, broadcast,
+overlapping registers) against the interpreter on random states with overflow, denormal,
+zero, -0, Inf and NaN inputs, in SSE2, AVX and plain C. With two NaN operands of ADD or MUL,
+which NaN (and so which clamped sign) survives depends on the compiler's operand order, in the
+interpreter too; the PS2 has no NaN, and the tests use negative NaNs.
+
+### Cost per frame
+
+Game-thread time per game frame (`--profile`: logic + VU0 + VU1 + GIF recording, mean of game
+frames 400-1500 of a headless run; the two builds alternately on an otherwise idle Ryzen 7
+9800X3D, Linux, 32-bit build; run to run within about 20%). Before: the build without the
+native VU0 paths (CALCPOINT native only without point lights).
+
+| Scene | Before | After |
+|---|---|---|
+| `RM_0000`, new game, cutscene skipped | 6.0 ms (VU0 4.9) | 1.1 ms |
+| `RM_0000`, the opening cutscene | 2.7 ms (VU0 1.9) | 0.6 ms |
+| `RM_0060`, walking and shooting zombies (as `layout_check.sh`) | 4.5 ms (VU0 3.2) | 1.0 ms |
+| `RM_0060`, standing while a zombie comes | 7.6 ms (VU0 5.9) | 1.3 ms |
+| `RM_0030` (outdoors, rain) | 5.8 ms (VU0 4.3) | 1.1 ms |
+| Title menu | 0.06 ms (no VU0) | 0.06 ms |
+| RE4 village, whole map (`RM_1310` mod, ~200k vertices a frame) | 23.3 ms | 9.6 ms |
+
+Retail rooms have point lights, so CALCPOINT ran through the static interpreter (~0.8 us a
+vertex); every macro op was a call with register copies. The village has none: its CALCPOINT
+was already native, at ~75 ns a vertex, now ~16 ns. The largest game-thread costs now: CALCPOINT
+runs, `pc_native_strip`, `vu_strip_clip`, the other VU0 programs (~0.1 ms) and, in the
+village, collision. The render thread (GS emulation, replays: `r_exec`, `r_interp`) is separate:
+1.5 ms a game frame in a retail room, 7.7 ms in the village.
 
 ## Audio and movies
 
@@ -453,8 +505,8 @@ called by the game thread.
   frame chain).
 - `--profile[=file]` writes one CSV line per game frame: total frame time and exclusive time in
   game logic, VU0, VU1, GS emulation + GL submission, interpolation, presentation and idle wait.
-  F1 -> Performance shows the same live. The native `CALCPOINT` is not timed separately and counts
-  as game logic.
+  F1 -> Performance shows the same live. The native `CALCPOINT` (single calls and runs) is not
+  timed separately and counts as game logic; VU0 is the other microprograms.
 - `--profile-samples=file` (Linux, same as `RECVX_PROFILE=file`) samples each thread at 1 kHz of
   its own CPU time; `pc/tools/profile.py build/pc/recvx file [top] [r|g]` summarises by function,
   optionally for the render (`r`) or game (`g`) thread only. `file.maps` lets it name libraries.
@@ -539,7 +591,8 @@ and game frames for game-state aids, as noted. Co-op test aids (`RECVX_COOP_*`,
 | `RECVX_GPU_TIME=1` | every 2 s: frames and in-between images per second, render-thread CPU and GPU time |
 | `RECVX_TRACE_NTEX=1` | log native texture binds, misses and render-texture captures |
 | `RECVX_TRACE_DMA=1` | log GIF DMA chain tags |
-| `RECVX_VU_CHECK=1`, `RECVX_VU_INTERP=1` | compare static VU code with the interpreter on every call / use the interpreter |
+| `RECVX_VU_CHECK=1`, `RECVX_VU_INTERP=1` | compare the static and native VU code with the interpreter on every call / use the interpreter |
+| `RECVX_VU_AVX=0` | the CALCPOINT run kernel in SSE2 instead of AVX |
 | `RECVX_DUMP_CALCPOINT=n`, `RECVX_DUMP_VU1=n` | dump VU0/VU1 state at the n-th call |
 | `RECVX_EFF_TRACE=1` | log live effects each frame |
 | `RECVX_TPS_TRACE=1/2`, `RECVX_TPS_AIM_AT=f`, `RECVX_TPS_ORBIT=deg`, `RECVX_ATMOS_TRACE=1` | third person: log free aim (`=2`: aim at the locked enemy, `f` along its hit capsule); turn the view about the player; log light and fog ([THIRDPERSON.md](THIRDPERSON.md)) |
