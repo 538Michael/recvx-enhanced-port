@@ -73,7 +73,9 @@ int main(void)
 #define RND() ((seed = seed * 1103515245u + 12345u) >> 8 & 0xFFFF)
 #define RF(lo, hi) ((float)(lo) + ((float)(hi) - (float)(lo)) * (float)RND() / 65535.0f)
 #define ODD() (odd[RND() % (sizeof(odd) / sizeof(odd[0]))])
-        for (int node = 0; node < 3000; node++) {
+        extern int vu_avx;   /* vu.c: 0 SSE2, -1 detect (AVX where the CPU has it) */
+        for (int pass = 0; pass < 2; pass++) for (int node = 0; node < 3000; node++) {
+            if (node == 0) vu_avx = pass ? -1 : 0;
             for (int r = 1; r < 32; r++) for (int c = 0; c < 4; c++) g_vu0.vf[r].f[c] = RF(-50, 50);
             for (int r = 1; r < 16; r++) g_vu0.vi[r] = (uint16_t)RND();
             g_vu0.vf[17].f[0] = RF(100, 400); g_vu0.vf[17].f[1] = RF(100, 400); g_vu0.vf[23].f[2] = RF(0.5, 2);
@@ -97,6 +99,22 @@ int main(void)
                 if (node % 5 == 2) g_vu0.vf[5].f[v % 3] *= 1e-37f;   /* denormal products: flushed */
                 if (node % 5 == 3) g_vu0.vf[4 + (v & 1)].u[RND() & 3] = ODD();
                 vu0_callms(VU0_ADDR_VU0_CALCPOINT);
+            }
+            {   /* the rest of the node as one run (vu0_calcpoint_n: four vertices per lane set, the
+                   last ones per vertex); RECVX_VU_CHECK compares it with per-vertex calls */
+                static float vin[24 * 8];
+                static uint8_t vout[24 * 64];
+                const int nv = 1 + (int)(RND() % 24);
+                for (int v = 0; v < nv; v++) {
+                    float* p = vin + 8 * v;
+                    for (int c = 0; c < 3; c++) { p[c] = RF(-200, 200); p[4 + c] = RF(-1, 1); }
+                    p[3] = 1.0f; p[7] = RF(-1, 1);
+                    if (node % 5 == 1) p[v % 3] *= 1e37f;
+                    if (node % 5 == 2) p[4 + v % 3] *= 1e-37f;
+                    if (node % 5 == 3) ((uint32_t*)p)[RND() & 7] = ODD();
+                }
+                if (node % 13 == 5) g_vu0.vf[29].f[1] += 1.0f;   /* vf28-31 not the matrix CALCPOINT restores */
+                vu0_calcpoint_n(vin, vout, nv);
             }
             vu0_callms(VU0_ADDR_VU0_CALCPOINT_END);
         }

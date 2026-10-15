@@ -707,10 +707,17 @@ static void check_against(const VuState* s, int unit, int addr)
 
 static void dump_vf(const char* tag, int r) { fprintf(stderr, "  %s vf%-2d = %12.5f %12.5f %12.5f %12.5f\n", tag, r, g_vu0.vf[r].f[0], g_vu0.vf[r].f[1], g_vu0.vf[r].f[2], g_vu0.vf[r].f[3]); }
 
+static int dump_calcpoint(void)   /* RECVX_DUMP_CALCPOINT=n */
+{
+    static int v = -1;
+    if (v < 0) v = getenv("RECVX_DUMP_CALCPOINT") ? atoi(getenv("RECVX_DUMP_CALCPOINT")) : 0;
+    return v;
+}
+
 void vu0_callms(int addr)
 {
-    static int dbg = -1, ndump;
-    if (dbg < 0) dbg = getenv("RECVX_DUMP_CALCPOINT") ? atoi(getenv("RECVX_DUMP_CALCPOINT")) : 0;
+    static int ndump;
+    const int dbg = dump_calcpoint();
     if (dbg && addr == VU0_ADDR_VU0_CALCPOINT && ++ndump == dbg) {
         static const int regs[] = { 0, 1, 4, 5, 12, 13, 17, 23, 24, 25, 26, 27, 28, 29, 30, 31 };
         fprintf(stderr, "CALCPOINT call %d, inputs:\n", ndump);
@@ -735,6 +742,194 @@ void vu0_callms(int addr)
     prof_pop();
 }
 
+/* CALCPOINT for four vertices side by side, one per lane (vu0_calcpoint_n): per vertex the
+   operations of calcpoint_fast in the same order and operand order, on what the caller
+   reads (vf07.xyz, vf18, vf06, vf11.x, the clip flags); the rest of the VU state (vf04/05,
+   ACC, Q, MAC, vi12-15, ...) is overwritten by the next vertex and is left to the last one,
+   which runs through calcpoint_fast. Every vertex starts with vf08 = 0: the previous one's
+   vf08 is clamped (finite), and x - x = +0. vf28-31 must already be the view matrix that the
+   program restores at its end (mem 60-63). */
+static inline __attribute__((always_inline)) void calcpoint_soa_body(VuState* s, const float* in, uint8_t* out, int n)
+{
+    V4 m1[4][4], m2[4][4], col[4][3], l24[4], l25[4], l26[4], l27[4], l12[4], l13[4];
+    const V4 one = v4set1(s->vf[0].f[3]), zero = v4set1(s->vf[0].f[0]), v17x = v4set1(s->vf[17].f[0]), v17y = v4set1(s->vf[17].f[1]);
+    const V4 v01z = v4set1(s->vf[1].f[2]), w7 = v4set1(s->vf[7].f[3]);
+    int on = 0, point = 0;
+    uint32_t clip = s->clip;
+    uint16_t vi11 = s->vi[11];
+    for (int r = 0; r < 4; r++)
+        for (int c = 0; c < 4; c++) { m1[r][c] = v4set1(s->vf[28 + r].f[c]); m2[r][c] = v4set1(s->mem[56 + r].f[c]); }
+    for (int r = 0; r < 4; r++) for (int c = 0; c < 3; c++) col[r][c] = v4set1(s->mem[71 + r].f[c]);
+    for (int k = 0; k < 4; k++) {
+        const uint16_t vi14 = (uint16_t)(s->vi[10] << k);   /* the light loop's vi14 */
+        l24[k] = v4set1(s->vf[24].f[k]); l25[k] = v4set1(s->vf[25].f[k]); l26[k] = v4set1(s->vf[26].f[k]);
+        l27[k] = v4set1(s->vf[27].f[k]); l12[k] = v4set1(s->vf[12].f[k]); l13[k] = v4set1(s->vf[13].f[k]);
+        if (vi14 & s->vi[7]) { on |= 1 << k; if (vi14 & s->vi[8]) point |= 1 << k; }
+    }
+    for (; n > 0; n -= 4, in += 32, out += 256) {
+        const int valid = n < 4 ? n : 4;   /* a last, partial group: the missing lanes repeat its last vertex */
+        float pad[32];
+        uint8_t tmp[256];
+        const float* src = in;
+        uint8_t* dst = out;
+        if (valid < 4) {
+            for (int v = 0; v < 4; v++) memcpy(pad + 8 * v, in + 8 * (v < valid ? v : valid - 1), 32);
+            src = pad; dst = tmp;
+        }
+        V4 px = v4ld((const VuVec*)src), py = v4ld((const VuVec*)(src + 8)), pz = v4ld((const VuVec*)(src + 16)), pw = v4ld((const VuVec*)(src + 24));
+        V4 nx = v4ld((const VuVec*)(src + 4)), ny = v4ld((const VuVec*)(src + 12)), nz = v4ld((const VuVec*)(src + 20)), nw = v4ld((const VuVec*)(src + 28));
+        V4 v18[4], v19[3], v5[4], v7[4], v6x, v6y, v6z, v6w, q, r8[4];
+        v4transpose(&px, &py, &pz, &pw);
+        v4transpose(&nx, &ny, &nz, &nw);
+        for (int c = 0; c < 4; c++)   /* MULAx/MADDAy/MADDAz/MADDw vf18, vf28-31 */
+            v18[c] = v4madd(v4madd(v4madd(v4mul(m1[0][c], px), m1[1][c], py), m1[2][c], pz), m1[3][c], one);
+        for (int c = 0; c < 3; c++)
+            v19[c] = v4madd(v4madd(v4mul(m1[0][c], nx), m1[1][c], ny), m1[2][c], nz);
+        q = v4div(one, v18[2]);                                    /* DIV Q, vf00w, vf18z */
+        v6x = v4mul(v4mul(v18[0], v17x), q);                       /* MUL.xy vf06, then MULq.xyz */
+        v6y = v4mul(v4mul(v18[1], v17y), q);
+        v6z = v4mul(v01z, q);                                      /* (MOVE.z vf06, vf01) */
+        v6w = v4mul(one, v19[2]);                                  /* MULz.w vf06, vf00, vf19z */
+        r8[0] = r8[1] = r8[2] = r8[3] = v4zero();
+        if (point) {   /* the whole lead-in of the light loop: vf09-11, vf05, vf04 and the FMANDs */
+            V4 d2[4], dot[4];
+            int m4z = 0, m4n = 0, m6z = 0, m6n = 0, m7z = 0, m7n = 0;
+            for (int k = 0; k < 4; k++) {
+                const V4 d9 = v4sub(l24[k], v18[0]), d10 = v4sub(l25[k], v18[1]), d11 = v4sub(l26[k], v18[2]);
+                d2[k] = v4madd(v4madd(v4mul(d9, d9), d10, d10), d11, d11);
+                dot[k] = v4madd(v4madd(v4mul(d9, v19[0]), d10, v19[1]), d11, v19[2]);
+                const V4 s6 = v4sub(l12[k], d2[k]), s7 = v4sub(l13[k], d2[k]);
+                /* MAC bit (3 - k) zero, (7 - k) sign of light k; lane v of each mask: vertex v */
+                m4z |= v4zero_bits(dot[k]) << 4 * k; m4n |= v4neg_bits(dot[k]) << 4 * k;
+                m6z |= v4zero_bits(s6) << 4 * k;     m6n |= v4neg_bits(s6) << 4 * k;
+                m7z |= v4zero_bits(s7) << 4 * k;     m7n |= v4neg_bits(s7) << 4 * k;
+            }
+            uint16_t vi13[4], vi12[4];
+            for (int v = 0; v < 4; v++) {
+                uint32_t a = 0, b = 0, c = 0;
+                for (int k = 0; k < 4; k++) {
+                    a |= (m4z >> (4 * k + v) & 1u) << (3 - k) | (m4n >> (4 * k + v) & 1u) << (7 - k);
+                    b |= (m6z >> (4 * k + v) & 1u) << (3 - k) | (m6n >> (4 * k + v) & 1u) << (7 - k);
+                    c |= (m7z >> (4 * k + v) & 1u) << (3 - k) | (m7n >> (4 * k + v) & 1u) << (7 - k);
+                }
+                vi13[v] = (uint16_t)((a & s->vi[9]) | (c & s->vi[9]));
+                vi12[v] = (uint16_t)(b & s->vi[9]);
+            }
+            for (int k = 0; k < 4; k++) {
+                if (!(point >> k & 1) || !(on >> k & 1)) continue;
+                int facing = 0, atten = 0;   /* lanes: vi01 = 0 (lit), vi15 != 0 (second MULq) */
+                for (int v = 0; v < 4; v++) {
+                    facing |= !(vi13[v] & s->vi[7 - k]) << v;
+                    atten |= ((vi12[v] & s->vi[7 - k]) != 0) << v;
+                }
+                if (!facing) continue;
+                const V4 t = v4mul(dot[k], v4div(one, v4sqrt(v4fabs(d2[k]))));   /* MULq: the RSQRT */
+                r8[k] = v4blend(r8[k], v4blend(t, v4mul(t, v4div(l12[k], d2[k])), atten), facing);
+            }
+        }
+        for (int k = 0; k < 4; k++) {   /* LIGHTk_PARA */
+            if (!(on >> k & 1) || (point >> k & 1)) continue;
+            const V4 lx = v4mul(v19[0], l27[k]), ly = v4mul(v19[1], l27[k]), lz = v4mul(v19[2], l27[k]);
+            r8[k] = v4max(v4madd(v4madd(v4mul(l24[k], lx), l25[k], ly), l26[k], lz), zero);
+        }
+        for (int c = 0; c < 4; c++)   /* LIGHT4: vf05 = vf18 by vf28-31 (mem 56-59) */
+            v5[c] = v4madd(v4madd(v4madd(v4mul(m2[0][c], v18[0]), m2[1][c], v18[1]), m2[2][c], v18[2]), m2[3][c], one);
+        for (int c = 0; c < 3; c++)   /* colour: vf07/09/10/11 (mem 71-74) by vf08 */
+            v7[c] = v4madd(v4madd(v4madd(v4mul(col[0][c], r8[0]), col[1][c], r8[1]), col[2][c], r8[2]), col[3][c], r8[3]);
+        v7[3] = w7;
+        {   /* CLIPw.xyz vf05, vf05w; FCGET; IAND vi11 */
+            const V4 w = v4fabs(v5[3]), nw4 = v4fneg(w);
+            const int gx = v4gt_bits(v5[0], w), lx = v4lt_bits(v5[0], nw4), gy = v4gt_bits(v5[1], w), ly = v4lt_bits(v5[1], nw4);
+            const int gz = v4gt_bits(v5[2], w), lz = v4lt_bits(v5[2], nw4);
+            for (int v = 0; v < valid; v++) {
+                const uint32_t cb = (gx >> v & 1) | (lx >> v & 1) << 1 | (gy >> v & 1) << 2 | (ly >> v & 1) << 3 | (gz >> v & 1) << 4 | (lz >> v & 1) << 5;
+                clip = ((clip << 6) | cb) & 0xFFFFFF;
+                vi11 &= (uint16_t)(clip & 0xFFF);
+            }
+        }
+        v18[3] = v4add(zero, v6z);   /* the fog slot: ADDz.x vf11, vf00, vf06z */
+        v4transpose(&v7[0], &v7[1], &v7[2], &v7[3]);
+        v4transpose(&v18[0], &v18[1], &v18[2], &v18[3]);
+        v4transpose(&v6x, &v6y, &v6z, &v6w);
+        for (int v = 0; v < 4; v++) {
+            v4st((VuVec*)(dst + 64 * v + 16), v7[v]);
+            v4st((VuVec*)(dst + 64 * v + 32), v18[v]);
+        }
+        v4st((VuVec*)(dst + 48), v6x); v4st((VuVec*)(dst + 112), v6y); v4st((VuVec*)(dst + 176), v6z); v4st((VuVec*)(dst + 240), v6w);
+        if (valid < 4) for (int v = 0; v < valid; v++) memcpy(out + 64 * v + 16, tmp + 64 * v + 16, 48);
+    }
+    s->clip = clip;
+    s->vi[11] = vi11;
+    memset(&s->vf[8], 0, sizeof(s->vf[8]));   /* any finite vf08: the next vertex starts at 0 */
+}
+
+static void calcpoint_soa_sse2(VuState* s, const float* in, uint8_t* out, int n) { calcpoint_soa_body(s, in, out, n); }
+/* x86: also compiled for AVX and chosen at run time (the same operations in VEX encoding,
+   without SSE's register copies: ~25% faster). vu_avx: -1 detect, 0 SSE2 (RECVX_VU_AVX=0), 1 AVX */
+#if defined(__SSE2__) && !defined(RECVX_VU_PORTABLE) && (defined(__i386__) || defined(__x86_64__))
+__attribute__((target("avx"))) static void calcpoint_soa_avx(VuState* s, const float* in, uint8_t* out, int n) { calcpoint_soa_body(s, in, out, n); }
+int vu_avx = -1;
+static void calcpoint_soa(VuState* s, const float* in, uint8_t* out, int n)
+{
+    if (vu_avx < 0) vu_avx = __builtin_cpu_supports("avx") && !(getenv("RECVX_VU_AVX") && !atoi(getenv("RECVX_VU_AVX")));
+    if (vu_avx) calcpoint_soa_avx(s, in, out, n);
+    else calcpoint_soa_sse2(s, in, out, n);
+}
+#else
+int vu_avx;
+#define calcpoint_soa calcpoint_soa_sse2
+#endif
+
+/* the decomp's per-vertex sequence: load vf04/vf05, CALCPOINT, store vf07, vf18 (w: vf11.x), vf06 */
+static void calcpoint_one(const float* in, uint8_t* out)
+{
+    vu_load_vf(4, in); vu_load_vf(5, in + 4);
+    vu0_callms(VU0_ADDR_VU0_CALCPOINT);
+    memcpy(out + 16, &g_vu0.vf[7], 16);
+    memcpy(out + 32, &g_vu0.vf[18], 12);
+    memcpy(out + 44, &g_vu0.vf[11], 4);
+    memcpy(out + 48, &g_vu0.vf[6], 16);
+}
+
+static void calcpoint_n_native(const float* in, uint8_t* out, int n)
+{
+    VuState* const s = &g_vu0;
+    s->cmsar0 = VU0_ADDR_VU0_CALCPOINT;
+    if (n > 4) {
+        int m;
+        if (memcmp(&s->vf[28], &s->mem[60], 64)) { calcpoint_one(in, out); in += 8; out += 64; n--; }   /* vf28-31 not yet the restored matrix */
+        m = n - 1;   /* the last vertex through calcpoint_fast */
+        calcpoint_soa(s, in, out, m);
+        in += 8 * m; out += 64 * m; n -= m;
+    }
+    for (; n > 0; n--, in += 8, out += 64) calcpoint_one(in, out);
+}
+
+/* VU0_CALCPOINT for n vertices: the vertex loop of njCnkCvVnPs2 after its first vertex
+   (ps2_NinjaCnk.c). in: 8 floats per vertex (position, normal); out: 64 bytes per vertex
+   (VU1_STRIP_BUF), +16 vf07, +32 vf18 with vf11.x (the fog input) in its w slot, +48 vf06.
+   The VU state afterwards is that of n calls. RECVX_VU_INTERP and RECVX_DUMP_CALCPOINT go
+   through vu0_callms per vertex; RECVX_VU_CHECK compares this with the per-vertex calls
+   (each of them checked against the interpreter). */
+void vu0_calcpoint_n(const float* in, void* out, int n)
+{
+    static uint8_t* ref;
+    static int ref_n;
+    if (!use_interp() && !vu_check() && !dump_calcpoint()) { calcpoint_n_native(in, (uint8_t*)out, n); return; }
+    if (vu_check() && !use_interp() && n > 0) {
+        VuState before = g_vu0, after;
+        if (ref_n < n) { free(ref); ref_n = n; ref = (uint8_t*)malloc((size_t)n * 64); }
+        memcpy(ref, out, (size_t)n * 64);
+        calcpoint_n_native(in, ref, n);
+        after = g_vu0; g_vu0 = before;
+        for (int i = 0; i < n; i++) calcpoint_one(in + 8 * i, (uint8_t*)out + 64 * i);
+        check_calls++;
+        if ((memcmp(ref, out, (size_t)n * 64) || memcmp(&after, &g_vu0, sizeof(after))) && check_bad++ < 20)
+            fprintf(stderr, "vu0 CALCPOINT run of %d vertices: native/per-vertex mismatch (%s)\n", n, memcmp(ref, out, (size_t)n * 64) ? "outputs" : "state");
+        return;
+    }
+    for (int i = 0; i < n; i++) calcpoint_one(in + 8 * i, (uint8_t*)out + 64 * i);
+}
 
 void vu1_callms(int addr)
 {

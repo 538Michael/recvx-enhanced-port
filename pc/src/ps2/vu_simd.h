@@ -54,6 +54,28 @@ static inline uint32_t v4mac(V4 v, int m)   /* MAC flags of the masked lanes: ze
     uint32_t z = rev4[_mm_movemask_ps(_mm_cmpeq_ps(v, _mm_setzero_ps()))], n = rev4[_mm_movemask_ps(v)];
     return (z | n << 4) & (uint32_t)(m | m << 4);
 }
+/* Lane-wise helpers for running several vertices side by side (one per lane); bit c of a
+   lane mask = lane c. */
+static inline V4 v4zero(void) { return _mm_setzero_ps(); }
+static inline V4 v4blend(V4 a, V4 b, int bits)   /* the lanes in bits from b */
+{
+    V4 k = _mm_castsi128_ps(_mm_set_epi32(-(bits >> 3 & 1), -(bits >> 2 & 1), -(bits >> 1 & 1), -(bits & 1)));
+    return _mm_or_ps(_mm_andnot_ps(k, a), _mm_and_ps(k, b));
+}
+static inline int v4neg_bits(V4 v) { return _mm_movemask_ps(v); }   /* sign bit set (-0 too) */
+static inline int v4zero_bits(V4 v) { return _mm_movemask_ps(_mm_cmpeq_ps(v, _mm_setzero_ps())); }
+static inline int v4gt_bits(V4 a, V4 b) { return _mm_movemask_ps(_mm_cmpgt_ps(a, b)); }
+static inline int v4lt_bits(V4 a, V4 b) { return _mm_movemask_ps(_mm_cmplt_ps(a, b)); }
+static inline V4 v4fabs(V4 a) { return _mm_andnot_ps(_mm_set1_ps(-0.0f), a); }   /* not clamped */
+static inline V4 v4fneg(V4 a) { return _mm_xor_ps(_mm_set1_ps(-0.0f), a); }
+static inline V4 v4sqrt(V4 a) { return _mm_sqrt_ps(a); }
+static inline V4 v4div(V4 a, V4 b)   /* the VU divide: b = +-0 -> +-FLT_MAX by the signs, else a / b clamped */
+{
+    V4 z = _mm_cmpeq_ps(b, _mm_setzero_ps());
+    V4 big = _mm_or_ps(_mm_set1_ps(FLT_MAX), _mm_and_ps(_mm_xor_ps(a, b), _mm_set1_ps(-0.0f)));
+    return _mm_or_ps(_mm_and_ps(z, big), _mm_andnot_ps(z, v4clamp(_mm_div_ps(a, b))));
+}
+static inline void v4transpose(V4* a, V4* b, V4* c, V4* d) { _MM_TRANSPOSE4_PS(*a, *b, *c, *d); }
 #else
 typedef VuVec V4;
 #define V4OP(name, expr) static inline V4 name(V4 a, V4 b) { V4 r; for (int c = 0; c < 4; c++) r.f[c] = vu_clampf(expr); (void)b; return r; }
@@ -92,6 +114,32 @@ static inline uint32_t v4mac(V4 v, int m)
     for (int c = 0; c < 4; c++)
         if (vu_field_on(m, c)) r |= (v.f[c] == 0.0f ? 1u << (3 - c) : 0) | (signbit(v.f[c]) ? 1u << (7 - c) : 0);
     return r;
+}
+static inline V4 v4zero(void) { return v4set1(0.0f); }
+static inline V4 v4blend(V4 a, V4 b, int bits) { for (int c = 0; c < 4; c++) if (bits >> c & 1) a.u[c] = b.u[c]; return a; }
+#define V4BITS(name, cond) static inline int name(V4 a, V4 b) { int r = 0; for (int c = 0; c < 4; c++) r |= (cond) << c; (void)b; return r; }
+V4BITS(v4gt_bits_, a.f[c] > b.f[c])
+V4BITS(v4lt_bits_, a.f[c] < b.f[c])
+V4BITS(v4neg_bits_, signbit(a.f[c]) != 0)
+V4BITS(v4zero_bits_, a.f[c] == 0.0f)
+#undef V4BITS
+#define v4gt_bits(a, b) v4gt_bits_(a, b)
+#define v4lt_bits(a, b) v4lt_bits_(a, b)
+#define v4neg_bits(a) v4neg_bits_(a, a)
+#define v4zero_bits(a) v4zero_bits_(a, a)
+static inline V4 v4fabs(V4 a) { for (int c = 0; c < 4; c++) a.f[c] = fabsf(a.f[c]); return a; }
+static inline V4 v4fneg(V4 a) { for (int c = 0; c < 4; c++) a.u[c] ^= 0x80000000u; return a; }
+static inline V4 v4sqrt(V4 a) { for (int c = 0; c < 4; c++) a.f[c] = sqrtf(a.f[c]); return a; }
+static inline V4 v4div(V4 a, V4 b)
+{
+    for (int c = 0; c < 4; c++)
+        a.f[c] = b.f[c] == 0.0f ? (signbit(a.f[c]) != signbit(b.f[c]) ? -FLT_MAX : FLT_MAX) : vu_clampf(a.f[c] / b.f[c]);
+    return a;
+}
+static inline void v4transpose(V4* a, V4* b, V4* c, V4* d)
+{
+    V4* r[4] = { a, b, c, d };
+    for (int i = 0; i < 4; i++) for (int j = i + 1; j < 4; j++) { uint32_t t = r[i]->u[j]; r[i]->u[j] = r[j]->u[i]; r[j]->u[i] = t; }
 }
 #endif
 static inline V4 v4madd(V4 acc, V4 a, V4 b) { return v4add(acc, v4mul(a, b)); }

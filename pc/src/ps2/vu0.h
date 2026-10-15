@@ -159,6 +159,9 @@ void     vu_ctc2(int reg, uint32_t value);
 
 /* Run a microprogram to completion starting at instruction address `addr`. */
 void vu0_callms(int addr);
+/* VU0_CALCPOINT for n vertices (the vertex loop of njCnkCvVnPs2): in 8 floats per vertex,
+   out 64 bytes per vertex (+16 vf07, +32 vf18 with vf11.x in its w, +48 vf06); vu.c */
+void vu0_calcpoint_n(const float* in, void* out, int n);
 void vu1_callms(int addr);
 void vu0_reset(void);
 /* VU1 XGKICK sink (GIF PATH1) */
