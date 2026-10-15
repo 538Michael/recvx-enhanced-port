@@ -607,6 +607,7 @@ and game frames for game-state aids, as noted. Co-op test aids (`RECVX_COOP_*`,
 | `RECVX_PAD_TRACE=1` | DS2 buttons of the pad report when they change |
 | `RECVX_MODERN_TRACE=1` | modern controls: each frame a direction is translated, the direction, cut (and whether the previous cut is held), target and facing angle, the player's place on screen and the camera |
 | `RECVX_MENU_TRACE=1` | menu clicks with the menu state |
+| `RECVX_ITEM_TRACE=1` | the bag (equipped slot, lighter slot, slots) and the metal detector's security boxes (`sys->itm[192]`, `[224]`) whenever a word changes, with the box screen's cursors, by presented frame |
 | `RECVX_PROFILE=file` | sampling profiler (as `--profile-samples`) |
 
 ## Tools

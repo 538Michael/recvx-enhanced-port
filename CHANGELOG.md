@@ -36,6 +36,17 @@
   neighbouring glyph of the font texture; they now sit half a texel inside the glyph's cell on
   every edge. Fix by fmil95 (decompilation team).
 
+### Fixes
+
+- **Metal detector security boxes** (prison, 0/9): taking an item out of the box onto the lighter
+  ("STANDARD") slot no longer makes it vanish. As on PS2, the item goes into the bag (or "There's
+  no space to put the item in.") and the lighter, if it was there, goes into the box; storing
+  the lighter with a full bag no longer overwrites the last item, and the lighter can be taken
+  out onto any slot again. The item box exchange (`ItemBoxChange`) was an inexact decompilation; it now does
+  what the PS2 code does in every case, which also keeps the equipped weapon right when two-slot
+  weapons move in or out of any item box and fills a partial ammo stack when ammo is taken out
+  onto an empty slot. Test aid: `RECVX_ITEM_TRACE=1` logs the bag and both security boxes.
+
 ## 0.2.0 (2026-10-14)
 
 ### Third person
