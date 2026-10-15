@@ -293,7 +293,10 @@ village, collision. The render thread (GS emulation, replays: `r_exec`, `r_inter
   driver is emulated at the SIF RPC level. The TQ request layer follows the retail
   `TSNDDRV.IRX`; HD/BD banks are played on a model of Sony's hardware synthesizer on SPU2 voices,
   with SPU2 reverb presets read from the disc. SQ MIDI sequences (ambient, door, event sounds)
-  run on a sequencer with the loop conventions of `MODMIDI.IRX`.
+  run on a sequencer with the loop conventions of `MODMIDI.IRX`, on the EE's 10 MIDI ports
+  (ports 0 and 1 carry the room's background ambience; the system sounds - typewriter, item box,
+  computers, doors - rotate over ports 2, 8 and 9). MIDI bank 1 is the door's (`DOOR_xxx.SPQ`,
+  loaded only with the door animation), 2 the common system sequences, 3 the room's ambience.
 - **Movies** (`movie/`): a PSS demuxer, an MPEG-2 decoder and the PCM soundtrack. Frames are
   delivered in the IPU's output format and drawn by the game's own upload and sprite code.
 
@@ -421,6 +424,11 @@ where the rows come from and who does the I/O:
 | `mcDispFileNumber` | numbers past 99 are drawn narrower, ending where two digits end |
 | `ExecuteSysLoadScreen` / `ExecuteSysSaveScreen` | `pc_sysload_native` / `pc_syssave_native`: `system.dat` read at boot, merged (`SysSaveHikaku`) and written by OPTION and the ranking, in one frame without the card screens |
 
+**Sounds**: the native screens keep the card screens' own sound calls (cursor, confirm, cancel,
+the typed-in row's keys and bell after a save); the card-only steps they skip (slot choice, card
+check, the system file's "save?" question) have no screen and play nothing, as no button is
+pressed there.
+
 With the memory card these hooks call the original code; `pc/tools/layout_check.sh` with
 `INI="save_system = 1"` and a scripted card save and load give byte-identical frames to the build
 before the native system.
@@ -454,6 +462,10 @@ ITEMS choice, `RECVX_TEST_SAVE`, the host's partner records (`coop-partners-nn.b
   contraction, but bit-exactness with the EE FPU is not guaranteed.
 - Uninitialized locals are zero (`-ftrivial-auto-var-init=zero`), a deterministic stand-in for
   MWCC's stale registers ([dev/uninitialized-locals.txt](dev/uninitialized-locals.txt)).
+- MWCC compiles a signed division by a power of two as an arithmetic shift (rounding down; C
+  rounds toward zero). Where it matters this is written as the shift under `TARGET_PC`:
+  `sdfunc.c SE_BANK_NO`, the bank of a sound number (negative numbers are the system MIDI
+  sounds: typewriter, item box, computers).
 - Functions that were empty in the retail build stay empty (for example `ADXT_Pause`).
 - `ps2_sg_sd.c Volume_Control`: retail's MIDI fade up writes the current volume into the fade's
   target and returns a stale register; the PC returns the current volume and leaves the target
@@ -602,7 +614,7 @@ and game frames for game-state aids, as noted. Co-op test aids (`RECVX_COOP_*`,
 | Variable | Effect |
 |---|---|
 | `RECVX_TRACE_TASKS=1` | game task (`sys->tk_flg`) changes |
-| `RECVX_TRACE_SND=1` | sound driver commands and key-ons |
+| `RECVX_TRACE_SND=1` | sound driver commands, key-ons, dropped requests (bank not loaded, no such program or block) and stolen voices |
 | `RECVX_TRACE_MC=1` | memory card commands and results |
 | `RECVX_PAD_TRACE=1` | DS2 buttons of the pad report when they change |
 | `RECVX_MODERN_TRACE=1` | modern controls: each frame a direction is translated, the direction, cut (and whether the previous cut is held), target and facing angle, the player's place on screen and the camera |

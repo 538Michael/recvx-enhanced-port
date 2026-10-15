@@ -125,7 +125,7 @@ renderer, skipped intro and door animations. Turn these off for a presentation c
 | Setting | ini key | Effect |
 |---|---|---|
 | Skip intro | `skip_intro` | on: boot straight into the title menu (next start) |
-| Skip door animations | `skip_doors` | on: room transitions use the game's load screen instead of the door/stairs/ladder animation |
+| Skip door animations | `skip_doors` | on: room transitions use the game's load screen instead of the door/stairs/ladder animation (and its sounds) |
 | Quick knife | `quick_knife` | on: hold the quick-knife key to draw the combat knife without opening the inventory; release to get the previous weapon back |
 | **Saves** | | |
 | Save system | `save_system` | **Native files** (0): every save a file in `save/saves`, no limit, no memory card screens; Memory card (original) (1): see [Saves](#saves) |

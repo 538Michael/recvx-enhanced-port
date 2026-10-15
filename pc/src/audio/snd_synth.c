@@ -468,7 +468,7 @@ static void tq_tick(void)
  * CC6 = id, CC38 = count marks its end (count 0 = forever; TSNDDRV's repeat callback always
  * allows repeating). Up to 8 loop ids per port.
  */
-#define MIDI_PORTS 8
+#define MIDI_PORTS 10   /* the EE's 10 MIDI handles (ps2_sg_sd.c __midi_value); its system slot rotates over ports 2, 8 and 9 */
 typedef struct {
     int playing, bank;
     const SndBlob* sq;
@@ -758,10 +758,12 @@ void snd_synth_command(const uint8_t* c, int len)
     }
     case 0x4B: master = ((c[1] << 8) | c[2]) / 16383.0f; return;
     case 0x2F: return;   /* status put: se_info/midi_info are written after every RPC */
-    case 0x20: port_play(c[1] & 7, c[2], c[3], c[4]); return;   /* SdrBgmReq: port, bank, vol, block */
-    case 0x21: if ((c[1] & 7) < MIDI_PORTS) port_stop(c[1] & 7); return;
+    case 0x20: port_play(c[1], c[2], c[3], c[4]); return;   /* SdrBgmReq: port, bank, vol, block */
+    case 0x21: if (c[1] < MIDI_PORTS) port_stop(c[1]); return;
     case 0x27: {   /* SdrBgmChg: port, vol, pan, pitch bend (LSB, MSB) */
-        MidiPort* p = &mport[c[1] & 7];
+        MidiPort* p;
+        if (c[1] >= MIDI_PORTS) return;
+        p = &mport[c[1]];
         p->vol = c[4] & 0x7F; p->pan = c[5] & 0x7F; p->pitch = (uint16_t)((c[6] & 0x7F) | ((c[7] & 0x7F) << 7));
         for (int ch = 0; ch < 16; ch++) port_apply(p, ch);
         return;
