@@ -7,9 +7,10 @@
 - **Modern controls for the fixed cameras** (option, off by default): CONTROLS -> "Fixed camera
   controls: Classic (tank) / Modern (camera-relative)" in F1 and ENHANCED SETTINGS, ini
   `fixed_cam_controls`. As the alternate controls of the RE HD remasters, the left stick or the
-  d-pad (arrow keys) walks where it points on screen, turning quickly and smoothly; the stick pushed far or the run button runs. Through a camera cut the held direction
-  keeps the previous camera's meaning until it turns by more than 35 degrees or is let go, so
-  the character does not walk back and forth at cut boundaries. Aiming, the quick-turn row,
+  d-pad (arrow keys) walks where it points on screen, turning quickly and smoothly;
+  the stick pushed far or the run button runs. Through a camera cut the held direction keeps
+  the previous camera's meaning until it is clearly changed or let go, so the character does
+  not walk back and forth at cut boundaries. Aiming, the quick-turn row,
   stairs, doors and items work as before; third person keeps its own controls; in co-op only
   your own player ([USER_GUIDE.md](docs/USER_GUIDE.md#modern-controls-fixed-cameras)).
 - Test aids: `RECVX_VPAD` holds axes at a value (`leftx=0.5`), `RECVX_MODERN_TRACE=1` logs the
