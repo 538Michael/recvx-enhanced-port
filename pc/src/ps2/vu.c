@@ -864,14 +864,19 @@ static inline __attribute__((always_inline)) void calcpoint_soa_body(VuState* s,
 }
 
 static void calcpoint_soa_sse2(VuState* s, const float* in, uint8_t* out, int n) { calcpoint_soa_body(s, in, out, n); }
-/* x86: also compiled for AVX and chosen at run time (the same operations in VEX encoding,
-   without SSE's register copies: ~25% faster). vu_avx: -1 detect, 0 SSE2 (RECVX_VU_AVX=0), 1 AVX */
+/* x86: also compiled for AVX (Sandy Bridge on) and chosen at run time: the same operations in
+   VEX encoding, without SSE's register copies (an ALU slot each before Ivy Bridge); ~25%
+   faster in a micro benchmark, ~5% in game on a Zen 5. vu_avx: -1 detect, 0 SSE2
+   (RECVX_VU_AVX=0), 1 AVX */
 #if defined(__SSE2__) && !defined(RECVX_VU_PORTABLE) && (defined(__i386__) || defined(__x86_64__))
 __attribute__((target("avx"))) static void calcpoint_soa_avx(VuState* s, const float* in, uint8_t* out, int n) { calcpoint_soa_body(s, in, out, n); }
 int vu_avx = -1;
 static void calcpoint_soa(VuState* s, const float* in, uint8_t* out, int n)
 {
-    if (vu_avx < 0) vu_avx = __builtin_cpu_supports("avx") && !(getenv("RECVX_VU_AVX") && !atoi(getenv("RECVX_VU_AVX")));
+    if (vu_avx < 0) {
+        __builtin_cpu_init();
+        vu_avx = __builtin_cpu_supports("avx") && !(getenv("RECVX_VU_AVX") && !atoi(getenv("RECVX_VU_AVX")));
+    }
     if (vu_avx) calcpoint_soa_avx(s, in, out, n);
     else calcpoint_soa_sse2(s, in, out, n);
 }
