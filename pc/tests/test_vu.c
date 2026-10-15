@@ -1,4 +1,5 @@
-/* VU0 core self-check: macro ops and a microprogram against hand-computed values.
+/* VU0 core self-check: macro ops and microprograms against hand-computed values, the native
+   paths (CALCPOINT, inline macro ops, strip clip) against the interpreter.
    Build/run: ctest (target test_vu). */
 #include "../src/ps2/vu0.h"
 #include "../src/ps2/vu0_labels.h"
@@ -16,6 +17,24 @@ static int fails;
 #define NEAR(a, b) (fabsf((a) - (b)) <= 1e-4f * (1.0f + fabsf(b)))
 
 void vu1_xgkick(const VuVec* mem, uint32_t qw, uint32_t mask) { (void)mem; (void)qw; (void)mask; }
+
+/* NaN inputs are negative: with two NaN operands of a commutative op (ADD, MUL) the NaN that
+   propagates, and so the sign of the clamped result, depends on the operand order the compiler
+   picked, in the interpreter too (the PS2 has no NaN; game data has none) */
+static uint32_t neg_nan(uint32_t u) { return (u & 0x7F800000u) == 0x7F800000u && (u & 0x7FFFFFu) ? u | 0x80000000u : u; }
+
+/* the interpreter's macro-mode op (vu.c upper_on, as vu_upper was before it was inlined): the
+   reference for the inline vu_upper */
+static void ref_upper(int op, int mask, int fd, int fs, int ft, int bc)
+{
+    VuVec vf_in[32], acc_in = g_vu0.acc;
+    int wrote_clip;
+    uint32_t bits = 0;
+    memcpy(vf_in, g_vu0.vf, sizeof(vf_in));
+    g_vu0.mac = vu_upper_on(&g_vu0, vf_in, &acc_in, g_vu0.q, op, mask, fd, fs, ft, bc, &wrote_clip, &bits);
+    if (wrote_clip) g_vu0.clip = ((g_vu0.clip << 6) | bits) & 0xFFFFFF;
+    g_vu0.vf[0].f[0] = g_vu0.vf[0].f[1] = g_vu0.vf[0].f[2] = 0.0f; g_vu0.vf[0].f[3] = 1.0f; g_vu0.vi[0] = 0;
+}
 
 int main(void)
 {
@@ -49,7 +68,7 @@ int main(void)
     {
         extern long vu_check_mismatches(void);
         static const uint32_t odd[] = { 0x00000000u, 0x80000000u, 0x00000001u, 0x807FFFFFu, 0x00800000u, 0x7F7FFFFFu,
-                                        0xFF7FFFFFu, 0x7F800000u, 0xFF800000u, 0x7FC00000u, 0xFFC00000u, 0x7F800001u };
+                                        0xFF7FFFFFu, 0x7F800000u, 0xFF800000u, 0xFFC00000u, 0xFF800001u };
         uint32_t seed = 12345;
 #define RND() ((seed = seed * 1103515245u + 12345u) >> 8 & 0xFFFF)
 #define RF(lo, hi) ((float)(lo) + ((float)(hi) - (float)(lo)) * (float)RND() / 65535.0f)
@@ -87,6 +106,36 @@ int main(void)
 #undef RND
     }
 
+    /* the inline macro-mode op (vu0.h vu_upper) against the interpreter's: every op, field mask
+       and broadcast, overlapping registers, random and odd (Inf, NaN, denormal, -0) values */
+    {
+        static const uint32_t odd[] = { 0x00000000u, 0x80000000u, 0x00000001u, 0x807FFFFFu, 0x00800000u, 0x7F7FFFFFu,
+                                        0xFF7FFFFFu, 0x7F800000u, 0xFF800000u, 0xFFC00000u, 0xFF800001u, 0x4F000000u,
+                                        0xCF000000u, 0x3F800000u, 0x3F800001u, 0x00000000u, 0x80000000u };
+        uint32_t seed = 4242;
+        long bad = 0;
+#define RND() ((seed = seed * 1103515245u + 12345u) >> 8 & 0xFFFF)
+        for (int t = 0; t < 200000; t++) {
+            VuState a, b;
+            const int op = 1 + (int)(RND() % (U_OPMSUB));   /* U_ADD .. U_OPMSUB */
+            const int mask = 1 + (int)(RND() % 15), fd = (int)(RND() % 32), fs = (int)(RND() % 32), ft = (int)(RND() % 32);
+            const int bc = (int)(RND() % 7) - 1;
+            for (int r = 1; r < 32; r++) for (int c = 0; c < 4; c++)
+                g_vu0.vf[r].u[c] = neg_nan((RND() & 7) ? (uint32_t)RND() << 16 ^ RND() ^ 0x40000000u * (RND() & 1) : odd[RND() % (sizeof(odd) / sizeof(odd[0]))]);
+            for (int c = 0; c < 4; c++) g_vu0.acc.u[c] = neg_nan((RND() & 7) ? (uint32_t)RND() << 16 ^ RND() : odd[RND() % (sizeof(odd) / sizeof(odd[0]))]);
+            g_vu0.q = (float)((int)RND() - 32768) / 256.0f; g_vu0.i = (float)((int)RND() - 32768) / 64.0f;
+            g_vu0.mac = RND(); g_vu0.clip = (uint32_t)RND() << 8;
+            if (fs && !(RND() & 3)) g_vu0.vf[fs].u[RND() % 3] = neg_nan(g_vu0.vf[ft].u[3] ^ (RND() & 1) << 31);   /* CLIP: x/y/z = +-w */
+            a = g_vu0;
+            vu_upper(op, mask, fd, fs, ft, bc);
+            b = g_vu0; g_vu0 = a;
+            ref_upper(op, mask, fd, fs, ft, bc);
+            if (memcmp(&b, &g_vu0, sizeof(b)) && bad++ < 5) fprintf(stderr, "vu_upper op %d mask %d fd %d fs %d ft %d bc %d differs\n", op, mask, fd, fs, ft, bc);
+        }
+        CHECK(bad == 0, "inline vu_upper: %ld ops differ from the interpreter", bad);
+#undef RND
+    }
+
     /* the strip clip test (vu_strip_clip) against the asm2c sequence it replaces */
     {
         static uint8_t vbuf[16 * 64] __attribute__((aligned(16)));
@@ -105,15 +154,15 @@ int main(void)
             ra = vu_strip_clip(idx, n, vbuf);
             b = g_vu0; g_vu0 = a;
             vu_load_vf(4, vbuf + idx[0] * 64 + 32);
-            vu_upper(U_MULA, 15, 0, 24, 4, BC_X); vu_upper(U_MADDA, 15, 0, 25, 4, BC_Y);
-            vu_upper(U_MADDA, 15, 0, 26, 4, BC_Z); vu_upper(U_MADD, 15, 5, 27, 0, BC_W);
+            ref_upper(U_MULA, 15, 0, 24, 4, BC_X); ref_upper(U_MADDA, 15, 0, 25, 4, BC_Y);
+            ref_upper(U_MADDA, 15, 0, 26, 4, BC_Z); ref_upper(U_MADD, 15, 5, 27, 0, BC_W);
             for (int k = 1; k < n && rb; k++) {
                 vu_load_vf(4, vbuf + idx[k * 3] * 64 + 32);
-                vu_clipw(5, 5);
-                vu_upper(U_MULA, 15, 0, 24, 4, BC_X); vu_upper(U_MADDA, 15, 0, 25, 4, BC_Y);
-                vu_upper(U_MADDA, 15, 0, 26, 4, BC_Z); vu_upper(U_MADD, 15, 5, 27, 0, BC_W);
+                ref_upper(U_CLIP, VU_XYZ, 0, 5, 5, BC_W);
+                ref_upper(U_MULA, 15, 0, 24, 4, BC_X); ref_upper(U_MADDA, 15, 0, 25, 4, BC_Y);
+                ref_upper(U_MADDA, 15, 0, 26, 4, BC_Z); ref_upper(U_MADD, 15, 5, 27, 0, BC_W);
                 rb &= vu_cfc2(18);
-                if (k == n - 1) { vu_clipw(5, 5); rb &= vu_cfc2(18); }
+                if (k == n - 1) { ref_upper(U_CLIP, VU_XYZ, 0, 5, 5, BC_W); rb &= vu_cfc2(18); }
             }
             CHECK(ra == rb && !memcmp(&b, &g_vu0, sizeof(b)), "vu_strip_clip differs (test %d: %u vs %u)", t, ra, rb);
         }

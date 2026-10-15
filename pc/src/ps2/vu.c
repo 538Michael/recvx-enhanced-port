@@ -155,48 +155,27 @@ uint32_t vu_upper_on(VuState* s, const VuVec* vf, const VuVec* acc, float q, int
 /* the strip clip test of njCnkCsUvh/njCnkCsUvn (ps2_NinjaCnk.c, asm2c of the EE asm): per
    vertex, CLIPw of the previous one's transform by the vf24..vf27 matrix, then that
    transform (MULAx/MADDAy/MADDAz/MADDw); the AND of the clip flags. The same macro-mode ops
-   as vu_upper, inlined (it was a call with a register copy per op, ~10 ms a frame in a
-   65k-strip room); leaves g_vu0 exactly as they did. Stops early (0) when the AND is 0. */
+   (vu_upper, inlined) in one loop instead of an asm2c block per strip; leaves g_vu0 exactly
+   as they did. Stops early (0) when the AND is 0. */
 uint32_t vu_strip_clip(const uint16_t* idx, int n, const void* vbuf)
 {
-    VuState* const s = &g_vu0;
     const uint8_t* const vb = (const uint8_t*)vbuf;
-    uint32_t op0 = 63, cb = 0;
-    int wc;
+    uint32_t op0 = 63;
 #define XFORM() do { \
-        s->mac = upper_on(s, s->vf, &s->acc, s->q, U_MULA, VU_XYZW, 0, 24, 4, BC_X, &wc, &cb); vf0_fix(s); \
-        s->mac = upper_on(s, s->vf, &s->acc, s->q, U_MADDA, VU_XYZW, 0, 25, 4, BC_Y, &wc, &cb); vf0_fix(s); \
-        s->mac = upper_on(s, s->vf, &s->acc, s->q, U_MADDA, VU_XYZW, 0, 26, 4, BC_Z, &wc, &cb); vf0_fix(s); \
-        s->mac = upper_on(s, s->vf, &s->acc, s->q, U_MADD, VU_XYZW, 5, 27, 0, BC_W, &wc, &cb); vf0_fix(s); } while (0)
-#define CLIPW() do { \
-        s->mac = upper_on(s, s->vf, &s->acc, s->q, U_CLIP, VU_XYZ, 0, 5, 5, BC_W, &wc, &cb); \
-        s->clip = ((s->clip << 6) | cb) & 0xFFFFFF; vf0_fix(s); } while (0)
-    memcpy(&s->vf[4], vb + ((uint32_t)idx[0] << 6) + 32, 16);
+        vu_upper(U_MULA, VU_XYZW, 0, 24, 4, BC_X); vu_upper(U_MADDA, VU_XYZW, 0, 25, 4, BC_Y); \
+        vu_upper(U_MADDA, VU_XYZW, 0, 26, 4, BC_Z); vu_upper(U_MADD, VU_XYZW, 5, 27, 0, BC_W); } while (0)
+    vu_load_vf(4, vb + ((uint32_t)idx[0] << 6) + 32);
     XFORM();
     for (int k = 1; k < n; k++) {
         if (op0 == 0) return 0;
-        memcpy(&s->vf[4], vb + ((uint32_t)idx[k * 3] << 6) + 32, 16);
-        CLIPW();
+        vu_load_vf(4, vb + ((uint32_t)idx[k * 3] << 6) + 32);
+        vu_clipw(5, 5);
         XFORM();
-        op0 &= s->clip;
+        op0 &= g_vu0.clip;
     }
-    CLIPW();
-    return op0 & s->clip;
+    vu_clipw(5, 5);
+    return op0 & g_vu0.clip;
 #undef XFORM
-#undef CLIPW
-}
-
-void vu_upper(int op, int mask, int fd, int fs, int ft, int bc)
-{
-    VuVec vf_in[32], acc_in = g_vu0.acc;
-    int wrote_clip; uint32_t bits = 0;
-    /* operands are read before any write; copy only what is touched */
-    vf_in[fs] = g_vu0.vf[fs];
-    if (bc != BC_Q && bc != BC_I) vf_in[ft] = g_vu0.vf[ft];
-    vf_in[fd] = g_vu0.vf[fd];
-    g_vu0.mac = vu_upper_on(&g_vu0, vf_in, &acc_in, g_vu0.q, op, mask, fd, fs, ft, bc, &wrote_clip, &bits);
-    if (wrote_clip) g_vu0.clip = ((g_vu0.clip << 6) | bits) & 0xFFFFFF;
-    vf0_fix(&g_vu0);
 }
 
 void vu_move(int mask, int ft, int fs)
@@ -221,11 +200,6 @@ static float vu_divide(float a, float b)
 void vu_div(int fs, int fsf, int ft, int ftf)   { g_vu0.q = vu_divide(g_vu0.vf[fs].f[fsf], g_vu0.vf[ft].f[ftf]); }
 void vu_sqrt(int ft, int ftf)                   { g_vu0.q = vu_clampf(sqrtf(fabsf(g_vu0.vf[ft].f[ftf]))); }
 void vu_rsqrt(int fs, int fsf, int ft, int ftf) { g_vu0.q = vu_divide(g_vu0.vf[fs].f[fsf], sqrtf(fabsf(g_vu0.vf[ft].f[ftf]))); }
-
-void vu_clipw(int fs, int ft)
-{
-    vu_upper(U_CLIP, VU_XYZ, 0, fs, ft, BC_W);
-}
 
 void vu_mtir(int it, int fs, int fsf) { if (it) g_vu0.vi[it] = (uint16_t)g_vu0.vf[fs].u[fsf]; }
 
@@ -566,77 +540,9 @@ static void vu_micro_run(VuState* s, const VuMicroInstr* code, int count, int ad
 #include "vu_static.inc"
 VU_STATIC(vu0_static_run, vu0_micro_code, VU0_CASES, 0)
 
-/* Four lanes, lane c = component c, with the VU float rules (vu_clampf). SSE2 where the
-   compiler targets it, otherwise (or with -DRECVX_VU_PORTABLE) plain C with the same results:
-   both do IEEE single operations one at a time and clamp each result. */
-#if defined(__SSE2__) && !defined(RECVX_VU_PORTABLE)
-#include <emmintrin.h>
-typedef __m128 V4;
-/* |x| below FLT_MIN (denormal, zero): +-0; Inf/NaN: +-FLT_MAX (MINPS returns its second operand
-   for a NaN); the sign is kept. Float ops only: shorter than the integer version on the
-   dependency chains of CALCPOINT. */
-static inline V4 v4clamp(V4 x)
-{
-    const V4 sg = _mm_set1_ps(-0.0f);
-    V4 a = _mm_andnot_ps(sg, x);
-    V4 keep = _mm_cmpnlt_ps(a, _mm_set1_ps(FLT_MIN));
-    a = _mm_and_ps(_mm_min_ps(a, _mm_set1_ps(FLT_MAX)), keep);
-    return _mm_or_ps(a, _mm_and_ps(sg, x));
-}
-static inline V4 v4sel(V4 dst, V4 r, int m)   /* VU field mask (x = 8): lanes of r */
-{
-    V4 k = _mm_castsi128_ps(_mm_set_epi32((m & 1) ? -1 : 0, (m & 2) ? -1 : 0, (m & 4) ? -1 : 0, (m & 8) ? -1 : 0));
-    return _mm_or_ps(_mm_andnot_ps(k, dst), _mm_and_ps(k, r));
-}
-static inline V4 v4mul(V4 a, V4 b) { return v4clamp(_mm_mul_ps(a, b)); }
-static inline V4 v4add(V4 a, V4 b) { return v4clamp(_mm_add_ps(a, b)); }
-static inline V4 v4sub(V4 a, V4 b) { return v4clamp(_mm_sub_ps(a, b)); }
-static inline V4 v4max(V4 a, V4 b) { return v4clamp(_mm_max_ps(a, b)); }   /* A > B ? A : B */
-static inline V4 v4set1(float f) { return _mm_set1_ps(f); }
-#define V4BC(v, c) _mm_shuffle_ps((v), (v), _MM_SHUFFLE(c, c, c, c))
-static inline float v4lane(V4 v, int c)
-{
-    switch (c) {
-    case 0: return _mm_cvtss_f32(v);
-    case 1: return _mm_cvtss_f32(V4BC(v, 1));
-    case 2: return _mm_cvtss_f32(_mm_movehl_ps(v, v));
-    default: return _mm_cvtss_f32(V4BC(v, 3));
-    }
-}
-static const uint8_t rev4[16] = { 0, 8, 4, 12, 2, 10, 6, 14, 1, 9, 5, 13, 3, 11, 7, 15 };
-static inline uint32_t v4mac(V4 v, int m)   /* MAC flags (mac_bits) of the masked lanes */
-{
-    uint32_t z = rev4[_mm_movemask_ps(_mm_cmpeq_ps(v, _mm_setzero_ps()))], n = rev4[_mm_movemask_ps(v)];
-    return (z | n << 4) & (uint32_t)(m | m << 4);
-}
-#define LD(r) _mm_loadu_ps(s->vf[r].f)
-#define LM(a) _mm_loadu_ps(s->mem[a].f)
-#define ST(r, v) _mm_storeu_ps(s->vf[r].f, v)
-#else
-typedef VuVec V4;
-#define V4OP(name, expr) static inline V4 name(V4 a, V4 b) { V4 r; for (int c = 0; c < 4; c++) r.f[c] = vu_clampf(expr); (void)b; return r; }
-V4OP(v4mul, a.f[c] * b.f[c])
-V4OP(v4add, a.f[c] + b.f[c])
-V4OP(v4sub, a.f[c] - b.f[c])
-V4OP(v4max, a.f[c] > b.f[c] ? a.f[c] : b.f[c])
-#undef V4OP
-static inline V4 v4clamp(V4 a) { for (int c = 0; c < 4; c++) a.f[c] = vu_clampf(a.f[c]); return a; }
-static inline V4 v4sel(V4 dst, V4 r, int m) { for (int c = 0; c < 4; c++) if (vu_field_on(m, c)) dst.u[c] = r.u[c]; return dst; }
-static inline V4 v4set1(float f) { V4 r = { { f, f, f, f } }; return r; }
-static inline V4 v4bc(V4 v, int c) { return v4set1(v.f[c]); }
-#define V4BC(v, c) v4bc((v), (c))
-static inline float v4lane(V4 v, int c) { return v.f[c]; }
-static inline uint32_t v4mac(V4 v, int m)
-{
-    uint32_t r = 0;
-    for (int c = 0; c < 4; c++) if (vu_field_on(m, c)) r |= mac_bits(v.f[c], c);
-    return r;
-}
-#define LD(r) (s->vf[r])
-#define LM(a) (s->mem[a])
-#define ST(r, v) (s->vf[r] = (v))
-#endif
-static inline V4 v4madd(V4 acc, V4 a, V4 b) { return v4add(acc, v4mul(a, b)); }
+#define LD(r) v4ld(&s->vf[r])
+#define LM(a) v4ld(&s->mem[a])
+#define ST(r, v) v4st(&s->vf[r], v)
 
 /* VU0_CALCPOINT (vsm/ps2_vu0.vsm): one vertex of a chunk model, called once per vertex of
    every node drawn (205k a frame in a whole-village room, ~3.7k in a retail room). The same
@@ -752,11 +658,7 @@ static void calcpoint_fast(VuState* s)
 #undef r25
 #undef r26
 #undef r27
-#if defined(__SSE2__) && !defined(RECVX_VU_PORTABLE)
-    _mm_storeu_ps(s->acc.f, acc);
-#else
-    s->acc = acc;
-#endif
+    v4st(&s->acc, acc);
 }
 #undef LD
 #undef LM

@@ -223,6 +223,9 @@ void  tps_bend(struct BH_PWORK* p);   /* the last free-aim bend on a display cop
 #include "ps2sdk_shim.h"
 #include "ps2_hw.h"
 #define u_long ps2_u_long
+#ifdef __SSE2__
+#include <emmintrin.h>   /* for vu_simd.h (vu0.h), which game files include after the define below */
+#endif
 
 /* EE data model: long is 64-bit. Must come after every host header. */
 #define long long long
