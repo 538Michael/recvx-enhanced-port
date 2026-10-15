@@ -18,16 +18,14 @@
 
 ### Performance
 
-- **VU0 runs as native code**: much less CPU time per frame on the game thread, which matters
-  most on older CPUs. Retail rooms ran the vertex program `VU0_CALCPOINT` through the VU
-  interpreter whenever a point light was on (most rooms); it is now native for every light
-  setup, whole vertex runs are computed four at a time (with AVX where the CPU has it), and the
-  macro-mode VU0 ops of the translated EE asm (skinning, matrices) are inlined. Game-thread time
-  per game frame on a Ryzen 7 9800X3D: retail rooms and cutscenes from 2.7-7.6 ms to 0.6-1.3 ms,
-  the whole RE4 village (`RM_1310`) from 23 ms to 9.6 ms. Results are bit-exact: frames are
-  byte-identical to before and to the interpreter (`RECVX_VU_INTERP=1`), `RECVX_VU_CHECK=1`
-  compares every call in game, ctest `vu`/`vu_portable` compare the native code with the
-  interpreter on random and edge-case inputs. `RECVX_VU_AVX=0` keeps SSE2.
+- **VU0 runs as native code**: much less CPU time per frame on the game thread. The vertex
+  program `VU0_CALCPOINT` ran through the VU interpreter whenever a point light was on (most
+  rooms); it is now native for every light setup and computes whole vertex runs four vertices at
+  a time, using AVX when the CPU supports it and SSE2 otherwise (`RECVX_VU_AVX=0` forces SSE2).
+  The macro-mode VU0 operations of the translated EE assembly (skinning, matrices) are inlined.
+  Results are bit-exact with the interpreter: frames are byte-identical, `RECVX_VU_INTERP=1`
+  still forces the interpreter, `RECVX_VU_CHECK=1` compares every call in game, and ctest
+  `vu`/`vu_portable` compare the native code with the interpreter on random and edge-case inputs.
 
 ### Renderer
 
