@@ -170,7 +170,10 @@ static int next_sample(Voice* v, int16_t* out)
 static void key_on(const SndBlob* hd, const SndBlob* bd, MidiCh* m, int note, int vel)
 {
     uint32_t prog = hd_entry(hd, HD_PROG, m->prog);
-    if (!prog || !bd->size) return;
+    if (!prog || !bd->size) {
+        if (trace_snd()) printf("tsnd: key-on prog %d note %d dropped (%s)\n", m->prog, note, prog ? "no samples loaded" : "no such program");
+        return;
+    }
     for (int s = 0; s < rd8(hd, prog + 4); s++) {
         uint32_t split = prog + rd32(hd, prog) + s * rd8(hd, prog + 5);
         uint32_t sset;
@@ -187,6 +190,7 @@ static void key_on(const SndBlob* hd, const SndBlob* bd, MidiCh* m, int note, in
             if (!v) {   /* steal the oldest */
                 v = &voice[0];
                 for (int i = 1; i < VOICES; i++) if (voice[i].age < v->age) v = &voice[i];
+                if (trace_snd()) printf("tsnd: all %d voices busy, the oldest (prog %d) stopped\n", VOICES, v->chan ? v->chan->prog : -1);
             }
             memset(v, 0, sizeof(*v));
             v->on = 1; v->chan = m; v->note = note; v->bd = bd;
@@ -464,7 +468,7 @@ static void tq_tick(void)
  * CC6 = id, CC38 = count marks its end (count 0 = forever; TSNDDRV's repeat callback always
  * allows repeating). Up to 8 loop ids per port.
  */
-#define MIDI_PORTS 8
+#define MIDI_PORTS 10   /* the EE's 10 MIDI handles (ps2_sg_sd.c __midi_value); its system slot rotates over ports 2, 8 and 9 */
 typedef struct {
     int playing, bank;
     const SndBlob* sq;
@@ -608,13 +612,13 @@ static void port_play(int port, int bank, int vol, int block)
     MidiPort* p;
     const SndBlob* sq;
     uint32_t chunk, max, ofs, blk;
-    if (port >= MIDI_PORTS || bank >= 4) return;
+    if (port >= MIDI_PORTS || bank >= 4) goto drop;
     sq = &g_snd_banks.sq[bank];
     chunk = rd32(sq, 0x24);                                  /* Sequ header: midiChunkAddr */
     max = rd32(sq, chunk + 12);
-    if (chunk == 0xFFFFFFFFu || max == 0xFFFFFFFFu || (uint32_t)block > max || !g_snd_banks.midi_hd[bank].size) return;
+    if (chunk == 0xFFFFFFFFu || max == 0xFFFFFFFFu || (uint32_t)block > max || !g_snd_banks.midi_hd[bank].size) goto drop;
     ofs = rd32(sq, chunk + 16 + block * 4);
-    if (ofs == 0xFFFFFFFFu) return;
+    if (ofs == 0xFFFFFFFFu) goto drop;
     port_stop(port);
     p = &mport[port];
     blk = chunk + ofs;
@@ -634,6 +638,9 @@ static void port_play(int port, int bank, int vol, int block)
     p->playing = 1;
     p->wait = read_delta(p);
     midi_bits |= 1u << port;
+    return;
+drop:
+    if (trace_snd()) printf("tsnd: MIDI port %d bank %d block %d dropped (no such port, bank or block)\n", port, bank, block);
 }
 
 /* run the driver's 240 Hz tick up to the current vblank (59.94 Hz -> 4.004 ticks) */
@@ -652,7 +659,10 @@ static void tq_request(int port, int tq, int ch, int vol, int pan, int pitch, in
 {
     TqSlot* t;
     if (port == 1 && !xb && tq >= SND_PARTNER_TQ && g_snd_banks.arms2_hd.size) xb = XB_PARTNER;
-    if (port >= SE_PORTS || ch >= 16 || !slot_hd(port, xb)->size) return;
+    if (port >= SE_PORTS || ch >= 16 || !slot_hd(port, xb)->size) {
+        if (trace_snd()) printf("tsnd: SE port %d ch %d prog %d dropped (bank not loaded)\n", port, ch, tq);
+        return;
+    }
     t = &slot[port][ch];
     t->xb = (uint8_t)xb;
     t->count = tq_length(slot_hd(port, xb), xb == XB_PARTNER ? tq - SND_PARTNER_TQ : tq);
@@ -748,10 +758,12 @@ void snd_synth_command(const uint8_t* c, int len)
     }
     case 0x4B: master = ((c[1] << 8) | c[2]) / 16383.0f; return;
     case 0x2F: return;   /* status put: se_info/midi_info are written after every RPC */
-    case 0x20: port_play(c[1] & 7, c[2], c[3], c[4]); return;   /* SdrBgmReq: port, bank, vol, block */
-    case 0x21: if ((c[1] & 7) < MIDI_PORTS) port_stop(c[1] & 7); return;
+    case 0x20: port_play(c[1], c[2], c[3], c[4]); return;   /* SdrBgmReq: port, bank, vol, block */
+    case 0x21: if (c[1] < MIDI_PORTS) port_stop(c[1]); return;
     case 0x27: {   /* SdrBgmChg: port, vol, pan, pitch bend (LSB, MSB) */
-        MidiPort* p = &mport[c[1] & 7];
+        MidiPort* p;
+        if (c[1] >= MIDI_PORTS) return;
+        p = &mport[c[1]];
         p->vol = c[4] & 0x7F; p->pan = c[5] & 0x7F; p->pitch = (uint16_t)((c[6] & 0x7F) | ((c[7] & 0x7F) << 7));
         for (int ch = 0; ch < 16; ch++) port_apply(p, ch);
         return;

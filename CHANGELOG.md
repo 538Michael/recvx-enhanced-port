@@ -34,6 +34,20 @@
   neighbouring glyph of the font texture; they now sit half a texel inside the glyph's cell on
   every edge. Fix by fmil95 (decompilation team).
 
+### Audio
+
+- **Missing system sounds**: the typewriter's keys and bell while a save is typed in, the item
+  box lid, the computer terminals' beeps and typed text (and other sounds the game plays as
+  system MIDI, such as some effects and enemy events) were silent in every save mode. The game
+  takes a sound's bank from its number divided by 256; the PS2 compiler rounds that down (an
+  arithmetic shift), C rounds toward zero, so these numbers (bit 31 set) asked for bank 3, which
+  holds the room's ambience, instead of bank 2.
+- The emulated sound driver has the game's 10 MIDI ports: the system sounds rotate over ports
+  2, 8 and 9, and 8 and 9 were played on ports 0 and 1, where they stopped the room's background
+  ambience (with door animations on, the door and stairs sounds did).
+- `RECVX_TRACE_SND` also logs requests the driver drops (bank not loaded, no such program or
+  block) and voices stolen when all 48 are busy.
+
 ## 0.2.0 (2026-10-14)
 
 ### Third person
