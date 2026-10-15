@@ -90,8 +90,9 @@ unsigned int modern_pad(unsigned int pad)
    game's own turns (the quick turn, auto-aim) or special moves */
 void modern_player(void)
 {
-    if (!steer || plp != &ply || plp->mode0 != 1 || plp->mode1 != 0 || plp->mode2 > 13 || plp->mode2 == 12 || (plp->flg & 0x100000))
+    int s = steer;
+    steer = 0;
+    if (!s || plp != &ply || plp->mode0 != 1 || plp->mode1 != 0 || plp->mode2 > 13 || plp->mode2 == 12 || (plp->flg & 0x100000))
         return;
     plp->ay += (int)modern_turn((short)plp->ay, target);
-    steer = 0;
 }

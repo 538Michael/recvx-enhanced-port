@@ -13,6 +13,9 @@ float modern_wrap(float a)
     return a > 32768.0f ? a - 65536.0f : a < -32768.0f ? a + 65536.0f : a;
 }
 
+/* ponytail: by the camera's orientation, as the HD remasters, not the exact on-screen direction
+   at the player's place: far off-centre in a wide shot, "up" runs a few degrees off screen-up
+   under perspective; project the ground axes at the player if that ever matters */
 float modern_target(float rx, float rz, float sx, float sy)
 {
     float n = sqrtf(rx * rx + rz * rz), dx, dz;

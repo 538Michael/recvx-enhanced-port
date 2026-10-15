@@ -269,6 +269,19 @@ Inline EE/VU0 assembly in the decomp is translated to C by `pc/tools/asm2c.py`.
   own. It waits until the player is back to a neutral state (not aiming, reloading, grabbed, in a
   menu, event or door), and on release restores the previous weapon (or the same item in another
   slot) once the knife is lowered. Nothing is restored if the weapon was changed meanwhile.
+- **Modern controls for the fixed cameras** (`fixed_cam_controls`; `pc/glue/modern_glue.c`, the
+  math in `input/modern.c`, ctest `modern`): `pad.c` keeps the frame's screen direction (left
+  stick past a 25% dead zone, else the d-pad rows). `modern_pad` (`bhSetPad`, before the quick
+  knife) replaces the direction bits by forward (`0x1`, plus run `0x400` when the stick is pushed
+  70%) or, more than 100 degrees off, a turn bit; `modern_player` (`bhControlPlayer`, after the
+  mode handler) turns `plp->ay` towards the target, 40% of the way per game frame, at most 30
+  degrees. The target is the direction on the ground of the view matrix's right axis (`cam.mtx`
+  column 0, so cameras with roll work) combined with the stick. While the direction is held across
+  a cut (`cam.ncut`, `cam.camver`) the old cut's axis stays until the direction turns by more than
+  35 degrees or is let go. Untouched: aiming (`mode1` 1), the quick-turn row (back only), the game's
+  own turns (`flg 0x100000`), third person, menus, events and doors; special moves (`mode2` 12 and
+  above 13: stairs, steps, pushing) only get forward, when the direction is within 90 degrees of
+  the facing. Only `plp == &ply`, so in co-op only the local player; nothing is sent.
 - **Mouse in menus** (`pc/glue/menu_glue.c`, hook at the end of `bhSetPad`;
   `input/menu_mouse.c` on the main thread): the mouse drives the screens' own cursor state, so
   keyboard and gamepad work unchanged. Window positions map to the game's 640x480 2D space through
@@ -478,7 +491,7 @@ and game frames for game-state aids, as noted. Co-op test aids (`RECVX_COOP_*`,
 |---|---|
 | `RECVX_INPUT="frame:buttons,..."` | scripted pad input by presented frame, e.g. `200:start,205:-` |
 | `RECVX_KEYS="f:key+key,f:-,f:@x:y"` | hold keyboard keys (SDL names, `_` for a space) from presented frame f, sent as key events; `@x:y` clicks at a window pixel |
-| `RECVX_VPAD="f:input+input,..."`, `RECVX_VPAD_TYPE=xbox\|ps5\|generic` | a virtual SDL gamepad holding inputs (ini spelling) from frame f |
+| `RECVX_VPAD="f:input+input,..."`, `RECVX_VPAD_TYPE=xbox\|ps5\|generic` | a virtual SDL gamepad holding inputs (ini spelling) from frame f; `axis=value` holds an axis at -1..1 (`leftx=0.5+lefty=-0.5`: the left stick half up-right) |
 | `RECVX_MENU_MOUSE="f:x:y[:act],..."` | scripted mouse in menus (window pixels; act `l`/`r` click, `L`/`U` left down/up, `w`/`s` wheel) |
 | `RECVX_TPS_MOUSE="frame:dx:dy,..."` | scripted third-person mouse motion |
 | `RECVX_UNFOCUS="f:1,f:0"` | hide the window at frame f (focus loss), `0` shows it again |
@@ -539,6 +552,7 @@ and game frames for game-state aids, as noted. Co-op test aids (`RECVX_COOP_*`,
 | `RECVX_TRACE_SND=1` | sound driver commands and key-ons |
 | `RECVX_TRACE_MC=1` | memory card commands and results |
 | `RECVX_PAD_TRACE=1` | DS2 buttons of the pad report when they change |
+| `RECVX_MODERN_TRACE=1` | modern controls: each frame a direction is translated, the direction, cut (and whether the previous cut is held), target and facing angle, the player's place on screen and the camera |
 | `RECVX_MENU_TRACE=1` | menu clicks with the menu state |
 | `RECVX_PROFILE=file` | sampling profiler (as `--profile-samples`) |
 

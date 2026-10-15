@@ -139,8 +139,9 @@ renderer, skipped intro and door animations. Turn these off for a presentation c
 
 Input source and Gamepad (see [Input source](#input-source-per-window)), **Mouse in menus**
 (`menu_mouse`, **on**: point and click in the inventory, item box, map, files, OPTION and these
-menus; right click goes back; drag to rotate and wheel to zoom when examining an item), then the
-bindings ([Rebinding](#rebinding)).
+menus; right click goes back; drag to rotate and wheel to zoom when examining an item), **Fixed
+camera controls** (`fixed_cam_controls`: **Classic (tank)** 0, Modern (camera-relative) 1; see
+[Modern controls](#modern-controls-fixed-cameras)), then the bindings ([Rebinding](#rebinding)).
 
 ### Third person
 
@@ -192,6 +193,30 @@ The game's own key types (OPTION -> KEY CONFIG) still decide what each PS2 butto
 
 Third person (keyboard and mouse): W/S/A/D move and turn, Shift run, E action, Q cancel,
 Tab inventory, M map, right mouse aim, left mouse fire.
+
+### Modern controls (fixed cameras)
+
+F1 -> Controls or ENHANCED SETTINGS -> CONTROLS: **Fixed camera controls** = Modern
+(camera-relative), ini `fixed_cam_controls = 1`. Off (Classic, tank controls) by default. Like the
+alternate controls of the Resident Evil HD remasters:
+
+- The **left stick** or the **d-pad** (arrow keys on the keyboard) points where the character
+  walks on screen; it turns there quickly (180 degrees in about 0.3 s) and walks. Pushed far
+  (70%) the stick runs; the run button runs as before (on the keyboard and d-pad, which have no
+  half push). Pointing more than 100 degrees away from where the character faces turns it on the
+  spot first.
+- **Camera cuts**: while the direction is held through a cut, it keeps meaning what it meant in
+  the previous camera, so the character keeps going the same way. The new camera takes over when
+  the direction turns by more than 35 degrees or is let go.
+- **Aiming** works as in Classic: holding the aim button stops, the stick or d-pad turns and aims
+  up / down, the game's auto-aim and the quick knife are unchanged. Letting go of aim returns to
+  modern movement.
+- **Quick turn**: bind the "Quick turn" row (unbound by default; it holds back, then run). While
+  it is held the stick does not walk.
+- Stairs, steps and ladders still start with the action button; while climbing or pushing a box
+  the direction only counts as "forward" when it points roughly where the character faces.
+- Third person keeps its own controls; this option only applies to the fixed cameras. In co-op
+  it changes only your own player.
 
 Hotkeys:
 
