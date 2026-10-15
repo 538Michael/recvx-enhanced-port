@@ -198,6 +198,12 @@ target_compile_options(test_bindings PRIVATE $<$<COMPILE_LANGUAGE:C>:-std=gnu11>
 target_link_libraries(test_bindings PRIVATE SDL3::SDL3)
 add_test(NAME bindings COMMAND test_bindings)
 
+# modern controls' direction math (pc/src/input/modern.c): camera + stick -> angle, the cut hold
+add_executable(test_modern tests/test_modern.c src/input/modern.c)
+target_compile_options(test_modern PRIVATE -std=gnu11)
+target_link_libraries(test_modern PRIVATE m)
+add_test(NAME modern COMMAND test_modern)
+
 # every recvx.ini key has a row in the settings table (F1 and OPTION > ENHANCED SETTINGS) or is listed
 add_test(NAME settings COMMAND ${CMAKE_COMMAND} -DSRC=${CMAKE_CURRENT_SOURCE_DIR} -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_settings.cmake)
 
