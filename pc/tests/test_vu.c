@@ -43,21 +43,32 @@ int main(void)
     CHECK(g_vu0.vf[4].f[1] == -1.0f && g_vu0.vf[5].f[1] == -1.0f && g_vu0.vf[4].f[0] == 0.0f, "WAVE_INIT");
 
     /* CALCPOINT's native path (vu.c calcpoint_fast) against the interpreter: random matrices,
-       vertices and leftover state, lights off, directional and point (point: interpreted), chained as a node's
-       vertices are; RECVX_VU_CHECK compares the whole VU state after every call */
+       vertices and leftover state, every light off, directional or point (in and out of range,
+       facing or not), chained as a node's vertices are, with overflow, denormal, zero, -0, Inf
+       and NaN inputs; RECVX_VU_CHECK compares the whole VU state after every call */
     {
         extern long vu_check_mismatches(void);
+        static const uint32_t odd[] = { 0x00000000u, 0x80000000u, 0x00000001u, 0x807FFFFFu, 0x00800000u, 0x7F7FFFFFu,
+                                        0xFF7FFFFFu, 0x7F800000u, 0xFF800000u, 0x7FC00000u, 0xFFC00000u, 0x7F800001u };
         uint32_t seed = 12345;
 #define RND() ((seed = seed * 1103515245u + 12345u) >> 8 & 0xFFFF)
 #define RF(lo, hi) ((float)(lo) + ((float)(hi) - (float)(lo)) * (float)RND() / 65535.0f)
-        for (int node = 0; node < 200; node++) {
+#define ODD() (odd[RND() % (sizeof(odd) / sizeof(odd[0]))])
+        for (int node = 0; node < 3000; node++) {
             for (int r = 1; r < 32; r++) for (int c = 0; c < 4; c++) g_vu0.vf[r].f[c] = RF(-50, 50);
             for (int r = 1; r < 16; r++) g_vu0.vi[r] = (uint16_t)RND();
             g_vu0.vf[17].f[0] = RF(100, 400); g_vu0.vf[17].f[1] = RF(100, 400); g_vu0.vf[23].f[2] = RF(0.5, 2);
+            for (int r = 28; r < 32; r++) for (int c = 0; c < 4; c++) g_vu0.vf[r].f[c] = RF(-1, 1);   /* view matrix */
+            for (int c = 0; c < 2; c++) g_vu0.vf[31].f[c] = RF(-100, 100);
             g_vu0.vf[31].f[2] = RF(50, 300);   /* view z in front: 1/z */
             g_vu0.q = RF(-1, 1); g_vu0.clip = RND() * 256u;
-            g_vu0.mem[67].u[0] = RND() & 0xFF;   /* light mask: lights on/off, point or directional */
-            if (node % 7 == 0) g_vu0.vf[12].f[0] = 0.0f;
+            /* INIT: vi10 = vf07.x, the lights (on: bits 7-4, point: 3-0); vf04-06 -> vf24-26 the
+               light positions (x, y, z rows), vf08/vf09 -> vf12/vf13 the point light ranges (squared) */
+            g_vu0.vf[7].u[0] = RND() & 0xFF;
+            for (int r = 4; r < 7; r++) for (int c = 0; c < 4; c++) g_vu0.vf[r].f[c] = RF(-300, 300);
+            for (int c = 0; c < 4; c++) { g_vu0.vf[8].f[c] = RF(0, 1e6); g_vu0.vf[9].f[c] = RF(0, 2e6); }
+            if (node % 7 == 0) g_vu0.vf[8].f[0] = 0.0f;
+            if (node % 11 == 3) g_vu0.vf[1 + RND() % 31].u[RND() & 3] = ODD();   /* an odd value in the leftover or matrix state */
             vu0_callms(VU0_ADDR_VU0_CALCPOINT_INIT);
             for (int v = 0; v < 6; v++) {
                 for (int c = 0; c < 3; c++) { g_vu0.vf[4].f[c] = RF(-200, 200); g_vu0.vf[5].f[c] = RF(-1, 1); }
@@ -65,11 +76,14 @@ int main(void)
                 if (v == 5) g_vu0.vf[4].f[0] = -0.0f;
                 if (node % 5 == 1) g_vu0.vf[4].f[v % 3] *= 1e37f;    /* overflow: clamped to +-FLT_MAX */
                 if (node % 5 == 2) g_vu0.vf[5].f[v % 3] *= 1e-37f;   /* denormal products: flushed */
+                if (node % 5 == 3) g_vu0.vf[4 + (v & 1)].u[RND() & 3] = ODD();
                 vu0_callms(VU0_ADDR_VU0_CALCPOINT);
             }
+            vu0_callms(VU0_ADDR_VU0_CALCPOINT_END);
         }
         CHECK(vu_check_mismatches() == 0, "CALCPOINT native path: %ld calls differ from the interpreter", vu_check_mismatches());
 #undef RF
+#undef ODD
 #undef RND
     }
 

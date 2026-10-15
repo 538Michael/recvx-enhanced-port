@@ -3,7 +3,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-#include <emmintrin.h>
 
 #define VU_INLINE static inline __attribute__((always_inline))
 
@@ -567,131 +566,202 @@ static void vu_micro_run(VuState* s, const VuMicroInstr* code, int count, int ad
 #include "vu_static.inc"
 VU_STATIC(vu0_static_run, vu0_micro_code, VU0_CASES, 0)
 
-/* SSE2, lane c = component c: the VU float rules (vu_clampf) on four lanes */
+/* Four lanes, lane c = component c, with the VU float rules (vu_clampf). SSE2 where the
+   compiler targets it, otherwise (or with -DRECVX_VU_PORTABLE) plain C with the same results:
+   both do IEEE single operations one at a time and clamp each result. */
+#if defined(__SSE2__) && !defined(RECVX_VU_PORTABLE)
+#include <emmintrin.h>
 typedef __m128 V4;
+/* |x| below FLT_MIN (denormal, zero): +-0; Inf/NaN: +-FLT_MAX (MINPS returns its second operand
+   for a NaN); the sign is kept. Float ops only: shorter than the integer version on the
+   dependency chains of CALCPOINT. */
 static inline V4 v4clamp(V4 x)
 {
-    __m128i b = _mm_castps_si128(x);
-    __m128i e = _mm_and_si128(b, _mm_set1_epi32(0x7F800000));
-    __m128i sg = _mm_and_si128(b, _mm_set1_epi32((int)0x80000000u));
-    __m128i inf = _mm_cmpeq_epi32(e, _mm_set1_epi32(0x7F800000));   /* Inf/NaN: +-FLT_MAX */
-    __m128i den = _mm_cmpeq_epi32(e, _mm_setzero_si128());          /* denormal: +-0 */
-    b = _mm_or_si128(_mm_andnot_si128(inf, b), _mm_and_si128(inf, _mm_or_si128(sg, _mm_set1_epi32(0x7F7FFFFF))));
-    b = _mm_or_si128(_mm_andnot_si128(den, b), _mm_and_si128(den, sg));
-    return _mm_castsi128_ps(b);
+    const V4 sg = _mm_set1_ps(-0.0f);
+    V4 a = _mm_andnot_ps(sg, x);
+    V4 keep = _mm_cmpnlt_ps(a, _mm_set1_ps(FLT_MIN));
+    a = _mm_and_ps(_mm_min_ps(a, _mm_set1_ps(FLT_MAX)), keep);
+    return _mm_or_ps(a, _mm_and_ps(sg, x));
 }
-static inline V4 v4mask(int m)   /* VU field mask (x = 8) as lanes */
+static inline V4 v4sel(V4 dst, V4 r, int m)   /* VU field mask (x = 8): lanes of r */
 {
-    return _mm_castsi128_ps(_mm_set_epi32((m & 1) ? -1 : 0, (m & 2) ? -1 : 0, (m & 4) ? -1 : 0, (m & 8) ? -1 : 0));
+    V4 k = _mm_castsi128_ps(_mm_set_epi32((m & 1) ? -1 : 0, (m & 2) ? -1 : 0, (m & 4) ? -1 : 0, (m & 8) ? -1 : 0));
+    return _mm_or_ps(_mm_andnot_ps(k, dst), _mm_and_ps(k, r));
 }
-static inline V4 v4sel(V4 dst, V4 r, int m) { V4 k = v4mask(m); return _mm_or_ps(_mm_andnot_ps(k, dst), _mm_and_ps(k, r)); }
 static inline V4 v4mul(V4 a, V4 b) { return v4clamp(_mm_mul_ps(a, b)); }
-static inline V4 v4madd(V4 acc, V4 a, V4 b) { return v4clamp(_mm_add_ps(acc, v4mul(a, b))); }
+static inline V4 v4add(V4 a, V4 b) { return v4clamp(_mm_add_ps(a, b)); }
 static inline V4 v4sub(V4 a, V4 b) { return v4clamp(_mm_sub_ps(a, b)); }
-static inline float v4lane(V4 v, int c) { float f[4]; _mm_storeu_ps(f, v); return f[c]; }
-static inline uint32_t v4mac(V4 v, int m)   /* MAC flags of the masked lanes */
+static inline V4 v4max(V4 a, V4 b) { return v4clamp(_mm_max_ps(a, b)); }   /* A > B ? A : B */
+static inline V4 v4set1(float f) { return _mm_set1_ps(f); }
+#define V4BC(v, c) _mm_shuffle_ps((v), (v), _MM_SHUFFLE(c, c, c, c))
+static inline float v4lane(V4 v, int c)
 {
-    float f[4];
-    uint32_t r = 0;
-    _mm_storeu_ps(f, v);
-    for (int c = 0; c < 4; c++) if (vu_field_on(m, c)) r |= mac_bits(f[c], c);
-    return r;
+    switch (c) {
+    case 0: return _mm_cvtss_f32(v);
+    case 1: return _mm_cvtss_f32(V4BC(v, 1));
+    case 2: return _mm_cvtss_f32(_mm_movehl_ps(v, v));
+    default: return _mm_cvtss_f32(V4BC(v, 3));
+    }
 }
-#define BC(v, c) _mm_shuffle_ps((v), (v), _MM_SHUFFLE(c, c, c, c))
+static const uint8_t rev4[16] = { 0, 8, 4, 12, 2, 10, 6, 14, 1, 9, 5, 13, 3, 11, 7, 15 };
+static inline uint32_t v4mac(V4 v, int m)   /* MAC flags (mac_bits) of the masked lanes */
+{
+    uint32_t z = rev4[_mm_movemask_ps(_mm_cmpeq_ps(v, _mm_setzero_ps()))], n = rev4[_mm_movemask_ps(v)];
+    return (z | n << 4) & (uint32_t)(m | m << 4);
+}
 #define LD(r) _mm_loadu_ps(s->vf[r].f)
 #define LM(a) _mm_loadu_ps(s->mem[a].f)
-
-/* VU0_CALCPOINT (vsm/ps2_vu0.vsm) without point lights (directional lights only, or none): one
-   vertex of a chunk model, called once per vertex of every node drawn (~0.8 us through
-   vu_step, 166 ms a frame for the 205k vertices of a whole-village room). The same operations
-   in program order with the interpreter's arithmetic (upper_on: products and sums clamped
-   per component, here four lanes at a time), and its timing resolved for these paths, which
-   have no data-dependent branches: every source is ready when read (the DIV's Q at MULq.xyz
-   vf06, at each FMAND the MAC flags of the FMAC 4 cycles before it, the CLIP flags at FCGET),
-   the light loop's RSQRTs leave the last one in Q, and the MAC flags are the ADDz.x's. Leaves
-   the whole VU state as vu0_static_run does (RECVX_VU_CHECK=1 compares every call against the
-   interpreter; pc/tests/test_vu.c). Other paths: 0, interpreted. */
-static int calcpoint_fast(VuState* s)
+#define ST(r, v) _mm_storeu_ps(s->vf[r].f, v)
+#else
+typedef VuVec V4;
+#define V4OP(name, expr) static inline V4 name(V4 a, V4 b) { V4 r; for (int c = 0; c < 4; c++) r.f[c] = vu_clampf(expr); (void)b; return r; }
+V4OP(v4mul, a.f[c] * b.f[c])
+V4OP(v4add, a.f[c] + b.f[c])
+V4OP(v4sub, a.f[c] - b.f[c])
+V4OP(v4max, a.f[c] > b.f[c] ? a.f[c] : b.f[c])
+#undef V4OP
+static inline V4 v4clamp(V4 a) { for (int c = 0; c < 4; c++) a.f[c] = vu_clampf(a.f[c]); return a; }
+static inline V4 v4sel(V4 dst, V4 r, int m) { for (int c = 0; c < 4; c++) if (vu_field_on(m, c)) dst.u[c] = r.u[c]; return dst; }
+static inline V4 v4set1(float f) { V4 r = { { f, f, f, f } }; return r; }
+static inline V4 v4bc(V4 v, int c) { return v4set1(v.f[c]); }
+#define V4BC(v, c) v4bc((v), (c))
+static inline float v4lane(V4 v, int c) { return v.f[c]; }
+static inline uint32_t v4mac(V4 v, int m)
 {
-    const uint16_t vi10 = s->vi[10];
-    const V4 r0 = LD(0), r12 = LD(12), r13 = LD(13), r17 = LD(17), r24 = LD(24), r25 = LD(25), r26 = LD(26), r27 = LD(27);
+    uint32_t r = 0;
+    for (int c = 0; c < 4; c++) if (vu_field_on(m, c)) r |= mac_bits(v.f[c], c);
+    return r;
+}
+#define LD(r) (s->vf[r])
+#define LM(a) (s->mem[a])
+#define ST(r, v) (s->vf[r] = (v))
+#endif
+static inline V4 v4madd(V4 acc, V4 a, V4 b) { return v4add(acc, v4mul(a, b)); }
+
+/* VU0_CALCPOINT (vsm/ps2_vu0.vsm): one vertex of a chunk model, called once per vertex of
+   every node drawn (205k a frame in a whole-village room, ~3.7k in a retail room). The same
+   operations in program order with the interpreter's arithmetic (upper_on: products and sums
+   clamped per component, here four lanes at a time), and its timing resolved for every path
+   (the program has no loops; stalls only delay, they never change a value):
+   - Q: MULq.xyz vf06 reads the DIV of vf18z (ready exactly then); in a point light's path
+     (LIGHTk_POINT) the MULq in the branch delay slot reads that light's RSQRT (13 cycles
+     after it, ready) and the MULq after the six NOPs the DIV issued in that slot; Q at the
+     end is the last DIV/RSQRT issued, so the other lights' RSQRTs are not computed.
+   - MAC flags: each FMAND reads those of the FMAC 4 cycles before it; at the end the ADDz.x's.
+   - CLIP flags: FCGET reads the CLIPw's (4 cycles before it).
+   Leaves the whole VU state as the interpreter does (RECVX_VU_CHECK=1 compares every call;
+   pc/tests/test_vu.c). */
+static void calcpoint_fast(VuState* s)
+{
+    /* registers the program only reads are read where used (x86-32 has 8 vector registers) */
+#define r0 LD(0)
+#define r12 LD(12)
+#define r13 LD(13)
+#define r17 LD(17)
+#define r24 LD(24)
+#define r25 LD(25)
+#define r26 LD(26)
+#define r27 LD(27)
     V4 r4 = LD(4), r5 = LD(5), r6 = LD(6), r7 = LD(7), r8 = LD(8), r9 = LD(9), r10 = LD(10), r11 = LD(11);
-    V4 r18 = LD(18), r19 = LD(19), r28 = LD(28), r29 = LD(29), r30 = LD(30), r31 = LD(31), acc = _mm_loadu_ps(s->acc.f);
-    uint32_t mac5, mac6, mac7, cb = 0;
-    float q, div;
-    for (uint16_t m = vi10, k = 0; k < 4; k++, m = (uint16_t)(m + m))
-        if ((m & s->vi[7]) && (m & s->vi[8])) return 0;   /* a point light */
-    acc = v4mul(r28, BC(r4, 0));                               /* MULAx.xyzw ACC, vf28, vf04x */
+    V4 r18, r19 = LD(19), r28 = LD(28), r29 = LD(29), r30 = LD(30), r31 = LD(31), acc;
+    uint16_t vi1, vi12, vi13, vi14 = s->vi[10], vi15 = s->vi[15];
+    uint32_t cb;
+    float q;
+    int q_rsqrt = 3;   /* the last Q operation: light k's RSQRT, or -1: q (a DIV) */
+    acc = v4mul(r28, V4BC(r4, 0));                             /* MULAx.xyzw ACC, vf28, vf04x */
     r6 = v4sel(r6, LD(1), VU_Z);                               /*  | MOVE.z vf06, vf01 */
-    acc = v4madd(acc, r29, BC(r4, 1));
-    acc = v4madd(acc, r30, BC(r4, 2));
-    r18 = v4madd(acc, r31, BC(r0, 3));                         /* vf18: view position */
-    acc = v4sel(acc, v4mul(r28, BC(r5, 0)), VU_XYZ);
-    acc = v4sel(acc, v4madd(acc, r29, BC(r5, 1)), VU_XYZ);
-    r19 = v4sel(r19, v4madd(acc, r30, BC(r5, 2)), VU_XYZ);     /* vf19: normal */
-    div = vu_divide(v4lane(r0, 3), v4lane(r18, 2));            /*  | DIV Q, vf00w, vf18z */
+    acc = v4madd(acc, r29, V4BC(r4, 1));
+    acc = v4madd(acc, r30, V4BC(r4, 2));
+    r18 = v4madd(acc, r31, V4BC(r0, 3));                       /* vf18: view position */
+    acc = v4sel(acc, v4mul(r28, V4BC(r5, 0)), VU_XYZ);
+    acc = v4sel(acc, v4madd(acc, r29, V4BC(r5, 1)), VU_XYZ);
+    r19 = v4sel(r19, v4madd(acc, r30, V4BC(r5, 2)), VU_XYZ);   /* vf19: normal */
+    q = vu_divide(v4lane(r0, 3), v4lane(r18, 2));             /*  | DIV Q, vf00w, vf18z */
     r6 = v4sel(r6, v4mul(r18, r17), VU_X | VU_Y);
     r8 = v4sub(r8, r8);
-    r9 = v4sub(r24, BC(r18, 0));  r28 = LM(56);
-    r10 = v4sub(r25, BC(r18, 1)); r29 = LM(57);
-    r11 = v4sub(r26, BC(r18, 2)); r30 = LM(58);
+    r9 = v4sub(r24, V4BC(r18, 0));  r28 = LM(56);
+    r10 = v4sub(r25, V4BC(r18, 1)); r29 = LM(57);
+    r11 = v4sub(r26, V4BC(r18, 2)); r30 = LM(58);
     r31 = LM(59);
-    r6 = v4sel(r6, v4mul(r0, BC(r19, 2)), VU_W);
-    r6 = v4sel(r6, v4mul(r6, _mm_set1_ps(div)), VU_XYZ);      /* MULq.xyz: the DIV is done */
+    r6 = v4sel(r6, v4mul(r0, V4BC(r19, 2)), VU_W);
+    r6 = v4sel(r6, v4mul(r6, v4set1(q)), VU_XYZ);              /* MULq.xyz: the DIV is done */
     acc = v4mul(r9, r9);
     acc = v4madd(acc, r10, r10);
-    r5 = v4madd(acc, r11, r11);
-    acc = v4mul(r9, BC(r19, 0));
-    acc = v4madd(acc, r10, BC(r19, 1));
-    r4 = v4madd(acc, r11, BC(r19, 2));  mac5 = v4mac(r4, VU_XYZW);
-    mac6 = v4mac(v4sub(r12, r5), VU_XYZW);                     /* SUB.xyzw vf00, vf12, vf05 */
-    mac7 = v4mac(v4sub(r13, r5), VU_XYZW);
-    s->vi[13] = (uint16_t)((mac5 & s->vi[9]) | (mac7 & s->vi[9]));   /* FMAND x3, IOR */
-    s->vi[12] = (uint16_t)(mac6 & s->vi[9]);
-    s->vi[14] = vi10;
-    q = s->q;
-#define LIGHT(k) do { /* LIGHTk: header, then LIGHTk_PARA when on: vf08[k] = max(L . N, 0) */      \
-        r10 = v4sel(r10, v4mul(r19, BC(r27, k)), VU_XYZ);                                          \
-        q = vu_divide(v4lane(r0, 3), sqrtf(fabsf(v4lane(r5, k))));   /* RSQRT Q, vf00w, vf05[k] */ \
-        s->vi[1] = s->vi[14] & s->vi[7];                                                            \
-        s->vi[15] = s->vi[14] & s->vi[8];                                                           \
-        s->vi[14] = (uint16_t)(s->vi[14] + s->vi[14]);                                              \
-        if (s->vi[1]) {                                                                             \
-            acc = v4sel(acc, v4mul(r24, BC(r10, 0)), VU_X >> k);                                    \
-            acc = v4sel(acc, v4madd(acc, r25, BC(r10, 1)), VU_X >> k);                              \
-            r8 = v4sel(r8, v4madd(acc, r26, BC(r10, 2)), VU_X >> k);                                \
-            r8 = v4sel(r8, v4clamp(_mm_max_ps(r8, BC(r0, 0))), VU_X >> k);   /* MAXx: A > B ? A : B */ \
+    r5 = v4madd(acc, r11, r11);                                /* vf05: squared distances */
+    acc = v4mul(r9, V4BC(r19, 0));
+    acc = v4madd(acc, r10, V4BC(r19, 1));
+    r4 = v4madd(acc, r11, V4BC(r19, 2));                       /* vf04: (light - point) . normal */
+    vi13 = (uint16_t)(v4mac(r4, VU_XYZW) & s->vi[9]);           /* FMAND x3, IOR */
+    vi12 = (uint16_t)(v4mac(v4sub(r12, r5), VU_XYZW) & s->vi[9]);   /* SUB.xyzw vf00, vf12, vf05 */
+    vi1 = (uint16_t)(v4mac(v4sub(r13, r5), VU_XYZW) & s->vi[9]);
+    vi13 |= vi1;
+#define RSQRT(k) vu_divide(v4lane(r0, 3), sqrtf(fabsf(v4lane(r5, k))))   /* RSQRT Q, vf00w, vf05[k] */
+    /* The lights' writes of ACC and vf10.xyz are dead (overwritten at LIGHT4 before any read), so
+       each light is computed on its own values and only its vf08 lane is kept: no dependency
+       from one light to the next. */
+#define LIGHT(k) do { /* LIGHTk: header, then LIGHTk_PARA (directional) or LIGHTk_POINT */          \
+        vi1 = vi14 & s->vi[7];                                                                     \
+        vi15 = vi14 & s->vi[8];                                                                    \
+        vi14 = (uint16_t)(vi14 + vi14);                                                            \
+        q_rsqrt = k;                                                                               \
+        if (vi1 && !vi15) {          /* vf08[k] = max(L . N, 0) */                                \
+            const V4 l = v4mul(r19, V4BC(r27, k));   /* MULk.xyz vf10, vf19, vf27[k] */            \
+            V4 t = v4madd(v4madd(v4mul(r24, V4BC(l, 0)), r25, V4BC(l, 1)), r26, V4BC(l, 2));       \
+            r8 = v4sel(r8, v4max(t, V4BC(r0, 0)), VU_X >> k);                                      \
+        } else if (vi1) {            /* point: facing and in range */                              \
+            vi1 = vi13 & s->vi[7 - k];                                                             \
+            vi15 = vi12 & s->vi[7 - k];                                                            \
+            if (!vi1) {                                                                            \
+                V4 t = v4mul(r4, v4set1(RSQRT(k)));  /* MULq | DIV */                              \
+                q = vu_divide(v4lane(r12, k), v4lane(r5, k));                                     \
+                q_rsqrt = -1;                                                                      \
+                if (vi15) t = v4mul(t, v4set1(q));                                                 \
+                r8 = v4sel(r8, t, VU_X >> k);                                                      \
+            }                                                                                      \
         } } while (0)
     LIGHT(0); LIGHT(1); LIGHT(2); LIGHT(3);
 #undef LIGHT
-    acc = v4mul(r28, BC(r18, 0));             r7 = v4sel(r7, LM(71), VU_XYZ);
-    acc = v4madd(acc, r29, BC(r18, 1));       r9 = v4sel(r9, LM(72), VU_XYZ);
-    acc = v4madd(acc, r30, BC(r18, 2));       r10 = v4sel(r10, LM(73), VU_XYZ);
-    r5 = v4madd(acc, r31, BC(r0, 3));         r11 = v4sel(r11, LM(74), VU_XYZ);   /* clip-space position */
-    acc = v4sel(acc, v4mul(r7, BC(r8, 0)), VU_XYZ);            r28 = LM(60);
-    acc = v4sel(acc, v4madd(acc, r9, BC(r8, 1)), VU_XYZ);      r29 = LM(61);
-    acc = v4sel(acc, v4madd(acc, r10, BC(r8, 2)), VU_XYZ);     r30 = LM(62);
+    if (q_rsqrt == 3) q = RSQRT(3);
+#undef RSQRT
+    acc = v4mul(r28, V4BC(r18, 0));           r7 = v4sel(r7, LM(71), VU_XYZ);
+    acc = v4madd(acc, r29, V4BC(r18, 1));     r9 = v4sel(r9, LM(72), VU_XYZ);
+    acc = v4madd(acc, r30, V4BC(r18, 2));     r10 = v4sel(r10, LM(73), VU_XYZ);
+    r5 = v4madd(acc, r31, V4BC(r0, 3));       r11 = v4sel(r11, LM(74), VU_XYZ);   /* clip-space position */
+    acc = v4sel(acc, v4mul(r7, V4BC(r8, 0)), VU_XYZ);          r28 = LM(60);
+    acc = v4sel(acc, v4madd(acc, r9, V4BC(r8, 1)), VU_XYZ);    r29 = LM(61);
+    acc = v4sel(acc, v4madd(acc, r10, V4BC(r8, 2)), VU_XYZ);   r30 = LM(62);
     {   /* CLIPw.xyz vf05, vf05w */
         float w = fabsf(v4lane(r5, 3)), x = v4lane(r5, 0), y = v4lane(r5, 1), z = v4lane(r5, 2);
-        cb = (x > w) | (x < -w) << 1 | (y > w) << 2 | (y < -w) << 3 | (z > w) << 4 | (z < -w) << 5;
+        cb = (uint32_t)((x > w) | (x < -w) << 1 | (y > w) << 2 | (y < -w) << 3 | (z > w) << 4 | (z < -w) << 5);
     }                                                          r31 = LM(63);
-    r7 = v4sel(r7, v4madd(acc, r11, BC(r8, 3)), VU_XYZ);       /* colour */
-    r11 = v4sel(r11, v4clamp(_mm_add_ps(r0, BC(r6, 2))), VU_X);   /* ADDz.x vf11, vf00, vf06z */
+    r7 = v4sel(r7, v4madd(acc, r11, V4BC(r8, 3)), VU_XYZ);     /* colour */
+    r11 = v4sel(r11, v4add(r0, V4BC(r6, 2)), VU_X);            /* ADDz.x vf11, vf00, vf06z */
     s->mac = v4mac(r11, VU_X);
     s->clip = ((s->clip << 6) | cb) & 0xFFFFFF;
     s->vi[1] = (uint16_t)(s->clip & 0xFFF);                    /* FCGET */
     s->vi[11] &= s->vi[1];
+    s->vi[12] = vi12; s->vi[13] = vi13; s->vi[14] = vi14; s->vi[15] = vi15;
     s->q = q;
-    _mm_storeu_ps(s->vf[4].f, r4);   _mm_storeu_ps(s->vf[5].f, r5);   _mm_storeu_ps(s->vf[6].f, r6);
-    _mm_storeu_ps(s->vf[7].f, r7);   _mm_storeu_ps(s->vf[8].f, r8);   _mm_storeu_ps(s->vf[9].f, r9);
-    _mm_storeu_ps(s->vf[10].f, r10); _mm_storeu_ps(s->vf[11].f, r11); _mm_storeu_ps(s->vf[18].f, r18);
-    _mm_storeu_ps(s->vf[19].f, r19); _mm_storeu_ps(s->vf[28].f, r28); _mm_storeu_ps(s->vf[29].f, r29);
-    _mm_storeu_ps(s->vf[30].f, r30); _mm_storeu_ps(s->vf[31].f, r31); _mm_storeu_ps(s->acc.f, acc);
-    return 1;
+    ST(4, r4);   ST(5, r5);   ST(6, r6);   ST(7, r7);   ST(8, r8);   ST(9, r9);   ST(10, r10); ST(11, r11);
+    ST(18, r18); ST(19, r19); ST(28, r28); ST(29, r29); ST(30, r30); ST(31, r31);
+#undef r0
+#undef r12
+#undef r13
+#undef r17
+#undef r24
+#undef r25
+#undef r26
+#undef r27
+#if defined(__SSE2__) && !defined(RECVX_VU_PORTABLE)
+    _mm_storeu_ps(s->acc.f, acc);
+#else
+    s->acc = acc;
+#endif
 }
-#undef BC
 #undef LD
 #undef LM
+#undef ST
+#undef V4BC
 VU_STATIC(vu1_static_run, vu1_micro_code, VU1_CASES, 1)
 
 /* RECVX_VU_INTERP=1: run the microcode through the interpreter instead (reference) */
@@ -753,11 +823,12 @@ void vu0_callms(int addr)
     g_vu0.cmsar0 = (uint32_t)addr;
     if (!g_vu0.mem_mask) g_vu0.mem_mask = 0xFF;
     /* ~100 ns: not timed (the clock reads cost as much), so it counts as game logic */
-    if (addr == VU0_ADDR_VU0_CALCPOINT && !vu_check() && !use_interp() && calcpoint_fast(&g_vu0)) return;
+    if (addr == VU0_ADDR_VU0_CALCPOINT && !vu_check() && !use_interp()) { calcpoint_fast(&g_vu0); return; }
     prof_push(PROF_VU0);   /* (the time: --profile) */
     if (vu_check()) { vu_ref = g_vu0; vu_micro_run_k(&vu_ref, vu0_micro_code, VU0_MICRO_COUNT, addr, 0, 1); }
     if (use_interp()) vu_micro_run(&g_vu0, vu0_micro_code, VU0_MICRO_COUNT, addr, 0);
-    else if (addr != VU0_ADDR_VU0_CALCPOINT || !calcpoint_fast(&g_vu0)) vu0_static_run(&g_vu0, addr);
+    else if (addr == VU0_ADDR_VU0_CALCPOINT) calcpoint_fast(&g_vu0);
+    else vu0_static_run(&g_vu0, addr);
     if (vu_check()) check_against(&g_vu0, 0, addr);
     prof_pop();
 }

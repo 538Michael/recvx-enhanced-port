@@ -184,6 +184,12 @@ add_executable(test_vu tests/test_vu.c src/ps2/vu.c)
 target_compile_options(test_vu PRIVATE -std=gnu11 -msse2 -mfpmath=sse -ffp-contract=off)
 target_link_libraries(test_vu PRIVATE m)
 add_test(NAME vu COMMAND test_vu)
+# the same against the plain C (non-SSE) native paths, as an arm64 build would compile them
+add_executable(test_vu_portable tests/test_vu.c src/ps2/vu.c)
+target_compile_definitions(test_vu_portable PRIVATE RECVX_VU_PORTABLE)
+target_compile_options(test_vu_portable PRIVATE -std=gnu11 -msse2 -mfpmath=sse -ffp-contract=off)
+target_link_libraries(test_vu_portable PRIVATE m)
+add_test(NAME vu_portable COMMAND test_vu_portable)
 
 # decodes every movie on the disc (needs RECVX_ISO; skipped otherwise)
 add_executable(test_movies tests/test_movies.c src/movie/mpeg2.c src/movie/pss.c)
