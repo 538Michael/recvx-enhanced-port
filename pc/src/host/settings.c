@@ -10,6 +10,7 @@
 #include "cheat.h"
 #include "menu_mouse.h"
 #include "bindings.h"
+#include "modern.h"
 #include "enemies.h"
 #include "lobby.h"
 #include "savestore.h"
@@ -98,6 +99,7 @@ static const char* const loots[] = { "Shared", "Individual" };
 static const char* const conns[] = { "Automatic", "Direct (P2P)", "Via server" };
 static const char* const atmos_names[] = { "Per cut (original)", "Smooth" };
 static const char* const free_cam_names[] = { "B (behind character)", "A (free)" };
+static const char* const fixed_cam_names[] = { "Classic (tank)", "Modern (camera-relative)" };
 static const char* const noclips[] = { "Off", "Through walls", "Walls + fly" };
 static const char* const sources[] = { "Auto", "Keyboard/mouse only", "Gamepad only" };
 static const char* const extras[] = { "Off", "Up to 1 per room", "Up to 2 per room", "Up to 3 per room" };
@@ -143,6 +145,9 @@ const Setting g_settings[] = {
       .help = "Any: the first one connected. 1-4: the gamepad the system numbers so (Xbox: its slot / light, PlayStation and "
               "Switch pads show it on their player lights); give each window its own number for local co-op." },
     { SP_CONTROLS, "Mouse in menus", V(g_menu_mouse.on), 0, 1, 1, .help = "Inventory, item box, map, files and these menus: point, left click selects, right click goes back." },
+    { SP_CONTROLS, "Fixed camera controls", V(g_modern_on), 0, 1, 1, fixed_cam_names,
+      .help = "Modern: the left stick or the d-pad (arrow keys) walks where it points on screen, pushed far or with run it runs; "
+              "aiming and the quick turn as Classic. Not in third person." },
 
     { SP_TPS, "Over-the-shoulder camera", V(g_tps.on), 0, 1, 1, .help = "Third person: mouse/keyboard controls and free aim. Events, doors and menus keep the original camera.", .group = "CAMERA" },
     { SP_TPS, "Mouse/keyboard camera", V(g_tps.free_cam), 0, 1, 1, free_cam_names,
