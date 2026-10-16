@@ -21,6 +21,8 @@ int tps_cam_active;    /* our camera is the view of the current frame */
 extern float fNaViwClipNear, fNaViwClipFar;
 void bhCalcModel(BH_PWORK* ewP);   /* MdlPut.h */
 void actor_aim_offset(const BH_PWORK* p, float* out);   /* actor_glue.c */
+int actor_aim_hand(const BH_PWORK* p, float* hand);
+float actor_cam_scale(void);
 uint64_t gs_frame_count(void); /* the presented frame (RECVX_INPUT, frame dumps) */
 
 static float yaw, pitch;          /* camera, game angle units (65536 = 360 deg); pitch > 0 looks up */
@@ -107,12 +109,13 @@ static void clear_of_walls(const NJS_POINT3* a, NJS_POINT3* b)
 static void view(NJS_POINT3* eye, NJS_POINT3* dir, NJS_POINT3* sh)
 {
     float s = sinf(RAD(yaw)), c = cosf(RAD(yaw)), sp = sinf(RAD(pitch)), cp = cosf(RAD(pitch));
-    float side = (g_tps.left ? -g_tps.shoulder : g_tps.shoulder) / 10.0f;
+    float k = actor_cam_scale();   /* "You appear as" a taller or shorter model: its height (1: the character's) */
+    float side = (g_tps.left ? -g_tps.shoulder : g_tps.shoulder) / 10.0f * k;
     NJS_POINT3 at, csh;
 
     /* forward (-sin, 0, -cos), right (cos, 0, -sin) */
     dir->x = -s * cp; dir->y = sp; dir->z = -c * cp;
-    at.x = plp->px; at.y = plp->py + g_tps.height / 10.0f; at.z = plp->pz;
+    at.x = plp->px; at.y = plp->py + g_tps.height / 10.0f * k; at.z = plp->pz;
     sh->x = at.x + c * side; sh->y = at.y; sh->z = at.z - s * side;
     csh = *sh;
     clear_of_walls(&at, &csh);
@@ -147,7 +150,7 @@ void tps_camera(void)
         if (pad_steer) yaw = wrap(yaw + wrap(plp->ay - yaw) * 0.4f);
     } else if (!aim) yaw = wrap(yaw + wrap(plp->ay - yaw) * 0.4f);   /* free aim: the mouse steers the camera */
     look(1.0f);
-    cur_dist += ((aiming() ? g_tps.aim_dist : g_tps.dist) / 10.0f - cur_dist) * 0.35f;
+    cur_dist += ((aiming() ? g_tps.aim_dist : g_tps.dist) / 10.0f * actor_cam_scale() - cur_dist) * 0.35f;
     cur_fov += ((float)(aiming() ? g_tps.aim_fov : g_tps.fov) - cur_fov) * 0.35f;
 
     {   /* test aid RECVX_TPS_ORBIT=degrees: the view only turned about the player (side views for
@@ -746,6 +749,26 @@ void tps_calc_model(void)
     a = atan2f(aim_t.y - ow[9].mtx[13] - ofs[1], sqrtf(dx * dx + dz * dz));
     bend_a = a = w * (a > 1.047f ? 1.047f : a < -1.047f ? -1.047f : a) / 2;   /* at most 60 degrees */
     bend(plp, a);
+    {   /* "You appear as" another model (the retargeting): the weapon is drawn in the model's hand, which
+           the bend swings about the chest as well, farther the taller the model, and in a gender-matched
+           pose the hand turns the weapon as that motion does. The pitch is solved on the weapon as it will
+           be drawn: its barrel (the hand's x axis from the muzzle) through the crosshair target. */
+        float h[16], t = a * 2 / (w > 0.01f ? w : 1);
+        for (int it = 0; it < 4 && actor_aim_hand(plp, h); it++) {
+            const NJS_POINT3* f = &WpnTab[plp->wpnr_no].wp_fps1;
+            float m[3], e, sg;
+            for (int j = 0; j < 3; j++) m[j] = f->x * h[j] + f->y * h[4 + j] + f->z * h[8 + j] + h[12 + j];
+            dx = aim_t.x - m[0]; dz = aim_t.z - m[2];
+            sg = dx * h[0] + (aim_t.y - m[1]) * h[1] + dz * h[2] < 0 ? -1.0f : 1.0f;   /* (the barrel's way along the axis) */
+            e = atan2f(aim_t.y - m[1], sqrtf(dx * dx + dz * dz)) - atan2f(sg * h[1], sqrtf(h[0] * h[0] + h[2] * h[2]));
+            if (fabsf(e) < 0.002f) break;
+            t += e;
+            t = t > 1.047f ? 1.047f : t < -1.047f ? -1.047f : t;
+            bhCalcModel(plp);   /* (unbent) */
+            bend_a = w * t / 2;
+            bend(plp, bend_a);
+        }
+    }
 }
 
 /* the same bend on a display copy of the player posed this tick (actor_glue.c: a gender-matched
