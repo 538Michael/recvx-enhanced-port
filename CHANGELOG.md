@@ -1,10 +1,10 @@
 # Changelog
 
-## Unreleased
+## 0.3.1 (2026-10-16)
 
 ### Renderer
 
-- **Camera cuts at high frame rates**: above 60 Hz the in-between images no longer blend across a
+- **Camera cuts at high frame rates**: at high frame rates the in-between images no longer blend across a
   camera cut. The game changes the cut after drawing a frame, so the renderer took the cut one
   frame late and swept the camera from the old view to the new one, through walls and past room
   parts hidden for one of the two cameras. The cut is now taken from the frame as drawn, event
@@ -12,7 +12,7 @@
   the new view is shown at once. As a side effect the frame just before a cut is now smoothed too.
 - **Effects follow what they are attached to**: the lighter's flame, muzzle flashes, smoke,
   sparks, fire and blood are placed in the in-between images like the 3D models, so the flame
-  stays on Claire's lighter at 120 Hz instead of jumping at 30 Hz. Their animation still steps
+  stays on Claire's lighter instead of jumping at the game's own rate. Their animation still steps
   at the game's rate. `RECVX_INTERP_STATS` also counts matched effect vertices and logs camera
   jumps.
 
@@ -32,12 +32,11 @@
   holds the weapon in its claw instead of mid-arm, Monster Steve moves his arms from the shoulders
   instead of the collarbones and holds the weapon in his hand instead of at the elbow.
 - **Feet on the floor**: a taller or shorter model crouches and bobs in proportion, and a foot of
-  another shape no longer lifts the body (Monster Steve walked 4 units above the floor, the Hunter
-  1).
+  another shape no longer lifts the body.
 - **Aiming up with tall models** in third person: the camera's height, shoulder offset and distance
   follow the model's height, so it is no longer inside a Tyrant or Monster Steve while aiming; the
   aim pose is solved on the weapon as it is drawn, so its barrel points at the crosshair for every
-  model and pitch (it was up to 1.5 degrees off at a far target and 11 at a near one). The shots are
+  model and pitch. The shots are
   unchanged: they always went where the crosshair is.
 - A weapon or gloved hand the model has no hand for (Nosferatu's right, the Bandersnatch's left)
   is no longer drawn floating in the air.
