@@ -343,7 +343,7 @@ static void randomize(const EnemyOpts* o)
                 if (cost - slot_cost(save.id) + slot_cost(kinds[i].id) > 128 - SPAWN_SLOTS_FREE) w[i] = 0;
                 if (w[i] && (f & K_BIG)) {
                     if (big < 0) big = open_dirs(&save, 35.0f);
-                    if (big < 6) w[i] = 0;
+                    if (big < 5) w[i] = 0;
                 }
                 mine |= w[i] && (i == room_kinds[0] || i == room_kinds[1]);
             }

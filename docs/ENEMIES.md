@@ -380,7 +380,7 @@ weight, then one of its looks (the spawner's entries of that type, from any stag
   to it: two of them in a prison room crashed in `en22.c bhEne22_MV04`), moths (their eggs use
   Claire's sub-models and 16 slots), bosses, water and wall types.
 * **Open space** (`open_dirs`): line tests against the walls (`bhCollisionCheckLine2`, as the
-  placements use) from the record in 8 directions at waist height; at least 6 must be clear for
+  placements use) from the record in 8 directions at waist height; at least 5 must be clear for
   35 units (3.5 m). Corridors and small rooms fail it. Ceiling height is not tested: fliers only
   replace fliers, and the tallest kind (Tyrant) fits under the retail rooms' ceilings.
 * **Kill-count rooms** (`DieEventCk`: doors that open when everything is dead, e.g. the prison's
