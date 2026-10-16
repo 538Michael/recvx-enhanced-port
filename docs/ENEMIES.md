@@ -370,7 +370,7 @@ weight, then one of its looks (the spawner's entries of that type, from any stag
 | Cerberus | 1 | 4 / 4 | |
 | Bandersnatch | 1 (Bandersnatch 2 is an event's arm: never) | 4 / 4 | |
 | Hunter, Sweeper | 2 | 3 / 4 | not in kill-count rooms (may leap out of a room) |
-| Black Widow | 1 | 2 / 3 | open space (25 slots with its brood) |
+| Black Widow | 1 | 2 / 3 | open space (25 slots with its brood); not in kill-count rooms (climbs walls) |
 | anatomist zombie | 1 | 2 / 2 | |
 | Tyrant | 2 | - / 2 | open space; not in kill-count rooms; not where the script uses `rm_flg` bits 29..31 (its code clears `rm_flg & 7` every frame) |
 | Giant Black Widow | 1 | - / 1 | as the Tyrant (writes `rm_flg & 1`) |
@@ -384,8 +384,9 @@ weight, then one of its looks (the spawner's entries of that type, from any stag
   35 units (3.5 m). Corridors and small rooms fail it. Ceiling height is not tested: fliers only
   replace fliers, and the tallest kind (Tyrant) fits under the retail rooms' ceilings.
 * **Kill-count rooms** (`DieEventCk`: doors that open when everything is dead, e.g. the prison's
-  5550..5710, 4012) are randomized with the kinds that stay in the room and die there. Every kind
-  dies with `flg & 2` (each has a `DieCk` in its own rooms), so the record's kill bit is set as before.
+  5550..5710, 4012) are randomized with the kinds that stay on the floor and die there: zombies,
+  Cerberus, Bandersnatches, anatomists. Each dies with `flg & 2` (each has a `DieCk` in its own
+  rooms, and `RECVX_ENEMY_KILL` kills them all in these rooms), so the record's kill bit is set as before.
 * **Variety**: *Wild* (default) draws each record's kind from all kinds that fit, a kind not yet
   drawn in this room first, then a look not yet used in this room. *Mild* draws two kinds per
   room (no Tyrant, Giant Black Widow or fliers) and alternates between them; if neither fits a
