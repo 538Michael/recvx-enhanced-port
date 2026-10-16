@@ -187,10 +187,28 @@ shows in-between images at the display rate:
 - At each display refresh the executed frame's whole GS stream is **replayed** with matched
   vertices blended in homogeneous space (x*w, y*w, w = 1/Q; S/T/Q rescaled so textures keep their
   perspective). For a display rate n times the game's (60/120/240 Hz) t = k/n; otherwise
-  t = time since arrival / frame period. Untagged output (2D, particles, screen filters) is shown
-  as is. Frames are never blended across a room change or a camera cut (`cam.ncut`). A mesh is
-  blended if at least half its vertices moved less than 128 px; single vertices moving more than
-  512 px are not.
+  t = time since arrival / frame period. Untagged output (2D, screen filters) is shown as is. A
+  mesh is blended if at least half its vertices moved less than 128 px; single vertices moving
+  more than 512 px are not.
+- **Cuts**: a frame that changed scene or camera is shown at once, without in-between images
+  (the previous frame's images end at that frame itself), so no image mixes two cameras. The
+  frame's scene is taken when its first mesh is drawn (`view_glue.c pc_frame_view`), because
+  `bhCheckCut` changes the cut after drawing: stage, room and, unless the third-person camera is
+  on, the cut (`ncut`, `camver`), the event/fixed camera mode with its event camera, and first
+  person. In addition the eye and view direction of `cam.mtx` are compared (`stream.c view_cut`):
+  a move of more than 10 units or a turn of more than 30 degrees in one game frame is a cut (event
+  cameras can switch a frame before their number does; the game's own smooth pans between cuts
+  stay below 5 units and 6 degrees). The third-person camera is not compared: it turns fast under
+  the mouse but never jumps.
+- **Effects** (`effect.c` 3D lists: fire, the lighter flame, muzzle flashes, smoke, sparks, blood)
+  are tagged per effect (`pc_effect_tag`): the tag is the effect's `eff[]` slot and that slot's
+  life (it starts again when the slot holds another effect or was not drawn in the previous
+  frame), and its polygons are numbered. Effect polygons drawn later from the ordering table get
+  the tag after their vertices (`Ps2AddOT` writes it to GS register 0x7E, `STREAM_TAG_REG`). So an
+  effect pairs only with itself; its position (and size on screen) is blended like a mesh's,
+  its animation frame (texture coordinates) and colour are the current frame's. Effects use the
+  128 px limit and do not count towards the "most meshes matched" test. 2D effects, lines and
+  effects with their own draw function (`ef_fnc`) stay as they are.
 - **Frame blend**: `PS2_swap` mixes each new frame 75% over the previous display image (a
   motion trail). Replays start from the display image as the frame found it, so the trail stays
   correct. With frame blend off the swap copies the frame instead (as during movies).

@@ -11,6 +11,7 @@ void     stream_image(const uint8_t* data, uint32_t len);
 void     stream_disp(uint32_t fbp, uint32_t fbw, uint32_t psm);
 void     stream_tag(uint32_t mesh);                 /* following GS output belongs to this mesh (0: none) */
 void     stream_strip(uint32_t strip);              /* ... and within it to this strip */
+void     stream_tag_last(uint32_t mesh, uint32_t strip);   /* the primitive group just drawn belongs to this mesh and strip */
 void     stream_tex_def_begin(uint32_t id, uint32_t tbp, uint32_t cbp, uint32_t image_pages);
 void     stream_tex_def_end(void);
 void     stream_tex_bind(uint32_t id, uint32_t tbp, uint32_t cbp);
