@@ -165,11 +165,13 @@ static void mp_word(float cx, float y, unsigned int col, unsigned int shadow, fl
    own 4-row layout but 16 higher, 5 rows closer together */
 static float title_row_y(int i, int n) { return n >= 5 ? 234.0f + 30.0f * i : 256.0f + 32.0f * i; }
 
+int pc_battle_unlocked(void);   /* host.c: the GAMEPLAY setting */
+
 void pc_title_menu_init(void)
 {
     ADV_WORK* ap = &AdvWork;
     int n;
-    if (getenv("RECVX_TEST_EXTRA") && !ap->ExtraFlag) {   /* test aid: the menu as after a cleared game (BATTLE GAME) */
+    if (pc_battle_unlocked() && !ap->ExtraFlag) {   /* setting: BATTLE GAME as after a cleared game; the system data's clear flag (ssd_flg 1) stays as it is */
         ap->ExtraFlag = 1;
         ap->CursorMax[0] = 4;
         ap->ModeCommandId[0] = 0; ap->ModeCommandId[1] = 1; ap->ModeCommandId[2] = 3; ap->ModeCommandId[3] = 2;

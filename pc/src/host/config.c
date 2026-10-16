@@ -34,6 +34,7 @@ static const struct { const char* key; int* val; int lo, hi; } keys[] = {
     { "quick_knife", &g_config.quick_knife, 0, 1 },
     { "model_cull", &g_config.model_cull, 0, 1 },
     { "skip_intro", &g_config.skip_intro, 0, 1 },
+    { "battle_unlocked", &g_config.battle_unlocked, 0, 1 },
     { "no_ink_ribbon", &g_config.no_ink_ribbon, 0, 1 },   /* typewriters save without an ink ribbon (co-op: the host's) */
     { "save_system", &g_config.save_system, 0, 1 },     /* 0 native files, 1 memory card */
     { "native_3d", &g_config.native_3d, 0, 1 },
