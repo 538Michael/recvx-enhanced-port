@@ -381,8 +381,8 @@ weight, then one of its looks (the spawner's entries of that type, from any stag
   Claire's sub-models and 16 slots), bosses, water and wall types.
 * **Open space** (`open_dirs`): line tests against the walls (`bhCollisionCheckLine2`, as the
   placements use) from the record in 8 directions at waist height; at least 5 must be clear for
-  35 units (3.5 m). Corridors and small rooms fail it. Ceiling height is not tested: fliers only
-  replace fliers, and the tallest kind (Tyrant) fits under the retail rooms' ceilings.
+  35 units (3.5 m). Corridors and small rooms fail it. Ceiling height is not tested (the room
+  collision has no ceilings to test against): fliers only replace fliers, at their own heights.
 * **Kill-count rooms** (`DieEventCk`: doors that open when everything is dead, e.g. the prison's
   5550..5710, 4012) are randomized with the kinds that stay on the floor and die there: zombies,
   Cerberus, Bandersnatches, anatomists. Each dies with `flg & 2` (each has a `DieCk` in its own
@@ -406,11 +406,30 @@ weight, then one of its looks (the spawner's entries of that type, from any stag
 * Offline alternative: `pc/tools/rdxbuild.py` builds rooms with several `enemy_assets` donors
   ([modding/BUILDING_ROOMS.md](modding/BUILDING_ROOMS.md)).
 
-Before this version the pool was the spawner's entries of a few types, drawn uniformly (24 of
-its 27..30 entries are zombie looks), Black Widows and Hunters only from stage 2, at most two
-entries per room, only free records, and rooms with a prop, a Spotter, the ceiling trap or a
-kill count were skipped. Over 10 seeds and 87 rooms 78% of these records were zombies and a room
-had 1.1 kinds on average (see the measurement below).
+#### Measured variety
+
+Before this version the pool was the spawner's entries of a few types drawn uniformly (24 of its
+27..30 entries are zombie looks), Black Widows and Hunters only from stage 2, at most two entries
+per room, only free records (event and script-shown records are 64% of them), and rooms with a
+prop, a Spotter, the ceiling trap or a kill count were skipped. No texture refusals were seen
+either way. Headless tours (new game, teleport through 87 rooms of all stages with enemies, 60
+game frames each), the roaming-type records (zombie, Black Widow, Cerberus, Hunter, Bandersnatch,
+bat, Spotter) as the log reports them:
+
+| | Before (10 seeds) | Wild (10 seeds) | Mild (6 seeds) |
+|---|---|---|---|
+| zombies among all these records | 78% | 52% | 55% |
+| zombies among free and script-shown records | 72% | 21% | 26% |
+| free records changed | 38% | 91% | 85% |
+| script-shown / event-driven records changed | 0% / 0% | 99% / 88% | 100% / 88% |
+| kinds per room (rooms with 2+ such records) | 1.10 | 2.29 | 1.57 |
+| (kind, look) pairs per room | 1.95 | 3.54 | 3.08 |
+| kinds a room showed over all seeds | 1.44 | 3.21 | 2.78 |
+
+Wild's free and script-shown records: Cerberus 22%, zombies 21%, Bandersnatches 19%, Hunters 13%,
+anatomists 13%, bats 5%, Spotters 4%, Black Widows 1.4%, Tyrants 0.9%, Giant Black Widows 0.6%
+(the big kinds pass the open-space test at few records). Rooms that still show one kind have only
+event-driven records (other looks of one type) or single-look event types.
 
 #### Event enemies per room
 
