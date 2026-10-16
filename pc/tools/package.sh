@@ -3,8 +3,8 @@
 # only the binaries named here and the repository's docs.
 #   pc/tools/package.sh OUT_DIR [--linux BUILD_DIR] [--windows BUILD_DIR] [--server BUILD_DIR]
 # (no build: only the notes and the checksums, e.g. over archives downloaded into OUT_DIR)
-#     --linux    build/  (cmake/linux-i686.cmake)  -> recvx-enhanced-recomp-VER-linux-i686.tar.gz (+ -debug)
-#     --windows  build-win/ (cmake/mingw-i686.cmake) -> recvx-enhanced-recomp-VER-windows-x86.zip (+ -debug)
+#     --linux    build/  (cmake/linux-i686.cmake)  -> recvx-enhanced-port-VER-linux-i686.tar.gz (+ -debug)
+#     --windows  build-win/ (cmake/mingw-i686.cmake) -> recvx-enhanced-port-VER-windows-x86.zip (+ -debug)
 #     --server   build-server/ (cmake -S pc/server)  -> recvx-server-VER-linux-x86_64.tar.gz
 # Also writes OUT_DIR/RELEASE_NOTES.md and OUT_DIR/SHA256SUMS (over every archive in OUT_DIR).
 # The -debug archives hold the unstripped binaries, for addr2line on crash-log addresses.
@@ -31,7 +31,7 @@ while [ $# -gt 0 ]; do
     case $1 in
     --linux)
         b=$2/pc/recvx; need "$b"
-        n=recvx-enhanced-recomp-$ver-linux-i686; d=$stage/$n; mkdir -p "$d"
+        n=recvx-enhanced-port-$ver-linux-i686; d=$stage/$n; mkdir -p "$d"
         ${STRIP:-strip} -o "$d/recvx" "$b"
         chmod 755 "$d/recvx"
         copy_docs "$d" $docs
@@ -41,7 +41,7 @@ while [ $# -gt 0 ]; do
     --windows)
         b=$2/pc/recvx.exe; need "$b"
         ws=${WIN_STRIP:-${MINGW_PREFIX:+$MINGW_PREFIX/bin/}i686-w64-mingw32-strip}
-        n=recvx-enhanced-recomp-$ver-windows-x86; d=$stage/$n; mkdir -p "$d"
+        n=recvx-enhanced-port-$ver-windows-x86; d=$stage/$n; mkdir -p "$d"
         "$ws" -o "$d/recvx.exe" "$b"
         copy_docs "$d" $docs
         (cd "$stage" && rm -f "$out/$n.zip" && zip -qrX "$out/$n.zip" "$n")
@@ -71,9 +71,9 @@ done
 
 - Your own disc image of *Resident Evil Code: Veronica X*, PS2 NTSC-U, **SLUS-20184** (\`.iso\`).
   No game data is included in these downloads.
-- **Windows** (\`recvx-enhanced-recomp-$ver-windows-x86.zip\`): Windows 10 or later, OpenGL 3.3.
+- **Windows** (\`recvx-enhanced-port-$ver-windows-x86.zip\`): Windows 10 or later, OpenGL 3.3.
   Unpack and run \`recvx.exe\`.
-- **Linux** (\`recvx-enhanced-recomp-$ver-linux-i686.tar.gz\`): glibc 2.34 or newer and the 32-bit
+- **Linux** (\`recvx-enhanced-port-$ver-linux-i686.tar.gz\`): glibc 2.34 or newer and the 32-bit
   (multilib) OpenGL, X11/Wayland and audio libraries. Unpack and run \`./recvx\`.
 - On the first start a file selector asks for the disc image; the choice is remembered. Settings
   and saves go to \`save/\` next to the game. F1 opens the settings. See \`docs/USER_GUIDE.md\`.

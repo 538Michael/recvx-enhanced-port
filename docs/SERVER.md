@@ -32,7 +32,7 @@ always relays. How to host and join step by step: [COOP.md](COOP.md).
 ## Building
 
 Prebuilt: `recvx-server-VER-linux-x86_64.tar.gz` on the
-[Releases](https://github.com/aikatore/recvx-enhanced-recomp/releases) page (static `recvx-server`,
+[Releases](https://github.com/aikatore/recvx-enhanced-port/releases) page (static `recvx-server`,
 `recvx-client`, the example config and the systemd unit).
 
 `recvx-server` is part of the normal build (`pc/CMakeLists.txt` adds `pc/server`). For a server

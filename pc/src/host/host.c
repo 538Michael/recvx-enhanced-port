@@ -146,7 +146,7 @@ static void watchdog(int sig)
 static void usage(void)
 {
     fprintf(stderr,
-        "recvx-enhanced-recomp " RECVX_VERSION "\n"
+        "recvx-enhanced-port " RECVX_VERSION "\n"
         "usage: recvx [options] <game disc image (.iso)>\n"
         "  --save-dir <dir>   settings and memory card directory (default: ./save if it exists,\n"
         "                     else save/ next to the program, which also holds mods/ and logs)\n"
@@ -223,7 +223,7 @@ static void parse_args(int argc, char** argv)
         else if (!strncmp(argv[i], "--profile", 9) && (argv[i][9] == 0 || argv[i][9] == '='))
             SDL_strlcpy(profile_path, argv[i][9] ? argv[i] + 10 : "recvx_profile.csv", sizeof(profile_path));
         else if (!strcmp(argv[i], "--help") || !strcmp(argv[i], "-h")) { usage(); exit(0); }
-        else if (!strcmp(argv[i], "--version")) { printf("recvx-enhanced-recomp " RECVX_VERSION "\n"); exit(0); }
+        else if (!strcmp(argv[i], "--version")) { printf("recvx-enhanced-port " RECVX_VERSION "\n"); exit(0); }
         else if (argv[i][0] != '-') iso_from(argv[i]);
         else { usage(); exit(1); }
     }
@@ -271,7 +271,7 @@ int main(int argc, char** argv)
     parse_args(argc, argv);
     home_dir();
     if (log_path[0]) { extern void log_start(const char*); log_start(log_path); }
-    host_log("recvx-enhanced-recomp " RECVX_VERSION "\n");
+    host_log("recvx-enhanced-port " RECVX_VERSION "\n");
     if (profile_path[0]) { extern void prof_open_csv(const char*); prof_open_csv(profile_path); }
 #ifndef _WIN32
     if (getenv("RECVX_WATCHDOG")) { signal(SIGALRM, watchdog); alarm((unsigned)atoi(getenv("RECVX_WATCHDOG"))); }

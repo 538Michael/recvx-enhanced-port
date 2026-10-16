@@ -162,5 +162,5 @@ jobs:
         run: |
           pre=
           case "$GITHUB_REF_NAME" in *-rc*|v0.*) pre=--prerelease ;; esac
-          gh release create "$GITHUB_REF_NAME" $pre --verify-tag --title "recvx-enhanced-recomp ${GITHUB_REF_NAME#v}" \
+          gh release create "$GITHUB_REF_NAME" $pre --verify-tag --title "recvx-enhanced-port ${GITHUB_REF_NAME#v}" \
             --notes-file dist/RELEASE_NOTES.md dist/*.tar.gz dist/*.zip dist/SHA256SUMS
