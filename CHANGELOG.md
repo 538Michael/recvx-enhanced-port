@@ -4,8 +4,8 @@
 
 ### Renderer
 
-- **Camera cuts at high frame rates**: at high frame rates the in-between images no longer blend across a
-  camera cut. The game changes the cut after drawing a frame, so the renderer took the cut one
+- **Camera cuts at high frame rates**: the in-between images no longer blend across a camera
+  cut. The game changes the cut after drawing a frame, so the renderer took the cut one
   frame late and swept the camera from the old view to the new one, through walls and past room
   parts hidden for one of the two cameras. The cut is now taken from the frame as drawn, event
   cameras and camera jumps (a cutscene cut, a door animation's camera) count as cuts too, and
