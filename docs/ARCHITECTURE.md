@@ -626,6 +626,7 @@ and game frames for game-state aids, as noted. Co-op test aids (`RECVX_COOP_*`,
 | `RECVX_ENEMY_EXTRA=0..3`, `RECVX_ENEMY_PLACE=0/1`, `RECVX_ENEMY_RANDOM=0/1`, `RECVX_ENEMY_SEED=n` | enemy options over the settings |
 | `RECVX_ENEMY_TRACE=dist` | one line per step of every enemy within dist units of a player |
 | `RECVX_KNIFE_TRACE=1`, `RECVX_KNIFE_DROP=1` | quick knife: log its state; drawing the knife empties the previous weapon's slot |
+| `RECVX_POSE_TRACE=file` | one line per game frame: the player's state (modes, weapon, motion, frame, `at_flg`, `ay`, `wax`) and every node of the body as drawn ("You appear as" included) in its base matrix's frame; twitches show as nodes moving back and forth (`pc/glue/pose_trace.c`) |
 | `RECVX_STRESS_SETTINGS=1` | volumes change every frame (settings/audio thread test) |
 
 ### Rendering

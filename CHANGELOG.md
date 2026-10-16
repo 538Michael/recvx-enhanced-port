@@ -49,6 +49,12 @@
 
 ### Fixes
 
+- **No more twitching when aiming or using the knife as another model** in third person: with
+  "You appear as" another model, or Claire's or Chris's model on the other character with
+  gender-matched animations, the upper body jerked back and forth when a weapon was raised,
+  fired or the knife swung. The aim on the weapon as drawn is now only adjusted while the aim pose
+  holds still, smoothly, and not for the knife. The character played without another model was
+  never affected. Test aid: `RECVX_POSE_TRACE=file` logs the player's body as drawn, per frame.
 - **Hands in the lobby's model preview**: the characters in the MULTIPLAYER lobby had no hands.
   They now wear the hand pieces the game gives an unarmed player, on the same wrist joints: each
   player character its own; the story cast's models, which have none, Chris's (men) or Claire's
