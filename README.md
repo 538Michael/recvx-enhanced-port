@@ -3,9 +3,9 @@
 > The underlying decompilation ([AshfordFamily/recvx-decomp](https://github.com/AshfordFamily/recvx-decomp)) is a separate, human-led project. Our changes to it live in a fork and are disclosed as AI-assisted, as that project asks.
 > No game data is included. You need your own legally obtained copy of *Resident Evil Code: Veronica X* (PS2, NTSC-U, SLUS-20184).
 
-# recvx-enhanced-recomp
+# recvx-enhanced-port
 
-[![build](https://github.com/aikatore/recvx-enhanced-recomp/actions/workflows/build.yml/badge.svg)](https://github.com/aikatore/recvx-enhanced-recomp/actions/workflows/build.yml)
+[![build](https://github.com/aikatore/recvx-enhanced-port/actions/workflows/build.yml/badge.svg)](https://github.com/aikatore/recvx-enhanced-port/actions/workflows/build.yml)
 
 A native PC port of *Resident Evil Code: Veronica X* (PS2) for Linux and Windows, built from the
 community decompilation [recvx-decomp](https://github.com/AshfordFamily/recvx-decomp). The
@@ -53,15 +53,15 @@ native paths replace the expensive parts. The game reads your own disc image in 
 ## Download
 
 Prebuilt Linux and Windows builds and the co-op server are on the
-[Releases](https://github.com/aikatore/recvx-enhanced-recomp/releases) page (no game data
+[Releases](https://github.com/aikatore/recvx-enhanced-port/releases) page (no game data
 included). Unpack and run `recvx.exe` (Windows) or `./recvx` (Linux); see
 [docs/USER_GUIDE.md](docs/USER_GUIDE.md).
 
 ## Building from source
 
 ```sh
-git clone --recursive https://github.com/aikatore/recvx-enhanced-recomp.git
-cd recvx-enhanced-recomp
+git clone --recursive https://github.com/aikatore/recvx-enhanced-port.git
+cd recvx-enhanced-port
 cmake -B build -G Ninja -DCMAKE_TOOLCHAIN_FILE=cmake/linux-i686.cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo
 cmake --build build
 ./build/pc/recvx
