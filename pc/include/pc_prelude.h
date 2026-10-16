@@ -68,6 +68,7 @@ unsigned int pc_native_prim(unsigned int prim, const unsigned int* dp, int n, in
 unsigned int pc_native_prim_raw(unsigned int prim, const unsigned int* dp, int n, int clip_3d_on, float* last_sz);
 void  Ps2AddPrim3DExNative(unsigned long long prim, void* dp, unsigned int num, int mode);   /* 0 Ex, 1 Ex1P, 2 ExI */
 #define NATIVE_MARKER_REG 0x7F
+#define STREAM_TAG_REG 0x7E   /* gs/native.h */
 /* native textures (pc/glue/texture_glue.c) */
 int   pc_native_tex(void);
 unsigned int pc_tex_begin(const void* tim2, const void* phead, unsigned int image_adr, unsigned int clut_adr, int* is_new);
@@ -98,6 +99,8 @@ float pc_overlay_x(float x);
 void  pc_mesh_begin(const void* model);
 void  pc_mesh_end(void);
 void  pc_mesh_strip(const void* strip);   /* within a mesh: the following output is this strip */
+void  pc_effect_tag(const void* op);      /* effect.c: the following output is this effect (O_WRK*, NULL: none) */
+unsigned long long pc_effect_poly(void); /* ps2_dummy.c Ps2AddOT: STREAM_TAG_REG value for an effect polygon (0: none) */
 /* online co-op (pc/glue/coop_glue.c, docs/COOP.md): the hooks are only called while coop_on */
 extern int coop_on;
 void  coop_control_remote(void);

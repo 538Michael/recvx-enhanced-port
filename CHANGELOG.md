@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### Renderer
+
+- **Camera cuts at high frame rates**: above 60 Hz the in-between images no longer blend across a
+  camera cut. The game changes the cut after drawing a frame, so the renderer took the cut one
+  frame late and swept the camera from the old view to the new one, through walls and past room
+  parts hidden for one of the two cameras. The cut is now taken from the frame as drawn, event
+  cameras and camera jumps (a cutscene cut, a door animation's camera) count as cuts too, and
+  the new view is shown at once. As a side effect the frame just before a cut is now smoothed too.
+- **Effects follow what they are attached to**: the lighter's flame, muzzle flashes, smoke,
+  sparks, fire and blood are placed in the in-between images like the 3D models, so the flame
+  stays on Claire's lighter at 120 Hz instead of jumping at 30 Hz. Their animation still steps
+  at the game's rate. `RECVX_INTERP_STATS` also counts matched effect vertices and logs camera
+  jumps.
+
 ### Picture calibration
 
 - **Brightness, Contrast and Gamma** in DISPLAY / PICTURE (F1 and ENHANCED SETTINGS), with
