@@ -32,6 +32,9 @@ typedef struct {
     int  screen_filter;      /* camera filter (vignette): 0 original 4:3, 1 stretched to the view, 2 off */
     int  cinema_bars;        /* cutscene letterbox bars: same modes */
     int  screen_effects;     /* full-screen effect overlays (noise/scanline layers): same modes */
+    int  brightness;         /* picture calibration in the present pass (gs_gl.c draw_display): -50..50, 0 neutral */
+    int  contrast;           /* 50..150 %, 100 neutral */
+    int  gamma;              /* tenths, 5..20, 10 neutral */
     int  skip_doors;
     int  quick_knife;        /* holding the quick-knife key draws the knife (pc/glue/knife_glue.c) */
     int  model_cull;         /* skip actors/objects whose test points are off-screen (as the PS2) */
@@ -55,6 +58,7 @@ void overlay_point(int flags, float x, float y);   /* render thread, before over
 float gs_wanted_scale(void);
 void  gs_set_scale(float scale);
 void  gs_update_widescreen(void);   /* apply g_config.aspect / window aspect (between frames) */
+float gs_picture(float c);          /* a 0..1 grey through brightness/contrast/gamma, as the present shader */
 void host_pump_events(void);
 void host_present(void);
 void host_fatal(const char* fmt, ...);

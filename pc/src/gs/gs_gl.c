@@ -127,7 +127,7 @@ static int batch_valid;
 static GLuint prog, vao, vbo, present_prog, present_vao, svao, svbo;
 static GLint u_rt_size, u_rt_margin, u_tme, u_tfx, u_tcc, u_fst, u_texsize, u_fge, u_fogcol, u_ate, u_atst, u_aref,
              u_tex, u_tex_alpha_scale, u_texofs, u_premul, u_zscale, u_clamp_mode, u_clamp_vals, u_afail_pass, u_rt16;
-static GLint up_tex, up_rect;
+static GLint up_tex, up_rect, up_pic;
 
 static const char* vs_src =
     "#version 330 core\n"
@@ -214,10 +214,29 @@ static const char* present_vs =
     "  v_uv = vec2(mix(u_rect.x, u_rect.z, c.x), mix(u_rect.y, u_rect.w, c.y));\n"
     "  gl_Position = vec4(c.x * 2.0 - 1.0, 1.0 - c.y * 2.0, 0.0, 1.0);\n"
     "}\n";
+/* u_pic: picture calibration (brightness offset, contrast, 1 / gamma, on); off at the neutral
+   values, so the image is the same as without it. gs_picture is the same on the CPU. */
 static const char* present_fs =
     "#version 330 core\n"
-    "in vec2 v_uv; uniform sampler2D u_tex; out vec4 o;\n"
-    "void main(){ o = vec4(clamp(texture(u_tex, v_uv).rgb, 0.0, 1.0), 1.0); }\n";
+    "in vec2 v_uv; uniform sampler2D u_tex; uniform vec4 u_pic; out vec4 o;\n"
+    "void main(){\n"
+    "  vec3 c = clamp(texture(u_tex, v_uv).rgb, 0.0, 1.0);\n"
+    "  if (u_pic.w != 0.0) c = clamp((pow(c, vec3(u_pic.z)) - 0.5) * u_pic.y + 0.5 + u_pic.x, 0.0, 1.0);\n"
+    "  o = vec4(c, 1.0);\n"
+    "}\n";
+
+static int picture(float* b, float* k, float* ig)
+{
+    *b = g_config.brightness / 200.0f; *k = g_config.contrast / 100.0f; *ig = 10.0f / (g_config.gamma > 0 ? g_config.gamma : 10);
+    return g_config.brightness != 0 || g_config.contrast != 100 || g_config.gamma != 10;
+}
+float gs_picture(float c)
+{
+    float b, k, ig;
+    if (!picture(&b, &k, &ig)) return c;
+    c = (SDL_powf(c, ig) - 0.5f) * k + 0.5f + b;
+    return c < 0 ? 0 : c > 1 ? 1 : c;
+}
 
 static GLuint compile(const char* vs, const char* fs)
 {
@@ -259,6 +278,7 @@ void gs_renderer_init(void)
     present_prog = compile(present_vs, present_fs);
     up_tex = glGetUniformLocation(present_prog, "u_tex");
     up_rect = glGetUniformLocation(present_prog, "u_rect");
+    up_pic = glGetUniformLocation(present_prog, "u_pic");
 
     glGenVertexArrays(1, &vao);
     glGenVertexArrays(1, &svao);
@@ -1513,6 +1533,11 @@ static void draw_display(GLuint tex, int rt_vw, int rt_vh)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glUniform1i(up_tex, 0);
+        {
+            float b, k, ig;
+            int on = picture(&b, &k, &ig);
+            glUniform4f(up_pic, b, k, ig, on ? 1.0f : 0.0f);
+        }
         {
             float x0 = g_margin_x && dw > 640.0f ? 0.0f : (float)g_margin_x;
             glUniform4f(up_rect, x0 / rt_vw, 0.0f, (x0 + dw) / rt_vw, dh / rt_vh);
