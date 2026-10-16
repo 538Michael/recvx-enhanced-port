@@ -206,6 +206,7 @@ int  sceSifCallRpc(sceSifClientData* cd, u_int fno, u_int mode, void* send, int 
 int  sceSifCheckStatRpc(sceSifRpcData* cd);
 int  sceSifGetOtherData(sceSifReceiveData* rd, void* src, void* dest, int size, u_int mode);
 u_int sceSifSetDma(sceSifDmaData* sdd, int len);
+u_int isceSifSetDma(sceSifDmaData* sdd, int len);
 int  sceSifDmaStat(u_int id);
 int  sceSifInitIopHeap(void);
 void* sceSifAllocIopHeap(u_int size);
@@ -305,6 +306,13 @@ int  StartThread(int tid, void* arg);
 int  CreateThread(struct ThreadParam* p);
 int  SetAlarm(u_short time, void (*cb)(int, u_short, void*), void* arg);
 void ExitHandler(void);
+int  AddIntcHandler(int cause, int (*handler)(int), int next);
+int  EnableIntc(int cause);
+int  DisableIntc(int cause);
+
+/* ---- libsdr.h / libssyn.h ---- */
+int  sceSdRemoteInit(void);
+int  sceSSyn_SetOutputMode(int mode);
 
 /* ---- opaque types of subsystems the PC layer replaces (movie/IPU) ---- */
 typedef struct { int dummy[16]; } sceIpuDmaEnv;

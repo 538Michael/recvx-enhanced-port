@@ -107,7 +107,6 @@ target_compile_options(recvx_game PRIVATE
     "SHELL:-idirafter ${DECOMP}/include/recvx-decomp-cri/cri/mwlib/ee/include"
     "SHELL:-include ${CMAKE_CURRENT_SOURCE_DIR}/include/pc_prelude.h"
     -std=gnu11
-    -fpermissive              # decomp relies on implicit declarations/int conversions
     -fno-strict-aliasing
     -fwrapv
     -fsigned-char             # EE char is signed
@@ -116,10 +115,14 @@ target_compile_options(recvx_game PRIVATE
     -fno-tree-vectorize
     -ftrivial-auto-var-init=zero  # deterministic stand-in for MWCC's stale registers (docs/dev/uninitialized-locals.txt)
 )
-# the decomp is compiled as is, without warnings except calls to undeclared functions (an implicit
-# int return breaks float and 64-bit results); missing returns and uninitialized locals are listed by
+# the decomp is compiled as is, without warnings (-w), but a call to an undeclared function stays an
+# error: without a prototype a float argument goes as a double and a char/float return is read as an
+# int. -w also hides -Werror=..., so this relies on GCC 14's permerror (no -fpermissive here; the other
+# permerrors the decomp needs are switched off one by one). GCC 13 (CI) only warns: the ctest
+# decomp_declarations checks it there. Missing returns and uninitialized locals are listed by
 # pc/tools/decomp_warnings.py. The port's own glue gets warnings.
-set_source_files_properties(${GAME_SOURCES} PROPERTIES COMPILE_OPTIONS "-w;-Werror=implicit-function-declaration")
+set_source_files_properties(${GAME_SOURCES} PROPERTIES COMPILE_OPTIONS
+    "-w;-Wno-incompatible-pointer-types;-Wno-int-conversion;-Wno-return-mismatch")
 set_source_files_properties(${GLUE_SOURCES} PROPERTIES COMPILE_OPTIONS "-Wall;-Wno-unused-function")
 if(WIN32)
     # GCC (not MSVC) bitfield layout, as on Linux and the EE
@@ -197,6 +200,12 @@ target_compile_options(test_movies PRIVATE -std=gnu11 -O2)
 target_link_libraries(test_movies PRIVATE m)
 add_test(NAME movies COMMAND test_movies)
 set_tests_properties(movies PROPERTIES SKIP_RETURN_CODE 77)
+
+# calls to undeclared functions in the decomp: GCC 14+ stops the build on them, GCC 13 only warns (and -w hides it)
+find_package(Python3 COMPONENTS Interpreter)
+if(Python3_FOUND AND CMAKE_GENERATOR STREQUAL "Ninja")
+    add_test(NAME decomp_declarations COMMAND Python3::Interpreter ${CMAKE_CURRENT_SOURCE_DIR}/tools/decomp_warnings.py --declarations ${CMAKE_BINARY_DIR})
+endif()
 
 # control bindings (pc/src/input/bindings.c): defaults, rebinding, ini, a virtual SDL gamepad
 add_executable(test_bindings tests/test_bindings.c src/input/bindings.c)

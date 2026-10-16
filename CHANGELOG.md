@@ -22,6 +22,14 @@
 - **Co-op**: the protocol changed (both players need this build); the host's variety and event
   setting count for both.
 
+### Fixes
+
+- **Game code calls with the right types**: a number of calls inside the game code went to
+  functions the code had never declared, which on the PC can pass a value in the wrong form or
+  read a result wrongly (the same kind of bug as the Palace monitor of Steve). Every call now
+  has its declaration, and the build refuses new ones. A route check of Monster Steve read its
+  "no route" answer wrongly; it only fed a value nothing uses, so nothing changes in play.
+
 ## 0.4.0 (2026-10-16)
 
 ### Gameplay

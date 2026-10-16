@@ -2,11 +2,14 @@
 """Regenerate docs/dev/missing-returns.txt and docs/dev/uninitialized-locals.txt.
 
     python3 pc/tools/decomp_warnings.py [BUILD_DIR]   (default: build)
+    python3 pc/tools/decomp_warnings.py --declarations BUILD_DIR
 
 Compiles every decomp source of the configured build tree again (its own command line, output
 to /dev/null) with -Wreturn-type -Wreturn-mismatch -Wmaybe-uninitialized instead of -w, and
 lists the warnings by file and function (no line numbers, so the lists only change when the
 code does). The build does not change: the decomp keeps compiling with -w (pc/CMakeLists.txt).
+--declarations (the ctest decomp_declarations) lists calls to undeclared functions instead and
+fails on any: GCC 14 and later stop the build on them, GCC 13 only warns and -w hides it.
 """
 import os
 import re
@@ -17,7 +20,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
 PROG = 'decomp/src/ps2/veronica/prog/'
-FLAGS = ['-Wreturn-type', '-Wreturn-mismatch', '-Wmaybe-uninitialized', '-Wuninitialized']
+FLAGS = ['-fpermissive', '-Wreturn-type', '-Wreturn-mismatch', '-Wmaybe-uninitialized', '-Wuninitialized']   # -fpermissive: GCC 14's return-mismatch error would stop before the uninitialized analysis
 
 HEADERS = {
     'missing-returns.txt': (
@@ -37,7 +40,7 @@ HEADERS = {
 
 
 def commands(build):
-    out = subprocess.run(['ninja', '-C', build, '-t', 'commands', 'pc/recvx'], check=True,
+    out = subprocess.run(['ninja', '-C', build, '-t', 'commands', 'recvx'], check=True,
                          capture_output=True, text=True).stdout
     for line in out.splitlines():
         args = shlex.split(line)
@@ -65,7 +68,7 @@ def warnings(job):
         if m:
             func = m.group(2) if os.path.basename(m.group(1)) == os.path.basename(src) else None
             continue
-        m = re.match(r'(.+?):\d+:\d+: warning: (.*) \[(-W[a-z-]+)\]', line)
+        m = re.match(r'(.+?):\d+:\d+: (?:warning|error): (.*) \[(-W[a-z-]+)\]', line)
         if m and os.path.basename(m.group(1)) == os.path.basename(src) and func:
             msg = re.sub(r'[‘’]', "'", m.group(2))
             found.append((os.path.basename(src), func, m.group(3), msg))
@@ -73,12 +76,22 @@ def warnings(job):
 
 
 if __name__ == '__main__':
-    BUILD = os.path.abspath(sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, 'build'))
+    decl = '--declarations' in sys.argv
+    args = [a for a in sys.argv[1:] if a != '--declarations']
+    BUILD = os.path.abspath(args[0] if args else os.path.join(ROOT, 'build'))
+    if decl:
+        FLAGS = ['-fsyntax-only', '-Wimplicit-function-declaration']
     jobs = list(commands(BUILD))
     if not jobs:
         sys.exit('no decomp compile commands in %s (configure it first)' % BUILD)
     with ThreadPoolExecutor(os.cpu_count()) as ex:
         found = sorted(set(w for ws in ex.map(warnings, jobs) for w in ws))
+    if decl:
+        found = [w for w in found if w[2] == '-Wimplicit-function-declaration']
+        for src, func, _, msg in found:
+            print('%s %s: %s' % (src, func, msg))
+        print('%d calls to undeclared functions in the decomp' % len(found))
+        sys.exit(1 if found else 0)
     lists = {'missing-returns.txt': [w for w in found if w[2] in ('-Wreturn-type', '-Wreturn-mismatch')],
              'uninitialized-locals.txt': [w for w in found if 'uninitialized' in w[2]]}
     for name, ws in lists.items():

@@ -35,6 +35,14 @@ their Python tests.
 
   Prefer a hook into `pc/glue` over larger edits in the decomp. Then update the submodule
   pointer here.
+- **Declarations**: decomp code must not call a function it has not declared (without a
+  prototype a `float` argument is passed as a `double` and a `char` or `float` result is read
+  wrongly on the PC). Include the function's header, under `#ifdef TARGET_PC` when the original
+  file did not include it (a plain prototype line where the header would clash, e.g. with
+  `macros.h`'s `MIN`/`MAX`). The decomp is compiled with `-w`, which also silences
+  `-Werror=implicit-function-declaration`; the build therefore leaves out `-fpermissive`, so
+  GCC 14 and later stop on an undeclared call despite `-w`. GCC 13 only warns: there the ctest
+  `decomp_declarations` (`python3 pc/tools/decomp_warnings.py --declarations build`) fails.
 
 ## Guidelines
 
