@@ -31,6 +31,22 @@
   the previous animation of models, `RECVX_RIG_DUMP=1` logs their skeletons and feet
   ([ACTORS.md](docs/ACTORS.md#retargeting)).
 
+### Audio
+
+- **Computer terminals click for every letter**: the Palace's security lock, the 3D scanner, the
+  Albinoid file, the password and self-destruct terminals. Each letter the screen prints starts a
+  short sound that the next letter stops one frame later. The emulated sound driver only moved on
+  when the game sent its next sounds, so a letter's sound was started and stopped at the same
+  moment and never heard: only the last letter of a line clicked. The driver now runs on the
+  sound output's own clock, as the PS2's sound processor does beside the game: its timer ticks
+  between the game's frames, and the game's sound commands are played in order at the time they
+  were sent. Every letter clicks, evenly spaced.
+- Other sounds lost the same way play too: a system sound cut by another one in the next frame,
+  and very short notes of the rooms' background sound sequences. Sound effects and sequences also
+  start without waiting for the game's next frame.
+- Test aids: `RECVX_TEST_COMPUTER="frame:n"` opens computer terminal n; `RECVX_TRACE_SND` also
+  logs notes released before they sounded.
+
 ### Fixes
 
 - **Hands in the lobby's model preview**: the characters in the MULTIPLAYER lobby had no hands.

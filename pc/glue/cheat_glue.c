@@ -209,6 +209,16 @@ static void scripted(unsigned int* inv)
             tw = strchr(tw, ',') ? strchr(tw, ',') + 1 : NULL;
         }
     }
+    {   /* RECVX_TEST_COMPUTER="frame:n,...": computer terminal n at that game frame (as the room scripts' EvtComSet n) */
+        static const char* ct = (const char*)-1;
+        if (ct == (const char*)-1) ct = getenv("RECVX_TEST_COMPUTER");
+        if (ct && sscanf(ct, "%d:%d%n", &f, &a, &n) == 2 && clock >= f && !(sys->cb_flg & 0x1)) {
+            sys->com_num = a;
+            sys->cb_flg |= 0x400000;
+            printf("test: computer %d in %d/%d at game frame %d\n", a, sys->stg_no, sys->rom_no, clock);
+            ct = ct[n] == ',' ? ct + n + 1 : NULL;
+        }
+    }
     {   /* RECVX_HP="frame:hp,...": our health set at that game frame (a quick game over) */
         static const char* hp = (const char*)-1;
         if (hp == (const char*)-1) hp = getenv("RECVX_HP");
