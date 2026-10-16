@@ -19,6 +19,7 @@
 #include "../../decomp/include/ps2/veronica/prog/sub1.h"
 #include "../../decomp/include/ps2/veronica/prog/objitm.h"
 #include "../../decomp/include/ps2/veronica/prog/ps2_NaMatrix.h"
+int ikou3(BH_PWORK* epw, NJS_POINT3* pos, int add_dir);   /* zonzon.c (its header redefines libc macros) */
 #include "../../decomp/include/ps2/veronica/prog/sdfunc.h"
 #include "../../decomp/include/ps2/veronica/prog/hitchk.h"
 #include "../../decomp/include/ps2/veronica/prog/player.h"
