@@ -538,6 +538,14 @@ ITEMS choice, `RECVX_TEST_SAVE`, the host's partner records (`coop-partners-nn.b
   a grab) is clamped to 2; there are three levels.
 - The Windows build gives the game glibc's `rand()` (`pc/src/ps2/stubs.c`): the game assumes
   `RAND_MAX` 0x7fffffff, UCRT's is 0x7fff. Both platforms get the same random sequence.
+- Every function the decomp calls is declared on the PC: the original sources call 74
+  functions without a prototype (harmless for MWCC on the EE), so `TARGET_PC` blocks include the
+  headers (`ps2sdk_shim.h` for the SDK calls). Undeclared, i686 GCC passes a `float` argument as
+  a `double` (`njSetScreenProjection`: the Palace monitor of Steve; `bhDispFontEx`) and reads a
+  `char` result as the whole register: `bhCheckRoute`/`bhCheckRouteID` return 0xFF as -1 on some
+  paths, so `en17.c bhEne17_Brain`'s `!= 255` took the route branch (it only sets Monster Steve's
+  route target, which nothing reads; `en09`/`en30` mask with 0xFF, `en19` stores into an
+  `unsigned char`). Enforced by the build (CONTRIBUTING.md).
 - Translated from the retail ELF instead of the decomp's asm blocks (hand-written asm in the
   original): `bhObj005` (`objitm.c`), `njMirror`, `_ClipInter`, `ScissorTriangle`, `KazuSet`.
 

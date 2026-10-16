@@ -201,8 +201,10 @@ need the disc image and a GPU are described in [ARCHITECTURE.md](ARCHITECTURE.md
 ## Compiler warnings
 
 The decomp's own sources compile with `-w` (unchanged code), except that calling an undeclared
-function is an error (`-Werror=implicit-function-declaration`: an implicit `int` return breaks
-float and 64-bit results). The port's code (`pc/glue`, `pc/src`) compiles with `-Wall`.
-`pc/tools/decomp_warnings.py [build dir]` recompiles the decomp with return-value and
+function is an error (a `float` argument goes as a `double`, a `char`, `float` or 64-bit result is
+read wrongly). `-w` also hides `-Werror=...`, so this is GCC 14's default error for it, kept by
+leaving out `-fpermissive`; with GCC 13 the ctest `decomp_declarations`
+(`pc/tools/decomp_warnings.py --declarations build`) finds them. The port's code (`pc/glue`,
+`pc/src`) compiles with `-Wall`. `pc/tools/decomp_warnings.py [build dir]` recompiles the decomp with return-value and
 uninitialized-variable warnings and regenerates [docs/dev/missing-returns.txt](dev/missing-returns.txt)
 and [docs/dev/uninitialized-locals.txt](dev/uninitialized-locals.txt).
