@@ -25,34 +25,13 @@
 ### Controls
 
 - **Twin-stick gamepad controls in third person**: with the over-the-shoulder camera the gamepad
-  now plays like the Resident Evil 2 and 4 remakes. The left stick walks where it points seen from
-  the camera (pushed far it runs), the right stick turns the camera, the left trigger aims with
-  the over-the-shoulder view and the right stick moves the crosshair, the right trigger fires.
-  Aiming is the same free aim as with the mouse. The quick knife, quick turn (its button, or the
-  stick pulled back with run; the camera swings round too), a button that puts the camera behind
-  the character, action, run, inventory and map all have gamepad buttons of their own, which can
-  be rebound separately from the fixed-camera buttons (CONTROLS, Gamepad, "Third person"). With
-  "Game auto-aim" on, the gamepad gets a gentle aim assist instead of the lock-on. Camera speed,
-  aiming speed, invert Y and both sticks' dead zones are on the THIRD PERSON page. Gamepad and
-  mouse/keyboard can be mixed: the camera follows the one used last. In menus, messages and
-  events the gamepad works as before. "Gamepad controls: Classic" brings back the old tank
-  controls with the camera behind.
-- **Reload button**: in third person R (keyboard) and RB / R1 (gamepad) reload the weapon from the
-  ammo in your inventory whenever its magazine is not full, without opening the inventory. It is
-  the game's own reload, as when you fire on an empty magazine: the same motion and sound, the
-  same ammo it picks and the same magazine size, with what does not fit staying in the inventory.
-  It works while aiming and with the weapon lowered while standing, walking or running. The
-  gamepad's quick turn moved to the d-pad's down (the stick gesture still works), and noclip fly
-  up lost R (Page Up stays). The fixed cameras and the Classic gamepad scheme get a "Reload" row
-  in CONTROLS to bind it to a button of your choice.
-
-### Fixes
-
-- **Game code calls with the right types**: a number of calls inside the game code went to
-  functions the code had never declared, which on the PC can pass a value in the wrong form or
-  read a result wrongly (the same kind of bug as the Palace monitor of Steve). Every call now
-  has its declaration, and the build refuses new ones. A route check of Monster Steve read its
-  "no route" answer wrongly; it only fed a value nothing uses, so nothing changes in play.
+  now plays like the Resident Evil 2 and 4 remakes: the left stick moves, the right stick turns
+  the camera, the left trigger aims and the right trigger fires. These buttons can be remapped
+  separately from the fixed-camera ones, and "Gamepad controls: Classic" brings back the old
+  controls.
+- **Reload button**: in third person, R (keyboard) or RB (gamepad) reloads your weapon whenever
+  it isn't full, without opening the inventory, just like firing on an empty magazine. On the
+  gamepad, quick turn moved to d-pad down.
 
 ## 0.4.0 (2026-10-16)
 
