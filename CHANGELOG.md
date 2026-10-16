@@ -22,6 +22,22 @@
 - **Co-op**: the protocol changed (both players need this build); the host's variety and event
   setting count for both.
 
+### Controls
+
+- **Twin-stick gamepad controls in third person**: with the over-the-shoulder camera the gamepad
+  now plays like the Resident Evil 2 and 4 remakes. The left stick walks where it points seen from
+  the camera (pushed far it runs), the right stick turns the camera, the left trigger aims with
+  the over-the-shoulder view and the right stick moves the crosshair, the right trigger fires.
+  Aiming is the same free aim as with the mouse. The quick knife, quick turn (its button, or the
+  stick pulled back with run; the camera swings round too), a button that puts the camera behind
+  the character, action, run, inventory and map all have gamepad buttons of their own, which can
+  be rebound separately from the fixed-camera buttons (CONTROLS, Gamepad, "Third person"). With
+  "Game auto-aim" on, the gamepad gets a gentle aim assist instead of the lock-on. Camera speed,
+  aiming speed, invert Y and both sticks' dead zones are on the THIRD PERSON page. Gamepad and
+  mouse/keyboard can be mixed: the camera follows the one used last. In menus, messages and
+  events the gamepad works as before. "Gamepad controls: Classic" brings back the old tank
+  controls with the camera behind.
+
 ### Fixes
 
 - **Game code calls with the right types**: a number of calls inside the game code went to

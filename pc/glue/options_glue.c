@@ -331,7 +331,7 @@ static void draw_row(int i, int sel)
     case K_HEAD: {
         char t[64];
         if (r->idx == BG_GAME) snprintf(t, sizeof(t), "GAME (KEY CONFIG TYPE %c)", 'A' + pc_keytype());
-        else snprintf(t, sizeof(t), "%s", heads[r->idx]);
+        else snprintf(t, sizeof(t), "%s", r->idx == BG_TPS && st.dev ? "THIRD PERSON (GAMEPAD, MODERN)" : heads[r->idx]);
         pc_ui_text(X_LABEL - 6, y + 2, t, 0.45f, 0xFFE0C080);
         return;
     }

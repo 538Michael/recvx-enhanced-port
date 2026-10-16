@@ -12,9 +12,12 @@
 #include "../../decomp/include/ps2/veronica/prog/ps2_NinjaCnk.h"
 #include "../../decomp/include/ps2/veronica/prog/ps2_NaFog.h"
 #include "../src/host/tps.h"
+#include "../src/host/modern.h"
+#include "../src/host/bindings.h"
 
 TpsConfig g_tps = { .fov = 75, .aim_fov = 65, .dist = 140, .aim_dist = 100, .height = 165, .shoulder = 35,
-                    .sens_x = 100, .sens_y = 100, .aim_sens = 70, .crosshair = 1, .atmos = 1, .key = 62 /* F5 */ };
+                    .sens_x = 100, .sens_y = 100, .aim_sens = 70, .crosshair = 1, .atmos = 1, .key = 62 /* F5 */,
+                    .pad_modern = 1, .pad_sens_x = 100, .pad_sens_y = 100, .pad_aim_sens = 50, .pad_dead_move = 20, .pad_dead_look = 15 };
 int tps_on;            /* hooks active (changes only at the frame hand-off) */
 int tps_cam_active;    /* our camera is the view of the current frame */
 
@@ -37,10 +40,23 @@ static float aim_corr;            /* free aim with a model: the drawn weapon's p
 static int no_cam_walls;          /* test aid (RECVX_TPS_ORBIT): the eye goes through walls */
 static unsigned move_keys;        /* camera A (g_tps.free_cam): the WASD keys held, walked relative to the camera */
 static int pad_steer;             /* the game rows (arrows, gamepad) press a direction: tank controls, the camera follows */
+/* gamepad, modern scheme (docs/THIRDPERSON.md "Gamepad") */
+static int pad_cam;               /* the gamepad was used last: free camera on the right stick, the left stick walks */
+static float stick_yaw, stick_pitch;   /* this frame's right stick as camera turn, game units (consumed like the mouse) */
+static int stick_moved;           /* the right stick moved this frame (pc_input_active) */
+static int pad_move;              /* the left stick walks this frame: tps_player turns towards pad_target */
+static float pad_target;
+static int recenter;              /* game frames left of the camera easing behind the character */
 
 #define DEG(a) ((a) * (65536.0f / 360.0f))
 #define TURN_PER_PIXEL DEG(0.12f)   /* mouse at 100% sensitivity */
 #define RAD(a) ((a) * (3.14159265f / 32768.0f))
+#define STICK_YAW DEG(6.0f)         /* right stick fully pushed at 100%: 180 degrees a second */
+#define STICK_PITCH DEG(4.0f)       /* 120 degrees a second */
+#define RUN_PUSH 0.7f               /* the left stick pushed this far runs (as modern_glue.c) */
+
+/* the game's lock-on instead of free aim ("Game auto-aim"); with the gamepad it is the gentle aim assist */
+static int lock_aim(void) { return g_tps.auto_aim && !pad_cam; }
 
 static float wrap(float a)
 {
@@ -60,6 +76,7 @@ static int camera_allowed(void)
 }
 
 static void atmos_off(void);
+static int nearest_enemy(float* oy, float* op, int* walled);
 
 /* player.c bhControlPlayer, before the mode handler (and when third person stops): the weapon
    modes pick motions by the aim height, so they keep the straight one free aim plays */
@@ -74,7 +91,7 @@ static void deactivate(void)
     atmos_off();
     tps_player_mode();
     if (!tps_cam_active) return;
-    tps_cam_active = g_tps.cam_active = g_tps.aiming = 0;
+    tps_cam_active = g_tps.cam_active = g_tps.aiming = g_tps.pad_play = 0;
     /* the room camera resumes: the game's own re-initialisation of the current cut */
     if (sys && !(sys->st_flg & 0x1)) sys->gm_flg |= 0x800;
 }
@@ -124,10 +141,10 @@ static void view(NJS_POINT3* eye, NJS_POINT3* dir, NJS_POINT3* sh)
     if (!no_cam_walls) clear_of_walls(&csh, eye);
 }
 
-static void look(float sens)
+static void look(float sens, float stick_sens)
 {
-    pitch += (g_tps.invert_y ? mouse_dy : -mouse_dy) * TURN_PER_PIXEL * g_tps.sens_y / 100.0f * sens;
-    mouse_dy = 0;
+    pitch += (g_tps.invert_y ? mouse_dy : -mouse_dy) * TURN_PER_PIXEL * g_tps.sens_y / 100.0f * sens + stick_pitch * stick_sens;
+    mouse_dy = stick_pitch = 0;
     if (pitch > DEG(60.0f)) pitch = DEG(60.0f);
     if (pitch < DEG(-60.0f)) pitch = DEG(-60.0f);
 }
@@ -142,15 +159,20 @@ void tps_camera(void)
     if (!tps_cam_active) { yaw = plp->ay; pitch = DEG(-8.0f); cur_dist = g_tps.dist / 10.0f; cur_fov = (float)g_tps.fov; }
     tps_cam_active = g_tps.cam_active = 1;
 
-    aim = aiming() && !g_tps.auto_aim;
+    aim = aiming() && !lock_aim();
     g_tps.aiming = aiming();
-    if (!(sys->sp_flg & 0x40)) mouse_dx = mouse_dy = 0;   /* frozen (above): no mouse look */
-    if (g_tps.free_cam && !aiming()) {   /* camera A: the mouse orbits the camera (aiming: tps_player, as B) */
-        yaw = wrap(yaw - mouse_dx * TURN_PER_PIXEL * g_tps.sens_x / 100.0f);
-        mouse_dx = 0;
+    if (!(sys->sp_flg & 0x40)) mouse_dx = mouse_dy = stick_yaw = stick_pitch = 0;   /* frozen (above): no mouse look */
+    if (recenter > 0 && !aiming()) {   /* gamepad: the camera eases behind the character */
+        recenter--;
+        yaw = wrap(yaw + wrap(plp->ay - yaw) * 0.35f);
+        pitch += (DEG(-8.0f) - pitch) * 0.35f;
+    }
+    if ((g_tps.free_cam || pad_cam) && !aiming()) {   /* camera A, the gamepad: mouse / right stick orbit the camera (aiming: tps_player) */
+        yaw = wrap(yaw - mouse_dx * TURN_PER_PIXEL * g_tps.sens_x / 100.0f + stick_yaw);
+        mouse_dx = stick_yaw = 0;
         if (pad_steer) yaw = wrap(yaw + wrap(plp->ay - yaw) * 0.4f);
     } else if (!aim) yaw = wrap(yaw + wrap(plp->ay - yaw) * 0.4f);   /* free aim: the mouse steers the camera */
-    look(1.0f);
+    look(1.0f, 1.0f);
     cur_dist += ((aiming() ? g_tps.aim_dist : g_tps.dist) / 10.0f * actor_cam_scale() - cur_dist) * 0.35f;
     cur_fov += ((float)(aiming() ? g_tps.aim_fov : g_tps.fov) - cur_fov) * 0.35f;
 
@@ -170,7 +192,7 @@ void tps_camera(void)
     cam.az = 0;
     cam.pers = (int)DEG(cur_fov);
     if (trace)
-        printf("tps: cam %c frame %u yaw %.1f pitch %.1f | ay %.1f at (%.1f %.1f) mode %d/%d/%d keys %x\n", g_tps.free_cam ? 'A' : 'B',
+        printf("tps: cam %c frame %u yaw %.1f pitch %.1f | ay %.1f at (%.1f %.1f) mode %d/%d/%d keys %x\n", pad_cam ? 'P' : g_tps.free_cam ? 'A' : 'B',
                (unsigned)gs_frame_count(), yaw * (360.0f / 65536.0f), pitch * (360.0f / 65536.0f), (short)plp->ay * (360.0f / 65536.0f),
                plp->px, plp->pz, plp->mode0, plp->mode1, plp->mode2, move_keys);
 
@@ -438,7 +460,69 @@ int tps_filter(O_WRK* op)
    the player's. */
 int pc_input_active(void)
 {
-    return (sys->pad_on && !(sys->ss_flg & 0x400000)) || (tps_on && mouse_moved);
+    return (sys->pad_on && !(sys->ss_flg & 0x400000)) || (tps_on && (mouse_moved || stick_moved));
+}
+
+/* the gamepad, modern scheme: which device played last, the right stick as camera turn, the left
+   stick as forward (and run) towards its direction seen from the camera (tps_player turns the
+   character). Pulled back and run pressed within QT_WAIT frames: the game's quick turn (the
+   turn on the spot waits for it that long). A quick turn or recenter swings the camera behind
+   the character; the stick keeps the camera it was given in until it turns or is let go
+   (modern_hold, as over the fixed cameras' cuts), so a held direction keeps walking that way.
+   Returns the quick-turn gesture's hold. */
+#define QT_WAIT 3
+static ModernHold hold;
+static int swings;                /* quick turns and recenters (modern_hold's "cut") */
+
+static int pad_sticks(unsigned int* pad)
+{
+    static int run_was, qt_hold, back_wait;
+    float lx, ly, rx, ry, m;
+    int stick = g_tps.pad_play && tps_pad_sticks(&lx, &ly, &rx, &ry), run;
+    if (tps_pad_touched()) pad_cam = g_tps.pad_modern;
+    else if (mouse_moved || tps_kbm_touched()) pad_cam = 0;
+    if (!g_tps.pad_modern) pad_cam = 0;
+    stick_yaw = stick_pitch = 0;
+    stick_moved = pad_move = 0;
+    if (!stick || !pad_cam) { run_was = qt_hold = back_wait = hold.held = 0; return 0; }
+    if (modern_stick(&rx, &ry, g_tps.pad_dead_look / 100.0f, 2.0f) > 0) recenter = 0, stick_moved = 1;
+    stick_yaw = -rx * STICK_YAW * g_tps.pad_sens_x / 100.0f;
+    stick_pitch = (g_tps.pad_invert_y ? -ry : ry) * STICK_PITCH * g_tps.pad_sens_y / 100.0f;
+    m = modern_stick(&lx, &ly, g_tps.pad_dead_move / 100.0f, 1.0f);
+    run = bind_held(B_TPS_RUN, BIND_PAD, bind_keys(), 0);
+    if (m > 0 && plp->mode0 == 1) {   /* (hits, grabs: the game's own stick directions) */
+        float cx = cosf(RAD(yaw)), cz = -sinf(RAD(yaw)), d;   /* the camera's right axis on the ground */
+        int free_turn, back;
+        modern_hold(&hold, atan2f(lx, ly) * (32768.0f / 3.14159265f), swings, &cx, &cz);
+        pad_target = modern_target(cx, cz, lx, ly);
+        d = modern_wrap(pad_target - (short)plp->ay);
+        free_turn = plp->mode1 == 0 && plp->mode2 <= 13 && plp->mode2 != 12 && !(plp->flg & 0x100000);
+        back = free_turn && fabsf(d) > DEG(100.0f);
+        back_wait = back ? back_wait + 1 : 0;
+        if (back && run && !run_was && back_wait <= QT_WAIT + 1) { qt_hold = 10; back_wait = QT_WAIT + 1; }   /* pulled back + run */
+        *pad &= ~0x6F;   /* the stick's (and the d-pad's) directions and aim up/down */
+        if (tps_cam_active && plp->mode1 == 0 && !qt_hold && !(back && back_wait <= QT_WAIT && !run)) {
+            if (!free_turn) {   /* stairs, steps, pushing, ...: on while it points ahead */
+                if (fabsf(d) < DEG(90.0f)) *pad |= 0x1;
+            } else {
+                if (back) *pad |= d > 0 ? 0x4 : 0x8;   /* turn on the spot first */
+                else *pad |= 0x1;
+                if (m >= RUN_PUSH) *pad |= 0x400;
+                pad_move = 1;
+            }
+        }
+    } else hold.held = back_wait = 0;
+    run_was = run;
+    if (trace) {
+        float oy = 0, op = 0;
+        int walled = 0, e = nearest_enemy(&oy, &op, &walled);
+        printf("tps: pad frame %u left %.2f %.2f (%.2f) right %.2f %.2f -> target %.1f ay %.1f yaw %.1f pitch %.1f quickturn %d mode %d/%d/%d"
+               " at (%.1f %.1f) nearest enemy %s%.1f %.1f deg off\n",
+               (unsigned)gs_frame_count(), lx, ly, m, rx, ry, pad_target * (360.0f / 65536.0f), (short)plp->ay * (360.0f / 65536.0f),
+               yaw * (360.0f / 65536.0f), pitch * (360.0f / 65536.0f), qt_hold, plp->mode1, plp->mode2, plp->mode3, plp->px, plp->pz,
+               !e ? "none " : walled ? "(behind a wall) " : "", oy * (360.0f / 65536.0f), op * (360.0f / 65536.0f));
+    }
+    return qt_hold > 0 ? qt_hold-- : 0;
 }
 
 /* pad.c bhSetPad, before pad_ps is derived: the keyboard/mouse layout as the game's
@@ -447,8 +531,14 @@ unsigned int tps_pad(unsigned int pad)
 {
     unsigned k;
     if (sys->ss_flg & 0x400000) return pad;   /* attract demo playback */
-    k = tps_input_keys();
-    pad_steer = (pad & 0xF) != 0;
+    k = tps_input_keys(plp && pad_sticks(&pad));
+    pad_steer = (pad & 0xF) != 0 && !pad_cam;   /* (the gamepad: its stick, or a d-pad turn: the camera stays) */
+    {   /* the gamepad: recenter, and a quick turn swings the camera round with the character */
+        static unsigned was;
+        unsigned now = pad_cam ? k & (TPS_K_RECENTER | TPS_K_QUICKTURN) : 0;
+        if (now & ~was) { recenter = 20; swings++; }
+        was = now;
+    }
     move_keys = 0;
     if (g_tps.free_cam && tps_cam_active && plp && plp->mode1 == 0 && !(k & TPS_K_QUICKTURN)) {
         /* camera A: any direction walks forward, tps_player turns the character towards it */
@@ -468,7 +558,7 @@ unsigned int tps_pad(unsigned int pad)
     if (k & TPS_K_MAP) pad |= 0x2000;
     if (k & TPS_K_STATUS) pad |= 0x4000;
     /* free aim: always the straight aim pose; tps_calc_model bends the upper body to the pitch */
-    if (g_tps.aiming && !g_tps.auto_aim && plp && plp->mode1 == 1) pad &= ~0x63;
+    if (g_tps.aiming && !lock_aim() && plp && plp->mode1 == 1) pad &= ~0x63;
     if (pad & 0x1) pad &= ~0x42;   /* as bhSetPad: forward wins, right wins */
     if (pad & 0x8) pad &= ~0x4;
     return pad;
@@ -486,6 +576,45 @@ static float ray_capsule(const NJS_POINT3* p, const NJS_POINT3* d, const NJS_CAP
         if (t > 0 && q < r * r && (best < 0 || t < best)) best = t;
     }
     return best;
+}
+
+static int aimable(const BH_PWORK* e) { return (e->flg & 0x1) && (e->flg & 0x20) && !(e->flg & 0x2) && !(e->stflg & 0x1000000); }
+
+/* the enemy whose middle is nearest the crosshair by angle: its offset (target minus crosshair,
+   game units) and whether a wall is in between; 0 = none */
+static int nearest_enemy(float* oy, float* op, int* walled)
+{
+    NJS_POINT3 eye, dir, sh, apos;
+    NJS_LINE line;
+    ATR_WORK* ahtp;
+    float best = -1, t[3] = { 0, 0, 0 }, len;
+    view(&eye, &dir, &sh);
+    for (int i = 0; i < sys->ewk_n; i++) {
+        const NJS_CAPSULE* c = &ene[i].watr;
+        float x = (c->c1.x + c->c2.x) / 2 - sh.x, y = (c->c1.y + c->c2.y) / 2 - sh.y, z = (c->c1.z + c->c2.z) / 2 - sh.z, ey, ep;
+        if (!aimable(&ene[i]) || x * x + z * z < 1.0f) continue;
+        ey = wrap(atan2f(-x, -z) * (32768.0f / 3.14159265f) - yaw);
+        ep = atan2f(y, sqrtf(x * x + z * z)) * (32768.0f / 3.14159265f) - pitch;
+        if (best < 0 || ey * ey + ep * ep < best) { best = ey * ey + ep * ep; *oy = ey; *op = ep; t[0] = x; t[1] = y; t[2] = z; }
+    }
+    if (best < 0) return 0;
+    line.px = sh.x; line.py = sh.y; line.pz = sh.z; line.vx = t[0]; line.vy = t[1]; line.vz = t[2];
+    apos = sys->apos; ahtp = sys->ahtp;
+    *walled = bhCheckL2Wall(&line, 0x400, &len) && len < sqrtf(t[0] * t[0] + t[1] * t[1] + t[2] * t[2]);
+    sys->apos = apos; sys->ahtp = ahtp;
+    return 1;
+}
+
+/* gentle aim assist (gamepad, "Game auto-aim" on): the stick's turn this frame with the enemy
+   nearest the crosshair, if it is within the cone and no wall is in between (modern_assist) */
+static void assist(float* dyaw, float* dpitch)
+{
+    float oy, op;
+    int walled;
+    if (!nearest_enemy(&oy, &op, &walled) || walled) return;
+    modern_assist(oy, op, dyaw, dpitch);
+    if (trace) printf("tps: assist enemy %.2f %.2f deg off -> turn %.2f %.2f deg\n", oy * (360.0f / 65536.0f), op * (360.0f / 65536.0f),
+                      *dyaw * (360.0f / 65536.0f), *dpitch * (360.0f / 65536.0f));
 }
 
 /* free aim: what the crosshair (screen centre) points at - the nearest enemy or wall on the
@@ -513,7 +642,7 @@ static void aim_at_crosshair(void)
     for (int i = 0; i < sys->ewk_n; i++) {
         BH_PWORK* e = &ene[i];
         float d;
-        if (!(e->flg & 0x1) || !(e->flg & 0x20) || (e->flg & 0x2) || (e->stflg & 0x1000000)) continue;
+        if (!aimable(e)) continue;
         d = ray_capsule(&sh, &dir, &e->watr);
         if (d > 0 && d < dist) dist = d;   /* in front of the shoulder */
     }
@@ -587,7 +716,7 @@ static float barrel_miss(const float* h, float* deg)
 void tps_trace_hands(const float* drawn, const float* real)
 {
     float d0, d1, m0, m1;
-    if (!trace || !g_tps.aiming || g_tps.auto_aim || plp->mode1 != 1) return;
+    if (!trace || !g_tps.aiming || lock_aim() || plp->mode1 != 1) return;
     m0 = barrel_miss(drawn, &d0);
     m1 = barrel_miss(real, &d1);
     printf("tps: drawn weapon vs crosshair target %.1f away: its barrel passes %.2f off (%.2f deg), the real hand's %.2f (%.2f deg); drawn hand %+.2f above the real\n",
@@ -649,10 +778,13 @@ void tps_player(void)
     if (trace && plp->mode1 == 1)
         printf("tps: weapon mode %d/%d motion %d frame %d/%d at (%.1f %.1f) ay %.1f hand y %.1f\n", plp->mode2, plp->mode3, plp->mtn_no, plp->frm_no >> 16,
                plp->mnwP ? plp->mnwP[plp->mtn_no].frm_num : -1, plp->px, plp->pz, (short)plp->ay * (360.0f / 65536.0f), plp->mlwP->owP[9].mtx[13] - plp->py);
-    if (plp->mode1 == 1 && !g_tps.auto_aim) {
-        yaw = wrap(yaw - mouse_dx * TURN_PER_PIXEL * g_tps.sens_x / 100.0f * g_tps.aim_sens / 100.0f);
-        mouse_dx = 0;
-        look(g_tps.aim_sens / 100.0f);
+    if (plp->mode1 == 1 && !lock_aim()) {
+        float dy = stick_yaw * g_tps.pad_aim_sens / 100.0f;
+        stick_pitch *= g_tps.pad_aim_sens / 100.0f;
+        if (pad_cam && g_tps.auto_aim) assist(&dy, &stick_pitch);
+        yaw = wrap(yaw - mouse_dx * TURN_PER_PIXEL * g_tps.sens_x / 100.0f * g_tps.aim_sens / 100.0f + dy);
+        mouse_dx = stick_yaw = 0;
+        look(g_tps.aim_sens / 100.0f, 1.0f);
         static int lock = -1;   /* test aid (RECVX_TPS_TRACE=2): follow the enemy the game locked on to */
         if (plp->flg & 0x100000) lock = plp->src_no;
         if (trace > 1 && lock >= 0 && (ene[lock].flg & 3) == 1) {   /* at RECVX_TPS_AIM_AT along its hit capsule (0 c1 .. 1 c2) */
@@ -663,13 +795,18 @@ void tps_player(void)
             dx = c->c1.x + (c->c2.x - c->c1.x) * f - sh.x; dy = c->c1.y + (c->c2.y - c->c1.y) * f - sh.y; dz = c->c1.z + (c->c2.z - c->c1.z) * f - sh.z;
             yaw = atan2f(-dx, -dz) * (32768.0f / 3.14159265f);
             pitch = atan2f(dy, sqrtf(dx * dx + dz * dz)) * (32768.0f / 3.14159265f);
-            look(0);   /* within the mouse's pitch range */
+            look(0, 0);   /* within the mouse's pitch range */
         }
         if (plp->flg & 0x100000) {   /* no lock-on turn (bhCPM2_act_suw / next target) */
             plp->flg &= ~0x100000;
             plp->stflg &= ~0x800;
         }
         aim_at_crosshair();
+        return;
+    }
+    if (pad_cam && plp->mode1 == 0) {   /* gamepad: towards the left stick's direction from the camera */
+        if (pad_move && plp->mode2 != 12 && !(plp->flg & 0x100000)) plp->ay += (int)modern_turn((short)plp->ay, pad_target);
+        pad_move = 0;
         return;
     }
     if (g_tps.free_cam) {
@@ -738,7 +875,7 @@ void tps_calc_model(void)
     static float w;   /* eased in/out when the weapon is raised/lowered */
     O_WORK* ow = plp->mlwP->owP;
     float a, dx, dz, ofs[3];
-    int on = tps_cam_active && !g_tps.auto_aim && plp->mode0 == 1 && plp->mode1 == 1 && plp->mode2 != 68;
+    int on = tps_cam_active && !lock_aim() && plp->mode0 == 1 && plp->mode1 == 1 && plp->mode2 != 68;
 
     bhCalcModel(plp);
     bend_a = 0;
@@ -838,4 +975,8 @@ void tps_frame(void)
     mouse_moved = mouse_dx != 0 || mouse_dy != 0;
     if (tps_on && !on) deactivate();
     tps_on = on;
+    /* the gamepad's third-person rows play while our camera is, the game not frozen (menus,
+       messages, pick-ups, their fades), through hits, grabs and weapon loads (a held trigger or
+       quick knife stays held) */
+    g_tps.pad_play = on && g_tps.pad_modern && tps_cam_active && sys && (sys->sp_flg & 0x40) && !(sys->ss_flg & 0x400000);
 }

@@ -104,6 +104,7 @@ static const char* const conns[] = { "Automatic", "Direct (P2P)", "Via server" }
 static const char* const atmos_names[] = { "Per cut (original)", "Smooth" };
 static const char* const free_cam_names[] = { "B (behind character)", "A (free)" };
 static const char* const fixed_cam_names[] = { "Classic (tank)", "Modern (camera-relative)" };
+static const char* const tps_pad_names[] = { "Classic (tank, camera behind)", "Modern (twin-stick)" };
 static const char* const noclips[] = { "Off", "Through walls", "Walls + fly" };
 static const char* const sources[] = { "Auto", "Keyboard/mouse only", "Gamepad only" };
 static const char* const extras[] = { "Off", "Up to 1 per room", "Up to 2 per room", "Up to 3 per room" };
@@ -168,7 +169,7 @@ const Setting g_settings[] = {
       .help = "Modern: the left stick or the d-pad (arrow keys) walks where it points on screen, pushed far or with run it runs; "
               "aiming and the quick turn as Classic. Not in third person." },
 
-    { SP_TPS, "Over-the-shoulder camera", V(g_tps.on), 0, 1, 1, .help = "Third person: mouse/keyboard controls and free aim. Events, doors and menus keep the original camera.", .group = "CAMERA" },
+    { SP_TPS, "Over-the-shoulder camera", V(g_tps.on), 0, 1, 1, .help = "Third person: mouse/keyboard or twin-stick gamepad controls and free aim. Events, doors and menus keep the original camera.", .group = "CAMERA" },
     { SP_TPS, "Mouse/keyboard camera", V(g_tps.free_cam), 0, 1, 1, free_cam_names,
       .help = "B: the camera stays behind the character, the mouse turns it. A: the mouse turns the camera around the character, WASD walk towards their direction on screen; aiming turns the character to the camera. Not the KEY CONFIG type." },
     { SP_TPS, "Field of view", V(g_tps.fov), 40, 120, 5, .fmt = "%d deg", .help = "Horizontal, over the 4:3 picture; widescreen shows more at the sides." },
@@ -185,7 +186,16 @@ const Setting g_settings[] = {
     { SP_TPS, "Aiming sensitivity", V(g_tps.aim_sens), 10, 200, 5, .fmt = "%d%%", .help = "Mouse sensitivity while aiming, relative to the above." },
     { SP_TPS, "Invert Y", V(g_tps.invert_y), 0, 1, 1 },
     { SP_TPS, "Crosshair", V(g_tps.crosshair), 0, 1, 1 },
-    { SP_TPS, "Game auto-aim", V(g_tps.auto_aim), 0, 1, 1, .help = "Off: free aim, the shot goes where the crosshair points. On: the game's lock-on." },
+    { SP_TPS, "Game auto-aim", V(g_tps.auto_aim), 0, 1, 1, .help = "Off: free aim, the shot goes where the crosshair points. On: the game's lock-on; with the gamepad (Modern) a gentle aim assist instead." },
+    { SP_TPS, "Gamepad controls", V(g_tps.pad_modern), 0, 1, 1, tps_pad_names, .group = "GAMEPAD",
+      .help = "Modern: the left stick walks where it points seen from the camera, the right stick turns the camera and aims; "
+              "own bindings (CONTROLS, gamepad, Third person). Classic: tank controls through the game's buttons, the camera behind." },
+    { SP_TPS, "Stick camera speed X", V(g_tps.pad_sens_x), 10, 300, 5, .fmt = "%d%%", .help = "Right stick fully pushed at 100%: 180 degrees a second." },
+    { SP_TPS, "Stick camera speed Y", V(g_tps.pad_sens_y), 10, 300, 5, .fmt = "%d%%" },
+    { SP_TPS, "Stick aiming speed", V(g_tps.pad_aim_sens), 10, 200, 5, .fmt = "%d%%", .help = "Right stick while aiming, relative to the above." },
+    { SP_TPS, "Stick invert Y", V(g_tps.pad_invert_y), 0, 1, 1 },
+    { SP_TPS, "Left stick dead zone", V(g_tps.pad_dead_move), 0, 50, 5, .fmt = "%d%%" },
+    { SP_TPS, "Right stick dead zone", V(g_tps.pad_dead_look), 0, 50, 5, .fmt = "%d%%" },
 
     { SP_AUDIO, "Music and voice", V(g_config.music_volume), 0, 100, 5, .fmt = "%d%%", .apply = apply_volume },
     { SP_AUDIO, "Sound effects", V(g_config.sfx_volume), 0, 100, 5, .fmt = "%d%%", .apply = apply_volume },

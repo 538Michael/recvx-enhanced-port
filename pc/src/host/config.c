@@ -83,6 +83,13 @@ static const struct { const char* key; int* val; int lo, hi; } keys[] = {
     { "tps_atmos", &g_tps.atmos, 0, 1 },
     { "tps_free_camera", &g_tps.free_cam, 0, 1 },
     { "tps_key", &g_tps.key, 1, 511 },
+    { "tps_pad_controls", &g_tps.pad_modern, 0, 1 },     /* third-person gamepad: 0 classic (tank), 1 modern (twin-stick) */
+    { "tps_pad_sens_x", &g_tps.pad_sens_x, 1, 1000 },
+    { "tps_pad_sens_y", &g_tps.pad_sens_y, 1, 1000 },
+    { "tps_pad_aim_sens", &g_tps.pad_aim_sens, 1, 300 },
+    { "tps_pad_invert_y", &g_tps.pad_invert_y, 0, 1 },
+    { "tps_pad_dead_move", &g_tps.pad_dead_move, 0, 90 },
+    { "tps_pad_dead_look", &g_tps.pad_dead_look, 0, 90 },
 };
 
 static void default_name(void);

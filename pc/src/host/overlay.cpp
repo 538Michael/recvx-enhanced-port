@@ -177,7 +177,8 @@ static void controls_section(void)
         if (ImGui::BeginTabItem("Gamepad")) { if (dev != BIND_PAD) cap_row = -1; dev = BIND_PAD; ImGui::EndTabItem(); }
         ImGui::EndTabBar();
     }
-    if (dev == BIND_PAD) ImGui::TextDisabled("%s; the left stick also moves, as on the DS2.", bind_pad_desc());
+    if (dev == BIND_PAD) ImGui::TextDisabled("%s; the left stick also moves, as on the DS2. The third-person rows play in third\n"
+                                             "person with Modern gamepad controls, instead of the game rows of the same buttons.", bind_pad_desc());
     ImGui::TextDisabled("Click a binding, then press the key/button (Esc cancels, Delete clears); right click clears.");
     if (msg[0]) ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "%s", msg);
     if (ImGui::BeginTable("##binds", 3, ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp)) {
@@ -193,7 +194,7 @@ static void controls_section(void)
                 ImGui::TableNextRow();
                 ImGui::TableSetColumnIndex(0);
                 if (group == BG_GAME) ImGui::SeparatorText("Game (as the KEY CONFIG type sets them)");
-                else ImGui::SeparatorText(group == BG_TPS ? "Third person (keyboard and mouse)" : "Hotkeys");
+                else ImGui::SeparatorText(group == BG_TPS ? (dev ? "Third person (gamepad, Modern)" : "Third person (keyboard and mouse)") : "Hotkeys");
                 if (group == BG_GAME) { ImGui::TableSetColumnIndex(1); ImGui::TextDisabled("type %c", 'A' + pc_keytype()); }
             }
             ImGui::TableNextRow();
@@ -243,6 +244,9 @@ static void settings_window(void)
                               "E/Space action, Q cancel, Tab status, M map (Controls changes them). F1 frees the mouse."
                             : "W/S walk, A/D turn, Shift run, mouse look; right mouse aim, left fire;\n"
                               "E/Space action, Q cancel, Tab status, M map (Controls changes them). F1 frees the mouse.");
+        if (g_tps.pad_modern)
+            ImGui::TextDisabled("Gamepad: left stick walks (pushed far runs), right stick camera / aim; LT aim, RT fire, A action,\n"
+                                "X run, B cancel, Y inventory, Back map, LB knife, RB quick turn, RS camera behind.");
     }
     if (ImGui::CollapsingHeader("Audio", ImGuiTreeNodeFlags_DefaultOpen)) changed |= settings_imgui(SP_AUDIO);
     for (int p = SP_COOP; p <= SP_EXTRAS; p += SP_EXTRAS - SP_COOP)   /* pages with their own windows (F3, F2): the SET_F1 rows */

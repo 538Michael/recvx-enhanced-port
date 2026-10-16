@@ -1,7 +1,7 @@
 # Third-person mode
 
-An optional over-the-shoulder camera with mouse/keyboard movement and free aim, in the style
-of RE4/RE5. Off by default. With it off the game behaves exactly as without it: every decomp
+An optional over-the-shoulder camera with mouse/keyboard or twin-stick gamepad movement and free
+aim, in the style of RE4/RE5 and the RE2/RE4 remakes. Off by default. With it off the game behaves exactly as without it: every decomp
 hook is `#ifdef TARGET_PC` + `if (tps_on)`; the logic lives in `pc/glue/tps_glue.c` (game
 thread), `pc/src/host/tps.h`, `pc/src/input/tps_input.c` and the F1 overlay (settings, mouse).
 
@@ -45,12 +45,58 @@ Setting "Mouse/keyboard camera" (THIRD PERSON page, ini `tps_free_camera`):
   Shift runs. Aiming turns the character to the camera direction (free aim: at once, through
   the crosshair as in B; with "Game auto-aim": towards the camera unless the game locks on);
   after aiming the camera stays where it looked. The quick-turn key does the game's quick
-  turn (S + Shift runs towards the camera). Arrow keys and the gamepad keep tank controls;
-  while they steer, the camera follows behind as in B.
+  turn (S + Shift runs towards the camera). Arrow keys (and the gamepad with Classic gamepad
+  controls) keep tank controls; while they steer, the camera follows behind as in B.
 
 Doors, events and cutscenes put the camera behind the character again in both. A/B are this
-option's own letters, not the game's KEY CONFIG types. The gamepad has no third-person camera
-(no right-stick camera).
+option's own letters, not the game's KEY CONFIG types.
+
+### Gamepad
+
+Setting "Gamepad controls" (THIRD PERSON page, ini `tps_pad_controls`): **Modern (twin-stick)**,
+the default, or Classic (the gamepad as a DualShock 2 through the game rows: tank controls, the
+camera behind, no camera or aim stick). Modern, as the RE2/RE4 remakes (button map:
+[USER_GUIDE.md](USER_GUIDE.md#third-person-with-a-gamepad)):
+
+* **Left stick**: walks towards its direction seen from the camera (`modern_target` with the
+  camera's right axis, as the fixed cameras' modern controls), past its dead zone; pushed 70% or
+  with the run button it runs. The character turns as with the fixed cameras' modern controls
+  (`modern_turn`: 40% of the way a frame, at most 30 degrees; more than 100 degrees away the
+  game's turn on the spot first). Stairs, steps and pushing: "forward" while it points ahead.
+* **Right stick**: orbits the camera (yaw free, pitch +-60 degrees, walls as above) at 180 / 120
+  degrees a second fully pushed at 100%, a squared response past its dead zone. Nothing pulls the
+  camera behind; the right stick click eases it there (pitch back to the start).
+* **Aim (LT)**: free aim as the mouse's (the same crosshair ray, shot, pose and aim height): the
+  character turns to the camera direction at once, the right stick moves the view (aim speed,
+  default 50% of the camera speed). With "Game auto-aim" on the gamepad keeps free aim with a
+  gentle assist (`modern_assist`): with the middle of the enemy nearest the crosshair within 6
+  degrees and no wall in between, the stick turns at half speed, and while it moves (not away
+  from the enemy) the view drifts a tenth of the way to it. A still stick never moves the aim.
+* **Quick turn**: its button (RB), or pulling the stick back (more than 100 degrees from the
+  facing) and pressing run within 3 frames (the turn on the spot waits that long for it): the
+  game's quick turn. Either swings the camera behind the character as it turns. The stick keeps
+  the camera it was given in (`modern_hold`, as over the fixed cameras' cuts) until it turns by
+  more than 35 degrees or is let go, so holding it keeps going the way it went.
+* **Bindings**: the gamepad set has its own third-person rows (ini `pad_tps_aim`, `pad_tps_fire`,
+  `pad_tps_action`, `pad_tps_cancel`, `pad_tps_run`, `pad_tps_inventory`, `pad_tps_map`,
+  `pad_tps_quickturn`, `pad_tps_knife`, `pad_tps_recenter`; there is no reload button, the game
+  reloads by itself). They play only while `g_tps.pad_play` (`tps_frame`: third person on and
+  Modern, our camera active, the game not frozen, no attract demo) and then take their buttons over
+  from the game rows (the d-pad, Start and anything else they do not use stay the game's). In
+  menus, messages, pick-ups, events and doors the gamepad is the DualShock 2 of the KEY CONFIG
+  type, as in Classic. An input held when `pad_play` changes counts for neither set until it is
+  let go (`bindings.c pad_row_reads`), so the button that opened a menu does not also act in it.
+  Hits, grabs and weapon loads keep `pad_play` (a held trigger stays held).
+* **Mixed devices**: `pad_cam` is the device used last (any gamepad button or stick past a third:
+  the gamepad; mouse motion, a key or a mouse button: keyboard/mouse). With the gamepad the camera
+  orbits freely and the left stick walks; with the mouse, camera A or B as set. "Game auto-aim"
+  means the lock-on with the mouse and the assist with the gamepad.
+
+Hooks: `tps_pad` (`pad_sticks`: device, right stick as `stick_yaw`/`stick_pitch`, left stick into
+the virtual bits; the quick-turn gesture into `tps_input_keys`), `tps_camera` (orbit, recenter),
+`tps_player` (the turn towards the stick; the right stick and the assist while aiming), `knife_pad`
+(`pad_quick_knife` also reads `pad_tps_knife`). Classic changes nothing: `pad_play` stays 0 and
+every gamepad path is the one from before.
 
 ### Settings
 
@@ -73,6 +119,11 @@ unit (the character is about 17 units tall).
 | Crosshair | `tps_crosshair` | 1 |
 | Game auto-aim (0 = free aim) | `tps_auto_aim` | 0 |
 | Mouse/keyboard camera (0 = B, 1 = A) | `tps_free_camera` | 0 |
+| Gamepad controls (0 = Classic, 1 = Modern) | `tps_pad_controls` | 1 |
+| Stick camera speed X / Y (percent; 100 = 180 / 120 degrees a second) | `tps_pad_sens_x`, `tps_pad_sens_y` | 100 |
+| Stick aiming speed (percent of the above) | `tps_pad_aim_sens` | 50 |
+| Stick invert Y | `tps_pad_invert_y` | 0 |
+| Left / right stick dead zone (percent) | `tps_pad_dead_move`, `tps_pad_dead_look` | 20, 15 |
 | Light and fog (1 = smooth, 0 = per cut) | `tps_atmos` | 1 |
 | Toggle key (SDL scancode) | `tps_key` | 62 (F5) |
 
@@ -81,7 +132,8 @@ unit (the character is about 17 units tall).
 | Env var | Effect |
 |---|---|
 | `RECVX_TPS_MOUSE="frame:dx:dy,..."` | moves the mouse dx/dy counts per game frame from that presented frame on |
-| `RECVX_TPS_TRACE=1` | logs the free aim per frame, each shot's direction and wall hit against the crosshair target ("SHOT"), the drawn weapon's barrel with "You appear as", the camera ("tps: cam A\|B"), the aim height given to the game; `=2` also keeps the camera on the enemy the game locked on to (the middle of its hit capsule, or `RECVX_TPS_AIM_AT=f` along it: 0 = `c1`, for a zombie the head, 1 = `c2`, its legs) |
+| `RECVX_VPAD="frame:input+input,..."` | a virtual gamepad ([ARCHITECTURE.md](ARCHITECTURE.md)): sticks as `leftx=0.5+lefty=-1` (up is negative), triggers `+lefttrigger`; a trigger after another input needs its own `+` (`+lefttrigger++righttrigger`) |
+| `RECVX_TPS_TRACE=1` | logs the gamepad per frame ("tps: pad": the sticks past their dead zones, the walk direction, facing, camera, quick turn, the enemy nearest the crosshair) and its aim assist ("tps: assist"), the free aim per frame, each shot's direction and wall hit against the crosshair target ("SHOT"), the drawn weapon's barrel with "You appear as", the camera ("tps: cam A\|B"), the aim height given to the game; `=2` also keeps the camera on the enemy the game locked on to (the middle of its hit capsule, or `RECVX_TPS_AIM_AT=f` along it: 0 = `c1`, for a zombie the head, 1 = `c2`, its legs) |
 | `RECVX_TPS_ORBIT=degrees` | turns only the view about the player (side views; aim unchanged, camera ignores walls) |
 | `RECVX_ATMOS_TRACE=1` | logs each game frame's cut, the game's fog, lights and filter and what "smooth" shows |
 | `RECVX_EFF_TRACE=1` | logs effects spawned and queued |

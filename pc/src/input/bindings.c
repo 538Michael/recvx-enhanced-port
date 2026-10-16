@@ -30,10 +30,12 @@ const BindRow bind_rows[B_COUNT] = {
     [B_TRADE] = { "trade", "Trade request (co-op)", BG_GAME, 1 },
     [B_TPS_FWD] = { "tps_forward", "Forward", BG_TPS, 0 },   [B_TPS_BACK] = { "tps_back", "Back", BG_TPS, 0 },
     [B_TPS_LEFT] = { "tps_left", "Turn left", BG_TPS, 0 },   [B_TPS_RIGHT] = { "tps_right", "Turn right", BG_TPS, 0 },
-    [B_TPS_RUN] = { "tps_run", "Run", BG_TPS, 0 },           [B_TPS_ACTION] = { "tps_action", "Action / confirm", BG_TPS, 0 },
-    [B_TPS_CANCEL] = { "tps_cancel", "Cancel", BG_TPS, 0 },  [B_TPS_STATUS] = { "tps_inventory", "Inventory", BG_TPS, 0 },
-    [B_TPS_MAP] = { "tps_map", "Map", BG_TPS, 0 },           [B_TPS_AIM] = { "tps_aim", "Aim (hold)", BG_TPS, 0 },
-    [B_TPS_FIRE] = { "tps_fire", "Fire", BG_TPS, 0 },        [B_TPS_QUICKTURN] = { "tps_quickturn", "Quick turn", BG_TPS, 0 },
+    [B_TPS_RUN] = { "tps_run", "Run", BG_TPS, 1 },           [B_TPS_ACTION] = { "tps_action", "Action / confirm", BG_TPS, 1 },
+    [B_TPS_CANCEL] = { "tps_cancel", "Cancel", BG_TPS, 1 },  [B_TPS_STATUS] = { "tps_inventory", "Inventory", BG_TPS, 1 },
+    [B_TPS_MAP] = { "tps_map", "Map", BG_TPS, 1 },           [B_TPS_AIM] = { "tps_aim", "Aim (hold)", BG_TPS, 1 },
+    [B_TPS_FIRE] = { "tps_fire", "Fire", BG_TPS, 1 },        [B_TPS_QUICKTURN] = { "tps_quickturn", "Quick turn", BG_TPS, 1 },
+    [B_TPS_KNIFE] = { "tps_knife", "Quick knife (hold)", BG_TPS, 2 },
+    [B_TPS_RECENTER] = { "tps_recenter", "Camera behind character", BG_TPS, 2 },
     [B_TPS_TOGGLE] = { "tps_toggle", "Third-person camera on/off", BG_HOTKEY, 0 },
     [B_SETTINGS] = { "settings", "Settings overlay", BG_HOTKEY, 0 },
     [B_CHEATS] = { "cheats", "Cheat menu", BG_HOTKEY, 0 },
@@ -47,7 +49,7 @@ const int bind_order[B_COUNT] = {
     B_UP, B_DOWN, B_LEFT, B_RIGHT, B_CROSS, B_SQUARE, B_CIRCLE, B_TRIANGLE, B_R1, B_L1, B_R2, B_L2,
     B_START, B_SELECT, B_R3, B_L3, B_QUICKTURN, B_QUICKKNIFE, B_TRADE,
     B_TPS_FWD, B_TPS_BACK, B_TPS_LEFT, B_TPS_RIGHT, B_TPS_RUN, B_TPS_ACTION, B_TPS_CANCEL, B_TPS_STATUS,
-    B_TPS_MAP, B_TPS_AIM, B_TPS_FIRE, B_TPS_QUICKTURN,
+    B_TPS_MAP, B_TPS_AIM, B_TPS_FIRE, B_TPS_QUICKTURN, B_TPS_KNIFE, B_TPS_RECENTER,
     B_TPS_TOGGLE, B_SETTINGS, B_CHEATS, B_COOP, B_FULLSCREEN, B_NOCLIP_UP, B_NOCLIP_DOWN,
 };
 
@@ -73,6 +75,10 @@ static const int defaults[2][B_COUNT][BIND_SLOTS] = {
         [B_L1] = { GB(LEFT_SHOULDER) }, [B_R1] = { GB(RIGHT_SHOULDER) },
         [B_TRIANGLE] = { GB(NORTH) }, [B_CIRCLE] = { GB(EAST) }, [B_CROSS] = { GB(SOUTH) }, [B_SQUARE] = { GB(WEST) },
         [B_QUICKKNIFE] = { GA(RIGHT_TRIGGER, 0) },
+        /* third person, modern scheme (as the RE remakes, the run button where type A has it) */
+        [B_TPS_AIM] = { GA(LEFT_TRIGGER, 0) }, [B_TPS_FIRE] = { GA(RIGHT_TRIGGER, 0) }, [B_TPS_ACTION] = { GB(SOUTH) },
+        [B_TPS_CANCEL] = { GB(EAST) }, [B_TPS_RUN] = { GB(WEST) }, [B_TPS_STATUS] = { GB(NORTH) }, [B_TPS_MAP] = { GB(BACK) },
+        [B_TPS_QUICKTURN] = { GB(RIGHT_SHOULDER) }, [B_TPS_KNIFE] = { GB(LEFT_SHOULDER) }, [B_TPS_RECENTER] = { GB(RIGHT_STICK) },
     },
 };
 
@@ -148,7 +154,7 @@ int bind_conflict(int row, int dev)
     return 0;
 }
 
-int bind_row_shown(int row, int dev) { return dev == BIND_KB || bind_rows[row].pad_ok; }
+int bind_row_shown(int row, int dev) { return dev == BIND_KB ? bind_rows[row].pad_ok != 2 : bind_rows[row].pad_ok != 0; }
 
 /* ---------------------------------------------------------------- names */
 static const char* pad_ini[SDL_GAMEPAD_BUTTON_COUNT] = {
@@ -443,12 +449,45 @@ const bool* bind_keys(void)
     return merged;
 }
 
-static int tps_uses(int code)
+static int tps_uses(int dev, int code)
 {
-    for (int r = B_TPS_FWD; r <= B_TPS_QUICKTURN; r++)
+    for (int r = B_TPS_FWD; r <= B_TPS_RECENTER; r++)
         for (int s = 0; s < BIND_SLOTS; s++)
-            if (bind_get(r, BIND_KB, s) == code) return 1;
+            if (bind_row_shown(r, dev) && bind_get(r, dev, s) == code) return 1;
     return 0;
+}
+
+static int pad_down(int c)
+{
+    if (c >= BIND_AXIS) {
+        int a = (c - BIND_AXIS) / 2, v = SDL_GetGamepadAxis(gamepad, (SDL_GamepadAxis)a);
+        int lim = a >= SDL_GAMEPAD_AXIS_LEFT_TRIGGER ? 8000 : 16000;
+        return (c - BIND_AXIS) & 1 ? v < -lim : v > lim;
+    }
+    return SDL_GetGamepadButton(gamepad, (SDL_GamepadButton)(c - 1));
+}
+
+/* the gamepad: in third-person play with the modern scheme (g_tps.pad_play, tps_glue.c) its
+   third-person rows play and take the inputs they use over from the game rows; elsewhere (menus,
+   events, doors) the game rows, as the KEY CONFIG type sets them. An input held when that
+   changes counts for neither until it is let go (a button that opened the inventory does not
+   also press its DS2 button there). Game thread. */
+static int pad_row_reads(int row, int c)
+{
+    static int was;
+    static unsigned char stale[BIND_AXIS + 2 * SDL_GAMEPAD_AXIS_COUNT];
+    int take = g_tps.pad_play;
+    if (take != was) {
+        was = take;
+        for (int i = 1; i < (int)sizeof(stale); i++)
+            stale[i] = (i < 1 + SDL_GAMEPAD_BUTTON_COUNT || i >= BIND_AXIS) && tps_uses(BIND_PAD, i) && pad_down(i);
+    }
+    if (c < (int)sizeof(stale) && stale[c]) {
+        if (pad_down(c)) return 0;
+        stale[c] = 0;
+    }
+    if (bind_rows[row].group == BG_TPS) return take;
+    return !(take && tps_uses(BIND_PAD, c));
 }
 
 int bind_held(int row, int dev, const bool* keys, int mouse)
@@ -459,15 +498,9 @@ int bind_held(int row, int dev, const bool* keys, int mouse)
         if (dev == BIND_KB) {
             if (!input_accept(g_input_source, 0, BIND_KB, 0)) return 0;   /* Gamepad only */
             /* third person takes the keys it uses over (W/A/S/Q by default) */
-            if (bind_rows[row].group == BG_GAME && g_tps.on && tps_uses(c)) continue;
+            if (bind_rows[row].group == BG_GAME && g_tps.on && tps_uses(BIND_KB, c)) continue;
             if (c >= BIND_MOUSE ? (mouse & SDL_BUTTON_MASK(c - BIND_MOUSE)) != 0 : c < SDL_SCANCODE_COUNT && keys[c]) return 1;
-        } else if (gamepad) {
-            if (c >= BIND_AXIS) {
-                int a = (c - BIND_AXIS) / 2, v = SDL_GetGamepadAxis(gamepad, (SDL_GamepadAxis)a);
-                int lim = a >= SDL_GAMEPAD_AXIS_LEFT_TRIGGER ? 8000 : 16000;
-                if ((c - BIND_AXIS) & 1 ? v < -lim : v > lim) return 1;
-            } else if (SDL_GetGamepadButton(gamepad, (SDL_GamepadButton)(c - 1))) return 1;
-        }
+        } else if (gamepad && pad_row_reads(row, c) && pad_down(c)) return 1;
     }
     return 0;
 }

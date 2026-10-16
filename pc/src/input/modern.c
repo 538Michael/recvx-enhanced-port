@@ -41,3 +41,22 @@ float modern_turn(float ay, float target)
     float d = modern_wrap(target - ay) * 0.4f, max = MODERN_DEG(30.0f);
     return d > max ? max : d < -max ? -max : d;
 }
+
+float modern_stick(float* x, float* y, float dead, float curve)
+{
+    float m = sqrtf(*x * *x + *y * *y), k;
+    if (m <= dead || m < 1e-6f) { *x = *y = 0; return 0; }
+    k = ((m > 1 ? 1 : m) - dead) / (1 - dead);
+    k = powf(k, curve);
+    *x *= k / m; *y *= k / m;
+    return k;
+}
+
+void modern_assist(float off_yaw, float off_pitch, float* dyaw, float* dpitch)
+{
+    if (off_yaw * off_yaw + off_pitch * off_pitch > MODERN_ASSIST_CONE * MODERN_ASSIST_CONE) return;
+    *dyaw *= 0.5f; *dpitch *= 0.5f;
+    if ((*dyaw != 0 || *dpitch != 0) && *dyaw * off_yaw + *dpitch * off_pitch >= 0) {
+        *dyaw += off_yaw * 0.1f; *dpitch += off_pitch * 0.1f;
+    }
+}
