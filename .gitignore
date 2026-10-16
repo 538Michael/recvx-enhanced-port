@@ -12,6 +12,9 @@ __pycache__/
 /saves/
 /mods/
 /scratch/
+# local maintainer workflow for decomp upstream fixes (not published)
+/docs/DECOMP_SYNC.md
+/pc/tools/decomp_upstream.sh
 
 # local tools and SDKs (not redistributable)
 /PS2 SDK/
