@@ -56,6 +56,10 @@ static const char* scale_name(int v, char* b, int n)
     return b;
 }
 static const char* tenths(int v, char* b, int n) { snprintf(b, n, "%d.%d", v / 10, v % 10); return b; }
+/* picture calibration (applied in gs_gl.c draw_display); the test pattern both menus show
+   while a SET_CALIB row is chosen: squares on a black and on a white strip, the faint ones at the ends */
+const unsigned char settings_calib[2][CALIB_STEPS] = { { 5, 10, 16, 24, 32 }, { 223, 231, 239, 245, 250 } };
+static void picture_reset(void) { g_config.brightness = 0; g_config.contrast = 100; g_config.gamma = 10; settings_save_later(); }
 /* "You appear as": positions in the menus' list (actors.c, without event doubles) */
 static int chr_get(void) { return appear_pos(g_coop.chr); }
 static void chr_set(int v) { g_coop.chr = appear_at(v); }
@@ -118,6 +122,14 @@ const Setting g_settings[] = {
     { SP_DISPLAY, "Cutscene bars", V(g_config.cinema_bars), 0, 2, 1, modes3, .help = "Original keeps them 4:3 in widescreen; fades always fill the screen." },
     { SP_DISPLAY, "Camera vignette", V(g_config.screen_filter), 0, 2, 1, modes3, .help = "Original keeps it 4:3 in widescreen." },
     { SP_DISPLAY, "Screen effects", V(g_config.screen_effects), 0, 2, 1, modes3, .help = "Full-screen effect layers. Original keeps them 4:3 in widescreen." },
+    { SP_DISPLAY, "Brightness", V(g_config.brightness), -50, 50, 1, .fmt = "%+d", .flags = SET_CALIB,
+      .help = "Lifts or lowers the dark end of the game's picture. Black strip: the left square should be barely visible." },
+    { SP_DISPLAY, "Contrast", V(g_config.contrast), 50, 150, 1, .fmt = "%d%%", .flags = SET_CALIB,
+      .help = "Spreads or narrows the tones around mid-grey. White strip: the right square should be barely visible." },
+    { SP_DISPLAY, "Gamma", V(g_config.gamma), 5, 20, 1, .name = tenths, .flags = SET_CALIB,
+      .help = "Higher brightens the mid-tones, lower darkens them; black and white stay." },
+    { SP_DISPLAY, "Reset picture calibration", NULL, .flags = SET_ACTION | SET_NOW, .apply = picture_reset,
+      .help = "Brightness, contrast and gamma back to neutral: the original picture." },
     { SP_DISPLAY, "Native 3D renderer", V(g_config.native_3d), 0, 1, 1, .help = "3D models projected and clipped by the GPU instead of the emulated VU1 and GS.", .group = "RENDERER" },
     { SP_DISPLAY, "Native textures", V(g_config.native_tex), 0, 1, 1, .help = "Textures uploaded once and bound afterwards instead of re-uploaded on every switch." },
     { SP_DISPLAY, "Cull off-screen models", V(g_config.model_cull), 0, 1, 1, .help = "As on the PS2. Off: models no longer pop at the screen edges. Third person never culls." },

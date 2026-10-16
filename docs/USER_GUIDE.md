@@ -115,10 +115,20 @@ renderer, skipped intro and door animations. Turn these off for a presentation c
 | Display-rate frames | `interpolate` | "Enhanced mode": in-between frames blended from the last two game frames, up to the display's refresh rate. The game logic stays at its original 30 FPS, so gameplay is unchanged. **On**; off is "vanilla" |
 | Frame blend (trail) | `frame_blend` | the PS2's motion trail (each frame mixed over the previous one). Auto, **Off**, On; Auto is on in vanilla and off with display-rate frames |
 | Cutscene bars, Camera vignette, Screen effects | `cinema_bars`, `screen_filter`, `screen_effects` | Original (4:3), **Stretch to width**, Off: how these full-screen layers behave in widescreen |
+| Brightness | `brightness` | -50 to +50, **0**: lifts or lowers the dark end of the picture |
+| Contrast | `contrast` | 50% to 150%, **100%**: spreads or narrows the tones around mid-grey |
+| Gamma | `gamma` | 0.5 to 2.0, **1.0** (in the ini in tenths, 5 to 20): higher brightens the mid-tones, black and white stay |
+| Reset picture calibration | | brightness, contrast and gamma back to neutral |
 | **Renderer** | | |
 | Native 3D renderer | `native_3d` | **on**: 3D models projected and clipped by the GPU instead of the emulated VU1/GS path |
 | Native textures | `native_tex` | **on**: textures uploaded once instead of on every switch |
 | Cull off-screen models | `model_cull` | **on** (as on the PS2); off stops models popping at the screen edges |
+
+Brightness, contrast and gamma change the game's picture (menus and movies included), not the F1
+overlay; at the neutral values the picture is exactly the original. While one of them is chosen,
+both menus show a test pattern: a black strip and a white strip with five grey squares each (in F1
+in the setting's tooltip). Turn Brightness until the left square on the black strip is barely
+visible, and Contrast until the right square on the white strip is barely visible.
 
 ### Gameplay
 
