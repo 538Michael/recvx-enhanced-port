@@ -200,6 +200,8 @@ static void test_events(void)
     BAD(EV_EOPTS, 1, e->u.eo.extra = 4);
     BAD(EV_EOPTS, 1, e->u.eo.seed = -1);
     BAD(EV_EOPTS, 1, e->u.eo.rand = 2);
+    BAD(EV_EOPTS, 1, e->u.eo.variety = 2);
+    BAD(EV_EOPTS, 1, e->u.eo.events = -1);
     /* EV_FX: an effect number the game has, references to an enemy slot or FX_*, finite floats; bursts bounded */
     /* EV_GRANT: an item the game has, a floor, a count, a room, a position the save region can hold */
     BAD(EV_GRANT, 0, e->u.gt.item = 0);

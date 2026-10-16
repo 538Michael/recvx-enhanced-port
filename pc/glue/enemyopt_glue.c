@@ -30,12 +30,12 @@ int spawn_count(void);
 void spawn_keep_texlist(const NJS_TEXLIST* l);
 void bhCheckEneWorkNum(void);   /* eneset.h */
 
-EnemyOpts g_enemy_opts;                 /* settings (F1, recvx.ini) */
+EnemyOpts g_enemy_opts = { .variety = 1, .events = 1 };   /* settings (F1, recvx.ini) */
 static EnemyOpts host_opts;             /* a co-op guest's: the host's */
 static int have_host_opts;
 int enemy_room_gen;                     /* room loads so far */
 
-/* test aids: RECVX_ENEMY_EXTRA / _PLACE / _RANDOM / _SEED override the settings */
+/* test aids: RECVX_ENEMY_EXTRA / _PLACE / _RANDOM / _SEED / _VARIETY / _EVENTS override the settings */
 __attribute__((constructor)) static void opts_env(void)
 {
     const char* e;
@@ -43,6 +43,8 @@ __attribute__((constructor)) static void opts_env(void)
     if ((e = getenv("RECVX_ENEMY_PLACE"))) g_enemy_opts.place = atoi(e);
     if ((e = getenv("RECVX_ENEMY_RANDOM"))) g_enemy_opts.rand = atoi(e);
     if ((e = getenv("RECVX_ENEMY_SEED"))) g_enemy_opts.seed = atoi(e);
+    if ((e = getenv("RECVX_ENEMY_VARIETY"))) g_enemy_opts.variety = atoi(e);
+    if ((e = getenv("RECVX_ENEMY_EVENTS"))) g_enemy_opts.events = atoi(e);
 }
 
 const EnemyOpts* enemy_opts(void)
@@ -59,7 +61,8 @@ void enemy_opts_from_host(const EnemyOpts* o)
     if (!o) kept_n = 0;   /* (enemy_rand_kept: the host's kept records go with its session) */
     if (o) {
         host_opts = *o;
-        host_log("enemies: the host's options: extra %d, placements %d, randomizer %d, seed %d\n", o->extra, o->place, o->rand, o->seed);
+        host_log("enemies: the host's options: extra %d, placements %d, randomizer %d (%s%s), seed %d\n", o->extra, o->place, o->rand,
+                 o->variety ? "wild" : "mild", o->events ? ", event enemies" : "", o->seed);
     }
 }
 
@@ -80,6 +83,7 @@ enum { REC_EVENT = 1, REC_SHOWN = 2, REC_HP = 4 };
 static unsigned char rec_flags[128];
 static const ActorModel* rand_src[128];   /* randomized records: where their new type comes from */
 static int all_dead_check;              /* the script counts kills (DieEventCk): "all dead" doors */
+static int rm_flg_used;                 /* the script tests or sets rm_flg bits 29..31 (= 0x4, 0x2, 0x1), which some types write */
 
 static void scan_script(void)
 {
@@ -88,7 +92,7 @@ static void scan_script(void)
     unsigned int offs[256], first, o, end;
     int n = 0, i, j;
     memset(rec_flags, 0, sizeof(rec_flags));
-    all_dead_check = 0;
+    all_dead_check = rm_flg_used = 0;
     if (!base) return;
     first = tab[0];
     for (i = 0; (unsigned)i * 4 < first && i < 256; i++) {
@@ -118,6 +122,11 @@ static void scan_script(void)
             case 153: case 208: rec_flags[p[1] & 127] |= REC_HP; break;   /* EnemyHpUp, EneLifeSetM */
             case 36: if (p[1] == 1) rec_flags[p[2] & 127] |= REC_SHOWN; break;   /* InitModelSet */
             case 33: all_dead_check = 1; break;   /* DieEventCk */
+            case 4: case 5: {   /* Ck / Set rm_flg (bit n: mask 0x80000000 >> n) */
+                int b = (p[2] | p[3] << 8) & 0x3FF;
+                if (p[1] == 4 && b >= 29 && b <= 31) rm_flg_used = 1;
+                break;
+            }
             case 1: if (depth < 64) ends[depth++] = o + p[1] + 1; break;   /* IfelCk */
             case 2: if (depth) depth--; if (depth < 64) ends[depth++] = o + p[1]; break;   /* ElseCk */
             case 3: if (depth) depth--; break;   /* Endif */
@@ -189,9 +198,6 @@ static void place(const EnemyOpts* o)
 }
 
 /* ---------------------------------------------------------------- (c) randomizer */
-/* Free-roaming records become other types within the slot budget of docs/ENEMIES.md "Requirements for randomizers and difficulty options"
-   (helper code, et_lp rows and the texture heap no longer limit the mix on the PC); everything else
-   (story, cutscene, scripted HP, bosses, "all dead" rooms) stays; any failure keeps the original. */
 /* A co-op guest randomizes as the host (the same options, seed and room file), but each side refuses a
    record whose type does not fit its own texture memory, and the guest's puppets follow the host's
    slots. So the guest follows the host: its spawns take no texture reserve (SPAWN_DICTATED), and the
@@ -214,77 +220,186 @@ void enemy_rand_kept(int room, int rec, int id)
     kept[kept_n++].rec = (unsigned char)rec;
 }
 
-static int boss_or_set_piece(int id)
+/* boss arenas: their scripts wait for the boss's death or drive it; nothing in these rooms changes */
+static int boss_arena(int id)
 {
-    return id == 2 || (id >= 11 && id <= 19) || id == 23 || id == 25 || id == 29 || id == 30 || (id >= 53 && id <= 56) || id == 0 || id == 24;
+    return id == 2 || (id >= 12 && id <= 17) || id == 19 || id == 23 || id == 24 || id == 29 || id == 30 || (id >= 53 && id <= 55);
 }
-static int rand_pool(int id, int stage) { return id == 1 || id == 4 || id == 9 || (stage >= 2 && (id == 3 || id == 5)); }
-#define slot_cost spawn_slots_needed
+#define slot_cost(id) ((id) < 31 ? spawn_slots_needed(id) : 1)
 
+/* What a record can become: a kind (weighted), then one of its looks (the spawn list's entries of that type,
+   unused ones in this room first). Weights per variety (0 Mild, 1 Wild); 0: not in that variety. */
+enum { K_BIG = 1,       /* needs open space around the record (not in corridors or small rooms) */
+       K_FLIER = 2,     /* only for flier records (bats, Spotters), which hover where they are placed */
+       K_RMFLG = 4,     /* its code writes rm_flg bits 0..2 (Tyrant clears them every frame): not where the script uses them */
+       K_NOCOUNT = 8 }; /* not where the doors count the kills: it may leave the room, fly out of reach or take too long */
+static const struct { unsigned char id, w[2], flags; } kinds[] = {
+    { 1, { 5, 5 }, 0 },                         /* zombie, 24 looks */
+    { 4, { 4, 4 }, 0 },                         /* Cerberus */
+    { 9, { 4, 4 }, 0 },                         /* Bandersnatch */
+    { 5, { 3, 4 }, K_NOCOUNT },                 /* Hunter, Sweeper: may leap out of a room */
+    { 3, { 2, 3 }, K_BIG },                     /* Black Widow (with its brood 25 slots) */
+    { 26, { 2, 2 }, 0 },                        /* anatomist */
+    { 22, { 2, 2 }, 0 },                        /* albinoid adult (walks on land) */
+    { 19, { 0, 2 }, K_BIG | K_RMFLG | K_NOCOUNT },   /* Tyrant, both looks */
+    { 23, { 0, 1 }, K_BIG | K_RMFLG | K_NOCOUNT },   /* Giant Black Widow */
+    { 7, { 0, 3 }, K_FLIER | K_RMFLG | K_NOCOUNT },  /* bat */
+    { 11, { 0, 2 }, K_FLIER | K_RMFLG | K_NOCOUNT }, /* Spotter */
+};
+#define KINDS (int)(sizeof(kinds) / sizeof(kinds[0]))
+static int ground_record(int id) { return id == 1 || id == 3 || id == 4 || id == 5 || id == 9; }
+static int flier_record(int id) { return id == 7 || id == 11; }
+static int look_ok(const ActorModel* m, int id) { return m->id == id && !(id == 9 && m->mdlver == 1); }   /* (Bandersnatch 2 is an event's arm) */
+
+/* directions (of 8) with no wall within `len` units of the record, at waist height */
+static int open_dirs(const BH_PWORK* ep, float len)
+{
+    int k, n = 0;
+    for (k = 0; k < 8; k++) {
+        float a = (float)k * (6.2831853f / 8.0f);
+        NJS_POINT3 p1 = { ep->px, ep->py + 10.0f, ep->pz }, p2 = { ep->px + len * sinf(a), ep->py + 10.0f, ep->pz + len * cosf(a) };
+        n += !bhCollisionCheckLine2(&p1, &p2, 0x4400, (char)ep->flr_no);
+    }
+    return n;
+}
+
+/* a look of kind `kd` for a record of type `id` model `ver`: not the record's own, unused in this room if any is left */
+static const ActorModel* pick_look(int kd, int id, int ver, const unsigned char* used)
+{
+    int j, n = 0, pass, pick;
+    for (pass = 0; pass < 2 && !n; pass++)
+        for (j = 0; j < spawn_count(); j++) {
+            const ActorModel* m = spawn_entry(j);
+            n += look_ok(m, kinds[kd].id) && !(m->id == id && m->mdlver == ver) && (pass || !used[j]);
+        }
+    if (!n) return NULL;
+    pick = (int)(rnd() % (unsigned)n);
+    for (j = 0; j < spawn_count(); j++) {
+        const ActorModel* m = spawn_entry(j);
+        if (look_ok(m, kinds[kd].id) && !(m->id == id && m->mdlver == ver) && (pass > 1 || !used[j]) && pick-- == 0) return m;
+    }
+    return NULL;
+}
+
+/* Records change at the room load (docs/ENEMIES.md "Randomizer"): free ones (and, with "event enemies", those the
+   script only shows or hides) to another kind; those an event drives (and those whose HP the script reads) to another
+   look of their own type, so the event's motions, AI states and HP tests still fit. Bosses and their arenas, NPCs,
+   water and wall types, props stay. Every record keeps its slot and kill bit; any refusal keeps the original.
+   The choices depend only on the options, the room file and its collision (the same on both co-op sides). */
 static void randomize(const EnemyOpts* o)
 {
-    int k, j, cand[128], nc = 0, cost = 0, kinds = 0, made = 0;
-    int pool[128], np = 0, kind[2], guest = coop_is_guest();
-    unsigned char held[128] = { 0 };   /* guest: records the host kept */
-    for (k = j = 0; k < kept_n; k++)   /* (this room's notes are used up by this load) */
-        if (guest && kept[k].room == room_file_now()) held[kept[k].rec] = 1;
+    int k, j, cost = 0, made = 0, nc = 0, guest = coop_is_guest(), room = room_file_now(), wild = o->variety != 0;
+    int kused[KINDS] = { 0 }, room_kinds[2] = { -1, -1 };
+    unsigned char held[128] = { 0 }, used[256] = { 0 }, cls[128] = { 0 };   /* cls: 1 another kind, 2 another look */
+    char line[600];
+    int ln = 0;
+    for (k = j = 0; k < kept_n; k++)   /* guest: records the host kept (this room's notes are used up by this load) */
+        if (guest && kept[k].room == room) held[kept[k].rec] = 1;
         else kept[j++] = kept[k];
     kept_n = j;
-    if (all_dead_check) { host_log("enemies: room %04d not randomized (its doors count the kills)\n", room_file_now()); return; }
     for (k = 0; k < rom->ene_n && k < 128; k++) {
         BH_PWORK* ep = &ene[k];
         if (!(ep->flg & 0x1)) continue;
-        if (boss_or_set_piece(ep->id)) { host_log("enemies: room %04d not randomized (boss or set piece %d)\n", room_file_now(), ep->id); return; }
-        if (!rec_flags[k] && (ep->id == 1 || ep->id == 3 || ep->id == 4 || ep->id == 5 || ep->id == 9)) cand[nc++] = k;   /* (not the fliers: their records hover) */
-        else if (ep->id < 31) cost += slot_cost(ep->id);
-        else cost += 1;
+        if (boss_arena(ep->id)) { host_log("enemies: room %04d not randomized (boss %d)\n", room, ep->id); return; }
+        cost += slot_cost(ep->id);   /* (all records: a change adds its difference, so a room never exceeds its own count) */
+        if (!ground_record(ep->id) && !(wild && flier_record(ep->id))) continue;
+        if (!rec_flags[k]) cls[k] = 1;
+        else if (o->events) cls[k] = rec_flags[k] & (REC_EVENT | REC_HP) ? 2 : 1;
+        if (cls[k] == 1 && ep->flr_no < 0) cls[k] = 0;   /* (no floor under it: one hanging somewhere for an event) */
+        nc += cls[k] != 0;
     }
     if (!nc) return;
-    for (j = 0; j < spawn_count(); j++)
-        if (rand_pool(spawn_entry(j)->id, sys->stg_no)) pool[np++] = j;
-    rnd_seed((unsigned)o->seed, (unsigned)room_file_now() * 977u + 0x3000u);
-    for (j = 0; j < 40 && kinds < 2; j++) {   /* up to two kinds */
-        const ActorModel* m = spawn_entry(pool[rnd() % np]);
-        int i, dup = 0;
-        for (i = 0; i < kinds; i++) dup |= spawn_entry(kind[i]) == m;
-        if (dup) continue;
-        { int q; for (q = 0; q < spawn_count() && spawn_entry(q) != m; q++); kind[kinds++] = q; }
+    if (!wild) {   /* Mild: up to two kinds for the room's free records */
+        rnd_seed((unsigned)o->seed, (unsigned)room * 977u + 0x3000u);
+        for (j = 0; j < 2; j++) {
+            int t = 0, r;
+            for (k = 0; k < KINDS; k++) t += k != room_kinds[0] && !(kinds[k].flags & K_NOCOUNT && all_dead_check) ? kinds[k].w[0] : 0;
+            for (r = (int)(rnd() % (unsigned)t), k = 0; k < KINDS; k++) {
+                int w = k != room_kinds[0] && !(kinds[k].flags & K_NOCOUNT && all_dead_check) ? kinds[k].w[0] : 0;
+                if (r < w) break;
+                r -= w;
+            }
+            room_kinds[j] = k;
+        }
     }
-    for (k = 0; k < nc; k++) {
-        int rec = cand[k], i;
-        const ActorModel* m = spawn_entry(kind[rnd() % kinds]);
-        BH_PWORK save = ene[rec];
+    for (k = 0; k < rom->ene_n && k < 128; k++) {
+        BH_PWORK save = ene[k];
         SpawnNote n = { 0 };
+        const ActorModel* m = NULL;
         const char* why;
-        if (cost + slot_cost(m->id) > 128 - SPAWN_SLOTS_FREE) m = spawn_entry(kind[0]);
-        if (cost + slot_cost(m->id) > 128 - SPAWN_SLOTS_FREE || (m->id == ene[rec].id && m->mdlver == ene[rec].mdlver)) { cost += slot_cost(ene[rec].id); continue; }
-        if (held[rec]) {   /* as the host's: the original */
-            cost += slot_cost(save.id);
-            host_log("enemies: record %d stays %d (as the host's)\n", rec, save.id);
+        int i, kd = -1;
+        if (!cls[k]) continue;
+        rnd_seed((unsigned)o->seed, (unsigned)room * 977u + 0x3000u + (unsigned)k * 7919u);   /* each record its own draws */
+        if (cls[k] == 2) {   /* another look of its type */
+            for (kd = 0; kd < KINDS && kinds[kd].id != save.id; kd++);
+            if (kd < KINDS) m = pick_look(kd, save.id, save.mdlver, used);
+        } else {
+            int w[KINDS], t = 0, fresh = 0, r, big = -1, mine = 0;
+            for (i = 0; i < KINDS; i++) {
+                int f = kinds[i].flags;
+                w[i] = kinds[i].w[wild];
+                if (!(f & K_FLIER) != !flier_record(save.id)) w[i] = 0;
+                if ((f & K_NOCOUNT) && all_dead_check) w[i] = 0;
+                if ((f & K_RMFLG) && rm_flg_used) w[i] = 0;
+                if (cost - slot_cost(save.id) + slot_cost(kinds[i].id) > 128 - SPAWN_SLOTS_FREE) w[i] = 0;
+                if (w[i] && (f & K_BIG)) {
+                    if (big < 0) big = open_dirs(&save, 35.0f);
+                    if (big < 6) w[i] = 0;
+                }
+                mine |= w[i] && (i == room_kinds[0] || i == room_kinds[1]);
+            }
+            for (i = 0; i < KINDS; i++) {
+                if (mine && i != room_kinds[0] && i != room_kinds[1]) w[i] = 0;   /* Mild: the room's two kinds, if one fits */
+                fresh |= w[i] && !kused[i];
+            }
+            for (i = 0; i < KINDS; i++) {   /* each kind once while unused ones are left */
+                if (fresh && kused[i]) w[i] = 0;
+                t += w[i];
+            }
+            if (t) {
+                for (r = (int)(rnd() % (unsigned)t), kd = 0; kd < KINDS && r >= w[kd]; kd++) r -= w[kd];
+                m = pick_look(kd, save.id, save.mdlver, used);
+            }
+        }
+        if (!m) {   /* its own kind drawn, without another look (Cerberus, bat), or nothing else fits */
+            if (kd >= 0 && kd < KINDS) kused[kd] = 1;
+            host_log("enemies: record %d stays type %d model %d (%s)\n", k, save.id, save.mdlver, cls[k] == 2 ? "event enemy, no other look of its type"
+                     : kd >= 0 && kinds[kd].id == save.id ? "its own kind drawn" : "nothing else fits");
+            continue;
+        }
+        for (j = 0; j < spawn_count() && spawn_entry(j) != m; j++);
+        used[j] = 1;
+        kused[kd] = 1;
+        if (held[k]) {   /* as the host's: the original */
+            host_log("enemies: record %d stays %d (as the host's)\n", k, save.id);
             continue;
         }
         n.room = m->room; n.rec = m->rec; n.id = m->id; n.mdlver = m->mdlver;
+        n.type = m->id == save.id ? save.type : 0;   /* the same type keeps its variant (an event's or a lying zombie's) */
         n.px = save.px; n.py = save.py; n.pz = save.pz; n.ay = save.ay; n.flr = save.flr_no;
-        ene[rec].flg = 0;
-        why = spawn_at(m, &n, rec, guest ? SPAWN_LOADING | SPAWN_DICTATED : SPAWN_LOADING, NULL);
+        ene[k].flg = 0;
+        why = spawn_at(m, &n, k, guest ? SPAWN_LOADING | SPAWN_DICTATED : SPAWN_LOADING, NULL);
         if (why) {   /* softlock-safe fallback: the original record as it was */
-            SpawnNote o = { (unsigned short)room_file_now(), (unsigned char)rec, (unsigned char)save.id, (unsigned char)save.mdlver, (unsigned char)save.type,
-                            save.flr_no, SPAWN_NOTE_KEPT, save.px, save.py, save.pz, (short)save.ay, 0 };
-            ene[rec] = save;
+            SpawnNote kn = { (unsigned short)room, (unsigned char)k, (unsigned char)save.id, (unsigned char)save.mdlver, (unsigned char)save.type,
+                             save.flr_no, SPAWN_NOTE_KEPT, save.px, save.py, save.pz, (short)save.ay, 0 };
+            ene[k] = save;
             bhCheckEneWorkNum();
-            cost += slot_cost(save.id);
-            host_log("enemies: record %d stays %d (%s)%s\n", rec, save.id, why, guest ? "; the host's may differ" : "");
-            if (!guest) coop_rand_kept(rec, &o);   /* the guest keeps it too */
+            host_log("enemies: record %d stays %d (%s)%s\n", k, save.id, why, guest ? "; the host's may differ" : "");
+            if (!guest) coop_rand_kept(k, &kn);   /* the guest keeps it too */
             continue;
         }
         for (i = 0; i < save.mdl_n; i++)   /* the original's textures are released with the room's (the record now holds the new type) */
             if ((save.mdl[i].flg & 0x200) && save.mdl[i].texP) spawn_keep_texlist(save.mdl[i].texP);
-        rand_src[rec] = m;   /* (the room file still says the old type: extra enemies copy from here) */
-        cost += slot_cost(m->id);
+        rand_src[k] = m;   /* (the room file still says the old type: extra enemies copy from here) */
+        cost += slot_cost(m->id) - slot_cost(save.id);
         made++;
-        host_log("enemies: room %04d record %d: type %d model %d -> %s (type %d model %d)\n", room_file_now(), rec, save.id, save.mdlver, m->name, m->id, m->mdlver);
+        host_log("enemies: room %04d record %d: type %d model %d -> %s (type %d model %d)%s\n", room, k, save.id, save.mdlver, m->name, m->id, m->mdlver,
+                 cls[k] == 2 ? ", event enemy: same type" : "");
     }
-    host_log("enemies: room %04d: %d of %d free-roaming enemies randomized (seed %d)\n", room_file_now(), made, nc, o->seed);
+    for (k = 0; k < rom->ene_n && k < 128 && ln < (int)sizeof(line) - 16; k++)
+        if ((ene[k].flg & 0x1) && ene[k].id < 31) ln += snprintf(line + ln, sizeof(line) - ln, " %d:%d.%d", k, ene[k].id, ene[k].mdlver);
+    host_log("enemies: room %04d: %d of %d records randomized (seed %d, %s%s), now%s\n", room, made, nc, o->seed, wild ? "wild" : "mild",
+             o->events ? ", event enemies" : "", line);
 }
 
 /* ---------------------------------------------------------------- the room load (room.c bhFinishRoom) */
@@ -307,11 +422,44 @@ void enemy_room_finished(void)
 /* types that roam freely and die like any enemy */
 static int extra_type(int id) { return id == 1 || id == 3 || id == 4 || id == 5 || id == 9 || id == 22 || id == 26; }
 
+/* Test aid RECVX_ENEMY_KILL=n: from n game frames into each room, every 20 frames each living enemy of the room's
+   records (ids 1..30, in its AI, shown) takes a heavy hit as from the player's weapon (weapon.c bhCheckGunAtari: hit
+   flag, joint, damage); logs each death (flg & 2: what the script's DieCk turns into its kill bit) and, at the next
+   room, how many of the room's enemies died. */
+static void kill_test(void)
+{
+    static int n = -2, gen = -1, t, hit[128], died[128], room;
+    int k, h = 0, d = 0;
+    if (n == -2) n = getenv("RECVX_ENEMY_KILL") ? atoi(getenv("RECVX_ENEMY_KILL")) : -1;
+    if (n < 0 || !sys || !plp || !rom || (sys->gm_flg & 0x9) || (sys->cb_flg & 0x1)) return;
+    if (gen != enemy_room_gen) {
+        for (k = 0; k < 128; k++) { h += hit[k]; d += died[k]; }
+        if (h) printf("test: room %04d: %d of %d enemies hit died\n", room, d, h);
+        gen = enemy_room_gen; t = 0; room = room_file_now();
+        memset(hit, 0, sizeof(hit)); memset(died, 0, sizeof(died));
+    }
+    if (++t < n) return;
+    for (k = 0; k < rom->ene_n && k < 128; k++) {
+        BH_PWORK* ep = &ene[k];
+        if (!(ep->flg & 0x1) || ep->id < 1 || ep->id > 30) continue;
+        if ((ep->flg & 0x2) && hit[k] && !died[k]) { died[k] = 1; printf("test: room %04d record %d (type %d) died after %d frames\n", room, k, ep->id, t - n); }
+        if ((ep->flg & 0x2) || (ep->stflg & 0x1000000) || ep->mode0 == 5 || (t - n) % 20) continue;
+        hit[k] = 1;
+        ep->flg |= 0x4;
+        ep->dpx = ep->px; ep->dpy = ep->py + 10.0f; ep->dpz = ep->pz;
+        ep->wpnr_no = plp->wpnr_no;
+        ep->djnt_no = ep->mlwP && ep->mlwP->obj_num > 1 ? 1 : 0;
+        ep->dam[ep->djnt_no] += 500;
+        ep->comb_flg |= 0x10;
+    }
+}
+
 void enemy_extras_frame(void)
 {
     static int done_gen = -1;
     const EnemyOpts* o;
     int cand[128], nc = 0, k, made = 0;
+    kill_test();
     if (done_gen == enemy_room_gen || !sys || !plp || !rom) return;
     o = enemy_opts();
     if (!o->extra || coop_is_guest()) { done_gen = enemy_room_gen; return; }

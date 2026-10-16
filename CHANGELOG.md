@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased
+
+### Gameplay
+
+- **More varied enemy randomizer**: a randomized room now draws from every enemy kind that works
+  there, from anywhere in the game (zombies in all their looks, Cerberus, Bandersnatches, Hunters
+  and Sweepers, Black Widows, anatomist zombies, adult albinoids, and in the new *Wild* variety
+  also Tyrants, Giant Black Widows, and bats and Spotters in place of bats), each kind weighted so
+  zombies no longer dominate, and each enemy of a room a different kind where possible. Big
+  enemies only appear where there is room around them, and rooms whose doors open once every
+  enemy is dead only get enemies that stay and can be killed there. Rooms with exploding props,
+  Spotters or the ceiling trap, and the prison's kill-to-open rooms, are randomized now too; boss
+  rooms stay as they are. New setting "Randomizer variety": *Wild* (default) or *Mild* (two
+  common kinds per room).
+- **Event enemies are randomized**: enemies a room shows later (ambushes, enemies appearing after a
+  story event) become other kinds as well, and enemies that a scene animates (zombies bursting in,
+  the Hunters' entrances) get another look of their own kind, so the scene still plays as
+  written. Kill flags and doors that open when enemies die keep working. New setting "Randomize
+  event enemies" (on by default).
+- **Co-op**: the protocol changed (both players need this build); the host's variety and event
+  setting count for both.
+
 ## 0.4.0 (2026-10-16)
 
 ### Gameplay
