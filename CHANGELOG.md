@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Picture calibration
+
+- **Brightness, Contrast and Gamma** in DISPLAY / PICTURE (F1 and ENHANCED SETTINGS), with
+  "Reset picture calibration". They adjust the game's picture, menus and movies included, but not
+  the F1 overlay, and change it live. At the neutral values the picture is exactly as before.
+- While one of them is chosen, both menus show a small test pattern of grey squares on a black and
+  a white strip, to set the dark and light ends.
+
 ### You appear as
 
 - **Models keep their own proportions when animated**: each model is moved by its own skeleton,

@@ -213,6 +213,11 @@ apart. An in-between replay is skipped when the next game frame is already queue
 rate limit (`fps_limit`: 30/60/90/120/144) caps presents per second below the display refresh
 (`render.c present_hz`); the game itself stays at 30.
 
+Picture calibration (`brightness`, `contrast`, `gamma`) is applied in the present shader
+(`gs_gl.c draw_display`, uniform `u_pic`), so executed frames, in-between images and movies get it
+and the overlay drawn afterwards does not. At the neutral values the shader skips it and the
+output is bit-identical; `gs_picture` is the same formula on the CPU (F1's test pattern).
+
 `glGetError` is read only every 64th executed frame (reading it after every flush made the
 render thread wait for the driver's GL thread).
 
@@ -421,6 +426,7 @@ third-person key binding).
 | `SET_GAME_ONLY` | only while a game runs |
 | `SET_ACTION` (+ `.apply`) | a command, not a value; the native menu runs it when it closes |
 | `SET_NOW` | an action the native menu runs at once |
+| `SET_CALIB` | picture calibration: while the row is chosen, both menus show the grey-step test pattern (`settings_calib`) |
 
 ## Save system
 
