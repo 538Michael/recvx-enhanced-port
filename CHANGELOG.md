@@ -4,6 +4,7 @@
 
 ### Fixes
 
+- **Alexia's tentacles** use their intended attack timing again: a decompilation bug read the wrong shape table. Fix by fmil95 (decompilation team).
 - **Metal detector with "No ink ribbons needed"** (prison): with the setting on (or the co-op
   host's INK RIBBONS *Not needed*), the detector went off even with every metal item put in the
   trays. The setting made every check for an ink ribbon succeed, and the detector checks for ink
