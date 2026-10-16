@@ -1132,12 +1132,33 @@ void gs_flush(void)
     {
         uint64_t sc = st->ctx.scissor;
         int x0 = sc & 0x7FF, x1 = (sc >> 16) & 0x7FF, y0 = (sc >> 32) & 0x7FF, y1 = (sc >> 48) & 0x7FF;
-        if (!cur_rt->has_box) { cur_rt->has_box = 1; cur_rt->bx0 = x0; cur_rt->by0 = y0; cur_rt->bx1 = x1; cur_rt->by1 = y1; }
-        else {
-            if (x0 < cur_rt->bx0) cur_rt->bx0 = x0;
-            if (y0 < cur_rt->by0) cur_rt->by0 = y0;
-            if (x1 > cur_rt->bx1) cur_rt->bx1 = x1;
-            if (y1 > cur_rt->by1) cur_rt->by1 = y1;
+        if (!cur_rt->has_box || x0 < cur_rt->bx0 || y0 < cur_rt->by0 || x1 > cur_rt->bx1 || y1 > cur_rt->by1) {
+            /* the drawn area: the scissor, cut to the vertices of a 2D batch. A copy into a small
+               target under a full-screen scissor (PS2_Render_Tex_Sub: 320x240 into FBP 476) must
+               not claim the pages below it, where a CLUT upload would mark it stale. Native 3D
+               (homogeneous positions) and static runs keep the scissor. */
+            int b0 = x0, b1 = x1, c0 = y0, c1 = y1;
+            if (!nsruns) {
+                float mx0 = 1e9f, mx1 = -1e9f, my0 = 1e9f, my1 = -1e9f;
+                int k;
+                for (k = 0; k < vcount && vbuf[k].w == 1.0f; k++) {
+                    mx0 = fminf(mx0, vbuf[k].x); mx1 = fmaxf(mx1, vbuf[k].x);
+                    my0 = fminf(my0, vbuf[k].y); my1 = fmaxf(my1, vbuf[k].y);
+                }
+                if (k == vcount) {
+                    if (mx0 > b0) b0 = (int)floorf(mx0);
+                    if (mx1 < b1) b1 = (int)ceilf(mx1);
+                    if (my0 > c0) c0 = (int)floorf(my0);
+                    if (my1 < c1) c1 = (int)ceilf(my1);
+                }
+            }
+            if (!cur_rt->has_box) { cur_rt->has_box = 1; cur_rt->bx0 = b0; cur_rt->by0 = c0; cur_rt->bx1 = b1; cur_rt->by1 = c1; }
+            else {
+                if (b0 < cur_rt->bx0) cur_rt->bx0 = b0;
+                if (c0 < cur_rt->by0) cur_rt->by0 = c0;
+                if (b1 > cur_rt->bx1) cur_rt->bx1 = b1;
+                if (c1 > cur_rt->by1) cur_rt->by1 = c1;
+            }
         }
         if (g_margin_x && x0 == 0 && x1 >= (int)fbw * 64 - 1) { x0 = -g_margin_x; x1 += g_margin_x; }   /* full width -> widened view */
         glEnable(GL_SCISSOR_TEST);
@@ -1708,12 +1729,15 @@ void gs_rt_to_mem(uint32_t bp, uint32_t bw, uint32_t psm, uint32_t x, uint32_t y
 
 /* StoreRenderTex on the GPU (RECVX_NATIVE_RTEX): GS pixels (0,0)-(w,h) of a render target
    copied at render resolution (margin and scale as in gs_rt_to_mem) into a new texture, 0 if
-   there is no such target (transparent black) */
-unsigned int gs_capture_rt(uint32_t fbp, uint32_t fbw, uint32_t w, uint32_t h)
+   there is no such target (transparent black). wide (hor+): GS x w/2 -+ w/2 * gs_hor_scale(),
+   the view the game drew with its widened clip volume, into a texture as many times wider
+   (the full-screen render texture, drawn back over the widened view) */
+unsigned int gs_capture_rt(uint32_t fbp, uint32_t fbw, uint32_t w, uint32_t h, int wide)
 {
     RenderTarget* rt = rt_find(fbp, fbw ? fbw : 1);
     GLuint tex = 0, fbo = 0;
-    int cw = 0, ch = 0, pw = (int)(w * g_scale), ph = (int)(h * g_scale);
+    float gw = wide && g_margin_x ? w * gs_hor_scale() : (float)w;   /* GS pixels captured across */
+    int cw = 0, ch = 0, pw = (int)(gw * g_scale), ph = (int)(h * g_scale);
     gs_flush();
     rt_touch(rt);
     ensure_target(&tex, &fbo, &cw, &ch, pw, ph);
@@ -1722,7 +1746,7 @@ unsigned int gs_capture_rt(uint32_t fbp, uint32_t fbw, uint32_t w, uint32_t h)
     glClearColor(0, 0, 0, 0);
     glClear(GL_COLOR_BUFFER_BIT);
     if (rt) {
-        int sx = (int)(g_margin_x * g_scale), sw = pw < rt->pw - sx ? pw : rt->pw - sx, sh = ph < rt->ph ? ph : rt->ph;
+        int sx = (int)((g_margin_x + (w - gw) / 2) * g_scale), sw = pw < rt->pw - sx ? pw : rt->pw - sx, sh = ph < rt->ph ? ph : rt->ph;
         glBindFramebuffer(GL_READ_FRAMEBUFFER, rt->fbo);
         glBlitFramebuffer(sx, 0, sx + sw, sh, 0, 0, sw, sh, GL_COLOR_BUFFER_BIT, GL_NEAREST);
     }

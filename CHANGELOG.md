@@ -19,6 +19,14 @@
   reached past its picture into the neighbouring one in the texture; each piece now samples only
   its own picture, as on the PS2. Fixed thanks to fmil95 (decompilation team), who found
   and tracked down the problem.
+- **Steve in the gas room** (Palace, the control panel after taking the gold Lugers): the close-up
+  of the monitor showed the game only in a tiny window in the middle of a black screen, at any
+  resolution. A call in the game code passed its value in a form the PC build read wrongly, so
+  the 3D after the monitor's picture was drawn far too small. The monitor itself now shows Steve
+  again instead of staying dark: the picture is drawn into a small area, and an unrelated upload
+  beside it made the renderer take that area for overwritten. The memory card screen's save
+  counts had the same kind of call. In widescreen the full-screen wobble (the gas in that room
+  and similar effects) now fills the whole view instead of a 4:3 picture with black bars.
 
 ### Fixes
 
