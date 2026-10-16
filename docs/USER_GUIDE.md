@@ -208,8 +208,8 @@ quick knife and the left stick click the trade request, since those buttons have
 The game's own key types (OPTION -> KEY CONFIG) still decide what each PS2 button does.
 
 Third person (keyboard and mouse): W/S/A/D move and turn, Shift run, E action, Q cancel,
-Tab inventory, M map, right mouse aim, left mouse fire. With a gamepad see
-[Third person with a gamepad](#third-person-with-a-gamepad).
+Tab inventory, M map, right mouse aim, left mouse fire, R reload ([Reload](#reload)). With a
+gamepad see [Third person with a gamepad](#third-person-with-a-gamepad).
 
 ### Third person with a gamepad
 
@@ -229,10 +229,16 @@ behind). As in the Resident Evil 2 and 4 remakes:
 | Y / Triangle | inventory | `pad_tps_inventory` |
 | View / Share (Back) | map | `pad_tps_map` |
 | LB / L1 (hold) | quick knife: knife drawn and raised, RT slashes, the weapon before on release | `pad_tps_knife` |
-| RB / R1 | quick turn (the camera swings round with the character) | `pad_tps_quickturn` |
+| RB / R1 | reload ([Reload](#reload)) | `pad_tps_reload` |
+| D-pad down | quick turn (the camera swings round with the character) | `pad_tps_quickturn` |
 | Right stick click | camera behind the character | `pad_tps_recenter` |
 | Left stick pulled back + run | quick turn | |
-| D-pad, Start | as before (d-pad: tank turn and walk; Start: options) | |
+| D-pad up / left / right, Start | as before (d-pad: tank turn and walk; Start: options) | |
+
+Reload sits on RB as in Resident Evil 4 and the RE4 remake's type C (the remakes' other types use
+X / Square, which runs here as in the game's type A); the quick turn, which the stick gesture also
+does, moved from RB to the d-pad's down. A `recvx.ini` from before the reload button that still
+has the quick turn on RB gets the new default.
 
 - **Moving**: the character turns quickly towards the stick's direction and walks; pointing more
   than 100 degrees away turns it on the spot first. After a quick turn or "camera behind" the
@@ -253,6 +259,26 @@ behind). As in the Resident Evil 2 and 4 remakes:
   near the centre.
 - The third-person gamepad buttons are their own bindings: rebinding one (CONTROLS, Gamepad,
   "Third person (gamepad, Modern)") leaves the fixed-camera binding of the same button alone.
+
+### Reload
+
+Reloads the equipped weapon from the ammo in the inventory without opening it, as the game does
+by itself when you fire with an empty magazine: the same motion, sound and magazine size, and it
+takes the first ammo in the inventory that reloads that weapon, as combining them in the
+inventory would (a magazine that fills up leaves the rest in the stack; a stack used up leaves
+the inventory). It works whenever the magazine is not full and matching ammo is there: while
+aiming (also through the sniper rifle's scope) and with the weapon lowered while standing,
+walking or running (the weapon comes up for the reload and goes down again; holding aim keeps
+it up). Without matching ammo, with a full magazine, unlimited ammo, during events, menus,
+doors or when grabbed it does nothing. Weapons the game does not reload by itself, the grenade
+launcher (its rounds are combined in the inventory) and the knife, are left alone; the bow gun
+reloads the kind of arrows it holds. The sniper rifle and linear launcher reload only through
+their scope (their reload ends in it).
+
+Defaults: R in third person, RB / R1 with the Modern third-person gamepad controls. The fixed
+cameras and the Classic third-person gamepad have no free button for it: bind the "Reload" row
+(CONTROLS, `key_reload` / `pad_reload`, unbound by default), which works in every mode. In co-op
+it is your own action: the partner sees the reload and the ammo stays in your inventory.
 
 ### Modern controls (fixed cameras)
 
@@ -287,7 +313,7 @@ Hotkeys:
 | F3 | co-op window |
 | F5 | third-person camera on/off |
 | F11 | fullscreen |
-| R / Page Up, F / Page Down | noclip fly up / down (when flying is on) |
+| Page Up, F / Page Down | noclip fly up / down (when flying is on; R reloads now) |
 
 ### Rebinding
 
@@ -309,12 +335,13 @@ pad_l2 = +lefttrigger
 pad_quickturn = -lefty
 ```
 
-Keys use SDL key names (`Z`, `Return`, `Left Shift`, `Page Up`), mouse buttons
+Keys use SDL key names (`Z`, `Return`, `Left Shift`, `PageUp`), mouse buttons
 `Mouse Left/Middle/Right/X1/X2`. Gamepad inputs are positional (`south` = Xbox A = PlayStation
 Cross, `east`, `west`, `north`, `back`, `start`, `guide`, `leftshoulder`, `rightshoulder`,
 `leftstick`, `rightstick`, `dpup`, `dpdown`, `dpleft`, `dpright`, `misc1`, `paddle1`-`paddle4`,
 `touchpad`) or an axis half (`+lefttrigger`, `-leftx`, `+lefty`, ...). `none` unbinds.
-Extra rows: "Quick turn" (unbound by default: back, then run), the third-person keys, the
+Extra rows: "Quick turn" (unbound by default: back, then run), "Reload" (unbound by default,
+[Reload](#reload)), the third-person keys, the
 third-person gamepad set (`pad_tps_*`, [Third person with a gamepad](#third-person-with-a-gamepad))
 and the hotkeys.
 

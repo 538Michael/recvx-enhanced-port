@@ -27,6 +27,7 @@ void actor_aim_offset(const BH_PWORK* p, float* out);   /* actor_glue.c */
 int actor_aim_hand(const BH_PWORK* p, float* hand);
 float actor_cam_scale(void);
 uint64_t gs_frame_count(void); /* the presented frame (RECVX_INPUT, frame dumps) */
+int reload_at_rest(void);      /* reload_glue.c */
 
 static float yaw, pitch;          /* camera, game angle units (65536 = 360 deg); pitch > 0 looks up */
 static float mouse_dx, mouse_dy;  /* this frame's mouse motion, pixels */
@@ -96,7 +97,8 @@ static void deactivate(void)
     if (sys && !(sys->st_flg & 0x1)) sys->gm_flg |= 0x800;
 }
 
-static int aiming(void) { return tps_cam_active && plp->mode0 == 1 && plp->mode1 == 1; }
+/* the weapon raised; not the reload of a lowered weapon (reload_glue.c), which keeps the walking camera */
+static int aiming(void) { return tps_cam_active && plp->mode0 == 1 && plp->mode1 == 1 && !reload_at_rest(); }
 
 static float cur_dist, cur_fov;   /* eased towards the walk/aim values */
 
@@ -774,7 +776,7 @@ void tps_player(void)
     float d;
     int n;
     if (trace && tps_cam_active && plp->mode1 == 1) trace_shot();
-    if (!tps_cam_active || plp->mode0 != 1 || (plp->mode1 == 0 && plp->mode2 > 13)) { frac = 0; return; }
+    if (!tps_cam_active || plp->mode0 != 1 || (plp->mode1 == 0 && plp->mode2 > 13) || reload_at_rest()) { frac = 0; return; }
     if (trace && plp->mode1 == 1)
         printf("tps: weapon mode %d/%d motion %d frame %d/%d at (%.1f %.1f) ay %.1f hand y %.1f\n", plp->mode2, plp->mode3, plp->mtn_no, plp->frm_no >> 16,
                plp->mnwP ? plp->mnwP[plp->mtn_no].frm_num : -1, plp->px, plp->pz, (short)plp->ay * (360.0f / 65536.0f), plp->mlwP->owP[9].mtx[13] - plp->py);
@@ -875,7 +877,7 @@ void tps_calc_model(void)
     static float w;   /* eased in/out when the weapon is raised/lowered */
     O_WORK* ow = plp->mlwP->owP;
     float a, dx, dz, ofs[3];
-    int on = tps_cam_active && !lock_aim() && plp->mode0 == 1 && plp->mode1 == 1 && plp->mode2 != 68;
+    int on = tps_cam_active && !lock_aim() && plp->mode0 == 1 && plp->mode1 == 1 && plp->mode2 != 68 && !reload_at_rest();
 
     bhCalcModel(plp);
     bend_a = 0;

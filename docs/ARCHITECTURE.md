@@ -34,7 +34,7 @@ settings menus) hook into the game through small glue functions.
 |---|---|
 | `decomp/` | the decomp as a submodule (fork, branch `pc-port`). PC changes are inside `#ifdef TARGET_PC` blocks: asm replacements, PS2-address idioms, hooks into the glue, and fixes of undefined behaviour, with the PS2 original kept under `#else` |
 | `pc/include/` | `pc_prelude.h` (force-included into every decomp file: host headers, `long` as 64-bit, declarations of all PC hooks) and replacement SDK headers (`sdk/`) |
-| `pc/glue/` | PC code that needs the decomp's types: co-op, lobby, trade screen, third person, model swaps, cheats, enemy options and spawner, native renderer hooks, ENHANCED SETTINGS menu, mouse in menus, quick knife, native saves |
+| `pc/glue/` | PC code that needs the decomp's types: co-op, lobby, trade screen, third person, model swaps, cheats, enemy options and spawner, native renderer hooks, ENHANCED SETTINGS menu, mouse in menus, quick knife, reload button, native saves |
 | `pc/src/ps2/` | EE/IOP layer: kernel, DMA, VIF1, VU0/VU1 (static microcode and interpreter), libcdvd, libpad, libmc, SIF, the address window |
 | `pc/src/gs/` | GS emulation (GIF parser, register file, local memory), the OpenGL rasterizer, the frame stream, native textures, in-between frames |
 | `pc/src/audio/` | CRI ADX (ADXF/ADXT), SDL audio output, the TSNDDRV sound driver (high-level emulation) and its synthesizer |
@@ -372,7 +372,7 @@ village, collision. The render thread (GS emulation, replays: `r_exec`, `r_inter
   buttons into actions in `bhSetPad` as before, so nothing in the game is patched per action.
   The menus name each row by what the button does under the current key type. Keyboard/mouse and
   gamepad have one binding set each, two slots per row; extra rows are the quick turn, quick knife,
-  trade request, the third-person keys and the hotkeys. The ini format is in
+  trade request, reload, the third-person keys and the hotkeys. The ini format is in
   [USER_GUIDE.md](USER_GUIDE.md#rebinding). Game and third-person rows may share keys (third
   person takes over the keys it uses); hotkeys share with neither. The gamepad set has its own
   third-person rows (modern scheme, [THIRDPERSON.md](THIRDPERSON.md#gamepad)): they read only
@@ -391,6 +391,14 @@ village, collision. The render thread (GS emulation, replays: `r_exec`, `r_inter
   own. It waits until the player is back to a neutral state (not aiming, reloading, grabbed, in a
   menu, event or door), and on release restores the previous weapon (or the same item in another
   slot) once the knife is lowered. Nothing is restored if the weapon was changed meanwhile.
+- **Reload** (`pc/glue/reload_glue.c`, hooked in `bhControlPlayer` after the mode handler, where
+  the game's own trigger-pull reload switches to it): on a press of a reload row (`pad_reload`: the
+  game row, unbound, or in third person `tps_reload`) with the magazine not full, the game's
+  `bhSearchBullet` combines the matching ammo into the weapon (`Combi_99`, as the inventory) and
+  the player goes to mode 70 (`bhCPM2_act_rld`: motion 116, sounds). Raised (aim pose or scope) as
+  the game does it; lowered, the weapon is first put up as `bhCPM0_action` raises it (straight aim),
+  so after the motion the game's own lowering follows. `reload_at_rest` keeps the third-person
+  camera out of its aim view for that.
 - **Modern controls for the fixed cameras** (`fixed_cam_controls`; `pc/glue/modern_glue.c`, the
   math in `input/modern.c`, ctest `modern`): `pad.c` keeps the frame's screen direction (left
   stick past a 25% dead zone, else the d-pad rows). `modern_pad` (`bhSetPad`, before the quick

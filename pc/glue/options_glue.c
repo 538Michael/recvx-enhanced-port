@@ -401,6 +401,7 @@ static void draw_help(void)
         int c = bind_conflict(r->idx, st.dev);
         if (c) { snprintf(t, sizeof(t), "Also bound to: %s. Bind one of them to something else.", bind_rows[c - 1].name); col = 0xFFFF8080; }
         else if (r->idx == B_QUICKTURN || r->idx == B_TPS_QUICKTURN) snprintf(t, sizeof(t), "Tap it: holds back, then presses run, as the game's own quick turn.");
+        else if (r->idx == B_RELOAD || r->idx == B_TPS_RELOAD) snprintf(t, sizeof(t), "Reloads from the inventory's ammo, as firing on an empty magazine does.");
         else snprintf(t, sizeof(t), "Confirm: change. Left/right: first or second binding (%s).", bind_code_name(st.dev, bind_get(r->idx, st.dev, st.slot), nm, sizeof(nm)));
         break;
     }

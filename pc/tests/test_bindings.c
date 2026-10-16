@@ -44,6 +44,14 @@ int main(void)
     CHECK(bind_ini_line("pad_r2", "+righttrigger") && !bind_get(B_R2, BIND_PAD, 0));
     CHECK(bind_ini_line("key_tps_action_2", "F") && bind_get(B_TPS_ACTION, BIND_KB, 1) == SDL_SCANCODE_F);
     CHECK(bind_ini_line("key_tps_action_2", "none"));
+    /* reload: R and the right shoulder in third person (once noclip fly up's and the quick turn's), the game rows' unbound */
+    CHECK(held(B_TPS_RELOAD, SDL_SCANCODE_R) && !held(B_NOCLIP_UP, SDL_SCANCODE_R) && !bind_get(B_RELOAD, BIND_KB, 0) && !bind_get(B_RELOAD, BIND_PAD, 0));
+    CHECK(bind_get(B_TPS_RELOAD, BIND_PAD, 0) == 1 + SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER && bind_get(B_TPS_QUICKTURN, BIND_PAD, 0) == 1 + SDL_GAMEPAD_BUTTON_DPAD_DOWN);
+    CHECK(bind_row_shown(B_TPS_RELOAD, BIND_KB) && bind_row_shown(B_TPS_RELOAD, BIND_PAD) && bind_row_shown(B_RELOAD, BIND_KB) && bind_row_shown(B_RELOAD, BIND_PAD));
+    /* a recvx.ini from before it (no key_tps_reload line before these): those old defaults are dropped */
+    CHECK(bind_ini_line("key_noclip_up", "R") && !bind_get(B_NOCLIP_UP, BIND_KB, 0) && !bind_conflict(B_TPS_RELOAD, BIND_KB));
+    CHECK(bind_ini_line("pad_tps_quickturn", "rightshoulder") && bind_get(B_TPS_QUICKTURN, BIND_PAD, 0) == 1 + SDL_GAMEPAD_BUTTON_DPAD_DOWN);
+    CHECK(bind_ini_line("key_noclip_up", "PageUp") && held(B_NOCLIP_UP, SDL_SCANCODE_PAGEUP));
     /* third person takes W/A/S/Q from the DS2 rows, nothing else */
     g_tps.on = 1;
     CHECK(!held(B_SQUARE, SDL_SCANCODE_A) && !held(B_R1, SDL_SCANCODE_W) && held(B_CROSS, SDL_SCANCODE_Z) && held(B_TPS_FWD, SDL_SCANCODE_W));
@@ -59,6 +67,13 @@ int main(void)
     /* hotkeys share with nobody; the toggle key's first slot is g_tps.key */
     bind_set(B_TPS_TOGGLE, BIND_KB, 0, SDL_SCANCODE_F6);
     CHECK(g_tps.key == SDL_SCANCODE_F6);
+    /* rebinding the reload: within the third-person set a key swaps, the game row's is its own */
+    bind_set(B_TPS_RELOAD, BIND_KB, 0, SDL_SCANCODE_E);
+    CHECK(held(B_TPS_RELOAD, SDL_SCANCODE_E) && held(B_TPS_ACTION, SDL_SCANCODE_R) && bind_swapped() && !strcmp(bind_swapped(), "Action / confirm"));
+    bind_set(B_TPS_RELOAD, BIND_KB, 0, SDL_SCANCODE_R);
+    CHECK(held(B_TPS_ACTION, SDL_SCANCODE_E));
+    bind_set(B_TPS_RELOAD, BIND_KB, 1, SDL_SCANCODE_G);
+    bind_set(B_RELOAD, BIND_PAD, 0, 1 + SDL_GAMEPAD_BUTTON_DPAD_LEFT);
     /* conflicts from a hand-edited ini */
     CHECK(bind_ini_line("key_l3", "Z") && bind_conflict(B_L3, BIND_KB) == 0);   /* Z is free now (Cross moved to X) */
     CHECK(bind_ini_line("key_l3", "Return") && bind_conflict(B_L3, BIND_KB) == B_START + 1);
@@ -92,6 +107,8 @@ int main(void)
         CHECK(n > 50 && held(B_CROSS, SDL_SCANCODE_X) && held(B_CIRCLE, SDL_SCANCODE_C) && g_tps.key == SDL_SCANCODE_F6);
         CHECK(bind_get(B_TPS_ACTION, BIND_KB, 1) == SDL_SCANCODE_X && bind_get(B_TPS_FIRE, BIND_KB, 0) == BIND_MOUSE + SDL_BUTTON_LEFT);
         CHECK(bind_get(B_TPS_RUN, BIND_PAD, 0) == 1 + SDL_GAMEPAD_BUTTON_DPAD_UP && bind_get(B_UP, BIND_PAD, 0) == 1 + SDL_GAMEPAD_BUTTON_DPAD_UP);
+        CHECK(bind_get(B_TPS_RELOAD, BIND_KB, 0) == SDL_SCANCODE_R && bind_get(B_TPS_RELOAD, BIND_KB, 1) == SDL_SCANCODE_G);
+        CHECK(bind_get(B_RELOAD, BIND_PAD, 0) == 1 + SDL_GAMEPAD_BUTTON_DPAD_LEFT && bind_get(B_TPS_QUICKTURN, BIND_PAD, 0) == 1 + SDL_GAMEPAD_BUTTON_DPAD_DOWN);
     }
     bind_set(B_TPS_RUN, BIND_PAD, 0, 1 + SDL_GAMEPAD_BUTTON_WEST);
     CHECK(bind_ini_line("pad_l2", "-lefty") && bind_get(B_L2, BIND_PAD, 0) == BIND_AXIS + SDL_GAMEPAD_AXIS_LEFTY * 2 + 1);
@@ -136,12 +153,12 @@ int main(void)
         SDL_SetJoystickVirtualAxis(j, SDL_GAMEPAD_AXIS_LEFT_TRIGGER, -32768);
         /* third-person play with the modern scheme: the third-person rows play, the game rows lose their buttons */
         SDL_SetJoystickVirtualAxis(j, SDL_GAMEPAD_AXIS_RIGHT_TRIGGER, 32767);
-        SDL_SetJoystickVirtualButton(j, SDL_GAMEPAD_BUTTON_DPAD_DOWN, true);
+        SDL_SetJoystickVirtualButton(j, SDL_GAMEPAD_BUTTON_DPAD_UP, true);
         SDL_UpdateGamepads();
         CHECK(bind_held(B_QUICKKNIFE, BIND_PAD, keys, 0) && !bind_held(B_TPS_FIRE, BIND_PAD, keys, 0));   /* not in third-person play */
         g_tps.pad_play = 1;
         CHECK(!bind_held(B_QUICKKNIFE, BIND_PAD, keys, 0) && !bind_held(B_TPS_FIRE, BIND_PAD, keys, 0));   /* held across the change: neither */
-        CHECK(bind_held(B_DOWN, BIND_PAD, keys, 0));                                                       /* the d-pad stays the game's */
+        CHECK(bind_held(B_UP, BIND_PAD, keys, 0));                                                         /* the d-pad (but the quick turn's back) stays the game's */
         SDL_SetJoystickVirtualAxis(j, SDL_GAMEPAD_AXIS_RIGHT_TRIGGER, -32768);
         SDL_UpdateGamepads();
         CHECK(!bind_held(B_TPS_FIRE, BIND_PAD, keys, 0));
@@ -154,7 +171,7 @@ int main(void)
         CHECK(!bind_held(B_QUICKKNIFE, BIND_PAD, keys, 0) && !bind_held(B_TPS_FIRE, BIND_PAD, keys, 0) && !bind_held(B_SQUARE, BIND_PAD, keys, 0));
         SDL_SetJoystickVirtualAxis(j, SDL_GAMEPAD_AXIS_RIGHT_TRIGGER, -32768);
         SDL_SetJoystickVirtualButton(j, SDL_GAMEPAD_BUTTON_WEST, false);
-        SDL_SetJoystickVirtualButton(j, SDL_GAMEPAD_BUTTON_DPAD_DOWN, false);
+        SDL_SetJoystickVirtualButton(j, SDL_GAMEPAD_BUTTON_DPAD_UP, false);
         SDL_UpdateGamepads();
         CHECK(!bind_held(B_QUICKKNIFE, BIND_PAD, keys, 0));
         SDL_SetJoystickVirtualAxis(j, SDL_GAMEPAD_AXIS_RIGHT_TRIGGER, 32767);

@@ -241,12 +241,12 @@ static void settings_window(void)
         if (ImGui::Button(key)) tps_key_wait = true;
         ImGui::TextDisabled(g_tps.free_cam
                             ? "W/A/S/D walk toward that screen direction, Shift run, mouse turns the camera; right mouse aim, left fire;\n"
-                              "E/Space action, Q cancel, Tab status, M map (Controls changes them). F1 frees the mouse."
+                              "E action, R reload, Q cancel, Tab status, M map (Controls changes them). F1 frees the mouse."
                             : "W/S walk, A/D turn, Shift run, mouse look; right mouse aim, left fire;\n"
-                              "E/Space action, Q cancel, Tab status, M map (Controls changes them). F1 frees the mouse.");
+                              "E action, R reload, Q cancel, Tab status, M map (Controls changes them). F1 frees the mouse.");
         if (g_tps.pad_modern)
             ImGui::TextDisabled("Gamepad: left stick walks (pushed far runs), right stick camera / aim; LT aim, RT fire, A action,\n"
-                                "X run, B cancel, Y inventory, Back map, LB knife, RB quick turn, RS camera behind.");
+                                "X run, B cancel, Y inventory, Back map, LB knife, RB reload, d-pad down quick turn, RS camera behind.");
     }
     if (ImGui::CollapsingHeader("Audio", ImGuiTreeNodeFlags_DefaultOpen)) changed |= settings_imgui(SP_AUDIO);
     for (int p = SP_COOP; p <= SP_EXTRAS; p += SP_EXTRAS - SP_COOP)   /* pages with their own windows (F3, F2): the SET_F1 rows */

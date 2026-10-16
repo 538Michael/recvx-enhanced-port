@@ -187,6 +187,17 @@ int pad_quick_knife(void)
            (gamepad && (bind_held(B_QUICKKNIFE, BIND_PAD, k, 0) || bind_held(B_TPS_KNIFE, BIND_PAD, k, 0)));
 }
 
+/* reload (pc/glue/reload_glue.c), game thread: its row is held on the keyboard/mouse or the gamepad, or in
+   third person the third-person reload row (keyboard/mouse; the gamepad's in third-person play with the modern scheme) */
+int pad_reload(void)
+{
+    const bool* k = bind_keys();
+    int m = tps_mouse_buttons();
+    if (!input_enabled || g_lobby_io.text_on) return 0;
+    return bind_held(B_RELOAD, BIND_KB, k, m) || (g_tps.on && bind_held(B_TPS_RELOAD, BIND_KB, k, m)) ||
+           (gamepad && (bind_held(B_RELOAD, BIND_PAD, k, 0) || bind_held(B_TPS_RELOAD, BIND_PAD, k, 0)));
+}
+
 /* co-op trade request (pc/glue/coop_glue.c), game thread: its row is held on the keyboard/mouse or the gamepad */
 int pad_trade_held(void)
 {

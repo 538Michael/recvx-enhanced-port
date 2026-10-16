@@ -205,6 +205,8 @@ unsigned int knife_pad(unsigned int pad);
 /* modern controls for the fixed cameras (pc/glue/modern_glue.c): nothing while they are off */
 unsigned int modern_pad(unsigned int pad);   /* pad.c bhSetPad, before knife_pad */
 void  modern_player(void);                    /* player.c bhControlPlayer, after the mode handler */
+/* reload button (pc/glue/reload_glue.c) */
+void  reload_player(void);                    /* player.c bhControlPlayer, after modern_player */
 struct STCAM_WRK;
 void  menu_examine(struct STCAM_WRK* sc);
 

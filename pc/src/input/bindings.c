@@ -28,12 +28,14 @@ const BindRow bind_rows[B_COUNT] = {
     [B_QUICKTURN] = { "quickturn", "Quick turn (back, then run)", BG_GAME, 1 },
     [B_QUICKKNIFE] = { "quickknife", "Quick knife (hold)", BG_GAME, 1 },
     [B_TRADE] = { "trade", "Trade request (co-op)", BG_GAME, 1 },
+    [B_RELOAD] = { "reload", "Reload", BG_GAME, 1 },
     [B_TPS_FWD] = { "tps_forward", "Forward", BG_TPS, 0 },   [B_TPS_BACK] = { "tps_back", "Back", BG_TPS, 0 },
     [B_TPS_LEFT] = { "tps_left", "Turn left", BG_TPS, 0 },   [B_TPS_RIGHT] = { "tps_right", "Turn right", BG_TPS, 0 },
     [B_TPS_RUN] = { "tps_run", "Run", BG_TPS, 1 },           [B_TPS_ACTION] = { "tps_action", "Action / confirm", BG_TPS, 1 },
     [B_TPS_CANCEL] = { "tps_cancel", "Cancel", BG_TPS, 1 },  [B_TPS_STATUS] = { "tps_inventory", "Inventory", BG_TPS, 1 },
     [B_TPS_MAP] = { "tps_map", "Map", BG_TPS, 1 },           [B_TPS_AIM] = { "tps_aim", "Aim (hold)", BG_TPS, 1 },
-    [B_TPS_FIRE] = { "tps_fire", "Fire", BG_TPS, 1 },        [B_TPS_QUICKTURN] = { "tps_quickturn", "Quick turn", BG_TPS, 1 },
+    [B_TPS_FIRE] = { "tps_fire", "Fire", BG_TPS, 1 },        [B_TPS_RELOAD] = { "tps_reload", "Reload", BG_TPS, 1 },
+    [B_TPS_QUICKTURN] = { "tps_quickturn", "Quick turn", BG_TPS, 1 },
     [B_TPS_KNIFE] = { "tps_knife", "Quick knife (hold)", BG_TPS, 2 },
     [B_TPS_RECENTER] = { "tps_recenter", "Camera behind character", BG_TPS, 2 },
     [B_TPS_TOGGLE] = { "tps_toggle", "Third-person camera on/off", BG_HOTKEY, 0 },
@@ -47,9 +49,9 @@ const BindRow bind_rows[B_COUNT] = {
 
 const int bind_order[B_COUNT] = {
     B_UP, B_DOWN, B_LEFT, B_RIGHT, B_CROSS, B_SQUARE, B_CIRCLE, B_TRIANGLE, B_R1, B_L1, B_R2, B_L2,
-    B_START, B_SELECT, B_R3, B_L3, B_QUICKTURN, B_QUICKKNIFE, B_TRADE,
+    B_START, B_SELECT, B_R3, B_L3, B_QUICKTURN, B_QUICKKNIFE, B_TRADE, B_RELOAD,
     B_TPS_FWD, B_TPS_BACK, B_TPS_LEFT, B_TPS_RIGHT, B_TPS_RUN, B_TPS_ACTION, B_TPS_CANCEL, B_TPS_STATUS,
-    B_TPS_MAP, B_TPS_AIM, B_TPS_FIRE, B_TPS_QUICKTURN, B_TPS_KNIFE, B_TPS_RECENTER,
+    B_TPS_MAP, B_TPS_AIM, B_TPS_FIRE, B_TPS_RELOAD, B_TPS_QUICKTURN, B_TPS_KNIFE, B_TPS_RECENTER,
     B_TPS_TOGGLE, B_SETTINGS, B_CHEATS, B_COOP, B_FULLSCREEN, B_NOCLIP_UP, B_NOCLIP_DOWN,
 };
 
@@ -62,10 +64,10 @@ static const int defaults[2][B_COUNT][BIND_SLOTS] = {
         [B_TPS_FWD] = { SC(W) }, [B_TPS_BACK] = { SC(S) }, [B_TPS_LEFT] = { SC(A) }, [B_TPS_RIGHT] = { SC(D) },
         [B_TPS_RUN] = { SC(LSHIFT), SC(RSHIFT) }, [B_TPS_ACTION] = { SC(E) }, [B_TPS_CANCEL] = { SC(Q) },
         [B_TPS_STATUS] = { SC(TAB) }, [B_TPS_MAP] = { SC(M) }, [B_TPS_AIM] = { MB(SDL_BUTTON_RIGHT) },
-        [B_TPS_FIRE] = { MB(SDL_BUTTON_LEFT) },
+        [B_TPS_FIRE] = { MB(SDL_BUTTON_LEFT) }, [B_TPS_RELOAD] = { SC(R) },
         [B_QUICKKNIFE] = { SC(SPACE) }, [B_TRADE] = { SC(T) },
         [B_TPS_TOGGLE] = { SC(F5) }, [B_SETTINGS] = { SC(F1) }, [B_CHEATS] = { SC(F2) }, [B_COOP] = { SC(F3) },
-        [B_FULLSCREEN] = { SC(F11) }, [B_NOCLIP_UP] = { SC(R), SC(PAGEUP) }, [B_NOCLIP_DOWN] = { SC(F), SC(PAGEDOWN) },
+        [B_FULLSCREEN] = { SC(F11) }, [B_NOCLIP_UP] = { SC(PAGEUP) }, [B_NOCLIP_DOWN] = { SC(F), SC(PAGEDOWN) },
     },
     [BIND_PAD] = {
         /* L3 is no game action under any key type (R3 is the inventory in A-C): the left stick click trades */
@@ -75,10 +77,11 @@ static const int defaults[2][B_COUNT][BIND_SLOTS] = {
         [B_L1] = { GB(LEFT_SHOULDER) }, [B_R1] = { GB(RIGHT_SHOULDER) },
         [B_TRIANGLE] = { GB(NORTH) }, [B_CIRCLE] = { GB(EAST) }, [B_CROSS] = { GB(SOUTH) }, [B_SQUARE] = { GB(WEST) },
         [B_QUICKKNIFE] = { GA(RIGHT_TRIGGER, 0) },
-        /* third person, modern scheme (as the RE remakes, the run button where type A has it) */
+        /* third person, modern scheme (as the RE remakes, the run button where type A has it; reload on the right
+           shoulder as in RE4 and the RE4 remake's type C, the quick turn on the d-pad's back) */
         [B_TPS_AIM] = { GA(LEFT_TRIGGER, 0) }, [B_TPS_FIRE] = { GA(RIGHT_TRIGGER, 0) }, [B_TPS_ACTION] = { GB(SOUTH) },
         [B_TPS_CANCEL] = { GB(EAST) }, [B_TPS_RUN] = { GB(WEST) }, [B_TPS_STATUS] = { GB(NORTH) }, [B_TPS_MAP] = { GB(BACK) },
-        [B_TPS_QUICKTURN] = { GB(RIGHT_SHOULDER) }, [B_TPS_KNIFE] = { GB(LEFT_SHOULDER) }, [B_TPS_RECENTER] = { GB(RIGHT_STICK) },
+        [B_TPS_RELOAD] = { GB(RIGHT_SHOULDER) }, [B_TPS_QUICKTURN] = { GB(DPAD_DOWN) }, [B_TPS_KNIFE] = { GB(LEFT_SHOULDER) }, [B_TPS_RECENTER] = { GB(RIGHT_STICK) },
     },
 };
 
@@ -334,7 +337,7 @@ const char* bind_row_label(int row, char* buf, int n)
 /* ---------------------------------------------------------------- recvx.ini */
 int bind_ini_line(const char* key, const char* value)
 {
-    static int knife_seen, trade_seen;   /* the file has quick-knife / trade lines (written before the third-person rows) */
+    static int knife_seen, trade_seen, reload_seen;   /* the file has quick-knife / trade / reload lines (written before the third-person rows) */
     int dev, slot = 0, code;
     char k[64];
     if (!strncmp(key, "key_quickknife", 14)) knife_seen = 1;
@@ -345,6 +348,11 @@ int bind_ini_line(const char* key, const char* value)
        L3's default then, is the trade request's now */
     if (!strncmp(key, "key_trade", 9)) trade_seen = 1;
     if (!trade_seen && !strcmp(key, "pad_l3") && !SDL_strcasecmp(value, "leftstick")) return 1;
+    /* a file from before the reload key (key_tps_reload comes before the hotkeys and every pad_ line): R was noclip fly
+       up's first key and the right shoulder the third-person quick turn's, both the reload's now */
+    if (!strncmp(key, "key_tps_reload", 14)) reload_seen = 1;
+    if (!reload_seen && !strcmp(key, "key_noclip_up") && !SDL_strcasecmp(value, "R")) { init(); put(B_NOCLIP_UP, BIND_KB, 0, 0); return 1; }
+    if (!reload_seen && !strcmp(key, "pad_tps_quickturn") && !SDL_strcasecmp(value, "rightshoulder")) return 1;
     if (!strncmp(key, "key_", 4)) dev = BIND_KB;
     else if (!strncmp(key, "pad_", 4)) dev = BIND_PAD;
     else return 0;

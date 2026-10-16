@@ -22,6 +22,7 @@ While it is on the mouse is captured (F1/F2/F3 free it).
 | E | action / examine / confirm |
 | Space (hold) | quick knife: knife drawn and raised, left mouse slashes ([USER_GUIDE.md](USER_GUIDE.md)) |
 | Q | cancel |
+| R | reload ([USER_GUIDE.md](USER_GUIDE.md#reload)) |
 | Tab | status screen (inventory) |
 | M | map |
 
@@ -30,7 +31,7 @@ row stops pressing its DualShock 2 button while third person is on (by default W
 R1/Square/Triangle/L1). All third-person keys, a quick-turn key (unbound by default) and the
 toggle key can be rebound in F1 -> Controls or OPTION -> ENHANCED SETTINGS -> CONTROLS (ini
 `key_tps_*`: `tps_forward`, `tps_back`, `tps_left`, `tps_right`, `tps_run`, `tps_action`,
-`tps_cancel`, `tps_inventory`, `tps_map`, `tps_aim`, `tps_fire`, `tps_quickturn`,
+`tps_cancel`, `tps_inventory`, `tps_map`, `tps_aim`, `tps_fire`, `tps_reload`, `tps_quickturn`,
 `tps_toggle`; the toggle key's first slot is also `tps_key`).
 
 ### Mouse/keyboard camera (A/B)
@@ -72,17 +73,21 @@ camera behind, no camera or aim stick). Modern, as the RE2/RE4 remakes (button m
   gentle assist (`modern_assist`): with the middle of the enemy nearest the crosshair within 6
   degrees and no wall in between, the stick turns at half speed, and while it moves (not away
   from the enemy) the view drifts a tenth of the way to it. A still stick never moves the aim.
-* **Quick turn**: its button (RB), or pulling the stick back (more than 100 degrees from the
+* **Quick turn**: its button (d-pad down), or pulling the stick back (more than 100 degrees from the
   facing) and pressing run within 3 frames (the turn on the spot waits that long for it): the
   game's quick turn. Either swings the camera behind the character as it turns. The stick keeps
   the camera it was given in (`modern_hold`, as over the fixed cameras' cuts) until it turns by
   more than 35 degrees or is let go, so holding it keeps going the way it went.
+* **Reload** (RB): the game's reload of an empty magazine at any time the magazine is not full
+  (`pc/glue/reload_glue.c`, [USER_GUIDE.md](USER_GUIDE.md#reload)). Aiming it is the game's own;
+  with the weapon lowered it comes up for the reload and goes down after it, and the camera stays
+  as when walking (`reload_at_rest`: no aim view, crosshair, facing or bend).
 * **Bindings**: the gamepad set has its own third-person rows (ini `pad_tps_aim`, `pad_tps_fire`,
   `pad_tps_action`, `pad_tps_cancel`, `pad_tps_run`, `pad_tps_inventory`, `pad_tps_map`,
-  `pad_tps_quickturn`, `pad_tps_knife`, `pad_tps_recenter`; there is no reload button, the game
-  reloads by itself). They play only while `g_tps.pad_play` (`tps_frame`: third person on and
-  Modern, our camera active, the game not frozen, no attract demo) and then take their buttons over
-  from the game rows (the d-pad, Start and anything else they do not use stay the game's). In
+  `pad_tps_reload`, `pad_tps_quickturn`, `pad_tps_knife`, `pad_tps_recenter`). They play only
+  while `g_tps.pad_play` (`tps_frame`: third person on and Modern, our camera active, the game not
+  frozen, no attract demo) and then take their buttons over from the game rows (the d-pad but its
+  down, Start and anything else they do not use stay the game's). In
   menus, messages, pick-ups, events and doors the gamepad is the DualShock 2 of the KEY CONFIG
   type, as in Classic. An input held when `pad_play` changes counts for neither set until it is
   let go (`bindings.c pad_row_reads`), so the button that opened a menu does not also act in it.

@@ -37,6 +37,14 @@
   mouse/keyboard can be mixed: the camera follows the one used last. In menus, messages and
   events the gamepad works as before. "Gamepad controls: Classic" brings back the old tank
   controls with the camera behind.
+- **Reload button**: in third person R (keyboard) and RB / R1 (gamepad) reload the weapon from the
+  ammo in your inventory whenever its magazine is not full, without opening the inventory. It is
+  the game's own reload, as when you fire on an empty magazine: the same motion and sound, the
+  same ammo it picks and the same magazine size, with what does not fit staying in the inventory.
+  It works while aiming and with the weapon lowered while standing, walking or running. The
+  gamepad's quick turn moved to the d-pad's down (the stick gesture still works), and noclip fly
+  up lost R (Page Up stays). The fixed cameras and the Classic gamepad scheme get a "Reload" row
+  in CONTROLS to bind it to a button of your choice.
 
 ### Fixes
 
