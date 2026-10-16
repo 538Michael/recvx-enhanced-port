@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+### You appear as
+
+- **Models keep their own proportions when animated**: each model is moved by its own skeleton,
+  with Claire's or Chris's joint rotations carried over relative to each one's rest pose, instead of
+  fixed joint positions. Long or extra-jointed limbs now bend at the right joints: the Bandersnatch
+  holds the weapon in its claw instead of mid-arm, Monster Steve moves his arms from the shoulders
+  instead of the collarbones and holds the weapon in his hand instead of at the elbow.
+- **Feet on the floor**: a taller or shorter model crouches and bobs in proportion, and a foot of
+  another shape no longer lifts the body (Monster Steve walked 4 units above the floor, the Hunter
+  1).
+- **Aiming up with tall models** in third person: the camera's height, shoulder offset and distance
+  follow the model's height, so it is no longer inside a Tyrant or Monster Steve while aiming; the
+  aim pose is solved on the weapon as it is drawn, so its barrel points at the crosshair for every
+  model and pitch (it was up to 1.5 degrees off at a far target and 11 at a near one). The shots are
+  unchanged: they always went where the crosshair is.
+- A weapon or gloved hand the model has no hand for (Nosferatu's right, the Bandersnatch's left)
+  is no longer drawn floating in the air.
+- The character played without another model is unchanged. Test aids: `RECVX_RETARGET=0` keeps
+  the previous animation of models, `RECVX_RIG_DUMP=1` logs their skeletons and feet
+  ([ACTORS.md](docs/ACTORS.md#retargeting)).
+
 ### Fixes
 
 - **Hands in the lobby's model preview**: the characters in the MULTIPLAYER lobby had no hands.

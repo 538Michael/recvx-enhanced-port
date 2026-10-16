@@ -14,7 +14,9 @@
  *    (aim pitch and all) times a rest correction that turns the model's rest bone direction onto
  *    the source's. Positions come from the model's own bone offsets; nodes without a map follow
  *    their parent rigidly (fingers, claws, face, tentacles). The weapon hands of the source are
- *    moved to the model's hands.
+ *    moved to the model's hands. Limbs are mapped by where the player's joints sit along each
+ *    chain, the root's height and the feet follow the source's in proportion (docs/ACTORS.md
+ *    "Retargeting"; RECVX_RETARGET=0: the previous mapping).
  *  - everything else: its own motion set's idle motion, looped (or its rest pose).
  * Textures go to the texture heap (shared by TIM2 index with a model the room already shows) and
  * are released when the model changes.
