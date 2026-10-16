@@ -30,7 +30,7 @@
 
 #define NOEV 0xFFFFFFFFu
 #define NATIVE_KEY (1ull << 63)   /* Group.key0 of a native 3D strip (v0 = its event) */
-enum { EV_REG, EV_IMAGE, EV_DISP, EV_DOWNLOAD, EV_TAG, EV_STRIP, EV_NATIVE, EV_TEXDEF, EV_TEXDEF_END, EV_TEXBIND, EV_TEXFORGET, EV_RAW, EV_RTEX };
+enum { EV_REG, EV_IMAGE, EV_DISP, EV_DOWNLOAD, EV_TAG, EV_STRIP, EV_NATIVE, EV_TEXDEF, EV_TEXDEF_END, EV_TEXBIND, EV_TEXFORGET, EV_RAW, EV_RTEX, EV_MOVIE };
 typedef struct { uint8_t kind, reg; uint32_t len; uint64_t v; } Ev;
 typedef struct { uint64_t key0; uint32_t v0, nv, strip, ord, sp; } Group;   /* sp: native strip's first Frame.spos */
 typedef struct { uint32_t mesh, g0, ng; } Inst;   /* a tagged mesh draw: groups g0.. */
@@ -70,7 +70,7 @@ uint32_t gs_tex_epoch;
 static int tex_event(const Ev* e)
 {
     switch (e->kind) {
-    case EV_IMAGE: case EV_TEXBIND: case EV_TEXDEF_END: case EV_TEXFORGET: case EV_DOWNLOAD: case EV_RTEX: return 1;
+    case EV_IMAGE: case EV_TEXBIND: case EV_TEXDEF_END: case EV_TEXFORGET: case EV_DOWNLOAD: case EV_RTEX: case EV_MOVIE: return 1;
     case EV_REG:   /* TEX0, TEX2, TEXCLUT, TEXA, transfers */
         return e->reg == 0x06 || e->reg == 0x07 || e->reg == 0x16 || e->reg == 0x17 || e->reg == 0x1c ||
                e->reg == 0x3b || (e->reg >= 0x50 && e->reg <= 0x54);
@@ -147,6 +147,8 @@ void stream_tex_bind(uint32_t id, uint32_t tbp, uint32_t cbp)
     push_ev(EV_TEXBIND, 0, 0, id | ((uint64_t)(tbp & 0x3FFF) << 32) | ((uint64_t)(cbp & 0x3FFF) << 46));
 }
 void stream_strip(uint32_t strip) { push_ev(EV_STRIP, 0, 0, strip); }
+/* movie frame `index` (pc/src/movie) is the texture at TBP tbp for the draws that follow */
+void stream_movie(uint32_t tbp, int index) { push_ev(EV_MOVIE, 0, (uint32_t)index, tbp & 0x3FFF); }
 /* StoreRenderTex on the GPU: the render target FBP/FBW, x 0..w-1, y 0..h-1, becomes
    definition id (a captured texture, bound like any other); no download, no sync point */
 void stream_rtex_capture(uint32_t id, uint32_t fbp, uint32_t fbw, uint32_t w, uint32_t h)
@@ -473,6 +475,9 @@ void stream_exec(Frame* f)
                 f->in[f->nin] = (Inst){ (uint32_t)e->v, (uint32_t)f->ng, 0 };
                 inst = (long)f->nin++;
             }
+            break;
+        case EV_MOVIE:
+            gs_movie_bind((uint32_t)e->v, (int)e->len);
             break;
         case EV_DISP:
             gs.disp_fbp = (uint32_t)(e->v & 0xFFFF); gs.disp_fbw = (uint32_t)((e->v >> 16) & 0xFFFF); gs.disp_psm = (uint32_t)(e->v >> 32);
@@ -804,6 +809,7 @@ void stream_replay(const Frame* r, float t)
         if (e->kind == EV_TEXDEF_END) { in_def = 0; continue; }
         if (in_def) continue;
         if (e->kind == EV_TEXBIND) { ntex_bind((uint32_t)e->v, (uint32_t)(e->v >> 32) & 0x3FFF, (uint32_t)(e->v >> 46) & 0x3FFF); continue; }
+        if (e->kind == EV_MOVIE) { gs_movie_bind((uint32_t)e->v, (int)e->len); continue; }
         if (e->kind == EV_RTEX) continue;    /* draws bind the executed frame's capture (replay resources) */
         if (e->kind == EV_IMAGE) continue;   /* a replay writes no GS memory: its textures and render-target
                                                   reloads are the executed frame's (gs_gl.c, replay resources) */

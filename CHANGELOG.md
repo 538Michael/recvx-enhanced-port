@@ -8,6 +8,15 @@
   They now wear the hand pieces the game gives an unarmed player, on the same wrist joints: each
   player character its own; the story cast's models, which have none, Chris's (men) or Claire's
   (women). Zombies and creatures keep their own hands. The look in game is unchanged.
+- **Movies play smoothly and in sync with their sound**: the intro, the opening, the in-game
+  movies and the ending. Reading and decoding a movie now happen on a thread of their own
+  instead of in the game's frames, the sound is kept queued ahead so it no longer runs dry
+  (gaps, and silence over the last frames of a movie), the picture follows the sound's clock
+  instead of running on its own, and the short freeze at the start of every movie is gone. Each
+  frame is uploaded once and converted to RGB on the GPU, with smoother colour edges; it is no
+  longer passed through the emulated GS memory. Skipping, pausing and the fades over a movie
+  work as before. Test aids: `RECVX_MOVIE=n` plays movie n in place of every movie,
+  `RECVX_MOVIE_TRACE=file` logs the frame timing and the sound's offset.
 
 ## 0.3.0 (2026-10-16)
 

@@ -18,6 +18,7 @@
 #include "stream.h"
 #include "../ps2_platform.h"
 #include "../render/gl_loader.h"
+#include "../movie/movie.h"
 #include <SDL3/SDL.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -615,9 +616,13 @@ static uint32_t clut_hash(uint64_t tex0)
     return h;
 }
 
+static uint32_t mv_tbp = UINT32_MAX;   /* gs_movie_bind */
+static GLuint mv_rgb;
+
 static GLuint tex_get(uint64_t tex0, uint64_t texa, int* out_w, int* out_h, float* ascale)
 {
     *ascale = 255.0f;
+    if ((tex0 & 0x3FFF) == mv_tbp && mv_rgb) { *out_w = *out_h = 512; return mv_rgb; }   /* the movie frame */
     {   /* native texture bound to this slot (textures.c) */
         unsigned int nt;
         int r = ntex_lookup(tex0, texa, &nt, out_w, out_h);
@@ -1157,7 +1162,7 @@ void gs_flush(void)
         uint64_t tex0 = st->ctx.tex0;
         uint32_t tbp = tex0 & 0x3FFF, tpsm = (tex0 >> 20) & 0x3F;
         uint32_t tw = 1u << ((tex0 >> 26) & 0xF), th = 1u << ((tex0 >> 30) & 0xF);
-        float ox, oy;
+        float ox = 0, oy = 0;
         RenderTarget* srt;
         int is16 = 0;
         dbg_tex0 = tex0;
@@ -1171,7 +1176,7 @@ void gs_flush(void)
                 ox = m->ox; oy = m->oy; is16 = m->is16;
                 replay_memo = m;
             } else {
-                srt = rt_for_texture(tbp, tpsm, &ox, &oy, &is16);
+                srt = tbp == mv_tbp ? NULL : rt_for_texture(tbp, tpsm, &ox, &oy, &is16);
                 if (m && !gs_replaying) { m->rt = srt && srt != cur_rt ? (int)(srt - rts) : -1; m->fbp = srt ? srt->fbp : 0; m->fbw = srt ? srt->fbw : 0; m->ox = ox; m->oy = oy; m->is16 = is16; record_memo = m; }
             }
         }
@@ -1701,6 +1706,100 @@ unsigned int gs_capture_rt(uint32_t fbp, uint32_t fbw, uint32_t w, uint32_t h)
     return tex;
 }
 
+/* ---------------- movies (pc/src/movie) ---------------- */
+
+static const char* movie_vs =
+    "#version 330 core\n"
+    "void main(){\n"
+    "  vec2 c = vec2((gl_VertexID & 1) != 0 ? 1.0 : 0.0, (gl_VertexID & 2) != 0 ? 1.0 : 0.0);\n"
+    "  gl_Position = vec4(c * 2.0 - 1.0, 0.0, 1.0);\n"
+    "}\n";
+/* YCbCr (ITU-R BT.601, video range) -> RGB, one fragment per image pixel (row 0 = the top
+   row, as uploaded). 4:2:0 chroma as MPEG-2 places it: on the even luma columns, between
+   two luma rows; interpolated. Alpha 0x80, as the IPU's output. */
+static const char* movie_fs =
+    "#version 330 core\n"
+    "uniform sampler2D u_y, u_cb, u_cr; out vec4 o;\n"
+    "void main(){\n"
+    "  vec2 p = gl_FragCoord.xy;\n"
+    "  vec2 c = vec2(p.x * 0.5 + 0.25, p.y * 0.5) / vec2(textureSize(u_cb, 0));\n"
+    "  float y = (texelFetch(u_y, ivec2(p), 0).r - 16.0 / 255.0) * (255.0 / 219.0);\n"
+    "  float cb = (texture(u_cb, c).r - 128.0 / 255.0) * (255.0 / 224.0), cr = (texture(u_cr, c).r - 128.0 / 255.0) * (255.0 / 224.0);\n"
+    "  o = vec4(clamp(vec3(y + 1.402 * cr, y - 0.344136 * cb - 0.714136 * cr, y + 1.772 * cb), 0.0, 1.0), 128.0 / 255.0);\n"
+    "}\n";
+
+/* Textures at TBP tbp are movie frame index from now until the next executed frame: the
+   frame's planes are uploaded once and converted into mv_rgb (512 x 512, the TEX0 size the
+   game's sprite uses, image at the top left). Replays bind the same frame again. */
+void gs_movie_bind(uint32_t tbp, int index)
+{
+    static GLuint prog_yuv, planes[3], fbo;
+    static int pw, ph;
+    static uint32_t shown;
+    uint32_t serial;
+    int w, h, stride;
+    const uint8_t* yuv;
+    gs_flush();   /* draws before this sample what was bound before */
+    mv_tbp = tbp;
+    if (!prog_yuv) {
+        prog_yuv = compile(movie_vs, movie_fs);
+        glUseProgram(prog_yuv);
+        glUniform1i(glGetUniformLocation(prog_yuv, "u_y"), 1);
+        glUniform1i(glGetUniformLocation(prog_yuv, "u_cb"), 2);
+        glUniform1i(glGetUniformLocation(prog_yuv, "u_cr"), 3);
+        glGenTextures(3, planes);
+        glGenTextures(1, &mv_rgb);
+        glBindTexture(GL_TEXTURE_2D, mv_rgb);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 512, 512, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+        glGenFramebuffers(1, &fbo);
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, mv_rgb, 0);
+    }
+    yuv = movie_lock_frame(index, &serial, &w, &h, &stride);
+    if (yuv && serial == shown) { movie_unlock_frame(); return; }
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+    fb_forget();
+    glDisable(GL_SCISSOR_TEST);
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_BLEND);
+    clip_distances(0);
+    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+    if (!yuv || w > 512 || h > 512) {   /* nothing decoded: black */
+        if (yuv) movie_unlock_frame();
+        glClearColor(0, 0, 0, 128.0f / 255.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+        shown = 0;
+        return;
+    }
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    for (int i = 0; i < 3; i++) {
+        int cw = i ? w / 2 : w, ch = i ? h / 2 : h;
+        const uint8_t* src = yuv + (i ? (size_t)stride * h + (size_t)(i - 1) * (stride / 2) * (h / 2) : 0);
+        glActiveTexture(GL_TEXTURE0 + 1 + i);
+        glBindTexture(GL_TEXTURE_2D, planes[i]);
+        glPixelStorei(GL_UNPACK_ROW_LENGTH, i ? stride / 2 : stride);
+        if (w != pw || h != ph) {
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, cw, ch, 0, GL_RED, GL_UNSIGNED_BYTE, src);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        } else {
+            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, cw, ch, GL_RED, GL_UNSIGNED_BYTE, src);
+        }
+    }
+    movie_unlock_frame();
+    glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+    pw = w; ph = h; shown = serial;
+    glViewport(0, 0, w, h);
+    glUseProgram(prog_yuv);
+    glBindVertexArray(present_vao);
+    glDrawArrays(0x0005 /* GL_TRIANGLE_STRIP */, 0, 4);
+    glActiveTexture(GL_TEXTURE0);
+    glBindVertexArray(vao);
+}
+
 /* ---------------- presentation (render thread) ---------------- */
 
 static int snapshot_valid, final_dumped, interp_dumped;
@@ -1712,6 +1811,7 @@ void gs_frame_begin(void)
     if (++memo_gen == 0) memo_gen = 1;   /* resources of the frame about to execute */
     if (ndoomed) { glDeleteTextures((GLsizei)ndoomed, doomed); ndoomed = 0; }
     nreloads = 0;
+    mv_tbp = UINT32_MAX;   /* a movie frame binds it again (EV_MOVIE) */
     snapshot_valid = 0;   /* no replays of the previous frame while this one is half executed (download) */
     memset(first, 0, sizeof(first));
     gs_set_scale(gs_wanted_scale());
