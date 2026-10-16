@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Renderer
+
+- **Menu frames: no more dark lines**: the status screen, files, map and item screens showed thin
+  dark lines between the pieces of their frames and backgrounds, most visible at higher internal
+  resolutions (for example around the text box under the menu). The last pixels of each piece
+  reached past its picture into the neighbouring one in the texture; each piece now samples only
+  its own picture, as on the PS2. Fix by fmil95 (decompilation team).
+
 ### Fixes
 
 - **Alexia's tentacles** use their intended attack timing again: a decompilation bug read the wrong shape table. Fix by fmil95 (decompilation team).
