@@ -21,9 +21,18 @@ typedef struct TpsConfig {
     int free_cam;             /* mouse/keyboard camera: 0 = B (behind the character, the mouse turns it),
                                  1 = A (free: the mouse orbits the camera, WASD walk relative to it) */
     int key;                  /* SDL scancode of the toggle key */
+    /* gamepad: 0 classic (tank controls through the DS2 rows, camera behind), 1 modern (twin-stick:
+       left stick camera-relative, right stick camera / aim, its own bindings) */
+    int pad_modern;
+    int pad_sens_x, pad_sens_y;   /* right stick camera speed, percent (100: 180 / 120 degrees a second) */
+    int pad_aim_sens;             /* right stick while aiming, percent of the above */
+    int pad_invert_y;
+    int pad_dead_move, pad_dead_look;   /* dead zones of the left / right stick, percent */
     /* published by the game thread */
     volatile int cam_active;  /* the third-person camera drew the last frame */
     volatile int aiming;      /* weapon raised (crosshair) */
+    volatile int pad_play;    /* modern gamepad scheme in third-person play: the gamepad's third-person
+                                 rows play instead of its game rows (bindings.c) */
 } TpsConfig;
 
 extern TpsConfig g_tps;
@@ -31,9 +40,12 @@ extern TpsConfig g_tps;
 /* input (pc/src/input/tps_input.c), called on the game thread */
 enum { TPS_K_FWD = 1, TPS_K_BACK = 2, TPS_K_LEFT = 4, TPS_K_RIGHT = 8, TPS_K_RUN = 16, TPS_K_ACTION = 32,
        TPS_K_STATUS = 64, TPS_K_MAP = 128, TPS_K_AIM = 256, TPS_K_FIRE = 512, TPS_K_CANCEL = 1024,
-       TPS_K_QUICKTURN = 2048 /* with BACK (and RUN): the quick-turn row */ };
-unsigned tps_input_keys(void);
+       TPS_K_QUICKTURN = 2048 /* with BACK (and RUN): the quick-turn row */, TPS_K_RECENTER = 4096 };
+unsigned tps_input_keys(int quickturn);       /* quickturn: also hold the quick turn (gamepad gesture) */
 void tps_take_mouse(float* dx, float* dy);   /* pixels moved since the last call */
+int tps_pad_sticks(float* lx, float* ly, float* rx, float* ry);   /* the gamepad's sticks, -1..1, y up; 0 = none */
+int tps_pad_touched(void);                   /* any gamepad button or stick in use */
+int tps_kbm_touched(void);                   /* any key or mouse button down (the mouse motion: tps_take_mouse) */
 /* main thread */
 void tps_input_event(const void* sdl_event);
 void tps_update_mouse_mode(void* window, int overlay_open);

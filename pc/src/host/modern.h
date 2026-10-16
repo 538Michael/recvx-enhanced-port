@@ -30,6 +30,19 @@ void modern_hold(ModernHold* h, float stick, int cut, float* rx, float* rz);
    degrees (180 degrees in about 9 frames, 0.3 s) */
 float modern_turn(float ay, float target);
 
+/* Third person with a gamepad, modern (twin-stick) scheme (pc/glue/tps_glue.c, docs/THIRDPERSON.md
+   "Gamepad"). A stick (x right, y up, -1..1) past a radial dead zone `dead` (0..1): rescaled so
+   the zone's edge is 0 and full deflection 1, its length raised to `curve` (1 linear, 2 finer
+   near the centre: the camera and aim response). Returns the new length; 0 inside the zone. */
+float modern_stick(float* x, float* y, float dead, float curve);
+
+/* gentle aim assist (the gamepad with "Game auto-aim" on): with a target within
+   MODERN_ASSIST_CONE of the crosshair (off_yaw/off_pitch: the target minus the crosshair) the
+   stick's turn this frame (dyaw/dpitch) is halved, and while it moves and not away from the
+   target the aim drifts a tenth of the way towards it. A still stick does nothing. */
+#define MODERN_ASSIST_CONE MODERN_DEG(6.0f)
+void modern_assist(float off_yaw, float off_pitch, float* dyaw, float* dpitch);
+
 #ifdef __cplusplus
 }
 #endif

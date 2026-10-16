@@ -374,7 +374,11 @@ village, collision. The render thread (GS emulation, replays: `r_exec`, `r_inter
   gamepad have one binding set each, two slots per row; extra rows are the quick turn, quick knife,
   trade request, the third-person keys and the hotkeys. The ini format is in
   [USER_GUIDE.md](USER_GUIDE.md#rebinding). Game and third-person rows may share keys (third
-  person takes over the keys it uses); hotkeys share with neither.
+  person takes over the keys it uses); hotkeys share with neither. The gamepad set has its own
+  third-person rows (modern scheme, [THIRDPERSON.md](THIRDPERSON.md#gamepad)): they read only
+  while `g_tps.pad_play` (third-person play, the game not frozen) and then take their buttons over
+  from the game rows; an input held when that changes counts for neither set until let go
+  (`pad_row_reads`).
 - **Input source** (`input_source`, `input_pad`): Gamepad only sets
   `SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS` at run time (`bind_apply_source`), so the pad keeps
   working without focus; an environment variable `SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS=1` wins

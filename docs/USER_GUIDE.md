@@ -156,15 +156,18 @@ camera controls** (`fixed_cam_controls`: **Classic (tank)** 0, Modern (camera-re
 
 ### Third person
 
-Over-the-shoulder camera with mouse/keyboard controls and free aim, toggled with **F5**
-(`tps`). The page holds field of view, camera distance and height, shoulder side, mouse
-sensitivity, invert Y, crosshair and the game's auto-aim. Two settings worth knowing:
+Over-the-shoulder camera with mouse/keyboard or twin-stick gamepad controls and free aim,
+toggled with **F5** (`tps`). The page holds field of view, camera distance and height, shoulder
+side, mouse sensitivity, invert Y, crosshair, the game's auto-aim and the gamepad settings
+([Third person with a gamepad](#third-person-with-a-gamepad)). Settings worth knowing:
 
 - **Mouse/keyboard camera** (`tps_free_camera`): **B** (default) keeps the camera behind the
   character and the mouse turns it; **A** lets the mouse orbit the camera freely and W/A/S/D walk
   relative to the camera. This is unrelated to the game's KEY CONFIG types.
 - **Light and fog** (`tps_atmos`): Per cut (original) or Smooth (fades over a second when the
   room's camera cut changes).
+- **Gamepad controls** (`tps_pad_controls`): **Modern (twin-stick)** (default) or Classic (tank
+  controls through the game's buttons, the camera behind).
 
 Details and limits: [THIRDPERSON.md](THIRDPERSON.md).
 
@@ -203,7 +206,51 @@ quick knife and the left stick click the trade request, since those buttons have
 The game's own key types (OPTION -> KEY CONFIG) still decide what each PS2 button does.
 
 Third person (keyboard and mouse): W/S/A/D move and turn, Shift run, E action, Q cancel,
-Tab inventory, M map, right mouse aim, left mouse fire.
+Tab inventory, M map, right mouse aim, left mouse fire. With a gamepad see
+[Third person with a gamepad](#third-person-with-a-gamepad).
+
+### Third person with a gamepad
+
+THIRD PERSON page: **Gamepad controls** = **Modern (twin-stick)**, the default (ini
+`tps_pad_controls = 1`; 0 = Classic, the tank controls of the fixed cameras with the camera
+behind). As in the Resident Evil 2 and 4 remakes:
+
+| Gamepad (Xbox / PlayStation) | Action | ini |
+|---|---|---|
+| Left stick | walk where it points seen from the camera; pushed far it runs | |
+| Right stick | turn the camera; while aiming, aim (the crosshair) | |
+| LT / L2 (hold) | aim: the character faces the camera's direction, the camera moves to the shoulder | `pad_tps_aim` |
+| RT / R2 | fire while aiming; otherwise action | `pad_tps_fire` |
+| A / Cross | action: doors, items, examine, confirm | `pad_tps_action` |
+| B / Circle | cancel | `pad_tps_cancel` |
+| X / Square (hold) | run | `pad_tps_run` |
+| Y / Triangle | inventory | `pad_tps_inventory` |
+| View / Share (Back) | map | `pad_tps_map` |
+| LB / L1 (hold) | quick knife: knife drawn and raised, RT slashes, the weapon before on release | `pad_tps_knife` |
+| RB / R1 | quick turn (the camera swings round with the character) | `pad_tps_quickturn` |
+| Right stick click | camera behind the character | `pad_tps_recenter` |
+| Left stick pulled back + run | quick turn | |
+| D-pad, Start | as before (d-pad: tank turn and walk; Start: options) | |
+
+- **Moving**: the character turns quickly towards the stick's direction and walks; pointing more
+  than 100 degrees away turns it on the spot first. After a quick turn or "camera behind" the
+  held stick keeps its meaning until it turns or is let go, so you keep running the way you
+  were going.
+- **Aiming** is free aim, exactly as with the mouse (the same crosshair, shot and pose). With
+  **Game auto-aim** on, the gamepad gets a gentle aim assist instead of the lock-on: near an
+  enemy the aim slows down and drifts slightly towards it while you move the stick.
+- **Menus, messages, events**: the gamepad works as the game's KEY CONFIG type sets it (as in
+  Classic); the third-person buttons only play while the third-person camera does. A button held
+  through the change (the one that opened the inventory, say) does nothing until let go.
+- **Mouse and keyboard together** (input source Auto): the camera follows the device used last;
+  the gamepad's right stick turns it freely, the mouse as set in "Mouse/keyboard camera".
+- Settings (THIRD PERSON page, GAMEPAD): stick camera speed X / Y (`tps_pad_sens_x`,
+  `tps_pad_sens_y`, 100%: 180 / 120 degrees a second fully pushed), stick aiming speed
+  (`tps_pad_aim_sens`, 50% of that), invert Y (`tps_pad_invert_y`), left and right stick dead
+  zones (`tps_pad_dead_move` 20%, `tps_pad_dead_look` 15%). The right stick's response is finer
+  near the centre.
+- The third-person gamepad buttons are their own bindings: rebinding one (CONTROLS, Gamepad,
+  "Third person (gamepad, Modern)") leaves the fixed-camera binding of the same button alone.
 
 ### Modern controls (fixed cameras)
 
@@ -265,8 +312,9 @@ Keys use SDL key names (`Z`, `Return`, `Left Shift`, `Page Up`), mouse buttons
 Cross, `east`, `west`, `north`, `back`, `start`, `guide`, `leftshoulder`, `rightshoulder`,
 `leftstick`, `rightstick`, `dpup`, `dpdown`, `dpleft`, `dpright`, `misc1`, `paddle1`-`paddle4`,
 `touchpad`) or an axis half (`+lefttrigger`, `-leftx`, `+lefty`, ...). `none` unbinds.
-Extra rows: "Quick turn" (unbound by default: back, then run), the third-person keys and the
-hotkeys.
+Extra rows: "Quick turn" (unbound by default: back, then run), the third-person keys, the
+third-person gamepad set (`pad_tps_*`, [Third person with a gamepad](#third-person-with-a-gamepad))
+and the hotkeys.
 
 ### Input source (per window)
 
