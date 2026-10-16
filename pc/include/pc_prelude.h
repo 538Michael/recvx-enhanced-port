@@ -75,6 +75,7 @@ unsigned int pc_tex_begin(const void* tim2, const void* phead, unsigned int imag
 void  pc_tex_end(unsigned int id, unsigned int image_adr, unsigned int clut_adr, int is_new);
 int   pc_native_rtex(void);   /* StoreRenderTex on the GPU (RECVX_NATIVE_RTEX, default on) */
 void  pc_rtex_capture(void* tim2, void* image, unsigned int w, unsigned int h);
+extern int pc_rtex_wide;      /* set before StoreRenderTex: capture the hor+ widened view (the full-screen render texture) */
 int   pc_rtex_bind(const void* image, unsigned int image_adr, unsigned int clut_adr);
 void  pc_native_strip(const unsigned short* idx_uv, int n, const struct VU1_STRIP_BUF* vbuf, unsigned int prim,
                       int color_mode, int single, float uv_scale);   /* enhanced mode: clip volume enlarged into the GS guard band */

@@ -154,9 +154,9 @@ void stream_tag_last(uint32_t mesh, uint32_t strip) { push_ev(EV_TAGLAST, 0, str
 void stream_movie(uint32_t tbp, int index) { push_ev(EV_MOVIE, 0, (uint32_t)index, tbp & 0x3FFF); }
 /* StoreRenderTex on the GPU: the render target FBP/FBW, x 0..w-1, y 0..h-1, becomes
    definition id (a captured texture, bound like any other); no download, no sync point */
-void stream_rtex_capture(uint32_t id, uint32_t fbp, uint32_t fbw, uint32_t w, uint32_t h)
+void stream_rtex_capture(uint32_t id, uint32_t fbp, uint32_t fbw, uint32_t w, uint32_t h, int wide)
 {
-    push_ev(EV_RTEX, 0, w | (h << 16), id | ((uint64_t)(fbp & 0x1FF) << 32) | ((uint64_t)(fbw & 0x3F) << 48));
+    push_ev(EV_RTEX, 0, w | (h << 16), id | ((uint64_t)(fbp & 0x1FF) << 32) | ((uint64_t)(fbw & 0x3F) << 48) | ((uint64_t)(wide != 0) << 56));
 }
 
 /* a + (b - a) * k for every attribute (all linear in view space) */
@@ -496,7 +496,7 @@ void stream_exec(Frame* f)
             gs.disp_fbp = (uint32_t)(e->v & 0xFFFF); gs.disp_fbw = (uint32_t)((e->v >> 16) & 0xFFFF); gs.disp_psm = (uint32_t)(e->v >> 32);
             break;
         case EV_RTEX:
-            ntex_define_capture((uint32_t)e->v, gs_capture_rt((uint32_t)(e->v >> 32) & 0x1FF, (uint32_t)(e->v >> 48) & 0x3F, e->len & 0xFFFF, e->len >> 16),
+            ntex_define_capture((uint32_t)e->v, gs_capture_rt((uint32_t)(e->v >> 32) & 0x1FF, (uint32_t)(e->v >> 48) & 0x3F, e->len & 0xFFFF, e->len >> 16, (int)(e->v >> 56) & 1),
                                 (int)(e->len & 0xFFFF), (int)(e->len >> 16));
             break;
         case EV_DOWNLOAD:

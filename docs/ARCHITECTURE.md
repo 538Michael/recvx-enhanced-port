@@ -168,7 +168,11 @@ headless.
   distortion, the stage-7 small screen, `Ps2TextureMalloc` textures). The game thread records a
   capture event instead; the render thread blits the render-target area into a texture that
   becomes a native texture definition, and the TIM2 only receives a 16-byte marker. A stale marker
-  falls back to a plain upload.
+  falls back to a plain upload. In widescreen the full-screen distortion captures the widened view
+  (`pc_rtex_wide`) and draws it back over the whole view. The other small screen (the Palace
+  monitor, `PS2_Render_Tex_Sub`) is a GS copy into FBP 476 sampled as a texture; a target's drawn
+  area is its scissor cut to the vertices of 2D batches, so a CLUT upload in the pages below that
+  copy does not make it stale.
 - Still emulated: the GS register/state model, GS memory (render-to-texture, CLUTs, non-native
   textures), render targets, VIF/DMA for the remaining packets.
 
