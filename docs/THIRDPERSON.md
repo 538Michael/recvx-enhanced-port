@@ -180,7 +180,8 @@ unit (the character is about 17 units tall).
 ## What hides room parts
 
 * Third person draws every room part while its camera is active (`ps2_NinjaCnk.c
-  pc_show_hidden`). Room records with `flg 0x40000000` (drawn only in the cuts in `hide[0..3]`)
+  pc_show_hidden`), except nodes without a model: they carry the hide flag for good (`bhSetCut`
+  only changes it on nodes with a model; rooms 6/8, 7/25, 9/8 and 9/17 have such nodes). Room records with `flg 0x40000000` (drawn only in the cuts in `hide[0..3]`)
   are drawn too (`objitm.c`). Model culling uses the active view.
 * Rooms are modelled for their camera angles: from elsewhere some walls are missing, single-sided
   or untextured. The camera is kept inside the collision walls (`bhCheckL2Wall`): the shoulder

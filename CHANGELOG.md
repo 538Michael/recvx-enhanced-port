@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- **Third person: crashes in four rooms**: with the over-the-shoulder camera on, the game crashed
+  on entering the Antarctic base's weapons storage room (the missiles and the magnum), the ladder
+  room between Rockfort's training facility and the Albinoid's pool, and the room the elevator
+  behind the tiger statue arrives in. These rooms now play normally with the camera on.
+
 ## 0.5.1 (2026-10-16)
 
 ### Fixes
