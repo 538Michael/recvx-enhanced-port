@@ -16,6 +16,7 @@ void     stream_tex_def_end(void);
 void     stream_tex_bind(uint32_t id, uint32_t tbp, uint32_t cbp);
 void     stream_tex_forget(uint32_t id);
 void     stream_rtex_capture(uint32_t id, uint32_t fbp, uint32_t fbw, uint32_t w, uint32_t h);
+void     stream_movie(uint32_t tbp, int index);    /* movie frame index is the texture at tbp */
 /* a point the overlay draws at (the co-op name tag), kept with the frame being drawn: screen x, y
    (640x480) and view depth w, STREAM_PT_* (only the frame's last call counts; none: 0) */
 enum { STREAM_PT_FRONT = 1, STREAM_PT_BEHIND = 2 };
