@@ -751,6 +751,8 @@ void tps_calc_model(void)
     actor_aim_offset(plp, ofs);
     dx = aim_t.x - ow[9].mtx[12] - ofs[0]; dz = aim_t.z - ow[9].mtx[14] - ofs[2];
     a = atan2f(aim_t.y - ow[9].mtx[13] - ofs[1], sqrtf(dx * dx + dz * dz));
+    if ((WpnTab[plp->wpnr_no].flg & 0x40000000) && a > 0) a = 0;   /* knife: level at targets above (an enemy
+                                                                       right in front raised the slash to its head), still bends down */
     bend_a = a = w * (a > 1.047f ? 1.047f : a < -1.047f ? -1.047f : a) / 2;   /* at most 60 degrees */
     bend(plp, a);
     {   /* "You appear as" another model (the retargeting): the weapon is drawn in the model's hand, which
