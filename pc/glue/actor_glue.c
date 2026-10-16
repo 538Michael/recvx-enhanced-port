@@ -438,6 +438,26 @@ static void retarget(Disguise* d, BH_PWORK* src, const Rig* sr)
         else for (j = 0; j < 9; j++) rot[i][j] = dm[(j / 3) * 4 + j % 3];
     }
     place(m, tr, rot, dm, root);
+    if (root == scaled) {   /* The feet as the source's: its lowest ankle or toe as far over the floor (in
+        proportion) beyond its rest height as the model's beyond the model's. Feet of another shape (a
+        Hunter's long foot, Monster Steve's claw) lift the leg differently when the source's toe bends. */
+        float fs = 1e9f, ft = 1e9f, rs = 1e9f, rt = 1e9f, hs = sr->rest[(int)sr->map[1]][1] - sr->rest[(int)sr->map[0]][1],
+              ht = tr->rest[(int)tr->map[1]][1] - tr->rest[(int)tr->map[0]][1];
+        for (k = 16; k <= 21; k++) {
+            if (k == 18 || k == 19 || tr->map[k] < 0 || sr->map[k] < 0) continue;
+            fs = fminf(fs, sow[(int)sr->map[k]].mtx[13]);
+            rs = fminf(rs, sr->rest[(int)sr->map[k]][1] - sr->rest[(int)sr->map[0]][1]);
+            ft = fminf(ft, m->owP[(int)tr->map[k]].mtx[13]);
+            rt = fminf(rt, tr->rest[(int)tr->map[k]][1] - tr->rest[(int)tr->map[0]][1]);
+        }
+        if (ft < 1e8f && hs > 1.0f && ht > 1.0f) {
+            float shift = rt + (fs - dm[13] - rs) * ht / hs - (ft - dm[13]);
+            if (shift > 3.0f) shift = 3.0f;
+            if (shift < -3.0f) shift = -3.0f;
+            scaled[1] += shift;
+            place(m, tr, rot, dm, root);
+        }
+    }
     {   /* Both hands on the weapon (two-handed aim and grips): the source's left hand is near its
            right. A model of other proportions has its hands elsewhere (longer arms, wider shoulders),
            so its left arm is solved to keep that hand where the source has it relative to the right
@@ -1188,6 +1208,16 @@ void actor_pose(int who, BH_PWORK* src)
                 for (i = 0; i < sr.n; i++) host_log("actor:  node %2d par %2d rest %7.2f %7.2f %7.2f\n", i, sr.par[i], sr.rest[i][0], sr.rest[i][1], sr.rest[i][2]);
             }
             retarget(d, drv, &sr);
+            if (getenv("RECVX_RIG_DUMP") && who == 0 && !redraw) {   /* the feet over the floor: the source's lowest ankle/toe and the model's */
+                float fs = 1e9f, ft = 1e9f;
+                int k;
+                for (k = 16; k <= 21; k++) {
+                    if (k == 18 || k == 19) continue;
+                    if (sr.map[k] >= 0) fs = fminf(fs, drv->mlwP->owP[(int)sr.map[k]].mtx[13] - (*src->mtx)[13]);
+                    if (d->rig.map[k] >= 0) ft = fminf(ft, m->owP[(int)d->rig.map[k]].mtx[13] - (*src->mtx)[13]);
+                }
+                host_log("actor: feet motion %d frame %d: source %.2f model %.2f over the floor\n", (int)drv->mtn_no, (int)(drv->frm_no >> 16), fs, ft);
+            }
             d->mapped = 1;
             if (who < 2) {   /* the source's weapon hands where the model's hands are, turned as the pose's (the copy has the source's nodes) */
                 int k;
