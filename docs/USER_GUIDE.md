@@ -136,6 +136,7 @@ visible, and Contrast until the right square on the white strip is barely visibl
 |---|---|---|
 | Skip intro | `skip_intro` | on: boot straight into the title menu (next start) |
 | Skip door animations | `skip_doors` | on: room transitions use the game's load screen instead of the door/stairs/ladder animation (and its sounds) |
+| Battle Game unlocked | `battle_unlocked` | **on**: the title menu offers BATTLE GAME without a finished playthrough (Claire to start with; the other characters unlock as in the original). Saves and system data are not changed; off: only after a cleared game, as the original |
 | Quick knife | `quick_knife` | on: hold the quick-knife key to draw the combat knife without opening the inventory; release to get the previous weapon back |
 | **Saves** | | |
 | Save system | `save_system` | **Native files** (0): every save a file in `save/saves`, no limit, no memory card screens; Memory card (original) (1): see [Saves](#saves) |

@@ -136,6 +136,8 @@ const Setting g_settings[] = {
 
     { SP_GAMEPLAY, "Skip intro", V(g_config.skip_intro), 0, 1, 1, .flags = SET_RESTART, .help = "Boot straight into the title menu: no warning screen, logos or intro movie.", .group = "GENERAL" },
     { SP_GAMEPLAY, "Skip door animations", V(g_config.skip_doors), 0, 1, 1, .help = "Room transitions use the game's load screen instead of the door, stairs or ladder animation." },
+    { SP_GAMEPLAY, "Battle Game unlocked", V(g_config.battle_unlocked), 0, 1, 1,
+      .help = "The title menu offers BATTLE GAME without a finished playthrough. Saves and records stay as they are; off: only after a cleared game, as the original." },
     { SP_GAMEPLAY, "Quick knife", V(g_config.quick_knife), 0, 1, 1,
       .help = "Hold the quick-knife key (Space, right trigger; see CONTROLS) to draw the knife without the inventory; release it for the weapon before." },
     { SP_GAMEPLAY, "Save system", V(g_config.save_system), 0, 1, 1, save_systems,

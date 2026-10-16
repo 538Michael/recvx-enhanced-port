@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Gameplay
+
+- **Battle Game from the start**: BATTLE GAME is in the title menu without a finished
+  playthrough (GAMEPLAY setting "Battle Game unlocked", on by default). It only changes what the
+  menu offers: your saves and system data are not touched, and turned off the menu is as in the
+  original again. Finishing a Battle Game saves its records but does not count as finishing
+  the story. Its characters unlock as before: Claire from the start, Chris after finishing the
+  story once, the others under the original's conditions.
+
 ### Renderer
 
 - **Menu frames: no more dark lines**: the status screen, files, map and item screens showed thin
