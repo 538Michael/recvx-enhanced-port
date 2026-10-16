@@ -602,6 +602,27 @@ void player_model_read(BH_PWORK* who, unsigned char* file, unsigned char* mdl, u
     sys->bmt_size = bmt_size_b;
 }
 
+/* bhReadWeaponData for `who` (weapon wpn): the hand objects objs[0..1], the weapon motions into
+   who->mnwP[100..] (plp, sys->obwp, sys->memp and the weapon buffers swapped for it and put back) */
+void player_weapon_read(BH_PWORK* who, O_WRK* objs, int wpn, unsigned char* file, unsigned char* wr, unsigned char* wl, unsigned char* wmt)
+{
+    BH_PWORK* plp_b = plp;
+    O_WRK* obwp_b = sys->obwp;
+    unsigned char *memp_b = sys->memp, *wr_b = sys->wrmdlp, *wl_b = sys->wlmdlp, *wmt_b = sys->plwmtp;
+    unsigned int wmt_size_b = sys->wmt_size;
+    plp = who;
+    who->wpnr_no = wpn;
+    sys->obwp = objs;
+    sys->memp = file;
+    sys->wrmdlp = wr; sys->wlmdlp = wl; sys->plwmtp = wmt;
+    bhReadWeaponData();
+    plp = plp_b;
+    sys->obwp = obwp_b;
+    sys->memp = memp_b;
+    sys->wrmdlp = wr_b; sys->wlmdlp = wl_b; sys->plwmtp = wmt_b;
+    sys->wmt_size = wmt_size_b;
+}
+
 /* object objs[2] linked to head node 5 of `who`, set up as bhSetPlayer does for player 1's sys->obwp[2] */
 void player_hair(O_WRK* objs, BH_PWORK* who, int chr, unsigned char* exp0, unsigned char* exp3)
 {
@@ -1432,6 +1453,30 @@ __attribute__((constructor)) static void actor_init(void)
 
 /* the display actor's work (its model, node matrices after actor_pose), NULL when none is shown */
 BH_PWORK* actor_work(int who) { return who >= 0 && who < ACTOR_SLOTS && dg[who].model >= 0 ? &dg[who].w : NULL; }
+
+/* node n of w's model has a mesh of its own: geometry, or skinned vertices (npSkinConvert's records
+   in node order: flg, mesh mno, with flg 2 the mesh's vertex table; flg 1: vertices bound to the node) */
+static int node_has_mesh(const BH_PWORK* w, int n)
+{
+    const ML_WORK* m = w->mlwP;
+    const int* s = w->skp[m - w->mdl];
+    int i, flg = 0;
+    if (m->objP[n].model) return 1;
+    for (i = 0; s && i <= n; i++) {
+        if (m->objP[i].evalflags & 0x20000000) { flg = 0; continue; }
+        if ((flg = *s++)) { s++; if (flg & 2) s += 1 + *s; }
+    }
+    return flg & 1;
+}
+
+/* the source's hand node (9, 13) is at the model's hand (actor_pose) and the model has no hand
+   there of its own (the story cast's models; zombies and creatures have theirs) */
+int actor_hand_free(int who, int node)
+{
+    Disguise* d = &dg[who];
+    int n = d->model >= 0 && d->mapped ? d->rig.map[node] : -1;
+    return n >= 0 && !node_has_mesh(&d->w, n);
+}
 
 int actor_head(int who, float* out)
 {

@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- **Hands in the lobby's model preview**: the characters in the MULTIPLAYER lobby had no hands.
+  They now wear the hand pieces the game gives an unarmed player, on the same wrist joints: each
+  player character its own; the story cast's models, which have none, Chris's (men) or Claire's
+  (women). Zombies and creatures keep their own hands. The look in game is unchanged.
+
 ## 0.3.0 (2026-10-16)
 
 ### Controls
