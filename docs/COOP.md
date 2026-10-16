@@ -657,8 +657,13 @@ partner's weapon's arms sound bank is loaded beside ours (programs `0x40 + n`).
 * **Zombie grabs** are handed to the grabbed joiner's game: the host sends the enemy's state as
   `EV_ESTATE` chunks plus `EV_GRAB`; the joiner runs the grab with its real player (bites, shake
   off, death) and sends snapshots of the slot; `EV_UNGRAB` returns it (with state, or without and
-  the host releases the zombie). A grab the joiner cannot take is refused and the zombie released.
-  The host takes a slot back after 300 joiner frames without snapshots, and when the partner
+  the host releases the zombie). A grab the joiner cannot take (its state does not fit, or the
+  position it puts the player at lies behind a wall from where the player stands) is refused and
+  the zombie released. The joiner's player takes the grab's modes, motion and position from the
+  host's proxy, and of its flags the ones the enemy changed there, plus the planted foot
+  (`flg` 0x40000, `bhFixPosition`) the grab's start lets go of: the proxy never has it, and an
+  aimed weapon or the knife left ours set, which moved the player off the zombie every frame of
+  the grab. The host takes a slot back after 300 joiner frames without snapshots, and when the partner
   leaves. A grab started while the joiner's enemy ran its own AI keeps running locally until it
   lets go.
 * **Safety nets**: a player in a grab state with no enemy holding it for 15 frames is let go (150

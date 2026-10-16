@@ -989,9 +989,27 @@ static void grab_back(int i, int state, int c)
     host_log("coop: the grab of enemy %d ends, handed back%s\n", i, state ? "" : " without its state");
 }
 
+/* a wall between p and q at waist height (the game's bullet ray test; its hit globals are preserved): a
+   position taken from the partner's game must not put our player through one (the wall check only pushes
+   out of walls the player overlaps) */
+static int wall_between(const BH_PWORK* p, const BH_PWORK* q)
+{
+    NJS_LINE line;
+    NJS_POINT3 apos = sys->apos;
+    ATR_WORK* ahtp = sys->ahtp;
+    float len;
+    int hit;
+    line.px = p->px; line.py = p->py + 10.0f; line.pz = p->pz;
+    line.vx = q->px - p->px; line.vy = q->py - p->py; line.vz = q->pz - p->pz;
+    hit = (line.vx != 0 || line.vz != 0) && bhCheckL2Wall(&line, 0x400, &len);
+    sys->apos = apos; sys->ahtp = ahtp;
+    return hit;
+}
+
 /* client: the host's enemy grabbed us. Taken only as a whole: the transfer the grab names is
    complete, the slot holds a zombie here (en01, the only grab handed over) with the same linked
-   child, and the state is plausible; otherwise the host gets the grab back and lets go. */
+   child, the state is plausible and its position not behind a wall; otherwise the host gets the
+   grab back and lets go. */
 static void grab_in(const Event* e)
 {
     const BH_PWORK* a = (const BH_PWORK*)(estate + ESTATE_PLY);
@@ -1012,7 +1030,7 @@ static void grab_in(const Event* e)
                                      : e->u.gr.mnw == MNW_ROOM ? sys->rmthp : ep->mnwP;
     if (!estate_x.done || estate_x.tid != e->u.gr.tid || estate_x.total != ESTATE_SIZE || ep->id != 1 || !ep->exp0 ||
         c != e->u.gr.child || (c < 128 && !(ene[c].flg & 0x1)) || !finite3(a->px, a->py, a->pz) || !mtn_ok(ep, set, a->mtn_no, a->frm_no) ||
-        !ene_unpack(ep, estate, e->u.gr.mdl, e->u.gr.mnw)) {
+        wall_between(plp, a) || !ene_unpack(ep, estate, e->u.gr.mdl, e->u.gr.mnw)) {
         host_log("coop: enemy %d grabs us, but its state does not fit here\n", i);
         grab_back(i, 0, e->u.gr.child);
         return;
@@ -1030,6 +1048,10 @@ static void grab_in(const Event* e)
     plp->ax = a->ax; plp->ay = a->ay; plp->az = a->az; plp->ayp = a->ayp;
     plp->at_flg = a->at_flg;
     plp->flg = (plp->flg | (a->flg & ~e->u.gr.flg_b)) & ~(e->u.gr.flg_b & ~a->flg);
+    /* the grab's start (en01 bhEne01_PlyDG00/01) let go of the planted foot (0x40000, bhFixPosition) on the proxy,
+       which never has it: ours, set by an aimed weapon or the knife, moved us by our last pose's foot every frame
+       of the grab - away from the zombie, into walls and through them */
+    plp->flg = (plp->flg & ~0x40000) | (a->flg & 0x40000);
     plp->stflg = (plp->stflg | (a->stflg & ~e->u.gr.stflg_b)) & ~(e->u.gr.stflg_b & ~a->stflg);
     plp->flg2 = (plp->flg2 | (a->flg2 & ~e->u.gr.flg2_b)) & ~(e->u.gr.flg2_b & ~a->flg2);
     x = *(unsigned int*)plp->exp1;
@@ -4991,6 +5013,7 @@ static int apply_event(const Event* e)
         if (e->u.ph.mode[0] == 2 && plp->mode0 != 2 && plp->mode0 != 3 && plp->hp >= 0) {
             plp->mode0 = 2; plp->mode1 = e->u.ph.mode[1]; plp->mode2 = e->u.ph.mode[2]; plp->mode3 = e->u.ph.mode[3];
             plp->flg |= e->u.ph.flg_set & 0xC;
+            plp->flg &= ~0x40000;   /* no planted foot, as the reaction's start (bhCPM0_damage) when the event skips it */
             *(int*)plp->exp1 |= e->u.ph.exp1_set & 0x4;
             plp->dvx = e->u.ph.dv[0]; plp->dvy = e->u.ph.dv[1]; plp->dvz = e->u.ph.dv[2];
             plp->stflg &= ~0x50000;
