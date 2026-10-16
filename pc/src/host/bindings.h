@@ -18,9 +18,10 @@ enum {
     B_QUICKTURN,                       /* back, then the run button (the game's quick turn) */
     B_QUICKKNIFE,                      /* hold: knife drawn and readied, the weapon before back on release (knife_glue.c) */
     B_TRADE,                           /* co-op: trade request / accept with the partner next to you (coop_glue.c, trade_glue.c) */
-    /* third person (keyboard and mouse; a gamepad drives it through the DS2 rows) */
+    /* third person: keyboard and mouse; the gamepad set has its own (modern scheme, g_tps.pad_modern:
+       run .. quick turn, knife, recenter; the classic scheme drives it through the DS2 rows) */
     B_TPS_FWD, B_TPS_BACK, B_TPS_LEFT, B_TPS_RIGHT, B_TPS_RUN, B_TPS_ACTION, B_TPS_CANCEL,
-    B_TPS_STATUS, B_TPS_MAP, B_TPS_AIM, B_TPS_FIRE, B_TPS_QUICKTURN,
+    B_TPS_STATUS, B_TPS_MAP, B_TPS_AIM, B_TPS_FIRE, B_TPS_QUICKTURN, B_TPS_KNIFE, B_TPS_RECENTER,
     /* port hotkeys (keyboard) */
     B_TPS_TOGGLE, B_SETTINGS, B_CHEATS, B_COOP, B_FULLSCREEN, B_NOCLIP_UP, B_NOCLIP_DOWN,
     B_COUNT
@@ -33,7 +34,7 @@ enum { BG_GAME, BG_TPS, BG_HOTKEY };   /* row groups */
 #define BIND_MOUSE 512
 #define BIND_AXIS 64
 
-typedef struct BindRow { const char* ini; const char* name; int group; int pad_ok; } BindRow;
+typedef struct BindRow { const char* ini; const char* name; int group; int pad_ok; } BindRow;   /* pad_ok: 0 keyboard only, 1 both sets, 2 gamepad only */
 extern const BindRow bind_rows[B_COUNT];
 extern const int bind_order[B_COUNT];  /* display order */
 

@@ -69,23 +69,55 @@ void tps_take_mouse(float* dx, float* dy)
 }
 
 /* the bindings' third-person rows (bindings.c; by default W/S forward/back, A/D turn, Shift run,
-   E/Space action, Q cancel, Tab status, M map, right mouse ready weapon, left mouse fire) */
-unsigned tps_input_keys(void)
+   E/Space action, Q cancel, Tab status, M map, right mouse ready weapon, left mouse fire), and the
+   gamepad's in third-person play with the modern scheme (they read nothing otherwise) */
+unsigned tps_input_keys(int quickturn)
 {
     static const struct { int row; unsigned bit; } map[] = {
         { B_TPS_FWD, TPS_K_FWD }, { B_TPS_BACK, TPS_K_BACK }, { B_TPS_LEFT, TPS_K_LEFT }, { B_TPS_RIGHT, TPS_K_RIGHT },
         { B_TPS_RUN, TPS_K_RUN }, { B_TPS_ACTION, TPS_K_ACTION }, { B_TPS_CANCEL, TPS_K_CANCEL },
         { B_TPS_STATUS, TPS_K_STATUS }, { B_TPS_MAP, TPS_K_MAP }, { B_TPS_AIM, TPS_K_AIM }, { B_TPS_FIRE, TPS_K_FIRE },
+        { B_TPS_RECENTER, TPS_K_RECENTER },
     };
     const bool* k = bind_keys();
-    int b = __atomic_load_n(&buttons, __ATOMIC_RELAXED), qt;
+    int b = __atomic_load_n(&buttons, __ATOMIC_RELAXED), qt, pad = bind_gamepad() != NULL;
     unsigned r = 0;
     if (!pad_game_input_enabled()) return 0;
     for (size_t i = 0; i < sizeof(map) / sizeof(map[0]); i++)
-        if (bind_held(map[i].row, BIND_KB, k, b)) r |= map[i].bit;
-    qt = bind_quickturn(1, bind_held(B_TPS_QUICKTURN, BIND_KB, k, b));
+        if (bind_held(map[i].row, BIND_KB, k, b) || (pad && bind_held(map[i].row, BIND_PAD, k, 0))) r |= map[i].bit;
+    qt = bind_quickturn(1, quickturn || bind_held(B_TPS_QUICKTURN, BIND_KB, k, b) || (pad && bind_held(B_TPS_QUICKTURN, BIND_PAD, k, 0)));
     if (qt) r |= TPS_K_BACK | TPS_K_QUICKTURN | (qt > 1 ? TPS_K_RUN : 0);
     return r;
+}
+
+static float axis(SDL_GamepadAxis a) { return SDL_GetGamepadAxis((SDL_Gamepad*)bind_gamepad(), a) / 32767.0f; }
+
+int tps_pad_sticks(float* lx, float* ly, float* rx, float* ry)
+{
+    *lx = *ly = *rx = *ry = 0;
+    if (!bind_gamepad() || !pad_game_input_enabled()) return 0;
+    *lx = axis(SDL_GAMEPAD_AXIS_LEFTX); *ly = -axis(SDL_GAMEPAD_AXIS_LEFTY);
+    *rx = axis(SDL_GAMEPAD_AXIS_RIGHTX); *ry = -axis(SDL_GAMEPAD_AXIS_RIGHTY);
+    return 1;
+}
+
+/* the gamepad played this frame: a button, a trigger or a stick past a third */
+int tps_pad_touched(void)
+{
+    SDL_Gamepad* g = (SDL_Gamepad*)bind_gamepad();
+    if (!g || !pad_game_input_enabled()) return 0;
+    for (int b = 0; b < SDL_GAMEPAD_BUTTON_COUNT; b++) if (SDL_GetGamepadButton(g, (SDL_GamepadButton)b)) return 1;
+    for (int a = 0; a < SDL_GAMEPAD_AXIS_COUNT; a++) if (SDL_abs(SDL_GetGamepadAxis(g, (SDL_GamepadAxis)a)) > 11000) return 1;
+    return 0;
+}
+
+int tps_kbm_touched(void)
+{
+    const bool* k = bind_keys();
+    if (!pad_game_input_enabled() || !input_accept(g_input_source, 0, BIND_KB, 0)) return 0;
+    if (__atomic_load_n(&buttons, __ATOMIC_RELAXED)) return 1;
+    for (int i = 1; i < SDL_SCANCODE_COUNT; i++) if (k[i]) return 1;
+    return 0;
 }
 
 /* mouse buttons held while the mouse is captured (bindings to mouse buttons) */

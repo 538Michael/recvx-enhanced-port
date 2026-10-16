@@ -177,12 +177,14 @@ static void build_report(unsigned char* r)
     }
 }
 
-/* quick knife (pc/glue/knife_glue.c), game thread: its row is held on the keyboard/mouse or the gamepad */
+/* quick knife (pc/glue/knife_glue.c), game thread: its row is held on the keyboard/mouse or the
+   gamepad (in third-person play with the modern scheme the gamepad's third-person knife row) */
 int pad_quick_knife(void)
 {
     const bool* k = bind_keys();
     if (!input_enabled || g_lobby_io.text_on) return 0;
-    return bind_held(B_QUICKKNIFE, BIND_KB, k, tps_mouse_buttons()) || (gamepad && bind_held(B_QUICKKNIFE, BIND_PAD, k, 0));
+    return bind_held(B_QUICKKNIFE, BIND_KB, k, tps_mouse_buttons()) ||
+           (gamepad && (bind_held(B_QUICKKNIFE, BIND_PAD, k, 0) || bind_held(B_TPS_KNIFE, BIND_PAD, k, 0)));
 }
 
 /* co-op trade request (pc/glue/coop_glue.c), game thread: its row is held on the keyboard/mouse or the gamepad */

@@ -93,6 +93,66 @@ int main(void)
         }
         CHECK(n <= 10);
     }
+
+    /* third person, gamepad: a stick inside its dead zone is nothing; past it, rescaled from the zone's edge */
+    x = 0.1f; z = 0.1f;
+    CHECK(modern_stick(&x, &z, 0.2f, 1) == 0 && x == 0 && z == 0);
+    x = 0; z = 1;
+    CHECK(fabsf(modern_stick(&x, &z, 0.2f, 1) - 1) < 1e-5f && fabsf(z - 1) < 1e-5f);
+    x = 1; z = 1;   /* a corner beyond the unit circle: length 1, direction kept */
+    CHECK(fabsf(modern_stick(&x, &z, 0.2f, 1) - 1) < 1e-5f && fabsf(x - z) < 1e-6f && fabsf(x - 0.70710678f) < 1e-4f);
+    x = -0.6f; z = 0;   /* halfway between the zone's edge and full: 0.5 linear, 0.25 with the camera's curve */
+    CHECK(fabsf(modern_stick(&x, &z, 0.2f, 1) - 0.5f) < 1e-5f && fabsf(x + 0.5f) < 1e-5f);
+    x = -0.6f; z = 0;
+    CHECK(fabsf(modern_stick(&x, &z, 0.2f, 2) - 0.25f) < 1e-5f && fabsf(x + 0.25f) < 1e-5f);
+    {   /* the aim response: no jump at the zone's edge, rising, fine near the centre (a tenth past the zone: 1% speed) */
+        float last = 0;
+        for (int i = 0; i <= 100; i++) {
+            float a = i / 100.0f, b = 0, l = modern_stick(&a, &b, 0.15f, 2);
+            CHECK(l >= last && l - last < 0.03f);
+            last = l;
+        }
+        x = 0.15f + 0.085f; z = 0;
+        CHECK(modern_stick(&x, &z, 0.15f, 2) < 0.011f);
+    }
+    /* stick -> direction under the third-person camera looking along yaw (tps_glue.c passes its right
+       axis (cos yaw, -sin yaw), as cam() here): up walks away from the camera, down towards it,
+       right to the camera's right; a half-pushed stick (past the dead zone) the same */
+    cam(D(40), &rx, &rz);
+    CHECK(NEAR(modern_target(rx, rz, 0, 1), D(40)) && NEAR(modern_target(rx, rz, 0, -1), D(220)));
+    CHECK(NEAR(modern_target(rx, rz, 0.4f, 0), D(-50)) && NEAR(modern_target(rx, rz, -0.4f, 0), D(130)));
+    x = 0.3f; z = -0.3f;
+    modern_stick(&x, &z, 0.2f, 1);
+    CHECK(NEAR(modern_target(rx, rz, x, z), D(40 - 135)));
+    /* a quick turn swings the camera half round: the held stick keeps the camera it was given in */
+    h.held = 0;
+    modern_hold(&h, D(180), 7, &rx, &rz);                 /* pulled back: walk towards the camera at 40 degrees */
+    CHECK(NEAR(modern_target(rx, rz, 0, -1), D(220)));
+    cam(D(220), &rx, &rz);                                /* the camera swung behind the turned character */
+    modern_hold(&h, D(180), 8, &rx, &rz);
+    CHECK(NEAR(modern_target(rx, rz, 0, -1), D(220)));    /* still held back: on the way the character faces */
+    cam(D(220), &rx, &rz);
+    modern_hold(&h, 0, 8, &rx, &rz);                      /* pushed up instead: the new camera */
+    CHECK(NEAR(modern_target(rx, rz, 0, 1), D(220)));
+
+    /* gentle aim assist: outside the cone nothing changes */
+    {
+        float dy = D(2), dp = D(-1);
+        modern_assist(D(10), 0, &dy, &dp);
+        CHECK(NEAR(dy, D(2)) && NEAR(dp, D(-1)));
+        /* inside: half speed, plus a tenth of the way towards the target while moving towards it */
+        dy = D(2); dp = 0;
+        modern_assist(D(4), D(1), &dy, &dp);
+        CHECK(NEAR(dy, D(1) + D(0.4f)) && NEAR(dp, D(0.1f)));
+        /* moving away from it: only half speed (it never holds the aim) */
+        dy = D(-2); dp = 0;
+        modern_assist(D(4), D(1), &dy, &dp);
+        CHECK(NEAR(dy, D(-1)) && NEAR(dp, 0));
+        /* a still stick: no pull */
+        dy = dp = 0;
+        modern_assist(D(4), D(1), &dy, &dp);
+        CHECK(dy == 0 && dp == 0);
+    }
     printf("modern: ok\n");
     return 0;
 }
