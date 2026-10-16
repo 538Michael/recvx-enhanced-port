@@ -534,6 +534,9 @@ static void aim_at_crosshair(void)
     h = sqrtf((t.x - o.x) * (t.x - o.x) + (t.z - o.z) * (t.z - o.z));
     plp->ay += (short)(ay - plp->ay);
     plp->wax = plp->waxp = (short)(int)(atan2f(t.y - o.y, h) * (32768.0f / 3.14159265f));
+    /* the knife slashes level at anything not below it: an enemy right in front puts the crosshair
+       on its body, well above the hand at that range, which raised the slash */
+    if ((WpnTab[plp->wpnr_no].flg & 0x40000000) && plp->wax > 0) plp->wax = plp->waxp = 0;
     aim_t = t;
     /* the game's aim height for what the shot goes at, read by the enemies until the next mode
        handler (tps_player_mode): zombies and the anatomist on the ground, a knocked-down Hunter,

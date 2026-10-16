@@ -63,6 +63,7 @@
 
 ### Fixes
 
+- Third person: the knife no longer slashes upwards at an enemy standing right in front; it slashes level at anything not below the player (aiming down at crawlers still works).
 - **No more twitching when aiming or using the knife as another model** in third person: with
   "You appear as" another model, or Claire's or Chris's model on the other character with
   gender-matched animations, the upper body jerked back and forth when a weapon was raised,
