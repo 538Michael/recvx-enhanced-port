@@ -422,7 +422,12 @@ Models not in the catalogue:
   spiders, Cerberus, albinoids, fish, Spotter, ant).
 * **Without co-op**: `game.c` calls `coop_control_remote` while `appear_on` (an appearance other
   than the character played is chosen or still shown); with "As played" nothing runs.
-* **Lobby preview**: `actor_set`, `actor_pose_alone`, `actor_draw` work outside a room.
+* **Lobby preview**: `actor_set`, `actor_pose`, `actor_draw` work outside a room. The
+  hands are the unarmed pieces (weapon file `chr * 30 + 20`, `player_weapon_read`) on nodes 9/13 of
+  the preview's player model, as `sys->obwp[0..1]`; the character is `appear_voice` (the cast its
+  own, other men Chris, women Claire; else the file shown). On a display actor they are drawn only
+  where `actor_hand_free`: the hand is mapped and the model has no mesh there of its own (no geometry
+  and no skinned vertices on that node: the story cast; zombies and creatures have theirs).
 * **Game over**: `njReleaseTextureAll` unloads the display actors; `coop_textures_released`
   clears the "player in control" state, so the appearance returns only once the player is back.
 
