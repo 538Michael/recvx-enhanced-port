@@ -33,6 +33,7 @@ static int trace;                 /* RECVX_TPS_TRACE=1: log the free aim */
 static NJS_POINT3 aim_t;          /* free aim: the crosshair target (tps_calc_model) */
 static int aim_h;                 /* free aim: the aim height bit given to the game (at_flg 4 up, 8 down), 0: none */
 static float bend_a;   /* the last free-aim bend (radians per node), 0: none */
+static float aim_corr;            /* free aim with a model: the drawn weapon's pitch minus the hand's (radians), eased */
 static int no_cam_walls;          /* test aid (RECVX_TPS_ORBIT): the eye goes through walls */
 static unsigned move_keys;        /* camera A (g_tps.free_cam): the WASD keys held, walked relative to the camera */
 static int pad_steer;             /* the game rows (arrows, gamepad) press a direction: tank controls, the camera follows */
@@ -739,7 +740,7 @@ void tps_calc_model(void)
     bhCalcModel(plp);
     bend_a = 0;
     w += (on - w) * 0.35f;
-    if (w < 0.01f || plp->mlwP->obj_num <= 9) return;
+    if (w < 0.01f || plp->mlwP->obj_num <= 9) { aim_corr = 0; return; }
     /* pitch from the weapon hand of the straight pose to the target (not wax: the shot starts
        lower, at 11 units, and needs a steeper angle for close targets); with "You appear as" the
        hand where the model holds the weapon (a Tyrant's is higher: its weapon pointed over the
@@ -752,9 +753,18 @@ void tps_calc_model(void)
     {   /* "You appear as" another model (the retargeting): the weapon is drawn in the model's hand, which
            the bend swings about the chest as well, farther the taller the model, and in a gender-matched
            pose the hand turns the weapon as that motion does. The pitch is solved on the weapon as it will
-           be drawn: its barrel (the hand's x axis from the muzzle) through the crosshair target. */
-        float h[16], t = a * 2 / (w > 0.01f ? w : 1);
-        for (int it = 0; it < 4 && actor_aim_hand(plp, h); it++) {
+           be drawn: its barrel (the hand's x axis from the muzzle) through the crosshair target.
+           actor_aim_hand is the hand as drawn last tick, in the frame of the chest now, so it is solved
+           only while the aim pose stands still (weapon raised, mode2 65, no motion blend) and not for the
+           knife (no barrel). Raising, shots, recoil and slashes keep the last correction, which is eased:
+           solved on a moving hand the upper body jumped back and forth. */
+        static int still;   /* ticks the aim pose has stood still (the hand read is last tick's) */
+        float h[16], t0 = a * 2 / w, t = t0, goal = aim_corr;
+        int it, steady;
+        still = plp->mode2 == 65 && !plp->hokan_count && !(WpnTab[plp->wpnr_no].flg & 0x40000000) ? still + 1 : 0;
+        steady = still >= 2;
+        if (!actor_aim_hand(plp, h)) { aim_corr = 0; return; }   /* no model: the hand's pitch */
+        for (it = 0; steady && it < 4 && (it == 0 || actor_aim_hand(plp, h)); it++) {
             const NJS_POINT3* f = &WpnTab[plp->wpnr_no].wp_fps1;
             float m[3], e, sg;
             for (int j = 0; j < 3; j++) m[j] = f->x * h[j] + f->y * h[4 + j] + f->z * h[8 + j] + h[12 + j];
@@ -765,9 +775,15 @@ void tps_calc_model(void)
             t += e;
             t = t > 1.047f ? 1.047f : t < -1.047f ? -1.047f : t;
             bhCalcModel(plp);   /* (unbent) */
-            bend_a = w * t / 2;
-            bend(plp, bend_a);
+            bend(plp, w * t / 2);
         }
+        if (steady) goal = t - t0;
+        aim_corr += (goal - aim_corr) * 0.35f;
+        t = t0 + aim_corr;
+        t = t > 1.047f ? 1.047f : t < -1.047f ? -1.047f : t;
+        bhCalcModel(plp);   /* (unbent) */
+        bend_a = w * t / 2;
+        bend(plp, bend_a);
     }
 }
 
