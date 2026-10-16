@@ -258,6 +258,13 @@ static void item_trace(const unsigned int* inv)
     int c;
     if (on < 0) on = getenv("RECVX_ITEM_TRACE") != NULL;
     if (!on) return;
+    if (sys->stg_no == 0 && sys->rom_no == 9) {   /* the detector's script: floor zone, rm_flg bit 2 (metal carried), ev_flg bit 53 (gone off) */
+        static unsigned int det = ~0u;
+        unsigned int d = sys->flr_idx << 2 | !!(sys->rm_flg & 0x20000000) << 1 | !!(sys->ev_flg[1] & 0x400);
+        if (d != det)
+            printf("detector: frame %u floor %u metal %u alarm %u\n", (unsigned)gs_frame_count(), d >> 2, d >> 1 & 1, d & 1);
+        det = d;
+    }
     for (c = 0; c < 16; c++) { now[c] = inv[c]; now[16 + c] = sys->itm[192 + c]; now[32 + c] = sys->itm[224 + c]; }
     if (!memcmp(now, seen, sizeof(now))) return;
     memcpy(seen, now, sizeof(now));
