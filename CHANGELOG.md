@@ -25,7 +25,7 @@
 ### Controls
 
 - **Twin-stick gamepad controls in third person**: with the over-the-shoulder camera the gamepad
-  now plays like the Resident Evil 2 and 4 remakes: the left stick moves, the right stick turns
+  now has a modern control scheme: the left stick moves, the right stick turns
   the camera, the left trigger aims and the right trigger fires. These buttons can be remapped
   separately from the fixed-camera ones, and "Gamepad controls: Classic" brings back the old
   controls.
