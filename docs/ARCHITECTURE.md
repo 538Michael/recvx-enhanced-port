@@ -81,7 +81,7 @@ Windows `-mno-ms-bitfields`.
 |---|---|
 | main (`main()`, `render_loop`) | SDL window and events, OpenGL, GS emulation and presentation, the F1/F2/F3 overlay, binding capture, lobby text input and clipboard, the setting appliers (window, vsync, volumes) and **every `recvx.ini` write** |
 | game (`game_thread`) | the decomp and `pc/glue` (ENHANCED SETTINGS menu, lobby, co-op incl. its UDP socket polled once per frame, cheats applied at the frame hand-off), disc reads, memory card, creating and destroying audio streams |
-| SDL audio | ADX decoding in the stream callbacks (own file handle per voice), the sound-effect synth mix |
+| SDL audio | ADX decoding in the stream callbacks (own file handle per voice), the sound driver's 240 Hz tick, its queued commands and the synth mix |
 | portmap | UPnP/NAT-PMP while hosting (`net/portmap.c`) |
 | co-op arrival times (Windows) | waits on the co-op socket and notes when data arrived (`net_rx_us`) |
 | log (Linux, `--log`) | copies stdout/stderr into the log file |
@@ -98,7 +98,9 @@ How state crosses threads:
   the last change and at exit. Nobody else calls `config_save`.
 - **Commands** from the overlay to the game are request words (`g_cheat.request`,
   `g_coop.request`, `g_coop.trade_req`), taken by the game thread at its frame.
-- **Audio**: one lock in `audio.c` covers a stream's publication, gain and removal.
+- **Audio**: one lock in `audio.c` covers a stream's publication, gain and removal. The sound
+  driver (`snd_iop.c`, `snd_synth.c`) has its own lock over the driver state, the banks and the
+  command queue the game thread fills and the mixer empties.
 - **Co-op status** strings are written by the game thread and read by the overlay without a
   lock; every string keeps a terminating 0, so a read may show a half-updated line but stays
   bounded.
@@ -297,6 +299,21 @@ village, collision. The render thread (GS emulation, replays: `r_exec`, `r_inter
   (ports 0 and 1 carry the room's background ambience; the system sounds - typewriter, item box,
   computers, doors - rotate over ports 2, 8 and 9). MIDI bank 1 is the door's (`DOOR_xxx.SPQ`,
   loaded only with the door animation), 2 the common system sequences, 3 the room's ambience.
+  - **Timing**: on the PS2 the driver runs on the IOP beside the game; the EE sends one command
+    batch per frame (`sdSysServer`) and the IOP's 240 Hz timer ticks the TQ slots and the MIDI
+    ports in between. Here the tick runs in the SDL audio callback, every 200 output samples, and
+    the RPC handler queues the sound commands in order, stamped with the time they were sent. A
+    mixed buffer stands for the time since the previous one, so each command runs at its share of
+    the buffer: commands keep their spacing (one game frame) and the ticks fall between them, as
+    on the PS2. Bank data commands (HD/BD/SQ uploads) run at once on the game thread, after what
+    was queued before them, since the EE reuses the staging buffer and polls the checksum. The
+    status block (`se_info`, `midi_info`) is filled from the driver state when the EE reads it
+    (`sceSifGetOtherData`). Without an audio device the commands run at once and the ticks follow
+    the vblank count.
+  - Why: the computers print a letter per frame, each a system MIDI sound that the next letter's
+    `sdMidiPlay` stops (`SdrBgmStop` of the previous port). When the ticks ran only at the next
+    RPC, a sequence's first note was keyed on and stopped in the same instant and never sounded;
+    short notes of other sequences were lost the same way.
 - **Movies** (`movie/`, `pc/glue/movie_glue.c`): the disc's FMVs are PSS files (MPEG-2 program
   stream: MPEG-2 video, 320 pixels wide, progressive 29.97 fps, and 16-bit PCM in private
   stream 1), decoded by our own demuxer and MPEG-2 decoder (`pss.c`, `mpeg2.c`). The game's own
@@ -524,7 +541,9 @@ Retail bugs fixed because they made frames depend on the layout:
 movies play by vblank count, pulled to the sound's position (`RECVX_SKIP_MOVIES` counts game
 frames instead, so test runs repeat), ADX streams report their position from the audio stream, the play time counts vblanks,
 and an in-between image's t follows the clock unless `RECVX_INTERP_T` fixes it. A run that waits
-on these can shift by frames.
+on these can shift by frames. The sound driver ticks with the audio output, so the sound status
+the EE reads (which sounds still play) follows it too: from run to run a sound trace can differ in
+the channel an enemy sound gets and in how many volume/pan updates are sent; the frames do not.
 
 Not covered: other stale or out-of-range reads that the scenarios do not reach. `rand()` is only
 called by the game thread.
@@ -590,6 +609,7 @@ and game frames for game-state aids, as noted. Co-op test aids (`RECVX_COOP_*`,
 | `RECVX_EQUIP="f:item:count[;f:item:count]"` | equip a weapon at game frame f (again later after `;`) |
 | `RECVX_HP="f:hp,..."`, `RECVX_RETRY="f,..."` | set health / set a retry point (Continue resumes in that room) at game frame f |
 | `RECVX_TEST_TYPEWRITER="f,..."` | open the typewriter's save screen at game frame f (as its ink ribbon question's "yes"; no ribbon needed) |
+| `RECVX_TEST_COMPUTER="f:n,..."` | open computer terminal n at game frame f, as the room scripts' `EvtComSet n` (1 self-destruct lock, 2 security lock, 3 Albinoid file, 4-6 3D scanner, 7 password; rooms 9/31, 1/2, 3/12, 0/9, 1/9) |
 | `RECVX_FLAGS="set:bit,..."` | set story flags at the first game frame (1 `ev_flg`, 2 `ky_flg`, 3 `ed_flg`, 7 `it_flg`, 8 `mp_flg`) |
 | `RECVX_INF_AMMO=1`, `RECVX_INF_HEALTH=1` | infinite ammo / health cheats on |
 | `RECVX_NOCLIP="f:mode,..."` | noclip mode 0/1/2 from game frame f, logs position every 15 frames |
@@ -635,7 +655,7 @@ and game frames for game-state aids, as noted. Co-op test aids (`RECVX_COOP_*`,
 | Variable | Effect |
 |---|---|
 | `RECVX_TRACE_TASKS=1` | game task (`sys->tk_flg`) changes |
-| `RECVX_TRACE_SND=1` | sound driver commands, key-ons, dropped requests (bank not loaded, no such program or block) and stolen voices |
+| `RECVX_TRACE_SND=1` | sound driver commands, key-ons, dropped requests (bank not loaded, no such program or block), stolen voices and notes released before they sounded (key-ons print from the audio thread) |
 | `RECVX_TRACE_MC=1` | memory card commands and results |
 | `RECVX_PAD_TRACE=1` | DS2 buttons of the pad report when they change |
 | `RECVX_MODERN_TRACE=1` | modern controls: each frame a direction is translated, the direction, cut (and whether the previous cut is held), target and facing angle, the player's place on screen and the camera |
