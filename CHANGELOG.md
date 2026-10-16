@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- **Co-op: grabbed while knifing or aiming**: when a zombie grabbed the joining player while the
+  knife was swinging or a weapon was raised, the character was held off to the side of the
+  zombie, twisted around one foot, and could end up inside or behind a wall when let go. The
+  grab now holds the character where the zombie has it, as in single player. A grab that would
+  put the character behind a wall is let go instead.
+
 ## 0.5.0 (2026-10-16)
 
 ### Gameplay
