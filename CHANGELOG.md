@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- **Metal detector with "No ink ribbons needed"** (prison): with the setting on (or the co-op
+  host's INK RIBBONS *Not needed*), the detector went off even with every metal item put in the
+  trays. The setting made every check for an ink ribbon succeed, and the detector checks for ink
+  ribbons too, since they count as metal there. The setting now only applies to the typewriters;
+  the detector goes off for ink ribbons you actually carry, as in the original. Test aid:
+  `RECVX_ITEM_TRACE=1` also logs the detector's state in that room.
+
 ## 0.3.1 (2026-10-16)
 
 ### Renderer
