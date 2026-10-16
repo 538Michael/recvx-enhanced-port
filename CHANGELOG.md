@@ -8,7 +8,8 @@
   dark lines between the pieces of their frames and backgrounds, most visible at higher internal
   resolutions (for example around the text box under the menu). The last pixels of each piece
   reached past its picture into the neighbouring one in the texture; each piece now samples only
-  its own picture, as on the PS2. Fix by fmil95 (decompilation team).
+  its own picture, as on the PS2. Fixed thanks to fmil95 (decompilation team), who found
+  and tracked down the problem.
 
 ### Fixes
 
