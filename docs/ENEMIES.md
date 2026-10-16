@@ -358,7 +358,7 @@ the record's own slot during the load.
 | shown or hidden by the script only (`InitModelSet`, "later-activated", ambushes that just appear) | another kind, with "Randomize event enemies" | the script only switches it on and off; it starts in its AI |
 | event-driven (`LoadWork`, motion pauses, links, positioning, zombie/face/render/look ops, `EneSeOn`) or HP read/set by the script | **another look of its own type**, with "Randomize event enemies" | the event plays the type's motion numbers and room motions on its skeleton, sets its AI modes (`SubCtr` 143/146/147), tests `id == 1` and its HP. All zombie looks share an 18-node first sub-model, Hunter and Sweeper a 28-node one, so the scene still fits; types with one look (Cerberus, Bandersnatch, Black Widow, bat, Spotter, moth, albinoids, anatomist) stay |
 | bosses and everything in their rooms (ids 2, 12..17, 19, 23, 24, 29, 30, 53..55: Gulp Worm, Alexia, Nosferatu, Alfred, Monster Steve, Tyrant fights, Giant Black Widow, tentacles, knights) | kept: the whole room | the scripts wait for the boss's death or drive it |
-| NPCs (ids >= 31), props (0), fish, albinoid infants, ants, moths, ceiling trap, scripted object | kept | water/wall/set-piece types, or no AI of their own |
+| NPCs (ids >= 31), props (0), fish, albinoids, ants, moths, ceiling trap, scripted object | kept | water/wall/set-piece types, or no AI of their own |
 | a record without a floor (`flr_no < 0`) | kept | hangs somewhere for an event |
 
 **Kinds** a free or shown record can become (`enemyopt_glue.c kinds[]`); a kind is drawn first by
@@ -372,11 +372,13 @@ weight, then one of its looks (the spawner's entries of that type, from any stag
 | Hunter, Sweeper | 2 | 3 / 4 | not in kill-count rooms (may leap out of a room) |
 | Black Widow | 1 | 2 / 3 | open space (25 slots with its brood) |
 | anatomist zombie | 1 | 2 / 2 | |
-| albinoid adult | 1 | 2 / 2 | (walks on land) |
 | Tyrant | 2 | - / 2 | open space; not in kill-count rooms; not where the script uses `rm_flg` bits 29..31 (its code clears `rm_flg & 7` every frame) |
 | Giant Black Widow | 1 | - / 1 | as the Tyrant (writes `rm_flg & 1`) |
 | bat, Spotter | 1 each | - / 3, 2 | only for bat/Spotter records (fliers hover where they are placed; ground enemies never become fliers and back); not in kill-count rooms; `rm_flg` as above |
 
+* Not in the pool: the adult albinoid (its code drives its own room's light 2 and an effect linked
+  to it: two of them in a prison room crashed in `en22.c bhEne22_MV04`), moths (their eggs use
+  Claire's sub-models and 16 slots), bosses, water and wall types.
 * **Open space** (`open_dirs`): line tests against the walls (`bhCollisionCheckLine2`, as the
   placements use) from the record in 8 directions at waist height; at least 6 must be clear for
   35 units (3.5 m). Corridors and small rooms fail it. Ceiling height is not tested: fliers only

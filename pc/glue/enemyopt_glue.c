@@ -240,7 +240,6 @@ static const struct { unsigned char id, w[2], flags; } kinds[] = {
     { 5, { 3, 4 }, K_NOCOUNT },                 /* Hunter, Sweeper: may leap out of a room */
     { 3, { 2, 3 }, K_BIG },                     /* Black Widow (with its brood 25 slots) */
     { 26, { 2, 2 }, 0 },                        /* anatomist */
-    { 22, { 2, 2 }, 0 },                        /* albinoid adult (walks on land) */
     { 19, { 0, 2 }, K_BIG | K_RMFLG | K_NOCOUNT },   /* Tyrant, both looks */
     { 23, { 0, 1 }, K_BIG | K_RMFLG | K_NOCOUNT },   /* Giant Black Widow */
     { 7, { 0, 3 }, K_FLIER | K_RMFLG | K_NOCOUNT },  /* bat */

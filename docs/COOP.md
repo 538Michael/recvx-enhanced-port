@@ -5,7 +5,7 @@ over the internet or a LAN (UDP). Co-op is an optional addon: with it off the ga
 as without it (every hook is `#ifdef TARGET_PC` and `if (coop_on)`).
 
 Part 1 is for players: how to host, join and play. Part 2 is the reference: architecture,
-protocol 19, security and limits. Related: [SERVER.md](SERVER.md) (the optional co-op server),
+protocol 20, security and limits. Related: [SERVER.md](SERVER.md) (the optional co-op server),
 [USER_GUIDE.md](USER_GUIDE.md) (settings, controls), [ACTORS.md](ACTORS.md) (models and voices),
 [ENEMIES.md](ENEMIES.md) (enemy options), [ARCHITECTURE.md](ARCHITECTURE.md),
 [BUILDING.md](BUILDING.md).
@@ -208,7 +208,7 @@ the co-op server ..." (name lookup, at most 5 s, never stalls the game), "The ho
   direct session goes on, a relayed one ends.
 * The server frees a vanished joiner's place after `member_timeout` (default 10 s); see also
   "Rejoin after a crash".
-* Game and server must speak the same server protocol (3); the game protocol (19) is end to end.
+* Game and server must speak the same server protocol (3); the game protocol (20) is end to end.
 
 ## In the game
 
@@ -489,7 +489,8 @@ grabbed by is released on the host, an unanswered trade item returns to its owne
 ## Enemy options in co-op
 
 The host's enemy options (EXTRA ENEMIES, REARRANGED, RANDOMIZER, SEED; F1 / ENHANCED SETTINGS GAMEPLAY,
-lobby GAME RULES) count for both. The joiner's lobby shows them (read-only) before the game
+lobby GAME RULES; "Randomizer variety" and "Randomize event enemies" in F1 / ENHANCED SETTINGS
+only) count for both. The joiner's lobby shows them (read-only) before the game
 starts; changes in game take effect at the next room load on both sides. Enemies the host adds
 appear in the joiner's game in the same slots. Details: [ENEMIES.md](ENEMIES.md).
 
@@ -766,9 +767,10 @@ floor or trigger, "Yes" chosen, an item used) hold only where the player did it.
   extra enemies) with slot, source room file and record, type, model version, variant, position.
   The joiner realizes it into the same slot; one that arrives while the joiner's room does not run
   waits (up to 900 frames). It also carries the randomizer records the host had to keep.
-* `EV_EOPTS` (host): the enemy options, at every new session, before each game state and on every
-  change. Placements and randomizer are computed from the room file and the seed only, so both make
-  the same records in the same slots.
+* `EV_EOPTS` (host): the enemy options (extra, placements, randomizer, seed, variety, event
+  enemies), at every new session, before each game state and on every change. Placements and
+  randomizer are computed from the room file (records, script, collision) and the seed only, so
+  both make the same records in the same slots, event records included.
 * More than 48 active enemy slots are sent as a moving window of 48 per frame.
 
 ### Trade transactions
@@ -808,16 +810,18 @@ send time minus the echoed datagram's arrival. Sample = arrival - our clock - th
 smoothed (EWMA 0.1). The name tag's point goes with the recorded frame (`stream_point`) and is
 interpolated with the in-between frames; it snaps on camera cuts and in vanilla mode.
 
-## Protocol 19
+## Protocol 20
 
-`COOP_VERSION` is **19**; both players need builds with the same version (a mismatch is reported,
-e.g. "the host runs co-op protocol 18, we 19: both need the same build"). The co-op server does not
+`COOP_VERSION` is **20**; both players need builds with the same version (a mismatch is reported,
+e.g. "the host runs co-op protocol 19, we 20: both need the same build"). The co-op server does not
 look at the game protocol. Version history in short: 11 join code, 1200-byte datagrams, checked
 events, `EV_ATR`; 12 `EV_FX`; 13 `EV_GRANT`; 14 `EV_TSCREEN`; 15 `EV_GONE`; 16 player id and rejoin
 tag, `EV_OWN`; 17 trade requests; 18 voices; 19 the game rules `OPT_IMPORTANT`, `OPT_NO_RIBBON`,
 `OPT_SKIP_SYNC`, the cutscene flags `PF_CINE` / `PF_SKIP` and `EV_SKIP` (synchronized cutscene skip),
 shared loot as one pool (`EV_PICKUP` gives the partner only items for both; `undo`), the shooter's
-aim height in `EV_ENE_HIT`, unknown flag and option bits refused. `Pose.pflg` and `Pose.flr` were added inside protocol 18
+aim height in `EV_ENE_HIT`, unknown flag and option bits refused; 20 `EV_EOPTS` carries the
+randomizer's variety and event-enemy setting (the randomizer's choices changed, so builds of 19 would
+make other enemies from the same seed). `Pose.pflg` and `Pose.flr` were added inside protocol 18
 (0 means "not sent", and receivers fall back).
 
 All structures are little-endian, packed as the compiler lays them out on x86 (pinned by
@@ -898,7 +902,7 @@ Slot, `mode[4]`, model index (`mlwP` as index into the enemy's `mdl[]`, -1..15),
 | `EV_BOX` | 12 | either | Shared item box: words taken out and put in (up to 16) |
 | `EV_BOXFIX` | 13 | host | Box correction: items the joiner could not have |
 | `EV_SPAWN` | 14 | host | An added enemy (`SpawnNote`), or a randomizer record the host kept |
-| `EV_EOPTS` | 15 | host | Enemy options: extra 0..3, placements, randomizer, seed |
+| `EV_EOPTS` | 15 | host | Enemy options: extra 0..3, placements, randomizer, seed, variety 0..1, event enemies 0..1 |
 | `EV_ATR` | 16 | either | 1..2 room records (wall, trigger, floor, object) after a world event |
 | `EV_FX` | 17 | either | An effect started here (`FX_BURST` 308, `FX_PARTICLE` 302, `FX_ARM`, or a generic entry) |
 | `EV_GRANT` | 18 | either | An event gave the sender an item: item, count, floor, position |

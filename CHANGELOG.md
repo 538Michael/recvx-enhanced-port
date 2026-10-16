@@ -6,7 +6,7 @@
 
 - **More varied enemy randomizer**: a randomized room now draws from every enemy kind that works
   there, from anywhere in the game (zombies in all their looks, Cerberus, Bandersnatches, Hunters
-  and Sweepers, Black Widows, anatomist zombies, adult albinoids, and in the new *Wild* variety
+  and Sweepers, Black Widows, anatomist zombies, and in the new *Wild* variety
   also Tyrants, Giant Black Widows, and bats and Spotters in place of bats), each kind weighted so
   zombies no longer dominate, and each enemy of a room a different kind where possible. Big
   enemies only appear where there is room around them, and rooms whose doors open once every
