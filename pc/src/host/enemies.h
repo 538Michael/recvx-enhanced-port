@@ -11,6 +11,8 @@ typedef struct EnemyOpts {
     int place;                  /* 1: rearranged placements */
     int rand;                   /* 1: enemy randomizer */
     int seed;                   /* placements and randomizer (0..2^31-1) */
+    int variety;                /* randomizer: 0 Mild (two common kinds per room), 1 Wild (every kind that fits; default) */
+    int events;                 /* randomizer: 1 also event enemies (default) */
 } EnemyOpts;
 extern EnemyOpts g_enemy_opts;  /* our settings (F1, recvx.ini) */
 

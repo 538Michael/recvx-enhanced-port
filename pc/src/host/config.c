@@ -64,6 +64,8 @@ static const struct { const char* key; int* val; int lo, hi; } keys[] = {
     { "enemy_place", &g_enemy_opts.place, 0, 1 },
     { "enemy_random", &g_enemy_opts.rand, 0, 1 },
     { "enemy_seed", &g_enemy_opts.seed, 0, 0x7FFFFFFF },
+    { "enemy_variety", &g_enemy_opts.variety, 0, 1 },    /* 0 Mild, 1 Wild */
+    { "enemy_random_events", &g_enemy_opts.events, 0, 1 },
     { "tps", (int*)&g_tps.on, 0, 1 },
     { "tps_fov", &g_tps.fov, 30, 130 },
     { "tps_aim_fov", &g_tps.aim_fov, 20, 130 },

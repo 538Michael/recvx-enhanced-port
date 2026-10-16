@@ -1,4 +1,4 @@
-/* Online co-op wire format (protocol 19, docs/COOP.md "Protocol 19" and "Security") and
+/* Online co-op wire format (protocol 20, docs/COOP.md "Protocol 20" and "Security") and
    the checks every received packet passes before it may change anything. No game state here:
    pc/glue/coop_glue.c applies what passes; pc/tests/test_coop.c feeds malformed packets. */
 #ifndef RECVX_COOP_PROTO_H
@@ -11,13 +11,14 @@ extern "C" {
 #endif
 
 #define COOP_MAGIC 0x504F4F43u          /* "COOP" */
-#define COOP_VERSION 19                 /* 11: join code, datagrams <= 1200 bytes, checked events, EV_ATR; 12: EV_FX; 13: EV_GRANT;
+#define COOP_VERSION 20                 /* 11: join code, datagrams <= 1200 bytes, checked events, EV_ATR; 12: EV_FX; 13: EV_GRANT;
                                            14: EV_TSCREEN, BUSY_TRADE, OPT_TRADE_FREEZE; 15: EV_GONE;
                                            16: player id and rejoin tag in PoseExt, EV_OWN, saved inventories (EV_BLOB pad);
                                            17: TS_WANT, TS_DECLINE (trade screen item requests);
                                            18: Pose.voice_n/voice (the sender's player voices);
                                            19: game rules OPT_IMPORTANT, OPT_NO_RIBBON, OPT_SKIP_SYNC; PF_CINE, PF_SKIP and
-                                               EV_SKIP (synchronized cutscene skip); unknown flag and option bits refused */
+                                               EV_SKIP (synchronized cutscene skip); unknown flag and option bits refused;
+                                           20: EV_EOPTS variety and event enemies (the randomizer's choices changed) */
 #define COOP_DGRAM_MAX 1200             /* bytes per datagram (below every internet path MTU) */
 #define COOP_EV_FRAME 16                /* events per frame (over the frame's datagrams) */
 #define COOP_SNAP_FRAME 48              /* enemy snapshots per frame */

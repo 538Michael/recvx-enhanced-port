@@ -199,7 +199,8 @@ Details in [COOP.md](COOP.md); what matters for enemies:
 
 1. **Record count and order** stay (scripts, `wrk_no`, model/motion/texture tables, co-op slots).
 2. **Kill bits**: a replaced record keeps its bit; extra enemies get none. New bits < 512.
-3. **Leave alone**: event-driven and event-shown records, NPCs (ids >= 31), ids 0, 25, 28, 53, 56.
+3. **Leave alone**: the *type* of event-driven records (another look of the same type keeps the
+   scene's motions and AI states; the randomizer does that), NPCs (ids >= 31), ids 0, 25, 28, 53, 56.
 4. **Bosses and set pieces** (2, 11..17, 19 in its story rooms, 23, 25, 29, 30, 53..55): their
    rooms' scripts wait for their death or events; replacing them can softlock the room.
 5. Types that cannot die normally (29, 53, 25, 0) must not replace a record that a `DieEventCk`
@@ -300,7 +301,8 @@ counted in `ef_extn`), so `bhReleaseMainTexture` releases it with the room's. Fa
 
 ## Enemy options
 
-All off by default; off, the code returns before touching anything. In co-op the host's options
+Extra enemies, placements and the randomizer are off by default; off, the code returns before touching
+anything (the variety and event settings only matter with the randomizer on). In co-op the host's options
 count for both. Code: `pc/glue/enemyopt_glue.c`, one decomp hook at the end of
 `room.c bhFinishRoom` (`enemy_room_finished`).
 
@@ -310,12 +312,15 @@ count for both. Code: `pc/glue/enemyopt_glue.c`, one decomp hook at the end of
 | "Rearranged enemies" (GAMEPLAY) | `enemy_place` | 0/1 | `RECVX_ENEMY_PLACE` |
 | "Enemy randomizer" (GAMEPLAY) | `enemy_random` | 0/1 | `RECVX_ENEMY_RANDOM` |
 | "Enemy seed" (GAMEPLAY) | `enemy_seed` | seed for placements and randomizer | `RECVX_ENEMY_SEED` |
+| "Randomizer variety" (GAMEPLAY) | `enemy_variety` | 0 = Mild, **1 = Wild** | `RECVX_ENEMY_VARIETY` |
+| "Randomize event enemies" (GAMEPLAY) | `enemy_random_events` | 0/**1** | `RECVX_ENEMY_EVENTS` |
 
 Every option first reads the room script once per load (`scan_script`) and marks records that an
 event drives (`LoadWork`, motion pauses, links, positioning, zombie/face/look/render ops), that the
 script shows or hides, whose HP the script tests or sets, and rooms with an "all dead" count.
-Marked records are never changed. Choices come from a xorshift generator seeded with (seed, room
-file, record), never from the game's `rand()`.
+Extra enemies and placements never change marked records; the randomizer changes some of them
+("Randomizer"). Choices come from a xorshift generator seeded with (seed, room file, record), never
+from the game's `rand()`.
 
 ### Extra enemies
 
@@ -340,18 +345,184 @@ file, record), never from the game's `rand()`.
 
 ### Randomizer
 
-* At room load, unmarked records of zombie, Black Widow, Cerberus, Hunter and Bandersnatch become
-  other types from a pool: zombies (all 24 looks), Cerberus, Bandersnatch (both looks) from stage
-  0, plus Black Widow and Hunters (both looks) from stage 2. Per room up to two new kinds.
-* Slots are counted with what each Init spawns, up to 122 (6 stay free).
-* Skipped rooms: rooms whose script counts kills (`DieEventCk`), rooms with a boss or set piece
-  (ids 0, 2, 11..19, 23..25, 29, 30, 53..56). Fliers are not replaced.
-* The record keeps its slot and kill bit: `spawn_at` realizes the new type into the record's own
-  slot during the load.
+At room load (`enemy_room_finished`, end of `bhFinishRoom`) records of zombies, Black Widows,
+Cerberus, Hunters and Bandersnatches (and, in Wild, bats and Spotters) become other enemies. Each
+record keeps its slot, kill bit, position, angle and floor: `spawn_at` realizes the new type into
+the record's own slot during the load.
+
+**Which records change, and how** (from `scan_script`, as `pc/tools/enemies.py room` shows it):
+
+| Record | Becomes | Why |
+|---|---|---|
+| free (no script use but its kill bit) | another kind | nothing in the script depends on its type |
+| shown or hidden by the script only (`InitModelSet`, "later-activated", ambushes that just appear) | another kind, with "Randomize event enemies" | the script only switches it on and off; it starts in its AI |
+| event-driven (`LoadWork`, motion pauses, links, positioning, zombie/face/render/look ops, `EneSeOn`) or HP read/set by the script | **another look of its own type**, with "Randomize event enemies" | the event plays the type's motion numbers and room motions on its skeleton, sets its AI modes (`SubCtr` 143/146/147), tests `id == 1` and its HP. All zombie looks share an 18-node first sub-model, Hunter and Sweeper a 28-node one, so the scene still fits; types with one look (Cerberus, Bandersnatch, Black Widow, bat, Spotter, moth, albinoids, anatomist) stay |
+| bosses and everything in their rooms (ids 2, 12..17, 19, 23, 24, 29, 30, 53..55: Gulp Worm, Alexia, Nosferatu, Alfred, Monster Steve, Tyrant fights, Giant Black Widow, tentacles, knights) | kept: the whole room | the scripts wait for the boss's death or drive it |
+| NPCs (ids >= 31), props (0), fish, albinoids, ants, moths, ceiling trap, scripted object | kept | water/wall/set-piece types, or no AI of their own |
+| a record without a floor (`flr_no < 0`) | kept | hangs somewhere for an event |
+
+**Kinds** a free or shown record can become (`enemyopt_glue.c kinds[]`); a kind is drawn first by
+weight, then one of its looks (the spawner's entries of that type, from any stage's room file):
+
+| Kind | Looks | Weight Mild / Wild | Rules |
+|---|---|---|---|
+| zombie | 24 | 5 / 5 | |
+| Cerberus | 1 | 4 / 4 | |
+| Bandersnatch | 1 (Bandersnatch 2 is an event's arm: never) | 4 / 4 | |
+| Hunter, Sweeper | 2 | 3 / 4 | not in kill-count rooms (may leap out of a room) |
+| Black Widow | 1 | 2 / 3 | open space (25 slots with its brood); not in kill-count rooms (climbs walls) |
+| anatomist zombie | 1 | 2 / 2 | |
+| Tyrant | 2 | - / 2 | open space; not in kill-count rooms; not where the script uses `rm_flg` bits 29..31 (its code clears `rm_flg & 7` every frame) |
+| Giant Black Widow | 1 | - / 1 | as the Tyrant (writes `rm_flg & 1`) |
+| bat, Spotter | 1 each | - / 3, 2 | only for bat/Spotter records (fliers hover where they are placed; ground enemies never become fliers and back); not in kill-count rooms; `rm_flg` as above |
+
+* Not in the pool: the adult albinoid (its code drives its own room's light 2 and an effect linked
+  to it: two of them in a prison room crashed in `en22.c bhEne22_MV04`), moths (their eggs use
+  Claire's sub-models and 16 slots), bosses, water and wall types.
+* **Open space** (`open_dirs`): line tests against the walls (`bhCollisionCheckLine2`, as the
+  placements use) from the record in 8 directions at waist height; at least 5 must be clear for
+  35 units (3.5 m). Corridors and small rooms fail it. Ceiling height is not tested (the room
+  collision has no ceilings to test against): fliers only replace fliers, at their own heights.
+* **Kill-count rooms** (`DieEventCk`: doors that open when everything is dead, e.g. the prison's
+  5550..5710, 4012) are randomized with the kinds that stay on the floor and die there: zombies,
+  Cerberus, Bandersnatches, anatomists. Each dies with `flg & 2` (each has a `DieCk` in its own
+  rooms, and `RECVX_ENEMY_KILL` kills them all in these rooms), so the record's kill bit is set as before.
+* **Variety**: *Wild* (default) draws each record's kind from all kinds that fit, a kind not yet
+  drawn in this room first, then a look not yet used in this room. *Mild* draws two kinds per
+  room (no Tyrant, Giant Black Widow or fliers) and alternates between them; if neither fits a
+  record, any Mild kind that does.
+* **Variants**: a record that keeps its type (another look) keeps its variant (an event's pose, a
+  lying zombie); another kind gets variant 0 (free-roaming).
+* **Slots**: all records are counted with what their Inits spawn; a change may only add up to 122
+  (6 stay free), so a room never exceeds the larger of that and its own count.
+* **Determinism**: each record's draws come from xorshift seeded with (seed, room file, record),
+  plus what earlier records of the room drew; nothing depends on the player, the game's `rand()`
+  or what was loaded before. Both co-op sides compute the same.
 * **Fallback**: any refusal (data not found, memory, textures) puts the original record back
-  exactly as it was, logged as `record N stays`.
+  exactly as it was, logged as `record N stays`; the host sends it to the guest as a
+  `SPAWN_NOTE_KEPT` note.
+* Log: one line per change (`room R record N: type T model V -> name (type T' model V')`, event
+  records marked `event enemy: same type`) and per room `now k:type.model ...`.
 * Offline alternative: `pc/tools/rdxbuild.py` builds rooms with several `enemy_assets` donors
   ([modding/BUILDING_ROOMS.md](modding/BUILDING_ROOMS.md)).
+
+#### Measured variety
+
+Before this version the pool was the spawner's entries of a few types drawn uniformly (24 of its
+27..30 entries are zombie looks), Black Widows and Hunters only from stage 2, at most two entries
+per room, only free records (event and script-shown records are 64% of them), and rooms with a
+prop, a Spotter, the ceiling trap or a kill count were skipped. No texture refusals were seen
+either way. Headless tours (new game, teleport through 87 rooms of all stages with enemies, 60
+game frames each), the roaming-type records (zombie, Black Widow, Cerberus, Hunter, Bandersnatch,
+bat, Spotter) as the log reports them:
+
+| | Before (10 seeds) | Wild (10 seeds) | Mild (6 seeds) |
+|---|---|---|---|
+| zombies among all these records | 78% | 52% | 55% |
+| zombies among free and script-shown records | 72% | 21% | 26% |
+| free records changed | 38% | 91% | 85% |
+| script-shown / event-driven records changed | 0% / 0% | 99% / 88% | 100% / 88% |
+| kinds per room (rooms with 2+ such records) | 1.10 | 2.29 | 1.57 |
+| (kind, look) pairs per room | 1.95 | 3.54 | 3.08 |
+| kinds a room showed over all seeds | 1.44 | 3.21 | 2.78 |
+
+Wild's free and script-shown records: Cerberus 22%, zombies 21%, Bandersnatches 19%, Hunters 13%,
+anatomists 13%, bats 5%, Spotters 4%, Black Widows 1.4%, Tyrants 0.9%, Giant Black Widows 0.6%
+(the big kinds pass the open-space test at few records). Rooms that still show one kind have only
+event-driven records (other looks of one type) or single-look event types.
+
+#### Event enemies per room
+
+What "Randomize event enemies" does with each room's event-driven and script-shown records of the
+roaming types (generated from the script walk; records not listed are free, or not enemies of these
+types). *Another kind*: the script only shows or hides them. *Another look*: an event drives them
+(the scene keeps its type). *Kept*: event-driven with no other look of their type, or a boss arena.
+
+| Room | Records (index) and what they become |
+|---|---|
+| 0020 | zombie 0,1,2,3,5: another look (event-driven) |
+| 0030 | zombie 3: another look (event-driven) |
+| 0031 | zombie 1,2,3,4,5: another look (event-driven) |
+| 0050 | zombie 2: another look (event-driven); Cerberus 0,1: **kept** (event-driven, one look) |
+| 0060 | zombie 3: another look (event-driven) |
+| 0070 | zombie 0,1,2,3: another look (event-driven) |
+| 0080 | zombie 0,1,2,3,4: another look (event-driven) |
+| 0090 | zombie 0,1,2,3,4: another look (event-driven) |
+| 0110 | zombie 1: another look (event-driven); anatomist 4: **kept** (event-driven, one look) |
+| 0140 | zombie 0,1,2,3: another look (event-driven) |
+| 0150 | zombie 0: another look (event-driven) |
+| 0160 | zombie 0,1,2,3,4: another look (event-driven) |
+| 1021 | zombie 0,1: another kind (shown or hidden only); zombie 2,3: another look (event-driven) |
+| 1030 | bat 3: **kept** (event-driven, one look) |
+| 1070 | zombie 0,1,2,3: another look (event-driven) |
+| 1090 | Bandersnatch 1: **kept** (event-driven, one look) |
+| 1100 | zombie 0,1,2,3,4: another look (event-driven) |
+| 1121 | Bandersnatch 0,1: **kept** (event-driven, one look) |
+| 2000 | Bandersnatch 0,1: **kept** (event-driven, one look) |
+| 2031 | zombie 0,3: another look (event-driven) |
+| 3020 | Cerberus 2,3: another kind (shown or hidden only) |
+| 3030 | zombie 0,1: another look (event-driven) |
+| 3050 | zombie 0,1,2,3,4: another look (event-driven) |
+| 3070 | zombie 1: another look (event-driven) |
+| 3100 | Bandersnatch 0,1: **kept** (event-driven, one look) |
+| 3120 | zombie 1,2: another look (event-driven); albinoid infant 0: **kept** (event-driven, one look) |
+| 3130 | Bandersnatch 0: **kept** (event-driven, one look) |
+| 3140 | zombie 7: another look (event-driven); albinoid infant 0,1,2,3,4,5,6: **kept** (event-driven, one look) |
+| 3160 | zombie 0,1,2,4: another kind (shown or hidden only) |
+| 3170 | zombie 0,1,2,3: another kind (shown or hidden only) |
+| 3180 | Bandersnatch 2,3: another kind (shown or hidden only) |
+| 3200 | zombie 0,1,2: another kind (shown or hidden only) |
+| 4000 | zombie 3,4,5: another look (event-driven) |
+| 4001 | zombie 0,1,2: another look (event-driven) |
+| 4010 | bat 0,1,2,3,4: **kept** (event-driven, one look) |
+| 4012 | Bandersnatch 0,1: **kept** (event-driven, one look) |
+| 4020 | zombie 1,2,3,4,5: another look (event-driven) |
+| 5520 | zombie 1,2: another look (event-driven) |
+| 5610 | zombie 0,1,2,4,5: another look (event-driven) |
+| 5650 | zombie 1,2,4: another look (event-driven) |
+| 5660 | zombie 0,1,2,3: another look (event-driven) |
+| 5670 | Hunter 1: another kind (shown or hidden only) |
+| 6010 | zombie 0,1,2,3: another look (event-driven) |
+| 6020 | zombie 1: another look (event-driven) |
+| 6030 | zombie 2: another look (event-driven); moth 3,4,5: **kept** (event-driven, one look) |
+| 6050 | zombie 0,1,2,3,4: another look (event-driven) |
+| 6070 | Cerberus 1: another kind (shown or hidden only); Cerberus 0,2: **kept** (event-driven, one look) |
+| 6080 | zombie 1,2,3,4,5: another look (event-driven) |
+| 6090 | Black Widow 0,1,2: another kind (shown or hidden only) |
+| 7031 | zombie 0,1: another kind (shown or hidden only) |
+| 7050 | Hunter 0: another look (event-driven) |
+| 7060 | zombie 1: another look (event-driven) |
+| 7070 | Bandersnatch 6: **kept** (event-driven, one look) |
+| 7071 | zombie 4,5,6: another kind (shown or hidden only) |
+| 7080 | Black Widow 0,1: **kept** (event-driven, one look) |
+| 7081 | Hunter 2,3: another look (event-driven); Spotter 0,1: **kept** (event-driven, one look) |
+| 7100 | albinoid adult 0: **kept** (event-driven, one look) |
+| 7110 | Hunter 1,3: another look (event-driven); Spotter 0: **kept** (event-driven, one look) |
+| 7130 | Hunter 0,1,2,3: another kind (shown or hidden only) |
+| 7140 | zombie 0: another look (event-driven) |
+| 7181 | Hunter 0: another look (event-driven); Spotter 1: **kept** (event-driven, one look) |
+| 7190 | zombie 0,1: another kind (shown or hidden only) |
+| 7191 | Hunter 1: another look (event-driven); Spotter 0: **kept** (event-driven, one look) |
+| 7200 | Hunter 0: another kind (shown or hidden only) |
+| 7250 | Black Widow 0,1: another kind (shown or hidden only) |
+| 8001 | zombie 0,1,2: another look (event-driven) |
+| 8010 | Hunter 0,1: another kind (shown or hidden only) |
+| 8020 | Hunter 0: another look (event-driven) |
+| 8030 | Hunter 2: another look (event-driven); Spotter 1: **kept** (event-driven, one look) |
+| 9010 | zombie 0,1,2,3: another look (event-driven) |
+| 9020 | zombie 0,1,2: another kind (shown or hidden only) |
+| 9030 | zombie 1,2,3,4,5: another look (event-driven) |
+| 9060 | zombie 0,1,2,3,4: another look (event-driven) |
+| 9080 | zombie 1,2,3,4,5: another look (event-driven) |
+| 9100 | Hunter 2: another look (event-driven); Spotter 0,1: **kept** (event-driven, one look) |
+| 9110 | Hunter 0: another look (event-driven) |
+| 9120 | zombie 0,1,2,3,4,5,6: another kind (shown or hidden only) |
+| 9130 | Hunter 0: another kind (shown or hidden only) |
+| 9190 | zombie 1,4: another kind (shown or hidden only); zombie 0,2,3: another look (event-driven) |
+| 9200 | zombie 0,1,2,3,4: another look (event-driven) |
+| 9220 | Hunter 0: another look (event-driven) |
+| 9290 | zombie 3: another kind (shown or hidden only); zombie 2,4,5: another look (event-driven) |
+| 9340 | zombie 1,2,3: another look (event-driven) |
 
 ### Limits
 
@@ -378,6 +549,7 @@ Test aids:
 |---|---|
 | `RECVX_SPAWN="gameframe:id[.mdlver][@dist],..."` | spawns the first spawner entry of that type/model version at that game frame; traces its state every 30 frames, HP changes and hits on the player |
 | `RECVX_SPAWN_SURVEY="stg:rom,..."` | tries every spawner entry in each room and logs the result; `RECVX_SPAWN_SURVEY_ALL=1` keeps the spawns |
-| `RECVX_ENEMY_EXTRA`, `_PLACE`, `_RANDOM`, `_SEED` | override the enemy options |
+| `RECVX_ENEMY_EXTRA`, `_PLACE`, `_RANDOM`, `_SEED`, `_VARIETY`, `_EVENTS` | override the enemy options |
+| `RECVX_ENEMY_KILL=n` | from n game frames into each room, every 20 frames each living, shown enemy of the room's records (ids 1..30, in its AI) takes a heavy hit as from the player's weapon; logs each death (`flg & 2`, what `DieCk` turns into the kill bit) and per room how many died (Black Widows take damage through their body parts and do not die from it) |
 | `RECVX_ENEMY_TRACE=dist` | traces enemy steps (co-op targets) |
 | `RECVX_TRACE_SND=1` | logs sound requests and extra banks |
