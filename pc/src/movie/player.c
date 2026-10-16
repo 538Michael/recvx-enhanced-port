@@ -36,7 +36,7 @@ static struct {
     int w, h, stride, produced, consumed, eof;
     int audio_rate, audio_open; uint64_t audio_put;
     /* statistics (RECVX_MOVIE_TRACE) */
-    uint64_t dec_ns, dec_max_ns; int late;
+    uint64_t dec_ns, dec_max_ns, wait_ns; int late;
 } mv;
 static uint32_t serial_next = 1;   /* frames ever decoded: a frame's identity for the render thread */
 
@@ -51,7 +51,11 @@ static void on_frame(const Mpeg2Frame* f, void* user)
         room = mv.produced - mv.consumed < RING;
         SDL_UnlockMutex(mv.m);
         if (room || SDL_GetAtomicInt(&mv.quit)) break;
-        SDL_DelayNS(2000000);
+        {
+            uint64_t w0 = SDL_GetTicksNS();
+            SDL_DelayNS(2000000);
+            mv.wait_ns += SDL_GetTicksNS() - w0;   /* not decode time */
+        }
     }
     if (SDL_GetAtomicInt(&mv.quit)) return;
     if (!mv.w) {
@@ -119,7 +123,8 @@ static int step(void)
     {
         uint64_t t0 = SDL_GetTicksNS(), dt;
         used = mpeg2_decode_frame(mv.dec, mv.es, mv.es_len, done);
-        dt = SDL_GetTicksNS() - t0;
+        dt = SDL_GetTicksNS() - t0 - mv.wait_ns;
+        mv.wait_ns = 0;
         memmove(mv.es, mv.es + used, mv.es_len - used);
         mv.es_len -= used;
         SDL_LockMutex(mv.m);

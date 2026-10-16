@@ -297,8 +297,27 @@ village, collision. The render thread (GS emulation, replays: `r_exec`, `r_inter
   (ports 0 and 1 carry the room's background ambience; the system sounds - typewriter, item box,
   computers, doors - rotate over ports 2, 8 and 9). MIDI bank 1 is the door's (`DOOR_xxx.SPQ`,
   loaded only with the door animation), 2 the common system sequences, 3 the room's ambience.
-- **Movies** (`movie/`): a PSS demuxer, an MPEG-2 decoder and the PCM soundtrack. Frames are
-  delivered in the IPU's output format and drawn by the game's own upload and sprite code.
+- **Movies** (`movie/`, `pc/glue/movie_glue.c`): the disc's FMVs are PSS files (MPEG-2 program
+  stream: MPEG-2 video, 320 pixels wide, progressive 29.97 fps, and 16-bit PCM in private
+  stream 1), decoded by our own demuxer and MPEG-2 decoder (`pss.c`, `mpeg2.c`). The game's own
+  movie code (Sofdec wrapper `mwwrap.c`, `ps2_sfd_mw.c`) runs unchanged: status PREP -> PLAYING
+  -> PLAYEND, skip, pause, fades.
+  - A **movie thread** (`player.c`) reads the file through its own handle, keeps half a second
+    of sound queued on the output device ahead of what plays, and decodes into a ring of 8 YUV
+    frames. Neither the game thread nor the render thread decodes.
+  - The **game thread** (`readMpeg`) picks the frame for each game frame: one per two vblanks
+    (the game runs at 29.97 Hz during movies, the movies' own rate), so the cadence is even; when
+    the sound's position (samples handed to the device minus those still queued) is a whole
+    frame or more away, the frame number follows it. The movie ends with its last video frame,
+    as on the PS2.
+  - The game's sprite (`vbrank_draw`, as on the PS2) draws the frame, so size, position and
+    the screen fades drawn over it are the game's. Before it, `stream_movie` puts the frame
+    number into the GS stream; the **render thread** (`gs_gl.c gs_movie_bind`) uploads the
+    three planes once per new frame and converts them on the GPU (BT.601 video range, MPEG-2
+    chroma siting, interpolated chroma) into the texture the sprite samples. The PS2 path's
+    upload of the IPU's macroblock output into GS memory (`setImageTag`) is gone.
+  - Movie frames have no tagged 3D, so the in-between path never blends or replays them: each
+    display refresh shows the latest executed frame.
 
 ## Input
 
@@ -502,8 +521,8 @@ Retail bugs fixed because they made frames depend on the layout:
 | `ps2_NaGraphics3D.c Ps2SetPlane` | copies a pointer parameter plus 12 stale stack bytes as the plane's point; the near-plane cone of `njDrawLine3D` (particle lines, search light, laser sight) went through stack addresses read as floats | the point is the camera point (0, 0, -dist) the planes are meant to pass through |
 
 **Real time by design** (as on the PS2, which runs these off the display and sound hardware):
-movies play by vblank count (`RECVX_SKIP_MOVIES` counts game frames instead, so test runs
-repeat), ADX streams report their position from the audio stream, the play time counts vblanks,
+movies play by vblank count, pulled to the sound's position (`RECVX_SKIP_MOVIES` counts game
+frames instead, so test runs repeat), ADX streams report their position from the audio stream, the play time counts vblanks,
 and an in-between image's t follows the clock unless `RECVX_INTERP_T` fixes it. A run that waits
 on these can shift by frames.
 
@@ -548,6 +567,7 @@ and game frames for game-state aids, as noted. Co-op test aids (`RECVX_COOP_*`,
 | `RECVX_FAST_DEMO=1` | start the attract demo right away |
 | `RECVX_SKIP_MOVIES=1` | movies end after 30 game frames without decoding (repeatable test runs) |
 | `RECVX_SKIP_CINE=n` | skip every cutscene after n game frames, as its skip button |
+| `RECVX_MOVIE=n` | play `MV_n.PSS` in place of every movie (e.g. the intro at start-up with `skip_intro = 0`) |
 
 ### Scripted input
 
@@ -600,6 +620,7 @@ and game frames for game-state aids, as noted. Co-op test aids (`RECVX_COOP_*`,
 | `RECVX_REPLAY_RTSTART=0` | in-between images start from the executed frame's display image (old behaviour) |
 | `RECVX_DISPLAY_HZ=n` | assume an n Hz display (e.g. 1000 with vsync off: present as fast as possible) |
 | `RECVX_TRACE_PRESENT=file` | one line per present: frame, t, start time, swap duration |
+| `RECVX_MOVIE_TRACE=file` | one line per game frame of a movie: time, vblanks, frame shown, game-thread time, sound position and queue, sound minus picture (ms); at the end decode times and frames shown before they were decoded |
 | `RECVX_GPU_TIME=1` | every 2 s: frames and in-between images per second, render-thread CPU and GPU time |
 | `RECVX_TRACE_NTEX=1` | log native texture binds, misses and render-texture captures |
 | `RECVX_TRACE_DMA=1` | log GIF DMA chain tags |
