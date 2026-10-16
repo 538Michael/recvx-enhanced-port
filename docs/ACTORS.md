@@ -495,7 +495,7 @@ joint rotations come from the source (`actor_glue.c rig_build`, `retarget`).
 * **A missing hand**: what the game links to a source hand the model does not have (Nosferatu's right
   hand, the Bandersnatch's left) is shrunk to a point instead of floating where the source's hand is.
 * **Free aim** ([THIRDPERSON.md](THIRDPERSON.md) "Free-aim pose"): the bend is solved on the weapon as
-  drawn (`actor_aim_hand`), and the third-person camera's height, shoulder offset and distance scale
+  drawn (`actor_aim_hand`; only while the aim pose stands still, eased, not for the knife), and the third-person camera's height, shoulder offset and distance scale
   with the model's head height over the character's (`actor_cam_scale`, 0.8 .. 1.8): the camera is no
   longer inside a Tyrant or Monster Steve.
 * **Previous retargeting**: `RECVX_RETARGET=0` (environment, read at start) keeps the earlier mapping
