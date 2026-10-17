@@ -18,17 +18,13 @@
   the DEFAULT row above ENHANCED SETTINGS (keyboard, gamepad and mouse). It asks first, with NO
   selected, so it cannot happen by accident; YES takes you back to the title menu as a game over
   does, and anything not saved is lost. It also works in the Battle Game. In co-op it ends the
-  session, and the partner plays on alone.
-- **Co-op**: when the host goes back to the title during a game, the partner now reads "The host
+  session, and the partner plays on alone; when the host leaves, the partner now reads "The host
   left the game" instead of "The host closed the lobby".
 - **ENHANCED SETTINGS tidied up**: your model settings ("You appear as", gender-matched
   animations, your model in cutscenes, talking faces) moved from the CO-OP page to a new
   APPEARANCE page, since they apply in single player too; F1 has the same section and can now
   change "You appear as" as well. The DISPLAY page has new WIDESCREEN and FOG AND BRIGHTNESS
   headings. Your settings stay as they were.
-- **Teleport names fit**: on the EXTRAS page the room and entry names leave out the area the
-  location row already shows ("Pool" instead of "Military Training Facility: Pool"), so long
-  names no longer shrink to an unreadable size.
 
 ### Appearance
 
@@ -56,16 +52,16 @@
 
 - **Teleport by name**: the teleport cheat (F2, and ENHANCED SETTINGS EXTRAS) no longer asks for
   stage, room and position numbers. You pick an area (marked as Claire's or Chris's part of the
-  game), then a room, then where to arrive. Rooms carry the game's own save menu names where it has
-  one and names of ours otherwise; each arrival point says which room's door leads there. In F2
-  you can type to search all rooms, and a "Raw ids" switch keeps the old number fields. Rooms you
+  game), then a room, then where to arrive. Every room has a name: the game's own save menu name
+  where it has one, otherwise one of ours after its area and what you find there ("Prison: Shower
+  room", "Palace: Gold Luger room", "Antarctic Base: Mansion hall"). Claire's and Chris's visits of
+  the same place share a name, the Battle Game's rooms say which story room they copy, and rooms
+  that only play a cutscene start with "Cutscene:". Each arrival point says which room's door
+  leads there. In F2 you can type part of a name to search all rooms, and a "Raw ids" switch keeps
+  the old number fields; on the EXTRAS page the names leave out the area the location row already
+  shows ("Pool" instead of "Military Training Facility: Pool"), so they stay readable. Rooms you
   added in the mods folder are listed too. The list is read from your disc the first time you open
   it, which takes a few seconds.
-- **Every room has a name in the teleport list**: no more numbered rooms. Each one is named after
-  its area and what you find there ("Prison: Shower room", "Palace: Gold Luger room",
-  "Antarctic Base: Mansion hall"), so typing part of a name finds it. Claire's and Chris's visits
-  of the same place share a name, the Battle Game's rooms say which story room they copy, and
-  rooms that only play a cutscene start with "Cutscene:".
 
 ## 0.5.2 (2026-10-17)
 
