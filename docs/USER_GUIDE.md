@@ -106,7 +106,7 @@ All PC settings are available in two places that edit the same values:
 
 Every setting of the table below is in both. Changes apply at once and are saved shortly after.
 The defaults of a first start are the PC-friendly ones: enhanced mode, widescreen, native
-renderer, skipped intro and door animations (Skip door animations: Instant). Turn these off for a presentation closer to the PS2.
+renderer, skipped intro and door animations (Skip door animations: Instant) and fast loading. Turn these off for a presentation closer to the PS2.
 
 ### Display
 
@@ -149,6 +149,7 @@ visible, and Contrast until the right square on the white strip is barely visibl
 |---|---|---|
 | Skip intro | `skip_intro` | on: boot straight into the title menu (next start) |
 | Skip door animations | `skip_doors` | the door, stairs, ladder and lift animations between rooms. Off (0): always played, as the original; **Instant** (1): the game's load screen instead (no animation, so no door sounds); Skippable (2): the animation plays, and any key, mouse button or gamepad button pressed while it runs ends it and the next room follows at once. The press that opened the door does not count; a press made while the next room is still loading ends the animation as soon as the room is ready. In co-op each player's own choice counts for its own doors; following the host always uses the load screen |
+| Fast loading | `fast_loading` | **on**: a room change, a new game or a loaded save no longer waits for what the PS2's disc and sound chip needed: the next room's sounds and textures are set up at once, so the load screen ends almost as soon as the screen is black, and with Skippable doors a press ends the animation that much sooner. The room's rain, smoke and sparks still get their usual head start before it appears. Off: the original loading times. In co-op each player's own choice counts; it does not need to match the partner's |
 | Battle Game unlocked | `battle_unlocked` | **on**: the title menu offers BATTLE GAME without a finished playthrough, and its character select offers all five characters at once (Claire, Claire in her other costume, Chris, Steve, Wesker). Saves and system data are not changed: characters and records you earn are still saved as in the original, and the Linear Launcher still needs an A rank with all five. Off: as the original, BATTLE GAME only after a cleared game and the characters you have earned |
 | Quick knife | `quick_knife` | on: hold the quick-knife key to draw the combat knife without opening the inventory; release to get the previous weapon back |
 | **Saves** | | |
