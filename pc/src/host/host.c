@@ -39,6 +39,13 @@ int pc_door_skip_pressed(int start)
     if (start) at = n;   /* the demo begins: the press that opened the door is older */
     return g_config.skip_doors == 2 && n != at;
 }
+int pc_intro_pressed(int start)
+{
+    static int at;   /* game thread */
+    int n = SDL_GetAtomicInt(&presses);
+    if (start) at = n;   /* a screen begins: older presses (and held keys) do not count */
+    return n != at;
+}
 int pc_quick_knife_on(void) { return g_config.quick_knife; }
 int pc_cfg_no_ink_ribbon(void) { return g_config.no_ink_ribbon; }   /* in co-op the host's counts (coop_glue.c pc_no_ink_ribbon) */
 /* the game tests a few joints of a model against the screen; with a wide or moving free

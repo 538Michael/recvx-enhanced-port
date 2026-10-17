@@ -17,6 +17,11 @@
 
 ### Gameplay
 
+- **Skip the intro screens one by one**: with "Skip intro" off, the warning screen, the ADX and
+  Capcom logos and the intro movie can now each be cut short with any key, mouse button or
+  gamepad button (the intro movie used to take only Start). One press skips the screen you are
+  looking at and the next one plays as usual; holding a button down does not skip them all, and
+  the press never carries over into the title menu.
 - **Skip door animations: Off, Instant or Skippable** (GAMEPLAY): the setting is now a choice.
   Off plays every door, stairs, ladder and lift animation as the original; Instant (the default,
   as before) goes straight to the load screen; Skippable plays the animation, and pressing any
