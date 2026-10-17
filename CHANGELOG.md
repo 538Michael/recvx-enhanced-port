@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+> [!NOTE]
+> **Small note from myself:**
+>
+> Hey guys, initially I never intended to make this a public Project and was just making a small "tweaked" version for me and a friend as I expected a "clean" port to be available soon anyway. That is the reason why there were Features like Co-op / OTS view prioritized before finishing the basegame.
+>
+> With more people just wanting the base experience working I shifted my focus a bit to address these issues quicker.
+>
+> Please use the Issue tracker if anything of the base experience is gamebreaking.
+>
+> Thanks for the help and enjoy the game!
+>
+> -aikatore
+
 ### Gameplay
 
 - **Skip door animations: Off, Instant or Skippable** (GAMEPLAY): the setting is now a choice.
