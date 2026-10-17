@@ -468,6 +468,9 @@ their file, `appear_part_anim`):
   of the motion for a tick: after every shot the male fire motion's recoil (the twitch after a
   handgun shot, any weapon; also the start of zombie grabs and a quick turn). A blend the game starts
   within a motion (the end of raising a weapon: `hokan_count` 1 on the same motion) is copied too.
+  The recorded frame counts only while the motion and set are still the ones recorded
+  (`pc_plp_mtn`, `pc_plp_set`): enemy code runs after the player and may start another motion (a
+  grab, Alexia's burn), whose own `frm_no` and blend are then taken, never the old motion's frame.
   Co-op sends the same frame (`Pose.frm_no`), so the partner sees each player's own frames (before,
   every player's one-shot motions flashed their first frame at the end on the partner's screen).
 * **Display**: a catalogue model is retargeted from the copy; a player-file mesh is drawn with the

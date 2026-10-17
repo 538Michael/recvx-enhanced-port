@@ -17,6 +17,9 @@
 
 ### Fixes
 
+- **Stuck after Alexia's flames**: after being set on fire by Alexia's first form, your character
+  could freeze in the next hit, aim or step and never get control back. Also with "You appear as",
+  the body no longer jumps to a wrong pose for a moment when an enemy grabs or burns you.
 - **Crash at the title with "You appear as"**: with your model set to one of the other playable
   characters, the game no longer crashes when you go back to the title from a co-op game (as host
   or partner, also after a game over), or when you open or leave the co-op lobby after playing.
