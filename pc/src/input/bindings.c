@@ -65,7 +65,7 @@ static const int defaults[2][B_COUNT][BIND_SLOTS] = {
         [B_TPS_RUN] = { SC(LSHIFT), SC(RSHIFT) }, [B_TPS_ACTION] = { SC(E) }, [B_TPS_CANCEL] = { SC(Q) },
         [B_TPS_STATUS] = { SC(TAB) }, [B_TPS_MAP] = { SC(M) }, [B_TPS_AIM] = { MB(SDL_BUTTON_RIGHT) },
         [B_TPS_FIRE] = { MB(SDL_BUTTON_LEFT) }, [B_TPS_RELOAD] = { SC(R) },
-        [B_QUICKKNIFE] = { SC(SPACE) }, [B_TRADE] = { SC(T) },
+        [B_QUICKKNIFE] = { SC(SPACE) }, [B_TRADE] = { SC(T) }, [B_RELOAD] = { SC(R) },   /* R: no game key in any key type */
         [B_TPS_TOGGLE] = { SC(F5) }, [B_SETTINGS] = { SC(F1) }, [B_CHEATS] = { SC(F2) }, [B_COOP] = { SC(F3) },
         [B_FULLSCREEN] = { SC(F11) }, [B_NOCLIP_UP] = { SC(PAGEUP) }, [B_NOCLIP_DOWN] = { SC(F), SC(PAGEDOWN) },
     },
@@ -77,6 +77,9 @@ static const int defaults[2][B_COUNT][BIND_SLOTS] = {
         [B_L1] = { GB(LEFT_SHOULDER) }, [B_R1] = { GB(RIGHT_SHOULDER) },
         [B_TRIANGLE] = { GB(NORTH) }, [B_CIRCLE] = { GB(EAST) }, [B_CROSS] = { GB(SOUTH) }, [B_SQUARE] = { GB(WEST) },
         [B_QUICKKNIFE] = { GA(RIGHT_TRIGGER, 0) },
+        /* reload: Aim + Triangle (shared with Triangle: bind_held). With the weapon raised Triangle does nothing in
+           any key type (map in A-C, options in D: system.c opens neither while st_flg 0x4, the weapon modes) */
+        [B_RELOAD] = { GB(NORTH) },
         /* third person, modern scheme (as the RE remakes, the run button where type A has it; reload on the right
            shoulder as in RE4 and the RE4 remake's type C, the quick turn on the d-pad's back) */
         [B_TPS_AIM] = { GA(LEFT_TRIGGER, 0) }, [B_TPS_FIRE] = { GA(RIGHT_TRIGGER, 0) }, [B_TPS_ACTION] = { GB(SOUTH) },
@@ -118,6 +121,15 @@ static int same_context(int a, int b)
     return !((ga == BG_GAME && gb == BG_TPS) || (ga == BG_TPS && gb == BG_GAME));
 }
 
+static int is_reload(int row) { return row == B_RELOAD || row == B_TPS_RELOAD; }
+
+/* a reload row may share a code with another row of its group: then it is a combination, Aim + that
+   button (bind_held) */
+static int may_share(int a, int b)
+{
+    return (is_reload(a) || is_reload(b)) && bind_rows[a].group != BG_HOTKEY && bind_rows[b].group != BG_HOTKEY;
+}
+
 void bind_set(int row, int dev, int slot, int code)
 {
     int old = bind_get(row, dev, slot);
@@ -127,7 +139,7 @@ void bind_set(int row, int dev, int slot, int code)
         if (bind_get(row, dev, !slot) == code) put(row, dev, !slot, 0);
         for (int r = 0; r < B_COUNT; r++)
             for (int s = 0; s < BIND_SLOTS; s++)
-                if (r != row && same_context(r, row) && bind_get(r, dev, s) == code) {
+                if (r != row && same_context(r, row) && !may_share(r, row) && bind_get(r, dev, s) == code) {
                     put(r, dev, s, old);   /* swap */
                     swapped = bind_rows[r].name;
                 }
@@ -150,7 +162,7 @@ int bind_conflict(int row, int dev)
         int c = bind_get(row, dev, s);
         if (!c) continue;
         for (int r = 0; r < B_COUNT; r++)
-            if (r != row && same_context(r, row) && bind_row_shown(r, dev))
+            if (r != row && same_context(r, row) && !may_share(r, row) && bind_row_shown(r, dev))
                 for (int t = 0; t < BIND_SLOTS; t++)
                     if (bind_get(r, dev, t) == c) return r + 1;
     }
@@ -337,9 +349,13 @@ const char* bind_row_label(int row, char* buf, int n)
 /* ---------------------------------------------------------------- recvx.ini */
 int bind_ini_line(const char* key, const char* value)
 {
-    static int knife_seen, trade_seen, reload_seen;   /* the file has quick-knife / trade / reload lines (written before the third-person rows) */
+    static int knife_seen, trade_seen, reload_seen, combo_seen;   /* the file has quick-knife / trade / reload lines (written before the third-person rows) */
     int dev, slot = 0, code;
     char k[64];
+    /* a file from before the reload combination (no bindings_version line, written first): the reload rows' "none",
+       their default then, gets today's defaults (R, Aim + Triangle) */
+    if (!strcmp(key, "bindings_version")) { combo_seen = 1; return 1; }
+    if (!combo_seen && (!strcmp(key, "key_reload") || !strcmp(key, "pad_reload")) && !SDL_strcasecmp(value, "none")) return 1;
     if (!strncmp(key, "key_quickknife", 14)) knife_seen = 1;
     /* a file from before the quick knife: Space was third-person action's default second key, now the quick knife's */
     if (!knife_seen && !strcmp(key, "key_tps_action_2") && !SDL_strcasecmp(value, "Space")) return 1;
@@ -377,7 +393,9 @@ void bind_ini_write(void* fp)
                "# the game rows are DS2 buttons, which the game's KEY CONFIG type turns into actions.\n"
                "# Keys as SDL names them (Z, Return, Left Shift, Mouse Right); gamepad: south/east/west/north\n"
                "# (Xbox A/B/X/Y, PlayStation Cross/Circle/Square/Triangle), back, start, leftshoulder, dpup, ...,\n"
-               "# +lefttrigger, -lefty (left stick up). A second binding: <name>_2. none = unbound.\n");
+               "# +lefttrigger, -lefty (left stick up). A second binding: <name>_2. none = unbound.\n"
+               "# reload may share a button with a game row (third person: a third-person row): Aim + that button.\n"
+               "bindings_version = 2\n");
     for (int dev = 0; dev < 2; dev++)
         for (int i = 0; i < B_COUNT; i++) {
             int r = bind_order[i];
@@ -498,17 +516,97 @@ static int pad_row_reads(int row, int c)
     return !(take && tps_uses(BIND_PAD, c));
 }
 
+/* code c of the row is down, for that row */
+static int code_down(int row, int dev, int c, const bool* keys, int mouse)
+{
+    if (dev == BIND_KB) {
+        if (!input_accept(g_input_source, 0, BIND_KB, 0)) return 0;   /* Gamepad only */
+        /* third person takes the keys it uses over (W/A/S/Q by default) */
+        if (bind_rows[row].group == BG_GAME && g_tps.on && tps_uses(BIND_KB, c)) return 0;
+        return c >= BIND_MOUSE ? (mouse & SDL_BUTTON_MASK(c - BIND_MOUSE)) != 0 : c < SDL_SCANCODE_COUNT && keys[c];
+    }
+    return gamepad && pad_row_reads(row, c) && pad_down(c);
+}
+
+static int raw_held(int row, int dev, const bool* keys, int mouse)
+{
+    for (int s = 0; s < BIND_SLOTS; s++) {
+        int c = bind_get(row, dev, s);
+        if (c && code_down(row, dev, c, keys, mouse)) return 1;
+    }
+    return 0;
+}
+
+/* ---------------------------------------------------------------- reload combination
+   A reload binding that another row of its group also has (bind_combo) reloads only as Aim + that button:
+   a press while aim is held, in play (reload_glue.c), belongs to the reload until it is let go, and no
+   other row sees it (no one-frame fire, map, knife...), also when aim is let go first. A press without
+   aim is the other row's until let go. Aim: the game rows the key type has aim on (R1), or in third
+   person the third-person aim. Game thread: bind_combo_frame each pad report (pad.c), before the rows
+   are read. */
+int reload_combo_ok(void);   /* reload_glue.c: our player in normal play */
+static unsigned char combo_mode[2][2][BIND_SLOTS];   /* [B_TPS_RELOAD?][dev][slot]: 0 up, 1 the other row's, 2 the reload's */
+
+static int aim_row(int row, int dev)
+{
+    int m = pc_keytype_mask(4);
+    return row < 16 ? m > 0 && (m & (1 << row)) : row == B_TPS_AIM && (dev == BIND_PAD || g_tps.on);
+}
+
+int bind_combo(int row, int dev, int slot)
+{
+    int c = is_reload(row) ? bind_get(row, dev, slot) : 0, shared = 0;
+    for (int r = 0; c && r < B_COUNT; r++) {
+        if (r == row || is_reload(r) || bind_rows[r].group != bind_rows[row].group || !bind_row_shown(r, dev)) continue;
+        for (int s = 0; s < BIND_SLOTS; s++)
+            if (bind_get(r, dev, s) == c) {
+                if (aim_row(r, dev)) return 0;   /* on the aim button itself: no combination, it reloads */
+                shared = 1;
+            }
+    }
+    return shared;
+}
+
+void bind_combo_frame(int on, const bool* keys, int mouse)
+{
+    int aim = -1;
+    for (int i = 0; i < 2; i++)
+        for (int dev = 0; dev < 2; dev++)
+            for (int s = 0; s < BIND_SLOTS; s++) {
+                int row = i ? B_TPS_RELOAD : B_RELOAD, c = bind_get(row, dev, s);
+                unsigned char* m = &combo_mode[i][dev][s];
+                if (!on || !c || (i && dev == BIND_KB && !g_tps.on) || !bind_combo(row, dev, s) || !code_down(row, dev, c, keys, mouse)) {
+                    *m = 0;   /* (the third-person keys play only in third person) */
+                    continue;
+                }
+                if (*m) continue;
+                if (aim < 0) {
+                    aim = 0;
+                    for (int r = 0; r < B_COUNT && !aim; r++)
+                        for (int d = 0; d < 2 && !aim; d++)
+                            aim = aim_row(r, d) && raw_held(r, d, keys, d == BIND_KB ? mouse : 0);
+                    aim = aim && reload_combo_ok();
+                }
+                *m = aim ? 2 : 1;
+            }
+}
+
+/* code c of dev is a reload combination's press */
+static int combo_taken(int dev, int c)
+{
+    for (int i = 0; i < 2; i++)
+        for (int s = 0; s < BIND_SLOTS; s++)
+            if (combo_mode[i][dev][s] == 2 && bind_get(i ? B_TPS_RELOAD : B_RELOAD, dev, s) == c) return 1;
+    return 0;
+}
+
 int bind_held(int row, int dev, const bool* keys, int mouse)
 {
     for (int s = 0; s < BIND_SLOTS; s++) {
         int c = bind_get(row, dev, s);
         if (!c) continue;
-        if (dev == BIND_KB) {
-            if (!input_accept(g_input_source, 0, BIND_KB, 0)) return 0;   /* Gamepad only */
-            /* third person takes the keys it uses over (W/A/S/Q by default) */
-            if (bind_rows[row].group == BG_GAME && g_tps.on && tps_uses(BIND_KB, c)) continue;
-            if (c >= BIND_MOUSE ? (mouse & SDL_BUTTON_MASK(c - BIND_MOUSE)) != 0 : c < SDL_SCANCODE_COUNT && keys[c]) return 1;
-        } else if (gamepad && pad_row_reads(row, c) && pad_down(c)) return 1;
+        if (is_reload(row) ? bind_combo(row, dev, s) && combo_mode[row == B_TPS_RELOAD][dev][s] != 2 : combo_taken(dev, c)) continue;
+        if (code_down(row, dev, c, keys, mouse)) return 1;
     }
     return 0;
 }
