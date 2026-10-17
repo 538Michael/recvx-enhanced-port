@@ -385,6 +385,7 @@ static void randomize(const EnemyOpts* o)
             bhCheckEneWorkNum();
             host_log("enemies: record %d stays %d (%s)%s\n", k, save.id, why, guest ? "; the host's may differ" : "");
             if (!guest) coop_rand_kept(k, &kn);   /* the guest keeps it too */
+            else cost += slot_cost(m->id) - slot_cost(save.id);   /* the host's budget (it made the change), so the next draws stay its */
             continue;
         }
         for (i = 0; i < save.mdl_n; i++)   /* the original's textures are released with the room's (the record now holds the new type) */

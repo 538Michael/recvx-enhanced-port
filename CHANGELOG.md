@@ -9,6 +9,9 @@
 - **HD textures: an unreadable file no longer slows the game down**: a replacement that cannot be
   loaded is skipped after the first try and named once in the log, instead of being read again
   every time its texture is drawn.
+- **Co-op randomizer**: when the joining player's game could not set up one of the host's random
+  enemies, the rest of that room could come out differently from the host's. It now follows the
+  host's choices.
 
 ## 0.6.0 (2026-10-17)
 
