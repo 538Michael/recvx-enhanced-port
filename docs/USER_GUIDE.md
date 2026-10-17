@@ -170,7 +170,10 @@ visible, and Contrast until the right square on the white strip is barely visibl
 
 Input source and Gamepad (see [Input source](#input-source-per-window)), **Mouse in menus**
 (`menu_mouse`, **on**: point and click in the inventory, item box, map, files, OPTION and these
-menus; right click goes back; drag to rotate and wheel to zoom when examining an item), **Fixed
+menus, the typewriter's save screen and LOAD GAME (with either save system: pointing at a save
+selects it, a click picks it, the wheel or a click on the arrows scrolls, YES / NO and the memory
+cards too) and the game's questions such as "Use an ink ribbon?"; right click goes back; drag to
+rotate and wheel to zoom when examining an item), **Fixed
 camera controls** (`fixed_cam_controls`: **Classic (tank)** 0, Modern (camera-relative) 1; see
 [Modern controls](#modern-controls-fixed-cameras)), then the bindings ([Rebinding](#rebinding)).
 

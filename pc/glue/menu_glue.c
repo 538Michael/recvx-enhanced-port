@@ -1,4 +1,5 @@
-/* Mouse in the inventory (status screen) and its sub-screens, the item box and the map.
+/* Mouse in the inventory (status screen) and its sub-screens, the item box, the map and a
+   message's choices (the save and load screens: save_glue.c).
    The mouse drives the menus' own state: hovering moves the game's cursor (listcsr_0/2,
    maincsr) the way its d-pad code does, clicks become the game's confirm/cancel pad bits,
    so keyboard and gamepad keep working unchanged. Game thread: menu_pad from bhSetPad
@@ -17,9 +18,10 @@ extern PARTS parts_06b[24], parts_09b[8];
 extern NJS_TEXANIM* testset[23];
 int pad_game_input_enabled(void);
 int pc_trade_screen(void);
+int pc_save_screen(void);
 
 enum { UP = 0x1, DOWN = 0x2, CONFIRM = 0xB00 /* like Cross, as tps_pad */, CANCEL = 0x1000, STATUS = 0x4000 };
-enum { NONE, STATUS_SCREEN, MAP_SCREEN };
+enum { NONE, STATUS_SCREEN, MAP_SCREEN, QUESTION };
 enum { TOPBAR = 100 };   /* hit ids: 1 the "standard" slot above the grid (pip[1]), 2..11 grid cells (listcsr_2), TOPBAR + n top bar button n */
 
 static float mx, my, dmx, dmy;   /* cursor (game 2D px) and its motion this frame while the left button is held */
@@ -29,9 +31,12 @@ static unsigned next_pad;        /* bits for the next frame */
 
 static int screen(void)
 {
-    if (!sys || (sys->ss_flg & 0x400000) || !(sys->ts_flg & 0x80)) return NONE;   /* sub-screen task, no demo */
-    if (!(sys->ts_flg & 0x200)) return STATUS_SCREEN;   /* bhSysCallItemselect runs StatusMain */
-    if (!(sys->ts_flg & 0x400)) return MAP_SCREEN;
+    if (!sys || (sys->ss_flg & 0x400000)) return NONE;   /* no demo */
+    if (sys->ts_flg & 0x80) {   /* sub-screen task */
+        if (!(sys->ts_flg & 0x200)) return STATUS_SCREEN;   /* bhSysCallItemselect runs StatusMain */
+        if (!(sys->ts_flg & 0x400)) return MAP_SCREEN;
+    }
+    if ((sys->st_flg & 0x8000) && sys->mes_seln > 0) return QUESTION;   /* a message's choices (the typewriter's "use an ink ribbon?") */
     return NONE;
 }
 
@@ -172,6 +177,25 @@ static unsigned status_screen(void)
     return fallback();   /* file view, pick-up dialog, ... */
 }
 
+/* a message's choices (message.c: the cursor glyph at mes_sps[i], the answer after it, left/right
+   move mes_sel, confirm takes it, cancel does nothing): an answer reaches to the next one on its
+   line, at most 160 px */
+static unsigned question(void)
+{
+    int hit = 0, h, i, j, n = sys->mes_seln < 16 ? sys->mes_seln : 16, ok = sys->mes_tim == 0;
+    for (i = 0; i < n; i++) {
+        float x = sys->mes_sps[i].x, y = sys->mes_sps[i].y, x1 = x + 160;
+        for (j = 0; j < n; j++)
+            if (sys->mes_sps[j].y == y && sys->mes_sps[j].x > x && sys->mes_sps[j].x < x1) x1 = sys->mes_sps[j].x;
+        if (mx >= x - 4 && mx < x1 - 4 && my >= y - 4 && my < y + 28) hit = 1 + i;
+    }
+    if (settle) last_hit = hit;   /* the pointer resting on an answer as the question comes up does not choose it */
+    if ((h = hover(hit, ok)) && h - 1 != sys->mes_sel) { sys->mes_sel = h - 1; sys->mes_fls = 0; CallSystemSe(0, 2); }
+    wheel = 0;
+    if (left && hit && ok) { sys->mes_sel = hit - 1; return CONFIRM; }
+    return 0;
+}
+
 /* pad.c bhSetPad, before pad_ps is derived */
 unsigned int menu_pad(unsigned int pad)
 {
@@ -180,7 +204,7 @@ unsigned int menu_pad(unsigned int pad)
     unsigned add;
 
     if (!was) trace = getenv("RECVX_MENU_TRACE") != NULL;
-    if (pc_trade_screen()) return pad;   /* the co-op trade screen takes the mouse (trade_glue.c) */
+    if (pc_trade_screen() || pc_save_screen()) return pad;   /* the co-op trade screen and the save/load screens take the mouse (trade_glue.c, save_glue.c) */
     left =__atomic_exchange_n(&g_menu_mouse.left, 0, __ATOMIC_RELAXED);
     right = __atomic_exchange_n(&g_menu_mouse.right, 0, __ATOMIC_RELAXED);
     left_up = __atomic_exchange_n(&g_menu_mouse.left_up, 0, __ATOMIC_RELAXED);
@@ -205,7 +229,7 @@ unsigned int menu_pad(unsigned int pad)
     if (left || right) clicked = 15; else if (clicked) clicked--;
 
     add = next_pad; next_pad = 0;
-    add |= scr == STATUS_SCREEN ? status_screen() : fallback();   /* map: wheel changes the floor, right click leaves */
+    add |= scr == STATUS_SCREEN ? status_screen() : scr == QUESTION ? question() : fallback();   /* map: wheel changes the floor, right click leaves */
     if (trace && (add || left || right)) {
         S_WORK* st = &swork;
         printf("menu: screen %d sub %#x mode %d test %d csr %u/%u main %d at (%.0f %.0f) hit %d -> pad %#x\n", scr, st->subscreenmode, st->mode,

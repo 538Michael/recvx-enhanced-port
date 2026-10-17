@@ -439,7 +439,12 @@ village, collision. The render thread (GS emulation, replays: `r_exec`, `r_inter
   keyboard and gamepad work unchanged. Window positions map to the game's 640x480 2D space through
   the display rectangle (pillarbox, stretch and hor+ margins included). Covered: inventory, item
   commands, combine, examine (drag rotates, wheel zooms), item box, files, map, title menu, co-op
-  lobby, OPTION and ENHANCED SETTINGS, the trade screen. The OS cursor is hidden unless such a screen or
+  lobby, OPTION and ENHANCED SETTINGS, the trade screen, a message's choices (`mes_sel`, e.g. the
+  typewriter's ink ribbon question), the save and load screens (`pc_save_mouse` in
+  `pc/glue/save_glue.c`, called by `ExecuteSaveScreen` / `ExecuteLoadScreen` before their state
+  runs, for both save systems: hover sets the list's rows, YES / NO or the card, clicks, the wheel
+  and the list's arrows become that frame's `sys->pad_ps` / `pad_on` bits; `menu_pad` leaves the
+  mouse to it while the screen runs). The OS cursor is hidden unless such a screen or
   an overlay is open; third person releases the captured mouse while a screen is open.
 - **Idle dimming**: the game's screen saver (`bhSysCallScreenSaver`, 50% black after 10800
   frames without pad input) only reads the PS2 pad. `pc_input_active` (`tps_glue.c`) also counts

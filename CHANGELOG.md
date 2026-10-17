@@ -8,6 +8,13 @@
   randomizer's variety (Wild or Mild) and whether event enemies change too in the lobby's GAME
   RULES, and the joining player sees them there. Both show while the randomizer is on.
 
+### Menus
+
+- **Mouse on the save and load screens**: at a typewriter and in LOAD GAME, point at a save to
+  select it and click to pick it, scroll with the wheel, and right click to go back. Yes/No
+  questions such as "Use an ink ribbon?" and the memory card screens work with the mouse too.
+  Keyboard and gamepad work as before.
+
 ### Fixes
 
 - **Crash at the title with "You appear as"**: with your model set to one of the other playable
