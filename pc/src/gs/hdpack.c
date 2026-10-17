@@ -44,7 +44,7 @@ enum { A_RAW, A_SCALED, A_CONST };   /* replacement alpha: GS units, 0..255, the
 typedef struct { uint64_t tex, clut; uint32_t bits; } Key;
 typedef struct {
     Key k; uint32_t name;
-    int st;                 /* 0 not loaded, 1 being read, 2 uploaded (gl), 3 not usable */
+    int st;                 /* 0 not loaded, 1 being read, 2 uploaded (gl), 3 not usable (the font / UI setting may allow it), 4 cannot be loaded */
     GLuint gl; uint32_t bytes; uint64_t last;
     uint8_t verdict, amode, aconst;
     uint32_t* orig; int ow, oh;   /* the original's texels, until it is checked */
@@ -524,9 +524,9 @@ static void load(Entry* e, uint32_t flags)
     t2 = SDL_GetTicksNS();
     e->gl = !data || !usable(e, flags) ? 0 : png ? upload_rgba(data, &e->bytes) : upload_dds(data, n, &e->bytes);
     if (png) SDL_DestroySurface(data); else SDL_free(data);
-    if (!e->gl) {
-        if (e->verdict == V_OK || e->verdict == V_UNKNOWN) host_log("hd textures: cannot load %s\n", rel(e));
-        e->st = 3;
+    if (!e->gl) {   /* unreadable or not uploadable: never tried again (bind would on every draw) */
+        e->st = data && e->verdict != V_UNKNOWN && !usable(e, flags) ? 3 : 4;
+        if (e->st == 4) host_log("hd textures: cannot load %s\n", rel(e));
     } else {
         if (e->amode == A_CONST) glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_A, GL_ONE);
         e->st = 2;
