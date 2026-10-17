@@ -31,15 +31,87 @@ static Row* rows;
 static int nrows, state;         /* 0 not started, 1 reading, 2 ready, 3 failed */
 static short at[1000];           /* stage * 100 + room -> row, -1 */
 
-/* ours, where the room is known for certain (the port's docs and fixes name them) */
+/* ours, for every room the save menu leaves unnamed: from the room's doors, examine messages, items,
+   enemies and a look at it (the Battle Game's rooms after the story room they copy); story cases of a
+   room, and Claire's and Chris's visits of the same place, share a name */
 static const struct { int stg, rom; const char* name; } labels[] = {
-    { 0, 0, "Opening" }, { 0, 2, "Graveyard" }, { 0, 9, "Metal detector" }, { 1, 2, "Hall" }, { 1, 11, "Piano room" },
-    { 5, 50, "Battle Game start" }, { 6, 8, "Weapons storage" }, { 7, 25, "Ladder room (Albinoid pool)" },
-    { 9, 8, "Weapons storage" }, { 9, 17, "Tiger statue elevator" },
+    { 0, 0, "Prison: Cell block (start)" }, { 0, 2, "Prison: Graveyard" }, { 0, 3, "Prison: Main gate" },
+    { 0, 5, "Prison: Courtyard" }, { 0, 6, "Prison: Barracks" }, { 0, 7, "Prison: Shower room" },
+    { 0, 8, "Prison: Guillotine room" }, { 0, 9, "Prison: Metal detector room" }, { 0, 10, "Prison: Outside the main gate" },
+    { 0, 11, "Prison: Dissection room" }, { 0, 12, "Prison: Torture room" }, { 0, 13, "Prison: Stone stairway" },
+    { 0, 14, "Prison: Exhibition hall" }, { 0, 15, "Prison: Iron statue room" }, { 0, 16, "Prison: Back alley" },
+    { 1, 0, "Palace: Front courtyard" }, { 1, 2, "Palace: Main hall" }, { 1, 3, "Palace: Restroom" },
+    { 1, 4, "Palace: Portrait room" }, { 1, 5, "Palace: Gold Luger room" }, { 1, 6, "Palace: Projector room" },
+    { 1, 7, "Palace: Hallway (crest doors)" }, { 1, 9, "Palace: Office" }, { 1, 10, "Palace: Passage to the residence" },
+    { 1, 11, "Palace: Piano room" }, { 1, 12, "Palace: Outer courtyard" }, { 1, 13, "Palace: Submarine dock" },
+    { 1, 14, "Palace: Submarine" },
+    { 2, 0, "Residence: Front garden" }, { 2, 1, "Residence: Entrance hall" }, { 2, 2, "Residence: Living room" },
+    { 2, 3, "Residence: Hallway (large doll)" }, { 2, 4, "Residence: Alfred's room" }, { 2, 5, "Residence: Alexia's room" },
+    { 2, 6, "Residence: Attic playroom" },
+    { 3, 0, "Military Training Facility: Lift hall" }, { 3, 1, "Military Training Facility: Relief stairway" },
+    { 3, 2, "Military Training Facility: Old tank room" }, { 3, 3, "Military Training Facility: Indigo card reader corridor" },
+    { 3, 5, "Military Training Facility: Locker room" }, { 3, 6, "Military Training Facility: Pool" },
+    { 3, 7, "Military Training Facility: Security office" }, { 3, 8, "Military Training Facility: Checkered corridor" },
+    { 3, 9, "Military Training Facility: Entrance yard" }, { 3, 10, "Military Training Facility: Catwalk (sub machine guns)" },
+    { 3, 12, "Military Training Facility: Command room" }, { 3, 13, "Military Training Facility: Bio-lab entrance" },
+    { 3, 14, "Military Training Facility: Bio-experiment room" }, { 3, 15, "Military Training Facility: Silver card reader corridor" },
+    { 3, 16, "Military Training Facility: Storeroom (grenade launcher)" }, { 3, 17, "Military Training Facility: Ventilation room" },
+    { 3, 18, "Military Training Facility: Turntable control room" }, { 3, 19, "Military Training Facility: Chemical lab" },
+    { 3, 20, "Military Training Facility: Workshop" }, { 3, 21, "Military Training Facility: Face relief room" },
+    { 3, 22, "Military Training Facility: Elevator" }, { 3, 23, "Cutscene: Alfred and the Tyrant" },
+    { 3, 24, "Cutscene: Alfred's jet take-off" },
+    { 4, 0, "Airport: Office" }, { 4, 1, "Airport: Hangar" }, { 4, 2, "Airport: Loading lift room" },
+    { 4, 3, "Airport: Submarine dock" }, { 4, 5, "Airport: Submarine" },
+    { 5, 1, "Transport plane: Cargo hold" }, { 5, 50, "Battle Game: Start" }, { 5, 51, "Battle Game: Piano room (palace)" },
+    { 5, 52, "Battle Game: Stone stairway (prison)" }, { 5, 53, "Battle Game: Back alley (prison)" },
+    { 5, 54, "Battle Game: Checkered corridor (training facility)" }, { 5, 55, "Battle Game: Tiger statue room (Antarctic)" },
+    { 5, 58, "Battle Game: Ventilation room (training facility)" }, { 5, 59, "Battle Game: Turntable control room (training facility)" },
+    { 5, 60, "Battle Game: Main hall (Antarctic)" }, { 5, 61, "Battle Game: Pipe corridor (Antarctic)" },
+    { 5, 62, "Battle Game: Indigo card reader corridor (training facility)" }, { 5, 63, "Battle Game: Command room (training facility)" },
+    { 5, 64, "Battle Game: Mansion corridor (Antarctic)" }, { 5, 65, "Battle Game: Dissection room (prison)" },
+    { 5, 66, "Battle Game: Silver card reader corridor (training facility)" }, { 5, 67, "Battle Game: Locker room (training facility)" },
+    { 5, 68, "Battle Game: Frozen corridor (Antarctic)" }, { 5, 69, "Battle Game: Lift hall (training facility)" },
+    { 5, 70, "Battle Game: Storeroom (training facility)" }, { 5, 71, "Battle Game: Office (airport)" },
+    { 5, 80, "Battle Game: Nosferatu battle" }, { 5, 81, "Battle Game: Alexia battle (final)" },
+    { 5, 82, "Battle Game: Alexia battle (mansion hall)" }, { 5, 83, "Battle Game: Gulp Worm battle" },
+    { 5, 84, "Battle Game: Tyrant battle" },
+    { 6, 1, "Antarctic Base: Workers' quarters" }, { 6, 2, "Antarctic Base: Workshop" }, { 6, 3, "Antarctic Base: Corridor (moth nest)" },
+    { 6, 5, "Antarctic Base: Main hall (sorter)" }, { 6, 6, "Antarctic Base: Vehicle bay" }, { 6, 7, "Antarctic Base: Generator room" },
+    { 6, 8, "Antarctic Base: Weapons storage" }, { 6, 9, "Antarctic Base: Cultivation room" },
+    { 6, 10, "Antarctic Base: Outside (Nosferatu battle)" },
+    { 7, 0, "Military Training Facility: Old tank room" }, { 7, 1, "Military Training Facility: Elevator" },
+    { 7, 3, "Military Training Facility: Command room" }, { 7, 4, "Military Training Facility: Workshop" },
+    { 7, 5, "Military Training Facility: Chemical lab" }, { 7, 6, "Military Training Facility: Face relief room" },
+    { 7, 7, "Military Training Facility: Capsule room" }, { 7, 8, "Military Training Facility: Lift corridor" },
+    { 7, 10, "Military Training Facility: Albinoid pool" }, { 7, 11, "Military Training Facility: Turntable control room" },
+    { 7, 12, "Military Training Facility: Lift hall" }, { 7, 13, "Military Training Facility: Entrance yard" },
+    { 7, 14, "Military Training Facility: Relief stairway" }, { 7, 15, "Military Training Facility: Security office" },
+    { 7, 16, "Military Training Facility: Turntable landing" }, { 7, 17, "Military Training Facility: Checkered corridor" },
+    { 7, 18, "Military Training Facility: Bio-lab entrance" }, { 7, 19, "Military Training Facility: Indigo card reader corridor" },
+    { 7, 20, "Military Training Facility: Storeroom (grenade launcher)" }, { 7, 21, "Military Training Facility: Ventilation room" },
+    { 7, 23, "Military Training Facility: Underground cave" }, { 7, 25, "Military Training Facility: Ladder room (Albinoid pool)" },
+    { 8, 0, "Airport: Office" }, { 8, 1, "Airport: Hangar" }, { 8, 2, "Airport: Loading lift room" },
+    { 8, 3, "Cutscene: Wesker's monitor room" }, { 8, 5, "Airport: Submarine dock" },
+    { 9, 0, "Antarctic Base: Hangar" }, { 9, 1, "Antarctic Base: Workers' quarters" }, { 9, 2, "Antarctic Base: Workshop" },
+    { 9, 3, "Antarctic Base: Corridor (moth nest)" }, { 9, 5, "Antarctic Base: Crane hall" },
+    { 9, 6, "Antarctic Base: Passage to the generator room" }, { 9, 7, "Antarctic Base: Generator room" },
+    { 9, 8, "Antarctic Base: Weapons storage" },
+    { 9, 9, "Antarctic Base: Emergency elevator" }, { 9, 10, "Antarctic Base: Pipe corridor" },
+    { 9, 11, "Antarctic Base: Drain control room" }, { 9, 12, "Antarctic Base: Frozen corridor" }, { 9, 13, "Antarctic Base: Pool room" },
+    { 9, 15, "Antarctic Base: Mansion hall (cocoon)" }, { 9, 16, "Antarctic Base: Tiger statue room" },
+    { 9, 17, "Antarctic Base: Tiger statue elevator" }, { 9, 18, "Antarctic Base: Computer room" },
+    { 9, 19, "Antarctic Base: Veronica portrait room" }, { 9, 20, "Antarctic Base: Mansion hallway" },
+    { 9, 22, "Antarctic Base: Laboratory" }, { 9, 23, "Antarctic Base: Alfred's room" }, { 9, 24, "Antarctic Base: Alexia's room" },
+    { 9, 25, "Antarctic Base: Attic" }, { 9, 26, "Antarctic Base: Mansion study" },
+    { 9, 27, "Antarctic Base: Mansion corridor (tentacles)" }, { 9, 28, "Antarctic Base: Steve battle room" },
+    { 9, 29, "Antarctic Base: Cell block" }, { 9, 30, "Antarctic Base: Linear launcher room" },
+    { 9, 31, "Antarctic Base: Self-destruct terminal" }, { 9, 32, "Antarctic Base: Mansion hall (Alexia battle)" },
+    { 9, 34, "Cutscene: Wesker and Claire (1)" }, { 9, 35, "Cutscene: Wesker and Claire (2)" },
+    { 9, 36, "Cutscene: Wesker and Claire (3)" }, { 9, 37, "Cutscene: Chris fights Wesker" },
 };
 /* ours, after the save menu's area names; stages 7..9 are Chris's half of the game */
 static const char* const stages[10] = {
-    "Claire: Rockfort Prison", "Claire: Rockfort Palace", "Claire: Rockfort Residence", "Claire: Rockfort Training Facility",
+    "Claire: Rockfort Prison", "Claire: Rockfort Palace", "Claire: Rockfort Residence", "Claire: Military Training Facility",
     "Claire: Rockfort Airport", "Transport plane / Battle Game", "Claire: Antarctic Base", "Chris: Rockfort Island",
     "Chris: Rockfort Airport", "Chris: Antarctic Base",
 };
@@ -313,7 +385,7 @@ int tp_entries(int i) { const TpRoom* r = tp_room(i); return r ? (r->npos ? r->n
 const char* tp_entry_name(int i, int pos, char* b, int n)
 {
     const Row* r = tp_room(i) ? &rows[i] : NULL;
-    char from[64];
+    char from[96];
     int k = r && pos >= 0 && pos < TP_POS ? r->nsrc[pos] : 0;
     if (r && !r->r.npos) snprintf(b, n, "Entry %d (none in the room file)", pos);
     else if (!k) snprintf(b, n, "Entry %d", pos);
@@ -329,7 +401,7 @@ const char* tp_entry_name(int i, int pos, char* b, int n)
 const char* tp_entry_sources(int i, int pos, char* b, int n)
 {
     const Row* r = tp_room(i) ? &rows[i] : NULL;
-    char nm[64];
+    char nm[96];
     b[0] = 0;
     for (int k = 0; r && pos >= 0 && pos < TP_POS && k < r->nsrc[pos]; k++) {
         tp_room_name(r->src[pos][k], 1, nm, sizeof(nm));
