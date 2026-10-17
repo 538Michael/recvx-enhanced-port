@@ -12,6 +12,7 @@
 #include <stdlib.h>
 
 int pad_quick_knife(void);
+int pc_in_play(const BH_PWORK* p, int scope);   /* reload_glue.c */
 int pc_quick_knife_on(void);   /* the option (host.c) */
 
 #define KNIFE 8                         /* item 8 "Combat Knife", weapon 2 (WpnTab flag 0x40000000: the knife's hit check) */
@@ -23,13 +24,8 @@ static int knife_slot, prev_slot, prev_id;
 
 static unsigned int* inv(void) { return &sys->itm[sys->ply_id * 16]; }
 
-/* normal play: our player in control; no event, door, menu, first person or weapon load running */
-static int in_play(void)
-{
-    return plp == &ply && plp->mnwP && plp->mlwP && (sys->sp_flg & 0x40) && !(sys->ss_flg & 0x400000) &&
-           !(sys->st_flg & 0x800001) && !(sys->gm_flg & 0x49) && !(sys->cb_flg & 0x5) && !(sys->ts_flg & 0x80) &&
-           !*(int*)&sys->mn_mode0 && !*(int*)&sys->mn_md0 && plp->mode0 == 1;
-}
+/* normal play: our player in control; no event, door, menu, first person or attract demo (reload_glue.c) */
+static int in_play(void) { return pc_in_play(plp, 0); }
 
 /* weapon down and standing, turning, walking, running or stepping back (not the quick turn,
    not the idle animation, stairs, pushing, ...) */

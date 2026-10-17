@@ -7,6 +7,16 @@
 - **Over-the-shoulder camera on stairs and ledges**: the camera now stays with the character
   while climbing stairs and climbing up or down a ledge, as it does while walking, instead of
   standing still and then jumping forward every few steps.
+- **Several HD texture packs**: when two packs have the same texture, the one in the folder that
+  comes first by name now always wins, so you can choose by naming the folders 1_..., 2_....
+- **HD textures: an unreadable file no longer slows the game down**: a replacement that cannot be
+  loaded is skipped after the first try and named once in the log, instead of being read again
+  every time its texture is drawn.
+- **Co-op randomizer**: when the joining player's game could not set up one of the host's random
+  enemies, the rest of that room could come out differently from the host's. It now follows the
+  host's choices.
+- **Battle Game characters**: turning "Battle Game unlocked" off in the F1 window while on the
+  title screen no longer leaves BATTLE GAME with only Claire to choose from.
 
 ## 0.6.0 (2026-10-17)
 

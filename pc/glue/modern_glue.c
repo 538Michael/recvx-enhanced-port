@@ -13,6 +13,7 @@
 #include <stdlib.h>
 
 int pad_move_dir(float* x, float* y);   /* pad.c: screen direction (x right, y up), 1 = analog */
+int pc_in_play(const BH_PWORK* p, int scope);   /* reload_glue.c */
 int pad_quickturn_held(void);
 uint64_t gs_frame_count(void);
 
@@ -22,13 +23,8 @@ static ModernHold hold;
 static float target;                    /* the angle to turn to this frame */
 static int steer;                       /* modern_pad asked modern_player to turn */
 
-/* normal play: our player in control; no event, door, menu, first person or attract demo */
-static int in_play(void)
-{
-    return plp == &ply && plp->mnwP && plp->mlwP && (sys->sp_flg & 0x40) && !(sys->ss_flg & 0x400000) &&
-           !(sys->st_flg & 0x800001) && !(sys->gm_flg & 0x49) && !(sys->cb_flg & 0x5) && !(sys->ts_flg & 0x80) &&
-           !*(int*)&sys->mn_mode0 && !*(int*)&sys->mn_md0 && plp->mode0 == 1;
-}
+/* normal play: our player in control; no event, door, menu, first person or attract demo (reload_glue.c) */
+static int in_play(void) { return pc_in_play(plp, 0); }
 
 static void trace(float x, float y, int analog, int held_old, unsigned pad)
 {

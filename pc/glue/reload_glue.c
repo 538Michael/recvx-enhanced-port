@@ -25,9 +25,9 @@ int pad_reload(void);
 
 static int rest;   /* a reload started with the weapon lowered, the aim not held since */
 
-/* normal play: our player in control; no event, door, menu, first person (but the scope: scope = 1) or attract demo
-   (as knife_glue.c) */
-static int in_play(const BH_PWORK* p, int scope)
+/* normal play: player p (plp: ours in control) with no event, door, menu, first person (but the scope: scope = 1)
+   or attract demo running. Also quick knife (knife_glue.c) and modern controls (modern_glue.c), with scope 0. */
+int pc_in_play(const BH_PWORK* p, int scope)
 {
     return p == &ply && p->mnwP && p->mlwP && (sys->sp_flg & 0x40) && !(sys->ss_flg & 0x400000) &&
            !(sys->st_flg & (scope ? 0x1 : 0x800001)) && !(sys->gm_flg & (scope ? 0x9 : 0x49)) && !(sys->cb_flg & 0x5) && !(sys->ts_flg & 0x80) &&
@@ -36,7 +36,7 @@ static int in_play(const BH_PWORK* p, int scope)
 
 /* a reload binding shared with another action takes a press with aim held only here (pc/src/input/bindings.c
    bind_combo_frame, pad report, game thread): elsewhere (menus, events) the button is the other action's */
-int reload_combo_ok(void) { return sys && in_play(&ply, 1); }
+int reload_combo_ok(void) { return sys && pc_in_play(&ply, 1); }
 
 /* third person: the reload of a lowered weapon is no aim (camera, crosshair, facing; tps_glue.c) */
 int reload_at_rest(void) { return rest; }
@@ -55,7 +55,7 @@ void reload_player(void)
         if (trace && plp == &ply && sys->pad_on != last) printf("pad: game pad %05x mode %d/%d\n", last = sys->pad_on, plp->mode1, plp->mode2);
     }
     if (rest && plp == &ply && (plp->mode0 != 1 || plp->mode1 != 1 || (sys->pad_on & 0x10))) rest = 0;
-    if (!now || was || !in_play(plp, plp->mode1 == 1 && plp->mode2 == 71)) { was = now; return; }
+    if (!now || was || !pc_in_play(plp, plp->mode1 == 1 && plp->mode2 == 71)) { was = now; return; }
     /* raised: where the trigger reloads (the aim pose held, the scope ready); lowered: where the aim button raises the
        weapon (bhCPM0_action); not the sniper rifle / linear launcher, whose reload ends in the scope */
     raised = plp->mode1 == 1 && (plp->at_flg & 0x10) && ((plp->mode2 >= 65 && plp->mode2 <= 67 && plp->mode3 == 1) || plp->mode2 == 71);

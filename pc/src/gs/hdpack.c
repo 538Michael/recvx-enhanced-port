@@ -44,7 +44,7 @@ enum { A_RAW, A_SCALED, A_CONST };   /* replacement alpha: GS units, 0..255, the
 typedef struct { uint64_t tex, clut; uint32_t bits; } Key;
 typedef struct {
     Key k; uint32_t name;
-    int st;                 /* 0 not loaded, 1 being read, 2 uploaded (gl), 3 not usable */
+    int st;                 /* 0 not loaded, 1 being read, 2 uploaded (gl), 3 not usable (the font / UI setting may allow it), 4 cannot be loaded */
     GLuint gl; uint32_t bytes; uint64_t last;
     uint8_t verdict, amode, aconst;
     uint32_t* orig; int ow, oh;   /* the original's texels, until it is checked */
@@ -67,7 +67,22 @@ static int key_cmp(const Key* a, const Key* b)
     return a->tex != b->tex ? (a->tex < b->tex ? -1 : 1) : a->clut != b->clut ? (a->clut < b->clut ? -1 : 1)
          : a->bits != b->bits ? (a->bits < b->bits ? -1 : 1) : 0;
 }
-static int ent_cmp(const void* a, const void* b) { return key_cmp(&((const Entry*)a)->k, &((const Entry*)b)->k); }
+static const char* rel(const Entry* e) { return names + e->name + root_len; }
+/* equal keys (the same texture in several folders): by the path in the pack, '\\' read as '/', so
+   folders named 1_..., 2_... are in that order and lookups take the first */
+static int path_cmp(const char* a, const char* b)
+{
+    for (;; a++, b++) {
+        unsigned char x = *a == '\\' ? '/' : (unsigned char)*a, y = *b == '\\' ? '/' : (unsigned char)*b;
+        if (x != y || !x) return x - y;
+    }
+}
+static int ent_cmp(const void* a, const void* b)
+{
+    int c = key_cmp(&((const Entry*)a)->k, &((const Entry*)b)->k);
+    return c ? c : path_cmp(rel(a), rel(b));
+}
+static int key_only_cmp(const void* a, const void* b) { return key_cmp(&((const Entry*)a)->k, &((const Entry*)b)->k); }
 
 static int parse_name(const char* f, Key* k)
 {
@@ -101,8 +116,6 @@ static SDL_EnumerationResult SDLCALL scan_cb(void* ud, const char* dir, const ch
     nnames += len;
     return SDL_ENUM_CONTINUE;
 }
-
-static const char* rel(const Entry* e) { return names + e->name + root_len; }
 
 /* <save>/hd_textures.txt: "<ok|rejected> <alpha mode> <constant alpha> <file size> <file in the pack>" */
 static int name_cmp(const void* a, const void* b) { return strcmp(rel(&ents[*(const int*)a]), rel(&ents[*(const int*)b])); }
@@ -155,12 +168,17 @@ static void setup(void)
     if (!SDL_GetPathInfo(dir, NULL)) return;
     SDL_EnumerateDirectory(dir, scan_cb, (void*)(intptr_t)0);
     if (!nents) { host_log("hd textures: no PCSX2 replacement textures in %s\n", dir); return; }
-    qsort(ents, (size_t)nents, sizeof(Entry), ent_cmp);
     root_len = strlen(dir);
     while (names[ents[0].name + root_len] == '/' || names[ents[0].name + root_len] == '\\') root_len++;
+    qsort(ents, (size_t)nents, sizeof(Entry), ent_cmp);
     state = 1;
     host_log("hd textures: %d replacements in %s (indexed in %u ms, cache %u MB)\n", nents, dir,
              (unsigned)(SDL_GetTicks() - t0), (unsigned)(cap_bytes >> 20));
+    {
+        int dup = 0;
+        for (int i = 1; i < nents; i++) dup += !key_cmp(&ents[i].k, &ents[i - 1].k) && (i < 2 || key_cmp(&ents[i - 1].k, &ents[i - 2].k));
+        if (dup) host_log("hd textures: %d names in several folders, the first folder in name order wins\n", dup);
+    }
     SDL_snprintf(cache_path, sizeof(cache_path), "%s/hd_textures.txt", g_config.save_dir);
     cache_load();
 }
@@ -254,7 +272,8 @@ void hdpack_note(unsigned int t, uint64_t tex0, uint64_t texa, int flags)
     uint32_t W = 1u << ((tex0 >> 26) & 0xF), H = 1u << ((tex0 >> 30) & 0xF);
     if (!hdpack_active() || !make_key(tex0, texa, &k)) return;
     key_ns += SDL_GetTicksNS() - t0;
-    e = bsearch(&(Entry){ .k = k }, ents, (size_t)nents, sizeof(Entry), ent_cmp);
+    e = bsearch(&(Entry){ .k = k }, ents, (size_t)nents, sizeof(Entry), key_only_cmp);
+    while (e && e > ents && !key_cmp(&e[-1].k, &k)) e--;   /* the first of equal keys */
     if (t >= cmap) {
         size_t c = t + 4096;
         map = realloc(map, c * sizeof(*map));
@@ -505,9 +524,9 @@ static void load(Entry* e, uint32_t flags)
     t2 = SDL_GetTicksNS();
     e->gl = !data || !usable(e, flags) ? 0 : png ? upload_rgba(data, &e->bytes) : upload_dds(data, n, &e->bytes);
     if (png) SDL_DestroySurface(data); else SDL_free(data);
-    if (!e->gl) {
-        if (e->verdict == V_OK || e->verdict == V_UNKNOWN) host_log("hd textures: cannot load %s\n", rel(e));
-        e->st = 3;
+    if (!e->gl) {   /* unreadable or not uploadable: never tried again (bind would on every draw) */
+        e->st = data && e->verdict != V_UNKNOWN && !usable(e, flags) ? 3 : 4;
+        if (e->st == 4) host_log("hd textures: cannot load %s\n", rel(e));
     } else {
         if (e->amode == A_CONST) glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_A, GL_ONE);
         e->st = 2;
