@@ -587,6 +587,21 @@ ITEMS choice, `RECVX_TEST_SAVE`, the host's partner records (`coop-partners-nn.b
   `unsigned char`). Enforced by the build (CONTRIBUTING.md).
 - Translated from the retail ELF instead of the decomp's asm blocks (hand-written asm in the
   original): `bhObj005` (`objitm.c`), `njMirror`, `_ClipInter`, `ScissorTriangle`, `KazuSet`.
+- **Fast loading** (`fast_loading`, default on): a room load (`bhSysCallMonitor` mode 4) sets one
+  texture list per frame and the sound monitor (`bhSysCallSndMonitor`) uploads each sound pack in
+  48 KB packets, one per VBLANK, with a checksum round trip per bank: the pace of the PS2's SIF DMA
+  to the sound chip, about 30-60 frames of an Instant door. With the setting on, the texture lists
+  are set in one frame and the sound monitor's steps run in one frame, each pack loaded on the game
+  task at once (`sdfunc.c pc_load_sound_pack_now`: `LoadSoundPackFile` looped, its read completed
+  by the file manager, each download done by `ps2_sg_sd.c pc_snd_download_now` as `sdDrvInit` does,
+  re-reading the IOP status after each step so the checksum compares the new bank's sum). A VBLANK
+  delivered inside (the disc read polls interrupts) leaves the downloads and the file manager to it.
+  The room's effects run in every frame of the load (`ef_flg` bit 0, steps 10-16) and take random
+  numbers; with the shorter load they are topped up to 30 frames at step 16, the shortest original
+  load, so rain and smoke look settled. Not in the attract demo (it replays recorded input from
+  `srand(1)` at the load). Off, frames are identical to a build without the setting; on, every load
+  is shorter and the frames after it (and the random sequence) differ. The log line `room: RM_xxxx ready N frames after
+  the door` (or `the game start`) gives the length of each load.
 
 ## Determinism
 

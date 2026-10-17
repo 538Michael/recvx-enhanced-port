@@ -35,6 +35,12 @@
   Nothing is written to your system data: characters and best times you earn are saved as before,
   and turned off the select shows only the characters you really unlocked. The Linear Launcher
   still needs an A rank with every character.
+- **Fast loading** (GAMEPLAY, on by default): room changes, starting a new game and loading a
+  save are much quicker. The game no longer waits for the PS2's disc and sound chip, which the PC
+  does not have: the next room's sounds and textures are ready at once, so the load screen is gone
+  almost as soon as the screen has turned black, and with "Skippable" doors you can skip the
+  animation much sooner. Turn it off for the original loading times. In co-op each player chooses
+  for themselves.
 
 ### Controls
 
