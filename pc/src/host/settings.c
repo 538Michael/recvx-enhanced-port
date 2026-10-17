@@ -160,6 +160,7 @@ const Setting g_settings[] = {
     { SP_DISPLAY, "Cutscene bars", V(g_config.cinema_bars), 0, 2, 1, modes3, .help = "Original keeps them 4:3 in widescreen; fades always fill the screen." },
     { SP_DISPLAY, "Camera vignette", V(g_config.screen_filter), 0, 2, 1, modes3, .help = "Original keeps it 4:3 in widescreen." },
     { SP_DISPLAY, "Screen effects", V(g_config.screen_effects), 0, 2, 1, modes3, .help = "Full-screen effect layers. Original keeps them 4:3 in widescreen." },
+    { SP_DISPLAY, "Movie zoom", V(g_config.movie_zoom), 0, 1, 1, .help = "Widescreen: movies grow, without stretching, until their black bars leave the screen (or the picture fills the width)." },
     { SP_DISPLAY, "Brightness", V(g_config.brightness), -50, 50, 1, .fmt = "%+d", .flags = SET_CALIB,
       .help = "Lifts or lowers the dark end of the game's picture. Black strip: the left square should be barely visible." },
     { SP_DISPLAY, "Contrast", V(g_config.contrast), 50, 150, 1, .fmt = "%d%%", .flags = SET_CALIB,
