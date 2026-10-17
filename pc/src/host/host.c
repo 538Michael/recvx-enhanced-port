@@ -49,10 +49,10 @@ int pc_frame_blend(void) { return g_config.frame_blend < 0 ? !g_config.interpola
 int pc_battle_unlocked(void) { return g_config.battle_unlocked; }
 int pc_skip_intro(void) { return g_config.skip_intro; }
 int pc_movie_zoom(void) { return g_config.movie_zoom; }
-/* fog reduced by r %: the fog density (njCalcFogPower) x 100 / (100 - r), so everything's fog is
-   that of something (100 - r) % as far: 50 % = x 2. 100 %: every distance reads the table's nearest
+/* fog at i % of the original: the fog density (njCalcFogPower) x 100 / i, so everything's fog is
+   that of something i % as far: 50 % = x 2. 0 %: every distance reads the table's nearest
    entry, 254 or 255 of 255 (no fog) */
-float pc_fog_scale(void) { int r = g_config.fog_reduction; return r >= 100 ? 1e6f : 100.0f / (100 - r); }
+float pc_fog_scale(void) { int i = g_config.fog_intensity; return i <= 0 ? 1e6f : 100.0f / i; }
 int pc_skip_intro_press_start(void)
 {
     static int done;
@@ -88,7 +88,7 @@ float pc_overlay_x(float x)
 
 HostConfig g_config = { .window_w = 1280, .window_h = 960, .vsync = 1, .log_level = 1, .music_volume = 100, .sfx_volume = 100, .interpolate = 1, .frame_blend = 0, .aspect = 2, .show_fps = 1, .show_ping = 1,
                        .screen_filter = 1, .cinema_bars = 1, .screen_effects = 1, .native_3d = 1, .model_cull = 1, .native_tex = 1, .quick_knife = 1,
-                       .skip_doors = 1, .skip_intro = 1, .battle_unlocked = 1, .contrast = 100, .gamma = 10 };   /* first-start defaults; recvx.ini overrides */
+                       .skip_doors = 1, .skip_intro = 1, .battle_unlocked = 1, .contrast = 100, .gamma = 10, .fog_intensity = 100 };   /* first-start defaults; recvx.ini overrides */
 SDL_Window* g_window;
 SDL_GLContext g_gl;
 
