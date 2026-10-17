@@ -14,6 +14,9 @@
   characters, the game no longer crashes when you go back to the title from a co-op game (as host
   or partner, also after a game over), or when you open or leave the co-op lobby after playing.
   The story's character switches and the Battle Game no longer crash with it either.
+- **Room sounds after they stop**: rain, wind and other looping room sounds now fade out fully
+  when they stop, as on the PS2. Before, a quiet trace of them went on playing, most noticeably on
+  the title screen after RETURN TO TITLE, and it could build up over a long game.
 - **Over-the-shoulder camera on stairs and ledges**: the camera now stays with the character
   while climbing stairs and climbing up or down a ledge, as it does while walking, instead of
   standing still and then jumping forward every few steps.
