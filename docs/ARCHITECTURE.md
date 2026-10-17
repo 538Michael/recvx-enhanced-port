@@ -434,7 +434,7 @@ One table, `g_settings[]` in `pc/src/host/settings.c`, drives both the F1 overla
 in-game ENHANCED SETTINGS pages. Each entry has a page, label, variable (or get/set), range and
 step, value names or a printf format, flags, help text, an applier, a `locked()` reason and an
 optional `.group` heading. Rows are in menu order; the pages (`SP_*`, `settings_pages[]`) are
-DISPLAY, GAMEPLAY, CONTROLS, THIRD PERSON, AUDIO, CO-OP, EXTRAS. `recvx.ini` keys live in `keys[]`
+DISPLAY, GAMEPLAY, CONTROLS, THIRD PERSON, AUDIO, APPEARANCE, CO-OP, EXTRAS. `recvx.ini` keys live in `keys[]`
 in `pc/src/host/config.c`.
 
 ENHANCED SETTINGS is option level 4 of the game's OPTION screen (`pc/glue/options_glue.c`; hooks in

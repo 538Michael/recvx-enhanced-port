@@ -95,14 +95,14 @@ All PC settings are available in two places that edit the same values:
 
 - **OPTION -> ENHANCED SETTINGS**: in the game's own OPTION screen (title menu, or Select in
   game) next to EXIT: select EXIT and press right (or click it). Drawn in the game's style, with
-  the pages DISPLAY, GAMEPLAY, CONTROLS, THIRD PERSON, AUDIO, CO-OP and EXTRAS. Left/right or
+  the pages DISPLAY, GAMEPLAY, CONTROLS, THIRD PERSON, AUDIO, APPEARANCE, CO-OP and EXTRAS. Left/right or
   L1/R1 on the page row switch pages, up/down (or the mouse wheel) choose a setting, left/right
   change it, cancel or a right click goes back. Long pages scroll; the bottom lines explain the
   selected setting, or why it cannot change right now. "(next start)" marks a setting that takes
   effect when the game starts again.
 - **F1**: the settings overlay, in the same order (sections Display, Gameplay, Controls, Third
-  person, Audio, Co-op, Performance). The co-op and cheat settings live in their own windows
-  (F3, F2); F1 shows a few of them.
+  person, Audio, Appearance, Co-op, Performance). The co-op and cheat settings live in their own
+  windows (F3, F2); F1 shows a few of them.
 
 Every setting of the table below is in both. Changes apply at once and are saved shortly after.
 The defaults of a first start are the PC-friendly ones: enhanced mode, widescreen, native
@@ -123,8 +123,10 @@ renderer, skipped intro and door animations (Skip door animations: Instant). Tur
 | Internal resolution | `scale` | **Auto** (follows the window) or 1x-8x of 640x448 |
 | Display-rate frames | `interpolate` | "Enhanced mode": in-between frames blended from the last two game frames, up to the display's refresh rate. The game logic stays at its original 30 FPS, so gameplay is unchanged. **On**; off is "vanilla" |
 | Frame blend (trail) | `frame_blend` | the PS2's motion trail (each frame mixed over the previous one). Auto, **Off**, On; Auto is on in vanilla and off with display-rate frames |
+| **Widescreen** | | |
 | Cutscene bars, Camera vignette, Screen effects | `cinema_bars`, `screen_filter`, `screen_effects` | Original (4:3), **Stretch to width**, Off: how these full-screen layers behave in widescreen |
 | Movie zoom | `movie_zoom` | **off**; on: in widescreen the movies are enlarged, never stretched, until the black bars above and below them leave the screen or the picture reaches the window's sides. Nothing of the picture is cut off: on 16:9 thin bars stay (the movies are wider than 16:9), on ultrawide the movie fills the height. No effect at 4:3 |
+| **Fog and brightness** | | |
 | Fog intensity | `fog_intensity` | 0% to 100%, **100%** (as on the PS2): how thick the game's distance fog is, including the black fog many rooms use as darkness (lower values let the unlit cell at the start show more of the room outside). The fog everywhere becomes that of something the value's % as far away: 50% doubles the fog's distance (the fog density x 2.00 of fmil95's PS2 patch), 0% removes it. Applies at once |
 | Brightness | `brightness` | -50 to +50, **0**: lifts or lowers the dark end of the picture |
 | Contrast | `contrast` | 50% to 150%, **100%**: spreads or narrows the tones around mid-grey |
@@ -188,12 +190,20 @@ Details and limits: [THIRDPERSON.md](THIRDPERSON.md).
 
 Music and voice (`music_volume`) and Sound effects (`sfx_volume`), 0-100%.
 
+### Appearance
+
+Your model, in single player and co-op (see [ACTORS.md](ACTORS.md)):
+
+| Setting | ini key | Effect |
+|---|---|---|
+| You appear as | `coop_char` | **As played**, or another player file, story cast member, creature or zombie; in co-op your partner sees it too (also in F3 and the lobby's MODEL row) |
+| Use gender-matched animations | `appear_gender_anim` | **on**: a man shown while you play Claire moves with Chris's motions, a woman shown while you play a man with Claire's |
+| Your model in cutscenes | `appear_in_cutscenes` | **on**; off keeps the real Claire or Chris in cutscenes, with their own hands, faces and voice, and shows your model only while you play. In co-op each player chooses for their own screen |
+| Talking faces in cutscenes (experimental) | `appear_cutscene_face` | **off**; on: your model in cutscenes moves its mouth with the lines |
+
 ### Co-op
 
-The CO-OP page (also in F3) holds your appearance ("You appear as", see
-[ACTORS.md](ACTORS.md); "Your model in cutscenes", `appear_in_cutscenes`, default on: off keeps the
-real Claire or Chris in cutscenes, with their own hands, faces and voice, and shows your model only
-while you play; in co-op each player chooses for their own screen), name tags, the ping display, follow host; the host's game rules: loot
+The CO-OP page (also in F3) holds your own choices: name tags, the ping display, follow host; the host's game rules: loot
 mode (Shared: each item lies there once and whoever takes it has it, so you split the supplies; key
 items go to both. Individual: each player takes their own copy), "Important items for both" (with
 shared loot, on by default: weapons and ink ribbons lie there for each player), "Synchronized cutscene skip" (a cutscene both watch is skipped once both pressed skip),
@@ -387,6 +397,8 @@ The F2 window (also the EXTRAS page of ENHANCED SETTINGS) is meant for testing a
   area and what is there ("Prison: Graveyard", "Military Training Facility: Pool"; rooms that only
   play a cutscene start with "Cutscene:"). Each entry says which room's door leads there
   ("Entry 1: from Prison: Metal detector room"; "+1" when there are more, F2 lists them on hover).
+  The EXTRAS page leaves the area out of these names ("Metal detector room") where the location
+  already says it, so they fit.
   Rooms you added in the mods folder show as "Custom room RM_xxxx", or by the name tag in their
   file header. The list is read from the disc the first time you open F2 or
   the EXTRAS page (a few seconds; until then the plain numbers show). In F2, typing in the open

@@ -343,7 +343,7 @@ loader ([ENEMIES.md](ENEMIES.md) "Enemy spawner (F2)").
 
 ## You appear as
 
-"You appear as" (F3 window, the lobby's MODEL row, ENHANCED SETTINGS -> CO-OP; ini `coop_char`) shows
+"You appear as" (F3 window, the lobby's MODEL row, F1 and ENHANCED SETTINGS -> APPEARANCE; ini `coop_char`) shows
 our player as one of the player files or one of 62 models found in the room files: the story
 cast, the creatures, the zombie variants (`pc/src/host/actors.c`). It applies in single player and
 co-op (the partner sees it too) and in cutscenes to the event double of the character played
@@ -434,7 +434,7 @@ Models not in the catalogue:
 
 ### Gender-matched animations
 
-Setting "Use gender-matched animations" (CO-OP page, ini `appear_gender_anim`, default 1): a man
+Setting "Use gender-matched animations" (APPEARANCE page, ini `appear_gender_anim`, default 1): a man
 shown while Claire is played moves with **Chris's** motions; a woman shown while a man is played
 moves with **Claire's**. Gameplay stays the played character's.
 
@@ -554,7 +554,7 @@ weapon of a hand the model lacks floated at the invisible source's hand.
   hand positions, so pieces and props sit on the model's wrists. The pieces stay the double's
   (Claire's gloved hands on Steve). Two doubles of the played character are each drawn in their
   own pose (`dbl_posed`).
-* **Talking faces** (setting "Talking faces in cutscenes (experimental)", CO-OP page, ini
+* **Talking faces** (setting "Talking faces in cutscenes (experimental)", APPEARANCE page, ini
   `appear_cutscene_face`, default 0): the cast talks through a face mask (`face.c`, `face_bh.c`,
   the model's `MASK` chunk; `fmCnkInitContext` inserts jaw/tongue/eye pivots, 27 -> 31 nodes;
   op `bhLipSet` starts a line of phonemes from the model's face table). With the option a cast
@@ -563,7 +563,7 @@ weapon of a hand the model lacks floated at the invisible source's hand.
   table are not shown; expressions are not copied. A player file chosen as the appearance is shown
   on the double as the same character's cutscene model. `face_src` copies rest meshes to 64-byte
   boundaries (the morph reads them with `lq`). A mask that does not fit leaves the model without.
-* **Your model in cutscenes** (CO-OP page and F1, ini `appear_in_cutscenes`, default 1). Off: the
+* **Your model in cutscenes** (APPEARANCE page and F1, ini `appear_in_cutscenes`, default 1). Off: the
   doubles stay the game's own (the real Claire or Chris, their hand pieces, face mask, lip sync);
   the chosen model is shown only while the player itself is. What counts as a cutscene is the
   double: a scene (story cutscene or a short in-game event) counts while an event double of the

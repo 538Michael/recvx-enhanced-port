@@ -22,7 +22,7 @@
 
 extern SDL_Window* g_window;
 
-const char* const settings_pages[SP_COUNT] = { "DISPLAY", "GAMEPLAY", "CONTROLS", "THIRD PERSON", "AUDIO", "CO-OP", "EXTRAS" };
+const char* const settings_pages[SP_COUNT] = { "DISPLAY", "GAMEPLAY", "CONTROLS", "THIRD PERSON", "AUDIO", "APPEARANCE", "CO-OP", "EXTRAS" };
 
 /* ---------------------------------------------------------------- appliers (main thread) */
 void settings_apply_window(void)
@@ -99,10 +99,14 @@ static void tp_room_set(int v)
     g_cheat.tp_pos = 0;
 }
 static int tp_room_n(void) { int k; tp_stage_first(g_cheat.tp_stg, &k); return k ? k : 100; }
+/* the value field is narrow: room names without their area ("Prison: "), which the location row
+   shows ("Cutscene: " stays). area_len: the length of s's area prefix, 0 if none */
+static int area_len(const char* s) { const char* c = strstr(s, ": "); return c && strncmp(s, "Cutscene", 8) ? (int)(c - s) + 2 : 0; }
+static void cut(char* s, int k) { memmove(s, s + k, strlen(s + k) + 1); }
 static const char* tp_room_nm(int v, char* b, int n)
 {
     int k, f = tp_stage_first(g_cheat.tp_stg, &k);
-    if (k && v >= 0 && v < k) return tp_room_name(f + v, 0, b, n);
+    if (k && v >= 0 && v < k) { cut(b, area_len(tp_room_name(f + v, 0, b, n))); return b; }
     snprintf(b, n, "%d%s", g_cheat.tp_rom, tp_reading() ? " (reading the room list)" : "");
     return b;
 }
@@ -110,7 +114,13 @@ static int tp_pos_n(void) { int i = tp_find(g_cheat.tp_stg, g_cheat.tp_rom); ret
 static const char* tp_pos_nm(int v, char* b, int n)
 {
     int i = tp_find(g_cheat.tp_stg, g_cheat.tp_rom);
-    if (i >= 0) return tp_entry_name(i, v, b, n);
+    if (i >= 0) {   /* "Entry 1: from Prison: Graveyard": the area left out when a room of this location has it */
+        char room[96], *from = strstr(tp_entry_name(i, v, b, n), "from ");
+        int k, f = tp_stage_first(g_cheat.tp_stg, &k), a = from ? area_len(from + 5) : 0;
+        for (int j = 0; a && j < k; j++)
+            if (!strncmp(tp_room_name(f + j, 0, room, sizeof(room)), from + 5, a)) { cut(from + 5, a); break; }
+        return b;
+    }
     snprintf(b, n, "%d", v);
     return b;
 }
@@ -157,11 +167,11 @@ const Setting g_settings[] = {
     { SP_DISPLAY, "Internal resolution", V(g_config.scale), 0, 8, 1, .name = scale_name, .help = "The resolution the game is drawn at; Auto follows the window." },
     { SP_DISPLAY, "Display-rate frames", V(g_config.interpolate), 0, 1, 1, .help = "In-between frames blended from the last two game frames. The game still runs at 30 FPS; half a frame of latency." },
     { SP_DISPLAY, "Frame blend (trail)", V(g_config.frame_blend), -1, 1, 1, onoff_auto, .help = "As on the PS2: each frame mixed over the previous one. Auto: on in vanilla, off with display-rate frames." },
-    { SP_DISPLAY, "Cutscene bars", V(g_config.cinema_bars), 0, 2, 1, modes3, .help = "Original keeps them 4:3 in widescreen; fades always fill the screen." },
+    { SP_DISPLAY, "Cutscene bars", V(g_config.cinema_bars), 0, 2, 1, modes3, .help = "Original keeps them 4:3 in widescreen; fades always fill the screen.", .group = "WIDESCREEN" },
     { SP_DISPLAY, "Camera vignette", V(g_config.screen_filter), 0, 2, 1, modes3, .help = "Original keeps it 4:3 in widescreen." },
     { SP_DISPLAY, "Screen effects", V(g_config.screen_effects), 0, 2, 1, modes3, .help = "Full-screen effect layers. Original keeps them 4:3 in widescreen." },
     { SP_DISPLAY, "Movie zoom", V(g_config.movie_zoom), 0, 1, 1, .help = "Widescreen: movies grow, without stretching, until their black bars leave the screen (or the picture fills the width)." },
-    { SP_DISPLAY, "Fog intensity", V(g_config.fog_intensity), 0, 100, 5, .fmt = "%d%%",
+    { SP_DISPLAY, "Fog intensity", V(g_config.fog_intensity), 0, 100, 5, .fmt = "%d%%", .group = "FOG AND BRIGHTNESS",
       .help = "The fog and the black fog of dark rooms: 100% as on the PS2, 50% pushes it twice as far away, 0% removes it." },
     { SP_DISPLAY, "Brightness", V(g_config.brightness), -50, 50, 1, .fmt = "%+d", .flags = SET_CALIB,
       .help = "Lifts or lowers the dark end of the game's picture. Black strip: the left square should be barely visible." },
@@ -240,11 +250,12 @@ const Setting g_settings[] = {
     { SP_AUDIO, "Music and voice", V(g_config.music_volume), 0, 100, 5, .fmt = "%d%%", .apply = apply_volume },
     { SP_AUDIO, "Sound effects", V(g_config.sfx_volume), 0, 100, 5, .fmt = "%d%%", .apply = apply_volume },
 
-    { SP_COOP, "You appear as", NULL, 0, 0, 1, .get = chr_get, .set = chr_set, .name = chr_name, .count = appear_count, .help = "Your model, also in single player and cutscenes; in co-op your partner sees it too.", .group = "YOU" },
-    { SP_COOP, "Use gender-matched animations", V(g_appear_anim), 0, 1, 1, .flags = SET_F1, .help = "A man shown while you play Claire walks, aims and fights with Chris's motions; a woman shown while you play a man, with Claire's." },
-    { SP_COOP, "Talking faces in cutscenes (experimental)", V(g_appear_face), 0, 1, 1, .flags = SET_F1, .help = "Your model in cutscenes moves its mouth with the lines, with the story cast's own faces (a player file shown there becomes the same character's cutscene model). From the next room with a cutscene on." },
-    { SP_COOP, "Your model in cutscenes", V(g_appear_cutscene), 0, 1, 1, .flags = SET_F1, .help = "Off: cutscenes show the real Claire or Chris, with their own hands, faces and voice; your model is back when you are in control again." },
-    { SP_COOP, "Partner's name tag", V(g_coop.nametag), 0, 1, 1, .help = "The partner's name above its head, or at the screen edge when it is out of view." },
+    { SP_APPEAR, "You appear as", NULL, 0, 0, 1, .get = chr_get, .set = chr_set, .name = chr_name, .count = appear_count, .help = "Your model, also in single player and cutscenes; in co-op your partner sees it too." },
+    { SP_APPEAR, "Use gender-matched animations", V(g_appear_anim), 0, 1, 1, .help = "A man shown while you play Claire walks, aims and fights with Chris's motions; a woman shown while you play a man, with Claire's." },
+    { SP_APPEAR, "Your model in cutscenes", V(g_appear_cutscene), 0, 1, 1, .help = "Off: cutscenes show the real Claire or Chris, with their own hands, faces and voice; your model is back when you are in control again." },
+    { SP_APPEAR, "Talking faces in cutscenes (experimental)", V(g_appear_face), 0, 1, 1, .help = "Your model in cutscenes moves its mouth with the lines, with the story cast's own faces (a player file shown there becomes the same character's cutscene model). From the next room with a cutscene on." },
+
+    { SP_COOP, "Partner's name tag", V(g_coop.nametag), 0, 1, 1, .help = "The partner's name above its head, or at the screen edge when it is out of view.", .group = "YOUR CHOICES" },
     { SP_COOP, "Show ping", V(g_config.show_ping), 0, 1, 1, .flags = SET_F1, .help = "In co-op, while connected: the round trip to the partner next to the frame rate." },
     { SP_COOP, "Follow host (joining player)", V(g_coop.follow), 0, 1, 1, .help = "The joining player's choice. On: you go through every door the host takes. Off: you stay and may explore other rooms; story cutscenes and character switches still bring you to the host." },
     { SP_COOP, "Loot (host)", V(g_coop.loot), 0, 1, 1, loots, .locked = in_session, .help = "Shared: each item lies there once, whoever takes it has it (split the supplies). Individual: each player takes their own copy. Key items go to both.", .group = "GAME RULES (HOST)" },
