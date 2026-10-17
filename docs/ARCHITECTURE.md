@@ -633,7 +633,7 @@ and game frames for game-state aids, as noted. Co-op test aids (`RECVX_COOP_*`,
 | `RECVX_ISO=path` | the disc image (as on the command line) |
 | `RECVX_MODS=dir` | mods folder (default `./mods`) |
 | `SDL_VIDEO_DRIVER=offscreen` | headless run |
-| `RECVX_SHOW_OVERLAY=1` / `=3` | open the F1 overlay / the co-op window at start |
+| `RECVX_SHOW_OVERLAY=1` / `=2` / `=3` | open the F1 overlay / the cheats window (F2) / the co-op window at start |
 | `RECVX_EXIT_FRAME=n` | exit at presented frame n |
 | `RECVX_WATCHDOG=sec` | Linux: print a backtrace after sec seconds and exit |
 | `RECVX_FAST_DEMO=1` | start the attract demo right away |
@@ -657,6 +657,7 @@ and game frames for game-state aids, as noted. Co-op test aids (`RECVX_COOP_*`,
 | Variable | Effect |
 |---|---|
 | `RECVX_TELEPORT="f:stg:rom:pos,..."` | teleport at game frame f |
+| `RECVX_TP_NAME="f:entry:room name,..."` | the teleport lists' room of that name (as the menus show it, e.g. `60:1:Prison: Obs. R`), then their Teleport; frames as `RECVX_TELEPORT`. `RECVX_TP_LIST=1` logs every listed room with its entries (`pc/src/host/teleport.c`) |
 | `RECVX_PLAYER=n` | the first teleport switches the played character to `ply_id` n (as the script op `bhPlayerChangeSet`) |
 | `RECVX_WARP="stg:rom:f:x:z:angle,..."` | move the player to x/z f frames after entering that room |
 | `RECVX_EQUIP="f:item:count[;f:item:count]"` | equip a weapon at game frame f (again later after `;`) |

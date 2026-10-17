@@ -105,7 +105,7 @@ All offsets are from the start of the expanded file, little-endian.
 | 0x1C | `hed03` | event script block |
 | 0x20 | `hed04` | texture table (last section) |
 | 0x24..0x5C | `hed05..hed19` | 0 |
-| 0x60 | `usrname[32]` | author tag string |
+| 0x60 | `usrname[32]` | author tag string (retail `N-MIKAMI`, `rdxbuild` from the tools); any other tag names a mods-only room in the teleport lists |
 
 ### Room block (`ROM_WORK`, 0x3EC bytes at `hed00`)
 
