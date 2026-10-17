@@ -36,7 +36,7 @@ typedef struct {
     int  brightness;         /* picture calibration in the present pass (gs_gl.c draw_display): -50..50, 0 neutral */
     int  contrast;           /* 50..150 %, 100 neutral */
     int  gamma;              /* tenths, 5..20, 10 neutral */
-    int  skip_doors;
+    int  skip_doors;         /* door/stairs/ladder animations: 0 played, 1 instant (load screen), 2 played, a press skips */
     int  quick_knife;        /* holding the quick-knife key draws the knife (pc/glue/knife_glue.c) */
     int  model_cull;         /* skip actors/objects whose test points are off-screen (as the PS2) */
     int  skip_intro;         /* boot straight into the title menu */

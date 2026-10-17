@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Gameplay
+
+- **Skip door animations: Off, Instant or Skippable** (GAMEPLAY): the setting is now a choice.
+  Off plays every door, stairs, ladder and lift animation as the original; Instant (the default,
+  as before) goes straight to the load screen; Skippable plays the animation, and pressing any
+  key, mouse button or gamepad button while it runs cuts it short and takes you into the next room
+  right away. The button you opened the door with does not count, so holding it does not skip.
+  Your old setting carries over (on is Instant, off is Off). In co-op each player chooses for their
+  own doors.
+
 ### Display
 
 - **Movie zoom** (DISPLAY, off by default): in widescreen the movies grow, without being
