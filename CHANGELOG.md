@@ -48,9 +48,9 @@
   whole screen as before.
 - **Fog intensity** (DISPLAY, full by default, as on the PS2): thins the game's fog, which on the
   PS2 can hide much of a room. Turn it down a little to see further into foggy places such as
-  Rockfort's yards, the airport or the Antarctic base, or all the way to remove the fog. Many rooms also use a black
-  fog as darkness, so these get lighter too. The change shows at once. Suggested by fmil95 of the
-  decompilation project.
+  Rockfort's yards, the airport or the Antarctic base, or all the way to remove the fog. Many
+  rooms also use a black fog as darkness, so these get lighter too. The change shows at once.
+  Suggested by fmil95 of the decompilation project.
 
 ### Cheats
 
