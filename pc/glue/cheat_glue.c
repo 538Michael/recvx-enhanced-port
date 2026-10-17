@@ -49,27 +49,33 @@ unsigned int pc_noclip(void)
     return mode ? 0x18 : 0;
 }
 
-/* item names from the game's own message data: glyph = ASCII - 32, 0xFF01 = space. Built when the data
+/* item and room names from the game's own message data: glyph = ASCII - 32, 0xFF01 = space. Built when the data
    appears or moves (the system load sets sys->mes_ip twice: the file, then its table), not every frame:
    the overlay (render thread) reads them. A name that changes is published whole: its first character
    last, so a reader sees the old name, an empty one (skipped) or the new one. */
+static void publish(char* out, int size, const unsigned int* tab, int i)
+{
+    unsigned int ofs = tab[i + 1];
+    const unsigned short* dp = (const unsigned short*)((const char*)tab + ofs);
+    char name[32] = { 0 };
+    int n = 0;
+    if (ofs < 0x40000)   /* sysmes.ald is 87 KB */
+        for (; n < size - 1 && *dp != 0xFFFF; dp++) name[n++] = *dp == 0xFF01 ? ' ' : *dp < 95 ? (char)(*dp + 32) : '?';
+    while (n && name[n - 1] == ' ') name[--n] = 0;   /* "Starting Part 2 " */
+    if (!memcmp(name, out, size)) return;
+    __atomic_store_n(&out[0], 0, __ATOMIC_RELEASE);
+    memcpy(out + 1, name + 1, size - 1);
+    __atomic_store_n(&out[0], name[0], __ATOMIC_RELEASE);
+}
+
 static void read_names(void)
 {
     static const unsigned int* built;
     if (sys->mes_ip == built) return;
     built = sys->mes_ip;
-    for (int id = 0; id < CHEAT_ITEMS; id++) {
-        unsigned int ofs = sys->mes_ip[id + 1];
-        unsigned short* dp = (unsigned short*)((char*)sys->mes_ip + ofs);
-        char name[32] = { 0 }, *out = g_cheat.names[id];
-        int n = 0;
-        if (ofs < 0x10000)
-            for (; n < 31 && *dp != 0xFFFF; dp++) name[n++] = *dp == 0xFF01 ? ' ' : *dp < 95 ? (char)(*dp + 32) : '?';
-        if (!memcmp(name, out, sizeof(name))) continue;
-        __atomic_store_n(&out[0], 0, __ATOMIC_RELEASE);
-        memcpy(out + 1, name + 1, sizeof(name) - 1);
-        __atomic_store_n(&out[0], name[0], __ATOMIC_RELEASE);
-    }
+    for (int id = 0; id < CHEAT_ITEMS; id++) publish(g_cheat.names[id], sizeof(g_cheat.names[id]), sys->mes_ip, id);
+    /* the save menu's room names (the teleport lists, pc/src/host/teleport.c): message 215 + RoomNameSwitch of the second table */
+    for (int k = 1; k < 19 && sys->mes_sp && sys->mes_sp[0] > 233; k++) publish(g_cheat.rooms[k], sizeof(g_cheat.rooms[k]), sys->mes_sp, 215 + k);
 }
 
 /* the game's own door transition (door type 255: no animation). An enemy grab plays the
@@ -178,6 +184,33 @@ static void scripted(unsigned int* inv)
         teleport(a, b, c);
         last = clock;
         tp = tp[n] == ',' ? tp + n + 1 : NULL;
+    }
+    {   /* RECVX_TP_NAME="frame:entry:room name,...": the teleport lists' room of that name (as the menus show it,
+           e.g. "Prison: Obs. R"), then the menus' Teleport; frames as RECVX_TELEPORT. RECVX_TP_LIST=1 logs the lists. */
+        static const char *tn = (const char*)-1, *tl;
+        char want[64], nm[96], en[96];
+        if (tn == (const char*)-1) { tn = getenv("RECVX_TP_NAME"); tl = getenv("RECVX_TP_LIST"); }
+        if (tl && tp_count() && g_cheat.rooms[1][0]) {   /* with the game's names */
+            for (int i = 0; i < tp_count(); i++) {
+                const TpRoom* r = tp_room(i);
+                printf("rooms: %d/%02d %s | %s | %s", r->stg, r->rom, r->file, tp_stage_name(r->stg), tp_room_name(i, 0, nm, sizeof(nm)));
+                for (int p = 0; p < tp_entries(i); p++) printf(" | %s", tp_entry_name(i, p, en, sizeof(en)));
+                printf("\n");
+            }
+            tl = NULL;
+        }
+        if (tn && tp_count() && sscanf(tn, "%d:%d:%n", &f, &c, &n) == 2 && clock >= f + last && !(sys->gm_flg & 0x9) && !(sys->cb_flg & 0x1)) {
+            int i, len = (int)strcspn(tn + n, ",");
+            snprintf(want, sizeof(want), "%.*s", len, tn + n);
+            for (i = 0; i < tp_count() && strcmp(tp_room_name(i, 0, nm, sizeof(nm)), want); i++) {}
+            if (i < tp_count()) {
+                g_cheat.tp_stg = tp_room(i)->stg; g_cheat.tp_rom = tp_room(i)->rom; g_cheat.tp_pos = c;
+                __atomic_or_fetch(&g_cheat.request, CHEAT_TELEPORT, __ATOMIC_ACQ_REL);
+                printf("test: teleport to '%s' (%d/%d, %s) at game frame %d\n", want, g_cheat.tp_stg, g_cheat.tp_rom, tp_entry_name(i, c, en, sizeof(en)), clock);
+            } else printf("test: no room named '%s' in the teleport list\n", want);
+            last = clock;
+            tn = tn[n + len] == ',' ? tn + n + len + 1 : NULL;
+        }
     }
     if (ef && sscanf(ef, "%d:%d:%d:%d", &f, &a, &b, &c) == 4) {
         if (ef_slot < 0 && clock >= f) {

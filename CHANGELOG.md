@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Cheats
+
+- **Teleport by name**: the teleport cheat (F2, and ENHANCED SETTINGS EXTRAS) no longer asks for
+  stage, room and position numbers. You pick an area (marked as Claire's or Chris's part of the
+  game), then a room, then where to arrive. Rooms carry the game's own save menu names where it has
+  one, a few more are named by us, and the rest are numbered; each arrival point says which room's
+  door leads there. In F2 you can type to search all rooms, and a "Raw ids" switch keeps the old
+  number fields. Rooms you added in the mods folder are listed too. The list is read from your disc
+  the first time you open it, which takes a few seconds.
+
 ## 0.5.2 (2026-10-17)
 
 ### Fixes

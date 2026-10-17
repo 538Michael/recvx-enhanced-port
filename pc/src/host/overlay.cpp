@@ -45,8 +45,9 @@ void overlay_init(void* window, void* gl_context)
     ImGui_ImplSDL3_InitForOpenGL(win, (SDL_GLContext)gl_context);
     ImGui_ImplOpenGL3_Init("#version 330 core");
     ready = true;
-    const char* show = SDL_getenv("RECVX_SHOW_OVERLAY");   /* debugging aid (screenshots): 1 F1, 3 the co-op window */
-    visible = show && strcmp(show, "3");
+    const char* show = SDL_getenv("RECVX_SHOW_OVERLAY");   /* debugging aid (screenshots): 1 F1, 2 the cheats (F2), 3 the co-op window */
+    visible = show && strcmp(show, "3") && strcmp(show, "2");
+    cheats_visible = show && !strcmp(show, "2");
     coop_visible = show && !strcmp(show, "3");
 }
 
@@ -281,6 +282,62 @@ static void settings_window(void)
     if (changed) settings_save_later();
 }
 
+/* F2 teleport: location, room and entry by name (teleport.c), a search over all rooms, or the raw numbers */
+static void teleport_pick(CheatState* c)
+{
+    static bool raw;
+    static char filter[48];
+    char b[128], e[160];
+    int n = tp_count(), k, cur = tp_find(c->tp_stg, c->tp_rom);
+    if (n && !raw) {
+        if (ImGui::BeginCombo("Location", tp_stage_name(c->tp_stg), ImGuiComboFlags_HeightLarge)) {
+            for (int s = 0; s < 10; s++) {
+                int first = tp_stage_first(s, &k);
+                if (k && ImGui::Selectable(tp_stage_name(s), s == c->tp_stg)) { c->tp_stg = s; c->tp_rom = tp_room(first)->rom; c->tp_pos = 0; }
+            }
+            ImGui::EndCombo();
+        }
+        if (ImGui::BeginCombo("Room", cur >= 0 ? tp_room_name(cur, 1, b, sizeof b) : "-", ImGuiComboFlags_HeightLarge)) {
+            if (ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
+            ImGui::SetNextItemWidth(-1);
+            ImGui::InputTextWithHint("##filter", "type to search every location", filter, sizeof filter);
+            for (int i = 0; i < n; i++) {
+                const TpRoom* r = tp_room(i);
+                tp_room_name(i, 1, b, sizeof b);
+                if (filter[0] ? !SDL_strcasestr(b, filter) && !SDL_strcasestr(tp_stage_name(r->stg), filter) : r->stg != c->tp_stg) continue;
+                if (filter[0]) snprintf(e, sizeof e, "%s   %s##%d", b, tp_stage_name(r->stg), i);
+                else snprintf(e, sizeof e, "%s##%d", b, i);
+                if (ImGui::Selectable(e, i == cur)) { c->tp_stg = r->stg; c->tp_rom = r->rom; c->tp_pos = 0; }
+                if (i == cur && ImGui::IsWindowAppearing()) ImGui::SetItemDefaultFocus();
+            }
+            ImGui::EndCombo();
+        }
+        if (cur >= 0) {
+            int m = tp_entries(cur);
+            if (c->tp_pos >= m) c->tp_pos = 0;
+            if (ImGui::BeginCombo("Entry", tp_entry_name(cur, c->tp_pos, b, sizeof b), ImGuiComboFlags_HeightLarge)) {
+                for (int p = 0; p < m; p++) {
+                    snprintf(e, sizeof e, "%s##%d", tp_entry_name(cur, p, b, sizeof b), p);
+                    if (ImGui::Selectable(e, p == c->tp_pos)) c->tp_pos = p;
+                    if (ImGui::IsItemHovered() && tp_entry_sources(cur, p, b, sizeof b)[0]) ImGui::SetTooltip("Doors here from:\n%s", b);
+                }
+                ImGui::EndCombo();
+            }
+        }
+        ImGui::TextDisabled("A room may not work in every story state.");
+    } else {
+        if (!n) ImGui::TextDisabled(tp_reading() ? "Reading the room list from the disc..." : "The room list could not be read.");
+        ImGui::TextDisabled("Uses the game's door transition; an invalid room or position may crash.");
+        ImGui::InputInt("Stage", &c->tp_stg);
+        ImGui::InputInt("Room", &c->tp_rom);
+        ImGui::InputInt("Position", &c->tp_pos);
+        c->tp_stg = SDL_clamp(c->tp_stg, 0, 9); c->tp_rom = SDL_clamp(c->tp_rom, 0, 99); c->tp_pos = SDL_clamp(c->tp_pos, 0, TP_POS - 1);
+    }
+    ImGui::Checkbox("Raw ids", &raw);
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Stage, room and entry position as numbers (as RECVX_TELEPORT), also rooms not in the list.");
+    ImGui::SameLine();
+}
+
 static void cheat_window(void)
 {
     CheatState* c = &g_cheat;
@@ -342,11 +399,7 @@ static void cheat_window(void)
                           "Spawned enemies are gone after leaving the room; their kills are not recorded.");
 
     ImGui::SeparatorText("Teleport");
-    ImGui::TextDisabled("Uses the game's door transition; an invalid room or position may crash.");
-    ImGui::InputInt("Stage", &c->tp_stg);
-    ImGui::InputInt("Room", &c->tp_rom);
-    ImGui::InputInt("Position", &c->tp_pos);
-    c->tp_stg = SDL_clamp(c->tp_stg, 0, 9); c->tp_rom = SDL_clamp(c->tp_rom, 0, 99); c->tp_pos = SDL_clamp(c->tp_pos, 0, 31);   /* the table's ranges */
+    teleport_pick(c);
     if (ImGui::Button("Current room")) { c->tp_stg = c->stg; c->tp_rom = c->rom; c->tp_pos = c->pos; }
     ImGui::SameLine();
     if (ImGui::Button("Go")) __atomic_or_fetch(&c->request, CHEAT_TELEPORT, __ATOMIC_ACQ_REL);

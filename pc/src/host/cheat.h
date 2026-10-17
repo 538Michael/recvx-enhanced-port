@@ -21,6 +21,7 @@ typedef struct CheatState {
     unsigned int inv[12];           /* [0] equipped slot index (0 = none), [1] knife slot, [2..] slots: (id << 16) | count */
     const char* result;             /* last action's outcome */
     char names[CHEAT_ITEMS][32];    /* item names from the game's message data, "" until loaded */
+    char rooms[19][24];             /* the save menu's room names by RoomNameSwitch (1..18), "" until loaded */
 } CheatState;
 
 extern CheatState g_cheat;
@@ -30,6 +31,26 @@ int spawn_count(void);
 const char* spawn_name(int i);
 const char* spawn_enemy(int i);     /* result message */
 void spawn_frame(int game_frame);   /* RECVX_SPAWN, trace */
+
+/* teleport destinations (pc/src/host/teleport.c): the rooms on the disc and in the mods folder,
+   read on a background thread from the first tp_count(); any thread */
+enum { TP_POS = 64 };               /* entries listed per room */
+typedef struct TpRoom {
+    unsigned char stg, rom, npos;   /* npos: entry positions (the most of its cases) */
+    unsigned char custom;           /* only in the mods folder */
+    char file[8];                   /* "RM_SRRC" of its first case */
+    char tag[32];                   /* custom: the name tag in its header, "" if none */
+} TpRoom;
+int tp_count(void);                 /* rooms, by stage and room; 0 while reading or if it failed */
+int tp_reading(void);
+const TpRoom* tp_room(int i);
+int tp_find(int stg, int rom);      /* -1: not a room */
+int tp_stage_first(int stg, int* n);   /* the stage's first room, *n rooms */
+int tp_entries(int i);              /* entries to choose from (1 for a room without any) */
+const char* tp_stage_name(int stg);
+const char* tp_room_name(int i, int with_file, char* buf, int n);
+const char* tp_entry_name(int i, int pos, char* buf, int n);      /* "Entry 2: from Palace: S.Room" */
+const char* tp_entry_sources(int i, int pos, char* buf, int n);   /* every room with a door to it, one per line */
 
 #ifdef __cplusplus
 }

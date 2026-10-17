@@ -367,8 +367,18 @@ The F2 window (also the EXTRAS page of ENHANCED SETTINGS) is meant for testing a
 - noclip: Through walls, or Walls + fly (fly with the noclip keys, or R2/L2);
 - add any item to the inventory, and view the inventory;
 - spawn an enemy of any type in front of you ([ENEMIES.md](ENEMIES.md));
-- teleport to a stage/room/entry position through the game's door transition (an invalid room
-  or position may crash).
+- teleport to any room through the game's door transition: choose a **location** (an area of the
+  game; Claire's and Chris's halves are listed separately, Chris's are the last three), a
+  **room** and an **entry** (where you arrive). Rooms carry the save menu's name where the game
+  has one (read from your disc, e.g. "Prison: front"), a few more a name of ours ("Graveyard",
+  "Metal detector"), the rest their number and file ("Room 14 (RM_2140)"). Each entry says which
+  room's door leads there ("Entry 1: from Metal detector"; "+1" when there are more, F2 lists
+  them on hover). Rooms you added in the mods folder show as "Custom room RM_xxxx", or by the
+  name tag in their file header. The list is read from the disc the first time you open F2 or
+  the EXTRAS page (a few seconds; until then the plain numbers show). In F2, typing in the open
+  Room list searches every location, and **Raw ids** brings back the stage/room/position numbers.
+  A room may not work in every story state (wrong case, missing scripts); an unlisted number may
+  crash.
 
 In co-op, enemy spawning is host-only. Actions chosen in ENHANCED SETTINGS run when the menu closes.
 

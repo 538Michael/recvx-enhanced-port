@@ -78,6 +78,42 @@ static void give(void) { if (g_cheat.give_id) __atomic_or_fetch(&g_cheat.request
 static void spawn(void) { __atomic_or_fetch(&g_cheat.request, CHEAT_SPAWN, __ATOMIC_ACQ_REL); }
 static void teleport(void) { __atomic_or_fetch(&g_cheat.request, CHEAT_TELEPORT, __ATOMIC_ACQ_REL); }
 static void here(void) { g_cheat.tp_stg = g_cheat.stg; g_cheat.tp_rom = g_cheat.rom; g_cheat.tp_pos = g_cheat.pos; }
+/* teleport rows by name (pc/src/host/teleport.c); the plain numbers until the room list is read */
+static const char* tp_stage_nm(int v, char* b, int n) { snprintf(b, n, "%s", tp_stage_name(v)); return b; }
+static void tp_stage_set(int v)
+{
+    int k, f = tp_stage_first(v, &k);
+    g_cheat.tp_stg = v;
+    if (k) g_cheat.tp_rom = tp_room(f)->rom;
+    g_cheat.tp_pos = 0;
+}
+static int tp_room_get(void)
+{
+    int k, f = tp_stage_first(g_cheat.tp_stg, &k), i = tp_find(g_cheat.tp_stg, g_cheat.tp_rom);
+    return !k ? g_cheat.tp_rom : i >= 0 ? i - f : -1;
+}
+static void tp_room_set(int v)
+{
+    int k, f = tp_stage_first(g_cheat.tp_stg, &k);
+    g_cheat.tp_rom = k ? tp_room(f + v)->rom : v;
+    g_cheat.tp_pos = 0;
+}
+static int tp_room_n(void) { int k; tp_stage_first(g_cheat.tp_stg, &k); return k ? k : 100; }
+static const char* tp_room_nm(int v, char* b, int n)
+{
+    int k, f = tp_stage_first(g_cheat.tp_stg, &k);
+    if (k && v >= 0 && v < k) return tp_room_name(f + v, 0, b, n);
+    snprintf(b, n, "%d%s", g_cheat.tp_rom, tp_reading() ? " (reading the room list)" : "");
+    return b;
+}
+static int tp_pos_n(void) { int i = tp_find(g_cheat.tp_stg, g_cheat.tp_rom); return i >= 0 ? tp_entries(i) : 32; }
+static const char* tp_pos_nm(int v, char* b, int n)
+{
+    int i = tp_find(g_cheat.tp_stg, g_cheat.tp_rom);
+    if (i >= 0) return tp_entry_name(i, v, b, n);
+    snprintf(b, n, "%d", v);
+    return b;
+}
 static int item_get(void) { return g_cheat.give_id; }
 static void item_set(int v)   /* on to the next id with a name, in the direction of the step */
 {
@@ -229,9 +265,11 @@ const Setting g_settings[] = {
     { SP_EXTRAS, "Enemy", NULL, 0, 0, 1, .get = spawn_get, .set = spawn_set, .name = spawn_nm, .count = spawn_count,
       .help = "Bosses and scripted enemies may not work outside their room; spawned enemies are gone after leaving it.", .group = "SPAWN" },
     { SP_EXTRAS, "Spawn in front of me", NULL, .flags = SET_ACTION | SET_GAME_ONLY, .apply = spawn },
-    { SP_EXTRAS, "Teleport stage", V(g_cheat.tp_stg), 0, 9, 1, .fmt = "%d", .help = "Uses the game's door transition; an invalid room or position may crash.", .group = "TELEPORT" },
-    { SP_EXTRAS, "Teleport room", V(g_cheat.tp_rom), 0, 99, 1, .fmt = "%d" },
-    { SP_EXTRAS, "Teleport position", V(g_cheat.tp_pos), 0, 31, 1, .fmt = "%d" },
+    { SP_EXTRAS, "Teleport location", V(g_cheat.tp_stg), 0, 9, 1, .set = tp_stage_set, .name = tp_stage_nm,
+      .help = "Every room on the disc and in the mods folder, by its save menu name where the game has one. Uses the game's door transition; a room may not work in every story state.", .group = "TELEPORT" },
+    { SP_EXTRAS, "Teleport room", NULL, 0, 99, 1, .get = tp_room_get, .set = tp_room_set, .name = tp_room_nm, .count = tp_room_n },
+    { SP_EXTRAS, "Teleport entry", V(g_cheat.tp_pos), 0, 31, 1, .name = tp_pos_nm, .count = tp_pos_n,
+      .help = "Where you arrive: the room's entry points, by the door that leads there." },
     { SP_EXTRAS, "Current room", NULL, .flags = SET_ACTION | SET_GAME_ONLY | SET_NOW, .apply = here, .help = "Fills in the room you are in." },
     { SP_EXTRAS, "Teleport", NULL, .flags = SET_ACTION | SET_GAME_ONLY, .apply = teleport },
 };
