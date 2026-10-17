@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Display
+
+- **Movie zoom** (DISPLAY, off by default): in widescreen the movies grow, without being
+  stretched, until the black bars above and below them leave the screen, or until the picture
+  reaches the sides of the window. Nothing of the picture itself is cut off. On a widescreen
+  monitor thin bars stay, since the movies are a little wider than the screen; on an ultrawide
+  one the bars are gone and the movie fills the full height. Fades over the movies cover the
+  whole screen as before.
+
 ## 0.5.2 (2026-10-17)
 
 ### Fixes

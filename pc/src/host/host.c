@@ -38,6 +38,7 @@ int pc_model_cull(void) { return g_config.model_cull && !tps_cam_active; }
 int pc_frame_blend(void) { return g_config.frame_blend < 0 ? !g_config.interpolate : g_config.frame_blend; }
 int pc_battle_unlocked(void) { return g_config.battle_unlocked; }
 int pc_skip_intro(void) { return g_config.skip_intro; }
+int pc_movie_zoom(void) { return g_config.movie_zoom; }
 int pc_skip_intro_press_start(void)
 {
     static int done;
