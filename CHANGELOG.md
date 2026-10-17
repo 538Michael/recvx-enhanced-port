@@ -12,6 +12,8 @@
 - **Co-op randomizer**: when the joining player's game could not set up one of the host's random
   enemies, the rest of that room could come out differently from the host's. It now follows the
   host's choices.
+- **Battle Game characters**: turning "Battle Game unlocked" off in the F1 window while on the
+  title screen no longer leaves BATTLE GAME with only Claire to choose from.
 
 ## 0.6.0 (2026-10-17)
 
