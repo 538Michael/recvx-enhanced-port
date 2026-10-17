@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- **Stuck after Alexia's flames**: after being set on fire by Alexia's first form, your character
+  could freeze in the next hit, aim or step and never get control back. Also with "You appear as",
+  the body no longer jumps to a wrong pose for a moment when an enemy grabs or burns you.
+
 ## 0.6.0 (2026-10-17)
 
 ### Gameplay
