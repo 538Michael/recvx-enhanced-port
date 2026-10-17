@@ -100,11 +100,9 @@
 
 ### Fixes
 
-- **No more twitch after a shot with gender-matched animations**: playing Claire as a male model
-  (or a man as a female model), the arms jerked back into the recoil for a moment after every shot,
-  with every weapon. The model now moves in step with the character, also when a zombie grabs you,
-  at a quick turn and when the weapon comes up. In co-op your partner no longer sees this twitch
-  either, nor the small one every character showed there at the end of a shot.
+- **No more twitch with gender-matched animations**: the model no longer jerks back into the
+  recoil after a shot, and no longer jumps when grabbed, at a quick turn or when raising the
+  weapon. In co-op the partner's shots look smooth too.
 - **Third person with "You appear as"**: when an enemy stepped right into the crosshair, the upper
   body no longer jumps up for a moment and settles back.
 
