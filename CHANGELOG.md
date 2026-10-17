@@ -73,6 +73,12 @@
   Rockfort's yards, the airport or the Antarctic base, or all the way to remove the fog. Many
   rooms also use a black fog as darkness, so these get lighter too. The change shows at once.
   Suggested by fmil95 of the decompilation project.
+- **Widescreen menus**: on widescreen and ultrawide monitors the picture strips at the top and
+  bottom of the OPTION screen now run across the whole window, without ending at the edge of the
+  picture. In the inventory, the item box, the files and the map, things the game keeps off-screen
+  stay hidden at the sides: no more blue box beside a file or manual, and when you turn a page the
+  next one no longer shows up at the right before it slides in. Panels sliding in and out of the
+  inventory stop at the edge of the menu, as on a 4:3 screen.
 
 ### Cheats
 
