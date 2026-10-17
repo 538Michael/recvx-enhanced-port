@@ -177,7 +177,10 @@ void  pc_adv_in_game(void);                      /* co-op: the guest is in a gam
 /* ENHANCED SETTINGS in the OPTION menu (pc/glue/options_glue.c): option level 4 */
 void  pc_options_frame(void);                    /* Adv_GameOptionScreen, every frame */
 void  pc_options_close(void);                    /* Adv_GameOptionScreen ends */
-void  pc_options_row8(int selected);             /* DisplayOptionPlateLevel0: ENHANCED SETTINGS, right of EXIT */
+void  pc_options_rows0(void);                    /* DisplayOptionPlateLevel0: ENHANCED SETTINGS, RETURN TO TITLE, its question */
+int   pc_options_quit(int port);                 /* DisplayOptionPlateLevel0: RETURN TO TITLE's question (0 not up, 1 up, -1 YES) */
+void  pc_options_quit_open(void);                /* DisplayOptionPlateLevel0: RETURN TO TITLE confirmed: ask */
+int   pc_options_quit_title(void);               /* bhSysCallOption: YES was chosen (once) */
 void  pc_options_mouse0(int port);               /* DisplayOptionPlateLevel0: hover, click */
 void  pc_options_mouse_back(int port, int level);/* levels 1-3: right click goes back */
 int   pc_options_pc(int port, int flag);         /* DisplayOptionPlate level 4 */

@@ -478,7 +478,7 @@ Every way out ends the session on both sides; hosting or joining again works at 
 | Leaving the lobby (BACK from step 1, cancel, right click; not START THE GAME) | session stopped | "The host closed the lobby" / "<name> left" |
 | LEAVE, CLOSE THE LOBBY, F3 Disconnect | session stopped | as below |
 | Quitting, closing the window | goodbye sent at exit | as below |
-| Back at the title from a game of this session (game over "No") | "Back at the title: the co-op session ended" | as below |
+| Back at the title from a game of this session (game over "No", OPTION's RETURN TO TITLE) | "Back at the title: the co-op session ended" | as below |
 | Goodbye from the host | | joiner: "The host closed the lobby" / "The host left the game"; in game it plays on alone |
 | Goodbye from the joiner | | host: "<name> left - hosting on UDP port ..., waiting for a partner"; in game it plays on alone |
 | Crash, network gone | | after 3 s "not responding"; after 15 s joiner: "Lost the connection to the host", host: back to waiting ("The partner timed out") |
