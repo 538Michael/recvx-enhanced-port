@@ -80,6 +80,7 @@ int pc_overlay_begin(int kind)
     return 1;
 }
 void pc_overlay_end(void) { overlay_stretch = 0; }
+int pc_overlay_wide(void) { return overlay_stretch; }
 float pc_overlay_x(float x)
 {
     extern float pc_hor_scale(void);

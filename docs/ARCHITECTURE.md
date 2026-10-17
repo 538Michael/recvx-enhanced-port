@@ -138,7 +138,12 @@ the middle. Model culling is widened the same way (`fNaViwHalfW`, the joint wind
 lists, authored for 4:3); in widescreen such a part is drawn anyway when its bounding sphere lies
 entirely outside the 4:3 view, while hidden parts inside it (occluders) stay hidden
 (`pc_show_hidden`). Full-width scissors, fills and render-target copies are extended into the
-margins.
+margins. So 2D drawn outside x 0..639, which the PS2's display never showed, would appear there:
+while the Itemselect and Map tasks run (status screen, item box, files, map; `main.c
+njUserMain` -> `pc_menu_clip`), their 2D is clipped to the 4:3 screen (`native_glue.c`:
+triangles by their clip distances, sprites on the CPU), except stretched overlays and full-width
+fills. The OPTION screen's scroll plates are drawn again 1344 pixels to either side
+(`adv.c DisplayOptionBg`) so the band reaches the edges.
 
 ### Native paths
 

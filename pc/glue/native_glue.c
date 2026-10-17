@@ -28,6 +28,35 @@
 extern float fVu1AspectH, fVu1Projection, fVu1OffsetX, fVu1OffsetY;
 extern float Ps2_zbuff_b;
 
+/* hor+ widescreen, while a menu task runs (main.c njUserMain): its 2D is kept inside the 4:3
+   screen, GS x 1728..2368 where the Ninja 2D calls put it, as the PS2's 640-wide display shows
+   it, so panels parked or sliding off-screen stay out of the margins. Stretched overlays (fades)
+   and full-width untextured fills keep the whole view. Triangles are clipped by their clip
+   distances (native_draw), sprites here; lines are not clipped. */
+#define CLIP_X0 1728.0f
+#define CLIP_X1 2368.0f
+static int menu_clip;
+void pc_menu_clip(int on) { menu_clip = on; }
+static int clip43(void) { return menu_clip && !pc_overlay_wide() && pc_hor_scale() > 1.0f; }
+
+static void clip_sprite(NativeRawVertex* a, NativeRawVertex* b, int tme)
+{
+    const int x0 = (int)(CLIP_X0 * 16.0f), x1 = (int)(CLIP_X1 * 16.0f);
+    NativeRawVertex *lo = a->x <= b->x ? a : b, *hi = lo == a ? b : a;
+    NativeRawVertex l = *lo, h = *hi;
+    float d = (float)(h.x - l.x);
+    if (!tme && l.x <= x0 && h.x >= x1) return;   /* a fill: the renderer widens it to the view */
+    if (h.x <= x0 || l.x >= x1) { a->adc = b->adc = 1; return; }
+    if (l.x < x0) {
+        float k = (x0 - l.x) / d;
+        lo->x = (uint16_t)x0; lo->u = (uint16_t)(l.u + (h.u - l.u) * k + 0.5f); lo->s = l.s + (h.s - l.s) * k;
+    }
+    if (h.x > x1) {
+        float k = (h.x - x1) / d;
+        hi->x = (uint16_t)x1; hi->u = (uint16_t)(h.u + (l.u - h.u) * k + 0.5f); hi->s = h.s + (l.s - h.s) * k;
+    }
+}
+
 static float clamp01(float v) { return v < 0.0f ? 0.0f : v > 1.0f ? 1.0f : v; }
 
 /* vu1GetVertexColor* (vf18 ambient, vf19 diffuse, vf20 specular, vf21.w alpha ratio) */
@@ -142,7 +171,7 @@ uint32_t pc_native_prim3d(unsigned int prim, const VU1_PRIM_BUF* in, int n, int 
 uint32_t pc_native_prim(unsigned int prim, const unsigned int* dp, int n, int clip_3d_on, int deferred, float* last_sz)
 {
     NativeVertex v[64];
-    int fst = (prim >> 8) & 1;
+    int fst = (prim >> 8) & 1, clip = !clip_3d_on && clip43();
     if (n > 64) n = 64;
     *last_sz = 0.0f;
     for (int i = 0; i < n; i++, dp += 12) {
@@ -160,9 +189,10 @@ uint32_t pc_native_prim(unsigned int prim, const unsigned int* dp, int n, int cl
             sz = sz < 0.0f ? 0.0f : sz > 65534.0f ? 65534.0f : sz;
             o->w = 1.0f;
             o->z = (float)(int)sz;
-            o->near_d = o->far_d = 1.0f;
             x = (float)(int)(x * 16.0f) / 16.0f;   /* the GS gets 2D positions as 12.4 fixed point (FTOI4) */
             y = (float)(int)(y * 16.0f) / 16.0f;
+            if (clip) { o->near_d = x - CLIP_X0; o->far_d = CLIP_X1 - x; }
+            else o->near_d = o->far_d = 1.0f;
         }
         *last_sz = sz < 0.0f ? 0.0f : sz > 65534.0f ? 65534.0f : sz;
         o->x = x * o->w; o->y = y * o->w;
@@ -202,6 +232,10 @@ uint32_t pc_native_prim_raw(unsigned int prim, const unsigned int* dp, int n, in
         o->u = (uint16_t)(dp[0] & 0x3FFF); o->v = (uint16_t)(dp[1] & 0x3FFF);
         o->r = (uint8_t)dp[4]; o->g = (uint8_t)dp[5]; o->b = (uint8_t)dp[6]; o->a = (uint8_t)dp[7];
         o->adc = clip_3d_on && (clip_flag != 0 || (dp[3] & 0x8000));
+    }
+    if (!clip_3d_on && clip43()) {
+        if ((prim & 7) == 6) for (int i = 0; i + 1 < n; i += 2) clip_sprite(&v[i], &v[i + 1], (prim >> 4) & 1);
+        else if ((prim & 7) == 0) for (int i = 0; i < n; i++) v[i].adc |= v[i].x < CLIP_X0 * 16.0f || v[i].x >= CLIP_X1 * 16.0f;
     }
     return native_defer_raw(prim, v, n);
 }
