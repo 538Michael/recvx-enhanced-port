@@ -82,7 +82,11 @@ carry no tags.
 
 ## Loading
 
-The folder is indexed by file name once, at the first texture (some 6700 files: a few ms). A file
+The folder is indexed by file name once, at the first texture (some 6700 files: a few ms). When
+several files have the same name (the same key, e.g. two packs in `1_...` and `2_...` folders), the
+one whose path in the pack folder comes first wins (byte order, `\` read as `/`, so the same on
+Windows and Linux; logged as `hd textures: N names in several folders, the first folder in name
+order wins`); the others are never loaded. A file
 is read, checked (the first time) and uploaded on the render thread when its texture is first
 drawn (DDS: BC1/BC2/BC3/BC7 compressed as they are, uncompressed RGBA/BGRA; PNG through SDL). A
 room's textures are first drawn under its fade-in, so the room shows its replacements from its

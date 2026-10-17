@@ -446,6 +446,8 @@ the pack comes:
    from PCSX2's `textures` directory (`mods/textures/SLUS-20184/replacements/...`), only its
    `replacements` folder, or the files themselves all work. A folder elsewhere:
    `hd_textures_dir = <path>` in `recvx.ini`, or `--hd-textures <path>`.
+   With several packs, name the folders `1_...`, `2_...`: on the same texture the first one in
+   name order wins.
 2. Start the game. The log says `hd textures: N replacements in <folder>`.
 
 Rooms show the replacements from their first visible frame; the first time a room is entered its

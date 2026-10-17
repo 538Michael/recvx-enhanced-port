@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- **Several HD texture packs**: when two packs have the same texture, the one in the folder that
+  comes first by name now always wins, so you can choose by naming the folders 1_..., 2_....
+
 ## 0.6.0 (2026-10-17)
 
 ### Gameplay
