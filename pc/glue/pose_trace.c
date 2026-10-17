@@ -13,22 +13,31 @@ int pose_trace_mark;
 
 void pose_trace(BH_PWORK* p)
 {
-    static FILE* f;
-    static int init, last = -1;
+    static FILE* fs[2];
+    static int init, lasts[2] = { -1, -1 };
+    int who = pose_trace_mark == 2;   /* 2: the co-op partner's draw (file.partner) */
+    FILE* f;
+    const BH_PWORK* q = who ? p : plp;
     const float* b;
     float ax[3][3];
     int i, j, k, n;
-    if (!init++ && getenv("RECVX_POSE_TRACE")) f = fopen(getenv("RECVX_POSE_TRACE"), "w");
-    if (!f || !p || !p->mlwP || !p->mlwP->owP || !p->mtx || !plp || sys->gfrm_ct == last) return;
-    last = sys->gfrm_ct;
+    if (!init++ && getenv("RECVX_POSE_TRACE")) {
+        char name[512];
+        fs[0] = fopen(getenv("RECVX_POSE_TRACE"), "w");
+        snprintf(name, sizeof(name), "%s.partner", getenv("RECVX_POSE_TRACE"));
+        fs[1] = fopen(name, "w");
+    }
+    f = fs[who];
+    if (!f || !p || !p->mlwP || !p->mlwP->owP || !p->mtx || !plp || sys->gfrm_ct == lasts[who]) return;
+    lasts[who] = sys->gfrm_ct;
     b = (const float*)p->mtx;
     for (i = 0; i < 3; i++) {
         float l = sqrtf(b[i * 4] * b[i * 4] + b[i * 4 + 1] * b[i * 4 + 1] + b[i * 4 + 2] * b[i * 4 + 2]);
         for (j = 0; j < 3; j++) ax[i][j] = l > 0 ? b[i * 4 + j] / l : 0;
     }
     n = p->mlwP->obj_num < 64 ? p->mlwP->obj_num : 64;
-    fprintf(f, "%d %d %d %d %d %d %d %d %x %d %d %.3f %d", sys->gfrm_ct, plp->mode0, plp->mode1, plp->mode2, plp->mode3, plp->wpnr_no,
-            (int)plp->mtn_no, plp->frm_no >> 16, plp->at_flg, (short)plp->ay, plp->wax, plp->py, n);
+    fprintf(f, "%d %d %d %d %d %d %d %d %x %d %d %.3f %d", sys->gfrm_ct, q->mode0, q->mode1, q->mode2, q->mode3, q->wpnr_no,
+            (int)q->mtn_no, q->frm_no >> 16, q->at_flg, (short)q->ay, q->wax, q->py, n);
     for (i = 0; i < n; i++) {
         const float* w = &p->mlwP->owP[i].mtx[12];
         for (k = 0; k < 3; k++)

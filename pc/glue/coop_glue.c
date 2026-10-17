@@ -43,6 +43,7 @@ int ikou3(BH_PWORK* epw, NJS_POINT3* pos, int add_dir);   /* zonzon.c (its heade
 extern char* rdx_files[205];             /* ps2_dvd_image.c: the room files */
 extern int rdx_image_data_max;
 extern int enemy_room_gen;              /* enemyopt_glue.c: room loads so far */
+extern int pose_trace_mark;             /* pose_trace.c (test aid RECVX_POSE_TRACE) */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -607,7 +608,7 @@ void coop_control_remote(void)
     tx.stg = sys->stg_no; tx.rom = sys->rom_no; tx.pos = sys->pos_no;
     tx.px = plp->px; tx.py = plp->py; tx.pz = plp->pz;
     tx.ax = plp->ax; tx.ay = plp->ay; tx.az = plp->az;
-    tx.mtn_no = plp->mtn_no; tx.frm_no = plp->frm_no; tx.mtn_md = plp->mtn_md;
+    tx.mtn_no = plp->mtn_no; tx.frm_no = actor_frame(plp); tx.mtn_md = plp->mtn_md;   /* the frame shown, not the next one */
     tx.hokan_count = plp->hokan_count; tx.hokan_rate = plp->hokan_rate;
     tx.wpnr_no = plp->wpnr_no; tx.hp = plp->hp;
     tx.mode0 = plp->mode0; tx.mode1 = plp->mode1;
@@ -723,8 +724,10 @@ void coop_draw_remote(void)
 {
     int i;
     if (!p2_show) return;
+    pose_trace_mark = 2;   /* test aid RECVX_POSE_TRACE: the partner's draw (file.partner) */
     if (actor_shown(1)) actor_draw(1);
     else actor_put_body(1, &ply2);
+    pose_trace_mark = 0;
     for (i = 0; i < 2; i++) {
         O_WRK* op = &p2wpn[i];
         if ((op->flg & 0x1) && op->mlwP != &no_model && op->mlwP && op->mlwP->objP && !(op->mdflg & 0x1)) bhPutModel((BH_PWORK*)op);

@@ -90,6 +90,9 @@ void* pc_mod_open(const char* name);
 int   pc_model_cull(void);      /* actors/objects off-screen are skipped (bhCheckClipModel/Point) */
 int   pc_frame_blend(void);     /* PS2_swap blends the new frame 75% over the previous one (motion trail) */
 unsigned int pc_noclip(void);   /* F2 cheat: player flags whose enemy/wall push bhControlPlayer skips */
+/* plp's frame and blend count as its bhSetMotion in bhControlPlayer takes them (it then advances and
+   decrements them), -1 none this tick: the gender-matched copy and the co-op partner play these (actor_glue.c) */
+extern int pc_plp_frm, pc_plp_hokan;
 int   pc_inf_ammo(void);      /* F2 cheat (pc/glue/cheat_glue.c): bhCheckBullet/bhCountBullet as for an unlimited weapon */
 float pc_fog_scale(void);              /* option: njCalcFogPower's fog density x this (ps2_NaFog.c), 1 = original */
 int   pc_movie_zoom(void);               /* option: movies zoomed until their letterbox bars leave the screen */

@@ -98,6 +98,16 @@
   added in the mods folder are listed too. The list is read from your disc the first time you open
   it, which takes a few seconds.
 
+### Fixes
+
+- **No more twitch after a shot with gender-matched animations**: playing Claire as a male model
+  (or a man as a female model), the arms jerked back into the recoil for a moment after every shot,
+  with every weapon. The model now moves in step with the character, also when a zombie grabs you,
+  at a quick turn and when the weapon comes up. In co-op your partner no longer sees this twitch
+  either, nor the small one every character showed there at the end of a shot.
+- **Third person with "You appear as"**: when an enemy stepped right into the crosshair, the upper
+  body no longer jumps up for a moment and settles back.
+
 ## 0.5.2 (2026-10-17)
 
 ### Fixes

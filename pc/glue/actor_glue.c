@@ -956,13 +956,30 @@ static int shadow_load(Shadow* s, int chr, int wpn)
     return 1;
 }
 
+int pc_plp_frm = -1, pc_plp_hokan;
+
+/* the frame p shows: our player's from before its bhSetMotion advanced plp->frm_no (player.c
+   bhControlPlayer, pc_plp_frm), so a copy playing it is not a frame ahead and does not show a motion's
+   first frame when the game leaves it on its last (the twitch after a shot); the partner's as received */
+int actor_frame(const BH_PWORK* p)
+{
+    return p == plp && pc_plp_frm >= 0 ? pc_plp_frm : p->frm_no;
+}
+
+/* the blend count p's bhSetMotion took this tick (it decrements it): our player's as recorded, so a blend
+   the game starts within a motion (the end of raising a weapon) is copied too; else one more than left */
+static int frame_hokan(const BH_PWORK* p)
+{
+    return p == plp && pc_plp_frm >= 0 ? pc_plp_hokan : p->hokan_count ? p->hokan_count + 1 : 0;
+}
+
 /* the copy posed in character s->chr's motion equivalent to src's (character `from`), or NULL */
 static BH_PWORK* shadow_step(Shadow* s, BH_PWORK* src, int from)
 {
     ML_WORK* sm = src->mlwP;
     MN_WORK *set = src->mnwP, *own;
     int mtn = src->mtn_no, i, k;
-    long frm = src->frm_no;
+    long frm = actor_frame(src);   /* (after its advance a motion's last frame has wrapped to its first) */
     if (!set || mtn < 0 || mtn >= 512 || !set[mtn].datP || set[mtn].obj_num > 22 || sm->obj_num < 22) return NULL;
     own = &set[mtn];
     if (set == src->mnwPb) {   /* base and weapon motions: the same number */
@@ -991,10 +1008,8 @@ static BH_PWORK* shadow_step(Shadow* s, BH_PWORK* src, int from)
         s->of = sm->objP;
     }
     for (i = 1; i < 22; i++) memcpy(s->obj[i].pos, sm->objP[i].pos, sizeof(s->obj[i].pos));   /* the source's bones */
-    if (set != s->w.mnwP || mtn != (int)s->w.mtn_no) {   /* a new motion blends as the source's (which took one step already) */
-        s->w.hokan_count = s->w.mnwP && src->hokan_count ? src->hokan_count + 1 : 0;
-        s->w.hokan_rate = src->hokan_rate;
-    }
+    s->w.hokan_count = s->w.mnwP ? frame_hokan(src) : 0;   /* blending as the source's this tick */
+    s->w.hokan_rate = src->hokan_rate;
     s->w.mnwP = set;
     s->w.mtn_no = mtn;
     s->w.frm_no = (int)frm;
@@ -1118,6 +1133,7 @@ static void hands_back(int who)
 /* game.c, before bhControlPlayer */
 void actor_hands_back(void)
 {
+    pc_plp_frm = -1;   /* (set again by this tick's bhControlPlayer) */
     if (!real[0].src) aim_ofs[0] = aim_ofs[1] = aim_ofs[2] = 0, aim_set = 0;
     hands_back(0);
     hands_back(1);

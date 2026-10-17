@@ -451,12 +451,21 @@ their file, `appear_part_anim`):
   of the source's 22-node skeleton with its own motion set: part file `10 + chr` and weapon file
   `wpn + chr * 30 + 20` (only the weapon file is re-read on a weapon change), 500 KB per slot.
   Every tick after the source's motion the copy plays the same motion number at the source's
-  phase, with its `mtn_md` and flip table, blending when the source changes motion; neck and head
+  phase, with its `mtn_md` and flip table, blending whenever the source blends; neck and head
   take the source's angles; the third-person aim bend applies too (`tps_bend`). A slot the other
   character lacks (Claire's 90..97) and room-set acting play the source's own motion. In a grab
   `appear_grab_motion` picks the other character's motion of the enemy's set (zombie
   400/425/450/425, Gulp Worm 21/29, Black Widow 14 * `ply_id`, Cerberus 100/105, bat 30/33/36,
   Bandersnatch 100/110/120, Alexia 2 10/16, Giant Black Widow 60/66).
+* **The frame**: the phase is that of the frame the source **shows** this tick (`actor_frame`), not
+  `frm_no`, which its `bhSetMotion` has already advanced: `player.c bhControlPlayer` records the
+  frame and blend count just before (`pc_plp_frm`, `pc_plp_hokan`). Played one frame ahead, a
+  motion the game leaves on its last frame had wrapped to its first, so the copy showed the start
+  of the motion for a tick: after every shot the male fire motion's recoil (the twitch after a
+  handgun shot, any weapon; also the start of zombie grabs and a quick turn). A blend the game starts
+  within a motion (the end of raising a weapon: `hokan_count` 1 on the same motion) is copied too.
+  Co-op sends the same frame (`Pose.frm_no`), so the partner sees each player's own frames (before,
+  every player's one-shot motions flashed their first frame at the end on the partner's screen).
 * **Display**: a catalogue model is retargeted from the copy; a player-file mesh is drawn with the
   copy's matrices and angles (`actor_put_body`), and the source's nodes 5, 9, 13 get the copy's
   matrices before the objects follow, so head part and weapons sit where they are drawn. The
@@ -496,7 +505,8 @@ joint rotations come from the source (`actor_glue.c rig_build`, `retarget`).
 * **A missing hand**: what the game links to a source hand the model does not have (Nosferatu's right
   hand, the Bandersnatch's left) is shrunk to a point instead of floating where the source's hand is.
 * **Free aim** ([THIRDPERSON.md](THIRDPERSON.md) "Free-aim pose"): the bend is solved on the weapon as
-  drawn (`actor_aim_hand`; only while the aim pose stands still, eased, not for the knife), and the third-person camera's height, shoulder offset and distance scale
+  drawn (`actor_aim_hand`; only while the aim pose stands still, eased, not for the knife; a solve
+  that stops converging, a target a few units from the muzzle, keeps its best step), and the third-person camera's height, shoulder offset and distance scale
   with the model's head height over the character's (`actor_cam_scale`, 0.8 .. 1.8): the camera is no
   longer inside a Tyrant or Monster Steve.
 * **Previous retargeting**: `RECVX_RETARGET=0` (environment, read at start) keeps the earlier mapping
