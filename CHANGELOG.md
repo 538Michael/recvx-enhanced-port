@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- **Over-the-shoulder camera on stairs and ledges**: the camera now stays with the character
+  while climbing stairs and climbing up or down a ledge, as it does while walking, instead of
+  standing still and then jumping forward every few steps.
+
 ## 0.6.0 (2026-10-17)
 
 ### Gameplay
