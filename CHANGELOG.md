@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Menus
+
+- **Return to the title**: during a game the OPTION screen has a new entry, RETURN TO TITLE, on
+  the DEFAULT row above ENHANCED SETTINGS (keyboard, gamepad and mouse). It asks first, with NO
+  selected, so it cannot happen by accident; YES takes you back to the title menu as a game over
+  does, and anything not saved is lost. It also works in the Battle Game. In co-op it ends the
+  session, and the partner plays on alone.
+- **Co-op**: when the host goes back to the title during a game, the partner now reads "The host
+  left the game" instead of "The host closed the lobby".
+
 ### Display
 
 - **Movie zoom** (DISPLAY, off by default): in widescreen the movies grow, without being

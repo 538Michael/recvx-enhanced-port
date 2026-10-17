@@ -80,6 +80,15 @@ card screens ("which memory card slot", "checking memory card", "not enough spac
   card saves** (F1 / ENHANCED SETTINGS GAMEPLAY) copies the card's saves into the save files again (ones
   already there are skipped).
 
+### Back to the title
+
+During a game, the OPTION screen (Select) has **RETURN TO TITLE** on DEFAULT's row, above ENHANCED
+SETTINGS: select DEFAULT and press right, or click it. It asks "Return to the title screen?" with
+NO selected, so a stray press does nothing; choose YES (left/right, then confirm) to go back to the
+title menu, as after a game over. Anything not saved is lost; changed options are kept. Cancel or a
+right click answers NO. It works in the Battle Game too. In co-op, leaving ends the session: the
+partner plays on alone. The OPTION screen of the title menu does not have it.
+
 ## Settings
 
 All PC settings are available in two places that edit the same values:

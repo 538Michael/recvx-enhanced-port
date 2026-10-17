@@ -3,7 +3,8 @@
  * like the co-op lobby (the game's font, the option screen's background and title, its cursor
  * sounds). Game thread, from adv.c (Adv_GameOptionScreen and DisplayOptionPlate*): option
  * level 4 is ours. Values come from the shared settings table (pc/src/host/settings.c) and the
- * control bindings (pc/src/input/bindings.c), the same ones the F1 overlay edits.
+ * control bindings (pc/src/input/bindings.c), the same ones the F1 overlay edits. In a game a
+ * ninth item, RETURN TO TITLE right of DEFAULT, asks first and then returns to the title.
  */
 #include "../../decomp/include/ps2/veronica/prog/types.h"
 #include "../../decomp/include/ps2/veronica/prog/main.h"
@@ -21,6 +22,7 @@ extern ADV_WORK AdvWork;
 extern QUAD Qtex[16];
 extern unsigned int* pad_type[4];
 extern OPTION OptionDef[];
+extern int coop_on;                    /* pc/src/host/coop.h */
 void host_log(const char* fmt, ...);
 void pc_ui_text(float x, float y, const char* s, float sc, unsigned int argb);
 float pc_ui_text_w(const char* s, float sc);
@@ -54,45 +56,118 @@ static unsigned int cancel_button(void) { return (sys->keytype & 3) < 3 ? AdvGet
 /* Adv_GameOptionScreen, every frame: the OS cursor shows while the option screen is up */
 void pc_options_frame(void) { g_menu_mouse.active = 1; }
 
-/* ---------------------------------------------------------------- level 0: ENHANCED SETTINGS
-   On EXIT's row, at the right, like STEREO / MONO and ON / OFF: left/right move between EXIT and
-   it (adv.c DisplayOptionPlateLevel0), up goes to DEFAULT, down wraps to the top as from EXIT. */
-#define ROW8_Y 352.0f
-#define ROW8_RIGHT 584.0f
-/* "ENHANCED SETTINGS" from the row labels' own letters (texture 0: AUDIO SETUP at v 0, KEY CONFIG
-   32, SCREEN SETUP 64, DEFAULT 160, EXIT 192, SETUP 224; the only H is in the narrower key config
-   caption CHANGE AIM at 256, drawn wider). u = left edge, w = width (measured from the texture),
-   dw = drawn width. */
-static const struct { short u, v, w, dw; } row8[] = {
-    { 16, 224, 16, 16 }, { 88, 64, 19, 19 }, { 302, 256, 13, 18 }, { 0, 0, 18, 18 },   /* E (SETUP) N (SCREEN) H (CHANGE) A (AUDIO) */
-    { 88, 64, 19, 19 }, { 70, 32, 17, 17 }, { 16, 224, 16, 16 }, { 0, 160, 18, 18 },  /* N C (CONFIG) E D (DEFAULT) */
-    { -1, 0, 12, 12 },                                                                  /* space */
-    { 0, 224, 15, 15 }, { 16, 224, 16, 16 }, { 33, 224, 18, 18 }, { 33, 224, 18, 18 }, /* S E T T (SETUP) */
-    { 38, 192, 11, 11 }, { 88, 64, 19, 19 }, { 158, 32, 19, 19 }, { 0, 224, 15, 15 },  /* I (EXIT) N G (CONFIG) S */
-};
+/* ---------------------------------------------------------------- level 0: ENHANCED SETTINGS, RETURN TO TITLE
+   ENHANCED SETTINGS: on EXIT's row, at the right, like STEREO / MONO and ON / OFF: left/right move
+   between EXIT and it (adv.c DisplayOptionPlateLevel0), up goes to the row above, down wraps to the
+   top as from EXIT. RETURN TO TITLE (in a game only): on DEFAULT's row above it, the same way; it
+   asks first (below). Both set in the row labels' own letters (texture 0: AUDIO SETUP at v 0, KEY
+   CONFIG 32, SCREEN SETUP 64, DEFAULT 160, EXIT 192, SETUP 224, ON / OFF 320; the only H is in the
+   narrower key config caption CHANGE AIM at 256, drawn wider). u = left edge, w = width (measured
+   from the texture), dw = drawn width. */
+#define ROW_RIGHT 584.0f
+typedef struct { short u, v, w, dw; } Glyph;
+#define G_A { 0, 0, 18, 18 }          /* AUDIO */
+#define G_O { 71, 0, 19, 19 }
+#define G_C { 70, 32, 17, 17 }        /* KEY CONFIG */
+#define G_G { 158, 32, 19, 19 }
+#define G_Y { 37, 32, 20, 20 }
+#define G_R { 34, 64, 20, 20 }        /* SCREEN */
+#define G_N { 88, 64, 19, 19 }
+#define G_D { 0, 160, 18, 18 }        /* DEFAULT */
+#define G_L { 89, 160, 16, 16 }
+#define G_I { 38, 192, 11, 11 }       /* EXIT */
+#define G_S { 0, 224, 15, 15 }        /* SETUP */
+#define G_E { 16, 224, 16, 16 }
+#define G_T { 33, 224, 18, 18 }
+#define G_U { 52, 224, 20, 20 }
+#define G_H { 302, 256, 13, 18 }      /* CHANGE */
+#define G_SP { -1, 0, 12, 12 }
+#define N_OF(a) (int)(sizeof(a) / sizeof(a[0]))
+static const Glyph w_enhanced[] = { G_E, G_N, G_H, G_A, G_N, G_C, G_E, G_D, G_SP, G_S, G_E, G_T, G_T, G_I, G_N, G_G, G_S };
+static const Glyph w_title[] = { G_R, G_E, G_T, G_U, G_R, G_N, G_SP, G_T, G_O, G_SP, G_T, G_I, G_T, G_L, G_E };
+static const Glyph w_yes[] = { G_Y, G_E, G_S };
+static const Glyph w_no[] = { { 65, 320, 19, 19 }, { 44, 320, 19, 19 } };   /* ON's letters, as ON / OFF */
 
-static float row8_x(void)   /* right-aligned with the values */
+static float word_w(const Glyph* g, int n)
 {
     float w = 0;
-    for (int i = 0; i < (int)(sizeof(row8) / sizeof(row8[0])); i++) w += row8[i].dw + 1;
-    return ROW8_RIGHT - w;
+    for (int i = 0; i < n; i++) w += g[i].dw + 1;
+    return w;
+}
+
+static void word(const Glyph* g, int n, float x, float y, unsigned int col, float z)
+{
+    QUAD* q = &Qtex[15];
+    for (int i = 0; i < n; i++) {
+        if (g[i].u >= 0) {
+            SetQuadPos(x, y, g[i].dw, 32.0f, q);
+            SetQuadUv2(g[i].u, g[i].v, g[i].w, 32.0f, 0, q);
+            AdvEasyDrawTexture(0, col, q, z, 1);
+        }
+        x += g[i].dw + 1;
+    }
+}
+
+static unsigned int pulse(void) { return ((unsigned int)AdvWork.FlushCount2 + 255) << 24 | 0xFFFFFF; }
+static unsigned int row_col(int i) { return OptionDef[i].SelectFlag ? pulse() : 0x7FAFAFAF; }   /* as the other rows */
+static float row8_x(void) { return ROW_RIGHT - word_w(w_enhanced, N_OF(w_enhanced)); }   /* right-aligned with the values */
+static float row9_x(void) { return ROW_RIGHT - word_w(w_title, N_OF(w_title)); }
+
+/* RETURN TO TITLE's question, over the option screen in the game's window: NO preselected; left/right
+   (or hover) choose, confirm or a click answers, cancel or a right click is NO. YES leaves the option
+   screen as EXIT does (system data saved if changed); system.c bhSysCallOption then returns to the
+   title as the soft reset does, and co-op ends the session there (coop_glue.c, "back at the title"). */
+static struct { int open, yes, go; } quit;
+#define Q_X0 112.0f
+#define Q_X1 528.0f
+#define Q_Y0 180.0f
+#define Q_Y1 316.0f
+#define Q_YN_Y 268.0f
+static float q_x(int yes) { return yes ? 320 - 56 - word_w(w_yes, 3) : 320 + 56; }
+
+void pc_options_quit_open(void) { quit.open = 1; quit.yes = 0; }
+int pc_options_quit_title(void) { int go = quit.go; quit.go = 0; return go; }
+
+int pc_options_quit(int port)
+{
+    unsigned int press = Pad[port].press;
+    int hit = -1;
+    if (!quit.open) return 0;
+    menu_mouse_take(&mt);
+    if (mt.y >= Q_YN_Y - 4 && mt.y < Q_YN_Y + 36)
+        for (int k = 0; k < 2; k++)
+            if (mt.x >= q_x(k) - 12 && mt.x < q_x(k) + word_w(k ? w_yes : w_no, k ? 3 : 2) + 12) hit = k;
+    if (hit >= 0 && (mt.moved || mt.left) && hit != quit.yes) { quit.yes = hit; CallSystemSe(0, 2); }
+    if (press & (P_LEFT | P_RIGHT)) { quit.yes ^= 1; CallSystemSe(0, 2); }
+    else if ((mt.left && hit >= 0) || (press & (ok_button() | P_START))) {
+        quit.open = 0;
+        CallSystemSe(0, quit.yes ? 3 : 0);
+        if (quit.yes) { quit.go = 1; host_log("options: return to the title\n"); return -1; }
+    } else if (mt.right || (press & (cancel_button() | P_SELECT))) { quit.open = 0; CallSystemSe(0, 0); }
+    return 1;
+}
+
+static void quit_draw(void)
+{
+    NJS_POINT3 tl = { Q_X0, Q_Y0, 0.2f }, br = { Q_X1, Q_Y1, 0.2f };
+    const char* l1 = "Return to the title screen?";
+    const char* l2 = coop_on ? "Unsaved progress will be lost. The co-op session ends." : "Unsaved progress will be lost.";
+    float sc2 = coop_on ? 0.5f : 0.6f;
+    pc_ui_rect(Q_X0, Q_Y0, Q_X1, Q_Y1, 0xE0000000, 0.19f);
+    AdvEasyDrawWindow(&tl, &br, 0xFFAFAFAF, 0x3F5F5F5F);
+    word(w_yes, 3, q_x(1), Q_YN_Y, quit.yes ? pulse() : 0x7FAFAFAF, 0.3f);
+    word(w_no, 2, q_x(0), Q_YN_Y, quit.yes ? 0x7FAFAFAF : pulse(), 0.3f);
+    pc_ui_text(320 - pc_ui_text_w(l1, 0.7f) / 2, Q_Y0 + 22, l1, 0.7f, 0xFFFFFFFF);
+    pc_ui_text(320 - pc_ui_text_w(l2, sc2) / 2, Q_Y0 + 54, l2, sc2, 0xFFC0C0C0);
+    AdvEasySetTextureList(0);   /* the option screen's textures again (the font set its own) */
 }
 
 /* DisplayOptionPlateLevel0, with the other rows: drawn as they are (dim, or pulsing when selected) */
-void pc_options_row8(int selected)
+void pc_options_rows0(void)
 {
-    ADV_WORK* ap = &AdvWork;
-    unsigned int col = selected ? (((unsigned int)ap->FlushCount2 + 255) << 24) | 0xFFFFFF : 0x7FAFAFAF;
-    float x = row8_x();
-    QUAD* q = &Qtex[15];
-    for (int i = 0; i < (int)(sizeof(row8) / sizeof(row8[0])); i++) {
-        if (row8[i].u >= 0) {
-            SetQuadPos(x, ROW8_Y, row8[i].dw, 32.0f, q);
-            SetQuadUv2(row8[i].u, row8[i].v, row8[i].w, 32.0f, 0, q);
-            AdvEasyDrawTexture(0, col, q, 0.05f, 1);
-        }
-        x += row8[i].dw + 1;
-    }
+    word(w_enhanced, N_OF(w_enhanced), row8_x(), 352.0f, row_col(7), 0.05f);
+    if (pc_in_game()) word(w_title, N_OF(w_title), row9_x(), 320.0f, row_col(8), 0.05f);
+    if (quit.open) quit_draw();
 }
 
 /* DisplayOptionPlateLevel0 before it reads the pad: hovering a row selects it, a click confirms
@@ -105,6 +180,7 @@ void pc_options_mouse0(int port)
     if (mt.x >= 32 && mt.x < 608 && mt.y >= 160 && mt.y < 384) {   /* rows 32 px apart, their values on the right */
         hit = (int)(mt.y - 160) / 32;
         if (hit == 6 && mt.x >= row8_x() - 4) hit = 7;   /* EXIT's row: ENHANCED SETTINGS on the right */
+        else if (hit == 5 && mt.x >= row9_x() - 4 && pc_in_game()) hit = 8;   /* DEFAULT's row: RETURN TO TITLE */
         else if (mt.x >= 320 && hit != 0 && hit != 4 && hit != 1) hit = -1;
     }
     if (hit >= 0 && (mt.moved || mt.left) && hit != ap->OptIndex) { ap->OptIndex = hit; CallSystemSe(0, 2); }
@@ -301,8 +377,6 @@ static void text_fit(float x, float y, const char* s, float sc, float w, unsigne
     pc_ui_text(x, y + (1.0f - k) * 9.0f, s, sc * k, col);
 }
 
-static unsigned int pulse(void) { return ((unsigned int)AdvWork.FlushCount2 + 255) << 24 | 0xFFFFFF; }
-
 static void draw_row(int i, int sel)
 {
     const Row* r = &rows[i];
@@ -498,6 +572,7 @@ int pc_options_pc(int port, int flag)
    cursor goes */
 void pc_options_close(void)
 {
+    quit.open = 0;
     if (st.any_pending)
         for (int i = 0; i < g_settings_n && i < (int)sizeof(st.pending); i++)
             if (st.pending[i]) { st.pending[i] = 0; settings_act(&g_settings[i]); }

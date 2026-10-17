@@ -5427,7 +5427,9 @@ static void receive(void)
             } else if (!is_host) {   /* the session is over: coop_frame stops it */
                 host_log("coop: the host left\n");
                 bye_reason = p.reject == COOP_REJ_REMOVED ? "The host removed you from the session (join again to come back)"
-                           : have_rx && (rx.flags & PF_IN_GAME) ? "The host left the game" : "The host closed the lobby";
+                           : (have_rx && (rx.flags & PF_IN_GAME)) || in_session_game() ? "The host left the game"   /* we play in its game: its last
+                           poses may be from the title already (game over "No", OPTION's RETURN TO TITLE) */
+                           : "The host closed the lobby";
                 have_peer = 0;   /* no goodbye back */
                 break;
             }

@@ -438,10 +438,15 @@ DISPLAY, GAMEPLAY, CONTROLS, THIRD PERSON, AUDIO, CO-OP, EXTRAS. `recvx.ini` key
 in `pc/src/host/config.c`.
 
 ENHANCED SETTINGS is option level 4 of the game's OPTION screen (`pc/glue/options_glue.c`; hooks in
-`adv.c`: `OptionDef[8]`, `DisplayOptionPlate` and the fades treat it like KEY CONFIG). Its entry
+`adv.c`: `OptionDef[9]`, `DisplayOptionPlate` and the fades treat it like KEY CONFIG). Its entry
 sits right of EXIT, lettered from the option texture's own glyphs: left/right move between EXIT
-and it, up from it goes to DEFAULT, down wraps to the top as from EXIT (`DisplayOptionPlateLevel0`,
-`pc_options_mouse0` for the mouse). The pages use the game's font, cursor sounds and highlight;
+and it, up from it goes to the row above, down wraps to the top as from EXIT (`DisplayOptionPlateLevel0`,
+`pc_options_mouse0` for the mouse). In a game (`tk_flg & 0x80`) a ninth item, RETURN TO TITLE,
+sits right of DEFAULT above it, lettered the same way. Confirming it opens a YES / NO question
+over the screen (`pc_options_quit`, NO preselected, cancel = NO); YES leaves the option screen as
+EXIT does (system data saved if changed), then `system.c bhSysCallOption` resumes the game as
+usual and returns to the title as the soft reset does (`PlayStopMovieEx`, `RequestAllStopSoundEx`,
+`bhReturnTitle`, the path of game over "No"). Co-op ends the session there ("back at the title"). The pages use the game's font, cursor sounds and highlight;
 labels and value names must be plain ASCII the font has (no `&`, `*`, `#`, `@`).
 
 **Adding a setting**: add the variable's ini key to `keys[]` in `config.c` and one entry to
