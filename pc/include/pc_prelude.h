@@ -207,6 +207,8 @@ int   pc_saves_native(int state);                /* the open save/load screen us
 int   pc_save_card(struct MEMORYCARDSTATE* mc);  /* native, instead of ExecuteMemoryCard: its queued read or write done with the save files; 100 */
 void  pc_save_list(struct SELECTFILEWINDOW* win, struct MEMORYCARDSTATE* mc, int saving);   /* the window's rows: the saves (+ a new one) */
 void  pc_save_move(struct SELECTFILEWINDOW* win, short* cursor, int dir);   /* the cursor up/down through any number of rows */
+void  pc_save_mouse(int saving, unsigned int state, int cg, short* cur_x, short* cur_y, short* sel,
+                    struct SELECTFILEWINDOW* win, struct MEMORYCARDSTATE* mc);   /* both save systems: the mouse as the screen's cursor and pad bits */
 int   pc_sysload_native(struct SYSLOAD_SCREEN* p);   /* the system file: 0 memory card, else the screen's result (1 none, 2 read) */
 int   pc_syssave_native(struct SYSSAVE_SCREEN* p);   /* 0 memory card, else the screen's result (1 failed, 2 written) */
 

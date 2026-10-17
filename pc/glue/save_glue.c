@@ -19,6 +19,7 @@
 #include "../src/host/fileio.h"
 #include "../src/host/lobby.h"
 #include "../src/host/coop.h"
+#include "../src/host/menu_mouse.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -112,6 +113,69 @@ int pc_save_card(MEMORYCARDSTATE* mc)
         }
     }
     return 100;   /* no card change */
+}
+
+/* ---------------------------------------------------------------- the mouse
+   ExecuteSaveScreen / ExecuteLoadScreen, before the state runs, with either save system: hovering
+   a row of the list, a YES/NO answer or a memory card moves the screen's own cursor there (with the
+   d-pad's sound), a click there confirms it, a click on a message confirms it; a right click is
+   cancel, the wheel and a click on the list's arrows are up/down. All as this frame's pad bits
+   (sys->pad_ps / pad_on as bhSetPad left them) or the cursor the d-pad moves, so keyboard and
+   gamepad are untouched. Hit areas: where DispTexture / DispLoadTexture draw (game 2D px). */
+static MouseTake smt;
+static int smouse_seen, swheel, sgap;
+
+/* menu_pad: a save or load screen ran since it last looked (the screen takes the mouse) */
+int pc_save_screen(void) { int s = smouse_seen; smouse_seen = 0; return s; }
+
+#define IN(x0, x1, y0, y1) (smt.x >= (x0) && smt.x < (x1) && smt.y >= (y0) && smt.y < (y1))
+
+void pc_save_mouse(int saving, unsigned int state, int cg, short* cur_x, short* cur_y, short* sel, SELECTFILEWINDOW* win, MEMORYCARDSTATE* mc)
+{
+    static const short yn_save[7] = { 0, 279, 359, 359, 0, 205, 227 };   /* DispTexture's YES/NO arrow by cCgFlag */
+    float yn = saving ? (cg >= 0 && cg < 7 ? yn_save[cg] : 0) : (cg == 2 ? 358 : 0);   /* DispLoadTexture's */
+    int hit = -1, cur;
+    unsigned int bits = 0;
+    smouse_seen = 1;
+    g_menu_mouse.active = 1;   /* the OS cursor shows */
+    if (state == 0) {   /* (re)started: what the mouse did before is not for this screen */
+        memset(&smt, 0, sizeof(smt));
+        menu_mouse_take(&smt);
+        swheel = sgap = 0;
+        return;
+    }
+    menu_mouse_take(&smt);
+    swheel += smt.wheel;
+    if (state == 20) {   /* the list: rows 40 px apart from the cursor's y 103 (mcDispWindowCurSol), arrows at x 320 above and below */
+        if (IN(16, 616, 100, 100 + 40 * win->slDispRecordNumber)) hit = (int)(smt.y - 100) / 40;
+        else if (smt.left && IN(296, 360, 64, 100)) swheel++;
+        else if (smt.left && IN(296, 360, 302, 340)) swheel--;
+        if (hit >= 0 && (smt.moved || smt.left) && hit != win->sCursol) {
+            *cur_y = win->sMesCur = win->slDispTopNumber + hit;
+            win->sCursol = hit;
+            CallSystemSe(0, 2);
+        }
+    } else if (state == 10) {   /* the memory cards (CheckDispMemoryCard: cursor at 70 + 268 x, 129 + 258 y), EXIT below */
+        int p0 = GetMemoryCardSelectPortState(mc, 0) == 2, p1 = GetMemoryCardSelectPortState(mc, 1) == 2;
+        if (p0 && IN(70, 338, 120, 360)) hit = 0;
+        else if (p1 && IN(338, 610, 120, 360)) hit = 1;
+        else if (IN(70, 400, 380, 420)) hit = 2;
+        cur = *cur_y ? 2 : p0 && p1 ? *cur_x : p1;
+        if (hit >= 0 && (smt.moved || smt.left) && hit != cur) {
+            *cur_y = hit == 2;
+            if (hit < 2 && p0 && p1) *cur_x = *sel = hit;
+            CallSystemSe(0, 2);
+        }
+    } else if (yn > 0) {   /* YES above NO, 22 px apart, right of the arrow */
+        if (IN(240, 400, yn - 3, yn + 41)) hit = smt.y >= yn + 19;
+        if (hit >= 0 && (smt.moved || smt.left) && hit != *sel) { *sel = hit; CallSystemSe(0, 2); }
+    } else hit = 0;   /* a message */
+    if (smt.left && hit >= 0) bits = 0x800;
+    else if (smt.right) bits = 0x1000;
+    else if (sgap) sgap = 0;   /* one up/down press every other frame, each a new press */
+    else if (swheel) { bits = swheel > 0 ? 0x1 : 0x2; swheel += swheel > 0 ? -1 : 1; sgap = 1; }
+    sys->pad_ps |= bits;
+    sys->pad_on |= bits;
 }
 
 /* ---------------------------------------------------------------- the system file */
