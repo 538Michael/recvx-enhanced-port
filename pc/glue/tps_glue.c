@@ -102,6 +102,41 @@ static int aiming(void) { return tps_cam_active && plp->mode0 == 1 && plp->mode1
 
 static float cur_dist, cur_fov;   /* eased towards the walk/aim values */
 
+/* The point the camera follows: the player's position, or the drawn body during the game's own
+   moves (mode2 14..22: stairs, climbing on or off a ledge, pushing). Stairs and ledges leave
+   plp->p where the move started and add the motion's travel at once: the stairs every two steps
+   (12 units on, 8 up or down), a ledge climb at its end; the model's root (owP[0]) carries it
+   smoothly. The camera follows the root less its offset from the followed point when the move
+   started, the height eased (the root bobs with each step and dips as the character crouches),
+   and afterwards eases back onto plp->p. */
+static NJS_POINT3 fol;     /* followed point (view) */
+static float fol_base[3];  /* root minus followed point when the move started */
+static int fol_move;       /* 1: in a move, 2: easing back after it, 0: on plp->p */
+#define FOL_EASE 0.35f
+
+static void follow(void)
+{
+    const float* r = plp->mlwP->owP->mtx;   /* the root as drawn this tick */
+    float* f = &fol.x;
+    const float* p = &plp->px;
+    int j;
+    if (plp->mode0 == 1 && plp->mode1 == 0 && plp->mode2 > 13) {
+        if (fol_move != 1)
+            for (j = 0; j < 3; j++) fol_base[j] = r[12 + j] - f[j];
+        fol_move = 1;
+        fol.x = r[12] - fol_base[0];
+        fol.z = r[14] - fol_base[2];
+        fol.y += (r[13] - fol_base[1] - fol.y) * FOL_EASE;
+        return;
+    }
+    if (fol_move) {
+        float d = 0;
+        for (j = 0; j < 3; j++) { f[j] += (p[j] - f[j]) * FOL_EASE; d += fabsf(p[j] - f[j]); }
+        fol_move = d > 0.01f ? 2 : 0;
+    }
+    if (!fol_move) fol = *(const NJS_POINT3*)p;
+}
+
 /* b moved towards a so that it stays 1.5 units in front of the first wall between them (the
    game's bullet ray test; its hit globals are preserved) */
 static void clear_of_walls(const NJS_POINT3* a, NJS_POINT3* b)
@@ -125,17 +160,18 @@ static void clear_of_walls(const NJS_POINT3* a, NJS_POINT3* b)
    ray starts there), eye = behind it on the ray through it. Walls pull a camera shoulder point
    in sideways (only if the shoulder itself is in a wall) and slide the eye forward along the
    ray; `sh` stays the wall-free one, so camera collision never moves the aim or the facing.
-   Depends on the player's position only. */
+   Depends on the player's position only (the followed point: follow). */
 static void view(NJS_POINT3* eye, NJS_POINT3* dir, NJS_POINT3* sh)
 {
     float s = sinf(RAD(yaw)), c = cosf(RAD(yaw)), sp = sinf(RAD(pitch)), cp = cosf(RAD(pitch));
     float k = actor_cam_scale();   /* "You appear as" a taller or shorter model: its height (1: the character's) */
     float side = (g_tps.left ? -g_tps.shoulder : g_tps.shoulder) / 10.0f * k;
+    const NJS_POINT3* o = fol_move ? &fol : (const NJS_POINT3*)&plp->px;
     NJS_POINT3 at, csh;
 
     /* forward (-sin, 0, -cos), right (cos, 0, -sin) */
     dir->x = -s * cp; dir->y = sp; dir->z = -c * cp;
-    at.x = plp->px; at.y = plp->py + g_tps.height / 10.0f * k; at.z = plp->pz;
+    at.x = o->x; at.y = o->y + g_tps.height / 10.0f * k; at.z = o->z;
     sh->x = at.x + c * side; sh->y = at.y; sh->z = at.z - s * side;
     csh = *sh;
     clear_of_walls(&at, &csh);
@@ -158,7 +194,8 @@ void tps_camera(void)
     int aim;
 
     if (!camera_allowed()) { deactivate(); return; }
-    if (!tps_cam_active) { yaw = plp->ay; pitch = DEG(-8.0f); cur_dist = g_tps.dist / 10.0f; cur_fov = (float)g_tps.fov; }
+    if (!tps_cam_active) { yaw = plp->ay; pitch = DEG(-8.0f); cur_dist = g_tps.dist / 10.0f; cur_fov = (float)g_tps.fov; fol_move = 0; fol = *(NJS_POINT3*)&plp->px; }
+    follow();
     tps_cam_active = g_tps.cam_active = 1;
 
     aim = aiming() && !lock_aim();
@@ -194,9 +231,10 @@ void tps_camera(void)
     cam.az = 0;
     cam.pers = (int)DEG(cur_fov);
     if (trace)
-        printf("tps: cam %c frame %u yaw %.1f pitch %.1f | ay %.1f at (%.1f %.1f) mode %d/%d/%d keys %x\n", pad_cam ? 'P' : g_tps.free_cam ? 'A' : 'B',
-               (unsigned)gs_frame_count(), yaw * (360.0f / 65536.0f), pitch * (360.0f / 65536.0f), (short)plp->ay * (360.0f / 65536.0f),
-               plp->px, plp->pz, plp->mode0, plp->mode1, plp->mode2, move_keys);
+        printf("tps: cam %c frame %u yaw %.1f pitch %.1f | ay %.1f at (%.1f %.1f) mode %d/%d/%d keys %x | p %.2f %.2f %.2f root %.2f %.2f %.2f follow %d %.2f %.2f %.2f eye %.2f %.2f %.2f\n",
+               pad_cam ? 'P' : g_tps.free_cam ? 'A' : 'B', (unsigned)gs_frame_count(), yaw * (360.0f / 65536.0f), pitch * (360.0f / 65536.0f),
+               (short)plp->ay * (360.0f / 65536.0f), plp->px, plp->pz, plp->mode0, plp->mode1, plp->mode2, move_keys, plp->px, plp->py, plp->pz,
+               plp->mlwP->owP->mtx[12], plp->mlwP->owP->mtx[13], plp->mlwP->owP->mtx[14], fol_move, fol.x, fol.y, fol.z, eye.x, eye.y, eye.z);
 
     /* the room's near plane can be far out (up to 22 units); the camera is close */
     clip_near = fNaViwClipNear; clip_far = fNaViwClipFar;

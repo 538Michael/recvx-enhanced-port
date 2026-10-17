@@ -140,7 +140,7 @@ unit (the character is about 17 units tall).
 |---|---|
 | `RECVX_TPS_MOUSE="frame:dx:dy,..."` | moves the mouse dx/dy counts per game frame from that presented frame on |
 | `RECVX_VPAD="frame:input+input,..."` | a virtual gamepad ([ARCHITECTURE.md](ARCHITECTURE.md)): sticks as `leftx=0.5+lefty=-1` (up is negative), triggers `+lefttrigger`; a trigger after another input needs its own `+` (`+lefttrigger++righttrigger`) |
-| `RECVX_TPS_TRACE=1` | logs the gamepad per frame ("tps: pad": the sticks past their dead zones, the walk direction, facing, camera, quick turn, the enemy nearest the crosshair) and its aim assist ("tps: assist"), the free aim per frame, each shot's direction and wall hit against the crosshair target ("SHOT"), the drawn weapon's barrel with "You appear as", the camera ("tps: cam A\|B"), the aim height given to the game; `=2` also keeps the camera on the enemy the game locked on to (the middle of its hit capsule, or `RECVX_TPS_AIM_AT=f` along it: 0 = `c1`, for a zombie the head, 1 = `c2`, its legs) |
+| `RECVX_TPS_TRACE=1` | logs the gamepad per frame ("tps: pad": the sticks past their dead zones, the walk direction, facing, camera, quick turn, the enemy nearest the crosshair) and its aim assist ("tps: assist"), the free aim per frame, each shot's direction and wall hit against the crosshair target ("SHOT"), the drawn weapon's barrel with "You appear as", the camera ("tps: cam A\|B": yaw, pitch, the player's position, the model's root, the point followed and the eye), the aim height given to the game; `=2` also keeps the camera on the enemy the game locked on to (the middle of its hit capsule, or `RECVX_TPS_AIM_AT=f` along it: 0 = `c1`, for a zombie the head, 1 = `c2`, its legs) |
 | `RECVX_TPS_ORBIT=degrees` | turns only the view about the player (side views; aim unchanged, camera ignores walls) |
 | `RECVX_ATMOS_TRACE=1` | logs each game frame's cut, the game's fog, lights and filter and what "smooth" shows |
 | `RECVX_EFF_TRACE=1` | logs effects spawned and queued |
@@ -212,6 +212,19 @@ unit (the character is about 17 units tall).
   turns `ay` towards camera yaw minus the keys' angle (not in the game's own turns or special
   moves, `mode2 > 13`); `tps_camera` adds the mouse X to the camera yaw. Pose, aim and co-op read
   `ay`/`wax`, never the camera.
+* **Stairs and ledges** (the game's own moves, `mode2` 14..22: `bhCPM2_act_kdu`/`kdd` stairs,
+  `dnu`/`dnd` climbing on or off a ledge; pushing, `psh`, moves the position every frame and the
+  ladder modes are used by no room, ladders between rooms are door animations): these moves leave
+  the player's position where the move started and add the motion's travel at once, the stairs
+  every two steps (12 units on, 8 up or down), a ledge climb at its end; only the drawn model (its
+  root, `owP[0]`) moves smoothly. Following the position, the camera stood still and
+  then jumped (up to 14.5 units in a frame on stairs, 10 on a ledge). The camera follows the root
+  instead (`follow`), less its offset when the move started, so it starts where the walking camera
+  was; its height eases (0.35 a frame: the root bobs with each step and dips as the character
+  crouches), and after the move the point followed eases back onto the position. The yaw is
+  untouched (B eases behind the character as when walking, A and the gamepad keep theirs), walls
+  pull the camera in as always. Largest camera move in a frame on stairs or a ledge now about
+  2 units (walking: 1).
 * Camera collision never feeds back into the aim: the crosshair ray starts at the wall-free
   shoulder point, and the camera position depends only on the player's position.
 * Mouse: SDL relative mode while third person is on and no overlay window is open; deltas are
