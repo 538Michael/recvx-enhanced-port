@@ -39,6 +39,10 @@ int pc_frame_blend(void) { return g_config.frame_blend < 0 ? !g_config.interpola
 int pc_battle_unlocked(void) { return g_config.battle_unlocked; }
 int pc_skip_intro(void) { return g_config.skip_intro; }
 int pc_movie_zoom(void) { return g_config.movie_zoom; }
+/* fog reduced by r %: the fog density (njCalcFogPower) x 100 / (100 - r), so everything's fog is
+   that of something (100 - r) % as far: 50 % = x 2. 100 %: every distance reads the table's nearest
+   entry, 254 or 255 of 255 (no fog) */
+float pc_fog_scale(void) { int r = g_config.fog_reduction; return r >= 100 ? 1e6f : 100.0f / (100 - r); }
 int pc_skip_intro_press_start(void)
 {
     static int done;

@@ -10,6 +10,11 @@
   monitor thin bars stay, since the movies are a little wider than the screen; on an ultrawide
   one the bars are gone and the movie fills the full height. Fades over the movies cover the
   whole screen as before.
+- **Fog reduction** (DISPLAY, off by default): thins the game's fog, which on the PS2 can hide
+  much of a room. Turn it up a little to see further into foggy places such as Rockfort's yards,
+  the airport or the Antarctic base, or all the way to remove the fog. Many rooms also use a black
+  fog as darkness, so these get lighter too. The change shows at once. Suggested by fmil95 of the
+  decompilation project.
 
 ### Cheats
 

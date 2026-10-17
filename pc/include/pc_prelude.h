@@ -88,6 +88,7 @@ int   pc_model_cull(void);      /* actors/objects off-screen are skipped (bhChec
 int   pc_frame_blend(void);     /* PS2_swap blends the new frame 75% over the previous one (motion trail) */
 unsigned int pc_noclip(void);   /* F2 cheat: player flags whose enemy/wall push bhControlPlayer skips */
 int   pc_inf_ammo(void);      /* F2 cheat (pc/glue/cheat_glue.c): bhCheckBullet/bhCountBullet as for an unlimited weapon */
+float pc_fog_scale(void);              /* option: njCalcFogPower's fog density x this (ps2_NaFog.c), 1 = original */
 int   pc_movie_zoom(void);               /* option: movies zoomed until their letterbox bars leave the screen */
 int   pc_skip_intro(void);               /* option: boot straight to the title menu */
 int   pc_skip_intro_press_start(void);   /* ... and past "press start", once */     /* option: room transitions without the door/stairs animation */   /* camera filter/vignette: 0 original, 1 stretched, 2 off */
