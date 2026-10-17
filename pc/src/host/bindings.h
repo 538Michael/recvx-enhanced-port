@@ -18,7 +18,7 @@ enum {
     B_QUICKTURN,                       /* back, then the run button (the game's quick turn) */
     B_QUICKKNIFE,                      /* hold: knife drawn and readied, the weapon before back on release (knife_glue.c) */
     B_TRADE,                           /* co-op: trade request / accept with the partner next to you (coop_glue.c, trade_glue.c) */
-    B_RELOAD,                          /* reload the weapon from the inventory's ammo, as on an empty trigger pull (reload_glue.c); unbound */
+    B_RELOAD,                          /* reload the weapon from the inventory's ammo, as on an empty trigger pull (reload_glue.c); R, Aim + Triangle */
     /* third person: keyboard and mouse; the gamepad set has its own (modern scheme, g_tps.pad_modern:
        run .. quick turn, knife, recenter; the classic scheme drives it through the DS2 rows) */
     B_TPS_FWD, B_TPS_BACK, B_TPS_LEFT, B_TPS_RIGHT, B_TPS_RUN, B_TPS_ACTION, B_TPS_CANCEL,
@@ -40,7 +40,7 @@ extern const BindRow bind_rows[B_COUNT];
 extern const int bind_order[B_COUNT];  /* display order */
 
 int  bind_get(int row, int dev, int slot);
-void bind_set(int row, int dev, int slot, int code);   /* a code another row of the same context has moves there (swap) */
+void bind_set(int row, int dev, int slot, int code);   /* a code another row of the same context has moves there (swap); a reload row shares it */
 void bind_reset(int dev);                               /* defaults of one set */
 int  bind_conflict(int row, int dev);                   /* another row of the same context shares a code: that row + 1, else 0 */
 int  bind_row_shown(int row, int dev);                  /* the row exists for this device */
@@ -56,7 +56,9 @@ int  bind_capture_left_ms(void);
 int  bind_event(const void* sdl_event); /* main thread, first: 1 = consumed by a capture */
 
 /* state, game thread */
-int  bind_held(int row, int dev, const bool* keys, int mouse);  /* any slot of the row is down */
+int  bind_held(int row, int dev, const bool* keys, int mouse);  /* any slot of the row is down (a reload combination's press counts only for the reload) */
+int  bind_combo(int row, int dev, int slot);                    /* a reload slot another row of its group shares: it reloads as Aim + that button */
+void bind_combo_frame(int on, const bool* keys, int mouse);     /* each pad report, first: which reload combinations were pressed with aim held */
 int  bind_hotkey(const void* sdl_event, int row);               /* a key-down event of this hotkey */
 void* bind_gamepad(void);              /* the open SDL_Gamepad (pad.c) */
 void bind_set_gamepad(void* gamepad);

@@ -13,11 +13,16 @@ TpsConfig g_tps = { .key = SDL_SCANCODE_F5 };
 SDL_Window* g_window;
 uint64_t gs_frame_count(void) { return 0; }
 void host_log(const char* fmt, ...) { (void)fmt; }
-int pc_keytype_mask(int v) { (void)v; return -1; }
+int pc_keytype_mask(int v) { return v == 4 ? 1 << B_R1 : -1; }   /* aim on R1, as in every key type */
+static int playing = 1;
+int reload_combo_ok(void) { return playing; }
 int pc_keytype(void) { return 0; }
 
 static bool keys[SDL_SCANCODE_COUNT];
 static int held(int row, int sc) { memset(keys, 0, sizeof(keys)); if (sc) keys[sc] = 1; return bind_held(row, BIND_KB, keys, 0); }
+/* a pad report with these keys down: the reload combination first, as pad.c */
+static void report(int a, int b) { memset(keys, 0, sizeof(keys)); keys[a] = keys[b] = 1; keys[0] = 0; bind_combo_frame(1, keys, 0); }
+static int now(int row) { return bind_held(row, BIND_KB, keys, 0); }
 
 int main(void)
 {
@@ -44,8 +49,52 @@ int main(void)
     CHECK(bind_ini_line("pad_r2", "+righttrigger") && !bind_get(B_R2, BIND_PAD, 0));
     CHECK(bind_ini_line("key_tps_action_2", "F") && bind_get(B_TPS_ACTION, BIND_KB, 1) == SDL_SCANCODE_F);
     CHECK(bind_ini_line("key_tps_action_2", "none"));
-    /* reload: R and the right shoulder in third person (once noclip fly up's and the quick turn's), the game rows' unbound */
-    CHECK(held(B_TPS_RELOAD, SDL_SCANCODE_R) && !held(B_NOCLIP_UP, SDL_SCANCODE_R) && !bind_get(B_RELOAD, BIND_KB, 0) && !bind_get(B_RELOAD, BIND_PAD, 0));
+    /* reload: R and the right shoulder in third person (once noclip fly up's and the quick turn's); the game row R and
+       Aim + Triangle, a combination as it shares Triangle; R is no combination (no other game row has it) */
+    CHECK(held(B_TPS_RELOAD, SDL_SCANCODE_R) && !held(B_NOCLIP_UP, SDL_SCANCODE_R) && bind_get(B_RELOAD, BIND_KB, 0) == SDL_SCANCODE_R);
+    CHECK(bind_get(B_RELOAD, BIND_PAD, 0) == 1 + SDL_GAMEPAD_BUTTON_NORTH && bind_get(B_TRIANGLE, BIND_PAD, 0) == 1 + SDL_GAMEPAD_BUTTON_NORTH);
+    CHECK(bind_combo(B_RELOAD, BIND_PAD, 0) && !bind_combo(B_RELOAD, BIND_KB, 0) && !bind_combo(B_TPS_RELOAD, BIND_KB, 0) && !bind_combo(B_TPS_RELOAD, BIND_PAD, 0));
+    report(SDL_SCANCODE_R, 0);
+    CHECK(now(B_RELOAD));   /* on its own: without aim too (the lowered weapon's reload) */
+    /* rebinding the reload onto a game row's key shares it (no swap, no conflict): Aim + Square */
+    bind_set(B_RELOAD, BIND_KB, 0, SDL_SCANCODE_A);
+    CHECK(!bind_swapped() && bind_get(B_SQUARE, BIND_KB, 0) == SDL_SCANCODE_A && bind_combo(B_RELOAD, BIND_KB, 0));
+    CHECK(!bind_conflict(B_RELOAD, BIND_KB) && !bind_conflict(B_SQUARE, BIND_KB));
+    report(SDL_SCANCODE_A, 0);                       /* without aim: Square's, until let go */
+    CHECK(now(B_SQUARE) && !now(B_RELOAD));
+    report(SDL_SCANCODE_A, SDL_SCANCODE_W);
+    CHECK(now(B_SQUARE) && !now(B_RELOAD) && now(B_R1));
+    report(SDL_SCANCODE_W, 0);
+    report(SDL_SCANCODE_A, SDL_SCANCODE_W);          /* pressed with aim held: the reload's, Square never sees it */
+    CHECK(now(B_RELOAD) && !now(B_SQUARE) && now(B_R1));
+    report(SDL_SCANCODE_A, 0);                       /* aim let go first: still the reload's, no late Square */
+    CHECK(now(B_RELOAD) && !now(B_SQUARE));
+    report(0, 0);
+    report(SDL_SCANCODE_A, SDL_SCANCODE_W);          /* both at once: the reload's */
+    CHECK(now(B_RELOAD) && !now(B_SQUARE));
+    report(0, 0);
+    playing = 0;                                     /* not in play (a menu, an event): Square's */
+    report(SDL_SCANCODE_A, SDL_SCANCODE_W);
+    CHECK(!now(B_RELOAD) && now(B_SQUARE));
+    playing = 1;
+    report(0, 0);
+    bind_set(B_RELOAD, BIND_KB, 0, SDL_SCANCODE_W);  /* on the aim button itself: no combination */
+    CHECK(!bind_combo(B_RELOAD, BIND_KB, 0) && bind_get(B_R1, BIND_KB, 0) == SDL_SCANCODE_W);
+    bind_set(B_TPS_RELOAD, BIND_KB, 1, SDL_SCANCODE_E);   /* third person: shares with action */
+    CHECK(!bind_swapped() && bind_combo(B_TPS_RELOAD, BIND_KB, 1) && bind_get(B_TPS_ACTION, BIND_KB, 0) == SDL_SCANCODE_E);
+    bind_set(B_TPS_RELOAD, BIND_KB, 1, 0);
+    bind_set(B_RELOAD, BIND_KB, 0, SDL_SCANCODE_F1);      /* a hotkey's: swapped as before */
+    CHECK(bind_swapped() && bind_get(B_SETTINGS, BIND_KB, 0) == SDL_SCANCODE_W);
+    bind_set(B_SETTINGS, BIND_KB, 0, SDL_SCANCODE_F1);
+    bind_set(B_RELOAD, BIND_KB, 0, SDL_SCANCODE_R);
+    CHECK(bind_get(B_R1, BIND_KB, 0) == SDL_SCANCODE_W && bind_get(B_RELOAD, BIND_KB, 0) == SDL_SCANCODE_R);
+    /* a recvx.ini from before the combination (no bindings_version line first): the reload rows' "none" (their default
+       then) keeps today's defaults; a binding stays, and after the version line "none" unbinds */
+    CHECK(bind_ini_line("key_reload", "none") && bind_ini_line("pad_reload", "none") && bind_get(B_RELOAD, BIND_KB, 0) == SDL_SCANCODE_R);
+    CHECK(bind_get(B_RELOAD, BIND_PAD, 0) == 1 + SDL_GAMEPAD_BUTTON_NORTH);
+    CHECK(bind_ini_line("key_reload", "G") && bind_get(B_RELOAD, BIND_KB, 0) == SDL_SCANCODE_G);
+    CHECK(bind_ini_line("bindings_version", "2") && bind_ini_line("key_reload", "none") && !bind_get(B_RELOAD, BIND_KB, 0));
+    CHECK(bind_ini_line("key_reload", "R"));
     CHECK(bind_get(B_TPS_RELOAD, BIND_PAD, 0) == 1 + SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER && bind_get(B_TPS_QUICKTURN, BIND_PAD, 0) == 1 + SDL_GAMEPAD_BUTTON_DPAD_DOWN);
     CHECK(bind_row_shown(B_TPS_RELOAD, BIND_KB) && bind_row_shown(B_TPS_RELOAD, BIND_PAD) && bind_row_shown(B_RELOAD, BIND_KB) && bind_row_shown(B_RELOAD, BIND_PAD));
     /* a recvx.ini from before it (no key_tps_reload line before these): those old defaults are dropped */
@@ -67,13 +116,14 @@ int main(void)
     /* hotkeys share with nobody; the toggle key's first slot is g_tps.key */
     bind_set(B_TPS_TOGGLE, BIND_KB, 0, SDL_SCANCODE_F6);
     CHECK(g_tps.key == SDL_SCANCODE_F6);
-    /* rebinding the reload: within the third-person set a key swaps, the game row's is its own */
+    /* rebinding the reload: within the third-person set a key is shared (Aim + E), the game row's is its own */
     bind_set(B_TPS_RELOAD, BIND_KB, 0, SDL_SCANCODE_E);
-    CHECK(held(B_TPS_RELOAD, SDL_SCANCODE_E) && held(B_TPS_ACTION, SDL_SCANCODE_R) && bind_swapped() && !strcmp(bind_swapped(), "Action / confirm"));
+    CHECK(!held(B_TPS_RELOAD, SDL_SCANCODE_E) && held(B_TPS_ACTION, SDL_SCANCODE_E) && !bind_swapped() && bind_combo(B_TPS_RELOAD, BIND_KB, 0));
     bind_set(B_TPS_RELOAD, BIND_KB, 0, SDL_SCANCODE_R);
-    CHECK(held(B_TPS_ACTION, SDL_SCANCODE_E));
+    CHECK(held(B_TPS_ACTION, SDL_SCANCODE_E) && held(B_TPS_RELOAD, SDL_SCANCODE_R));
     bind_set(B_TPS_RELOAD, BIND_KB, 1, SDL_SCANCODE_G);
-    bind_set(B_RELOAD, BIND_PAD, 0, 1 + SDL_GAMEPAD_BUTTON_DPAD_LEFT);
+    bind_set(B_RELOAD, BIND_PAD, 0, 1 + SDL_GAMEPAD_BUTTON_DPAD_LEFT);   /* shared with Left */
+    CHECK(!bind_swapped() && bind_get(B_LEFT, BIND_PAD, 0) == 1 + SDL_GAMEPAD_BUTTON_DPAD_LEFT && bind_combo(B_RELOAD, BIND_PAD, 0));
     /* conflicts from a hand-edited ini */
     CHECK(bind_ini_line("key_l3", "Z") && bind_conflict(B_L3, BIND_KB) == 0);   /* Z is free now (Cross moved to X) */
     CHECK(bind_ini_line("key_l3", "Return") && bind_conflict(B_L3, BIND_KB) == B_START + 1);

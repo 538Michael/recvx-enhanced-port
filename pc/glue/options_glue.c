@@ -344,6 +344,7 @@ static void capture_end(int code)
     settings_save_later();
     CallSystemSe(0, 3);
     if (bind_swapped()) { snprintf(nm, sizeof(nm), "Swapped with %s", bind_swapped()); say(nm); }
+    else if (bind_combo(row, st.dev, st.slot)) say("Shared: hold aim and press it to reload; without aim it does its own action.");
     host_log("options: %s %s slot %d = %s\n", st.dev ? "pad" : "key", bind_rows[row].ini, st.slot + 1, bind_code_name(st.dev, code < 0 ? 0 : code, nm, sizeof(nm)));
 }
 
@@ -422,6 +423,8 @@ static void draw_row(int i, int sel)
             float x = 360 + k * 124;
             unsigned int c = conflict ? 0xFFFF6060 : k == st.slot && sel ? col : dim;
             const char* nm = st.capture == r->idx + 1 && k == st.slot ? "..." : bind_code_name(st.dev, bind_get(r->idx, st.dev, k), val, sizeof(val));
+            char combo[80];
+            if (!(st.capture == r->idx + 1 && k == st.slot) && bind_combo(r->idx, st.dev, k)) { snprintf(combo, sizeof(combo), "Aim + %s", nm); nm = combo; }
             if (sel && k == st.slot) pc_ui_rect(x - 4, y - 2, x + 116, y + ROW_H - 5, 0x40FFFFFF, Z_HI + 0.01f);
             text_fit(x, y, nm, SC_ROW, 110, c);
         }
@@ -475,7 +478,9 @@ static void draw_help(void)
         int c = bind_conflict(r->idx, st.dev);
         if (c) { snprintf(t, sizeof(t), "Also bound to: %s. Bind one of them to something else.", bind_rows[c - 1].name); col = 0xFFFF8080; }
         else if (r->idx == B_QUICKTURN || r->idx == B_TPS_QUICKTURN) snprintf(t, sizeof(t), "Tap it: holds back, then presses run, as the game's own quick turn.");
-        else if (r->idx == B_RELOAD || r->idx == B_TPS_RELOAD) snprintf(t, sizeof(t), "Reloads from the inventory's ammo, as firing on an empty magazine does.");
+        else if (r->idx == B_RELOAD || r->idx == B_TPS_RELOAD)
+            snprintf(t, sizeof(t), "Reloads from the inventory's ammo, as firing on an empty magazine does. Shared with another action: "
+                                   "Aim + button reloads.");
         else snprintf(t, sizeof(t), "Confirm: change. Left/right: first or second binding (%s).", bind_code_name(st.dev, bind_get(r->idx, st.dev, st.slot), nm, sizeof(nm)));
         break;
     }

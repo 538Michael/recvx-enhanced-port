@@ -12,6 +12,17 @@
   Your old setting carries over (on is Instant, off is Off). In co-op each player chooses for their
   own doors.
 
+### Controls
+
+- **Reload with the fixed cameras, and Aim + button**: reloading now works out of the box in
+  every camera and control scheme. On the keyboard R reloads everywhere; on the gamepad hold aim
+  and press Triangle / Y (with the twin-stick third-person controls RB stays). The reload button
+  can now share a button with another action instead of taking it away: pressed while you aim it
+  reloads, and the other action does not happen; pressed without aiming the button does what it
+  always did. CONTROLS shows such a binding as "Aim + button". Pressing aim and the button
+  together also works, the reload follows as soon as the weapon is up. If you had left the reload
+  unbound, you get the new defaults.
+
 ### Menus
 
 - **Return to the title**: during a game the OPTION screen has a new entry, RETURN TO TITLE, on

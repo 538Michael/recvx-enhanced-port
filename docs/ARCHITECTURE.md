@@ -398,12 +398,20 @@ village, collision. The render thread (GS emulation, replays: `r_exec`, `r_inter
   slot) once the knife is lowered. Nothing is restored if the weapon was changed meanwhile.
 - **Reload** (`pc/glue/reload_glue.c`, hooked in `bhControlPlayer` after the mode handler, where
   the game's own trigger-pull reload switches to it): on a press of a reload row (`pad_reload`: the
-  game row, unbound, or in third person `tps_reload`) with the magazine not full, the game's
+  game row, or in third person `tps_reload`) with the magazine not full, the game's
   `bhSearchBullet` combines the matching ammo into the weapon (`Combi_99`, as the inventory) and
   the player goes to mode 70 (`bhCPM2_act_rld`: motion 116, sounds). Raised (aim pose or scope) as
   the game does it; lowered, the weapon is first put up as `bhCPM0_action` raises it (straight aim),
   so after the motion the game's own lowering follows. `reload_at_rest` keeps the third-person
-  camera out of its aim view for that.
+  camera out of its aim view for that. A press while the weapon is still coming up waits for it.
+  **Aim + button**: a reload slot may share its code with another row of its group (`bind_combo`;
+  `bind_set` shares instead of swapping, `bind_conflict` ignores it). `bind_combo_frame`, first in
+  each pad report, latches each such press: with aim held (the DS2 rows of the key type's aim bit,
+  or third-person aim) and `reload_combo_ok` (our player in play) it belongs to the reload until
+  released, else to the other row; `bind_held` then gives the press to that one only, so the game
+  never sees a frame of the other action, and letting go of aim first changes nothing. The
+  gamepad's default `pad_reload` is such a combination (Triangle, which does nothing with the
+  weapon raised: `system.c` opens map, inventory and options only without `st_flg` 0x4).
 - **Modern controls for the fixed cameras** (`fixed_cam_controls`; `pc/glue/modern_glue.c`, the
   math in `input/modern.c`, ctest `modern`): `pad.c` keeps the frame's screen direction (left
   stick past a 25% dead zone, else the d-pad rows). `modern_pad` (`bhSetPad`, before the quick

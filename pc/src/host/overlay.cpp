@@ -158,7 +158,7 @@ static bool settings_imgui_any(int page)
 static void controls_section(void)
 {
     static int dev, cap_row = -1, cap_slot;
-    static char msg[96];
+    static char msg[128];
     char label[128], nm[64];
     if (cap_row >= 0) {
         int c = bind_capture_poll();
@@ -166,6 +166,7 @@ static void controls_section(void)
             if (c != -2) {
                 bind_set(cap_row, dev, cap_slot, c == -3 ? 0 : c);
                 if (bind_swapped()) SDL_snprintf(msg, sizeof msg, "Swapped with %s", bind_swapped());
+                else if (bind_combo(cap_row, dev, cap_slot)) SDL_snprintf(msg, sizeof msg, "Shared: hold aim and press it to reload");
                 else msg[0] = 0;
                 settings_save_later();
             }
@@ -180,7 +181,8 @@ static void controls_section(void)
     }
     if (dev == BIND_PAD) ImGui::TextDisabled("%s; the left stick also moves, as on the DS2. The third-person rows play in third\n"
                                              "person with Modern gamepad controls, instead of the game rows of the same buttons.", bind_pad_desc());
-    ImGui::TextDisabled("Click a binding, then press the key/button (Esc cancels, Delete clears); right click clears.");
+    ImGui::TextDisabled("Click a binding, then press the key/button (Esc cancels, Delete clears); right click clears.\n"
+                        "Reload can share a button: then Aim + button reloads.");
     if (msg[0]) ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "%s", msg);
     if (ImGui::BeginTable("##binds", 3, ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp)) {
         ImGui::TableSetupColumn("action", ImGuiTableColumnFlags_WidthStretch, 2.2f);
@@ -208,7 +210,7 @@ static void controls_section(void)
                 ImGui::TableSetColumnIndex(1 + k);
                 char b[96];
                 if (cap_row == r && cap_slot == k) SDL_snprintf(b, sizeof b, "press... %ds##%d_%d", (bind_capture_left_ms() + 999) / 1000, r, k);
-                else SDL_snprintf(b, sizeof b, "%s##%d_%d", bind_code_name(dev, bind_get(r, dev, k), nm, sizeof nm), r, k);
+                else SDL_snprintf(b, sizeof b, "%s%s##%d_%d", bind_combo(r, dev, k) ? "Aim + " : "", bind_code_name(dev, bind_get(r, dev, k), nm, sizeof nm), r, k);
                 if (ImGui::Button(b, ImVec2(-FLT_MIN, 0))) { cap_row = r; cap_slot = k; msg[0] = 0; bind_capture_start(dev); }
                 if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) { bind_set(r, dev, k, 0); settings_save_later(); }
             }

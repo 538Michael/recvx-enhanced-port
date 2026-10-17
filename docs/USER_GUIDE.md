@@ -224,10 +224,12 @@ Keyboard defaults (all rebindable):
 | Enter / Backspace | Start / Select |
 | Space (hold) | Quick knife |
 | T | Co-op trade request (next to the partner) |
+| R | Reload ([Reload](#reload)) |
 
 Any gamepad SDL supports works as a DualShock 2 (south/east/west/north = Cross/Circle/Square/
 Triangle, shoulders L1/R1, left trigger L2, right stick click R3). The right trigger is the
 quick knife and the left stick click the trade request, since those buttons have no game action.
+Aim (R1 / RB) + Triangle (Y) reloads ([Reload](#reload)).
 The game's own key types (OPTION -> KEY CONFIG) still decide what each PS2 button does.
 
 Third person (keyboard and mouse): W/S/A/D move and turn, Shift run, E action, Q cancel,
@@ -298,10 +300,32 @@ launcher (its rounds are combined in the inventory) and the knife, are left alon
 reloads the kind of arrows it holds. The sniper rifle and linear launcher reload only through
 their scope (their reload ends in it).
 
-Defaults: R in third person, RB / R1 with the Modern third-person gamepad controls. The fixed
-cameras and the Classic third-person gamepad have no free button for it: bind the "Reload" row
-(CONTROLS, `key_reload` / `pad_reload`, unbound by default), which works in every mode. In co-op
-it is your own action: the partner sees the reload and the ammo stays in your inventory.
+Defaults:
+
+| Mode | Keyboard | Gamepad |
+|---|---|---|
+| Fixed cameras | R | Aim + Triangle: hold R1 / RB, press Triangle / Y |
+| Third person, Classic gamepad | R | Aim + Triangle (as the fixed cameras) |
+| Third person, Modern gamepad | R | RB / R1 |
+
+The game rows' "Reload" (`key_reload` / `pad_reload`) works in every mode, the third-person
+"Reload" (`key_tps_reload` / `pad_tps_reload`) in third person. R is no game key in any key type.
+The gamepad has no free button, so its reload shares Triangle: while the weapon is raised
+Triangle does nothing in any key type (it is the map, or the options in type D, which open only
+with the weapon lowered).
+
+**Aim + button**: a reload binding may share a button with another action of its set (the game
+rows, or the third-person rows). Then it is a combination: pressed while aim is held it reloads,
+and the other action does not see that press at all, also when aim is let go before the button;
+pressed without aim the button does its own action, as before. Aim and the button pressed
+together count as Aim + button; the reload follows as soon as the weapon is up. In menus, events
+and the inventory the button always does its own action. CONTROLS shows such a binding as
+"Aim + Triangle" (or the key's name); a reload binding no other action uses works on its own, also
+with the weapon lowered. Bound to the aim button itself it reloads on every aim.
+
+A `recvx.ini` from before this (no `bindings_version` line) whose reload rows are still `none`,
+their default then, gets these defaults. In co-op it is your own action: the partner sees the
+reload and the ammo stays in your inventory.
 
 ### Modern controls (fixed cameras)
 
@@ -343,7 +367,7 @@ Hotkeys:
 F1 -> Controls (tabs Keyboard / mouse and Gamepad: click a binding, then press the key; right
 click clears) or OPTION -> ENHANCED SETTINGS -> CONTROLS (DEVICE picks the set). Each row has two
 slots. While waiting for a key, Esc cancels and Delete clears. A key already used by another row
-is swapped to that row. Gamepad buttons are named after the connected pad (Xbox, PlayStation,
+is swapped to that row; Reload instead shares it (Aim + button, [Reload](#reload)). Gamepad buttons are named after the connected pad (Xbox, PlayStation,
 Nintendo or generic).
 
 Bindings are saved in `recvx.ini` as `key_<row>` and `pad_<row>` (second slot `<row>_2`):
@@ -363,8 +387,8 @@ Keys use SDL key names (`Z`, `Return`, `Left Shift`, `PageUp`), mouse buttons
 Cross, `east`, `west`, `north`, `back`, `start`, `guide`, `leftshoulder`, `rightshoulder`,
 `leftstick`, `rightstick`, `dpup`, `dpdown`, `dpleft`, `dpright`, `misc1`, `paddle1`-`paddle4`,
 `touchpad`) or an axis half (`+lefttrigger`, `-leftx`, `+lefty`, ...). `none` unbinds.
-Extra rows: "Quick turn" (unbound by default: back, then run), "Reload" (unbound by default,
-[Reload](#reload)), the third-person keys, the
+Extra rows: "Quick turn" (unbound by default: back, then run), "Reload" (R, Aim + Triangle on
+the gamepad, [Reload](#reload)), the third-person keys, the
 third-person gamepad set (`pad_tps_*`, [Third person with a gamepad](#third-person-with-a-gamepad))
 and the hotkeys.
 

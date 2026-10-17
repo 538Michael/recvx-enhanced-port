@@ -81,7 +81,9 @@ camera behind, no camera or aim stick). Modern, as the RE2/RE4 remakes (button m
 * **Reload** (RB): the game's reload of an empty magazine at any time the magazine is not full
   (`pc/glue/reload_glue.c`, [USER_GUIDE.md](USER_GUIDE.md#reload)). Aiming it is the game's own;
   with the weapon lowered it comes up for the reload and goes down after it, and the camera stays
-  as when walking (`reload_at_rest`: no aim view, crosshair, facing or bend).
+  as when walking (`reload_at_rest`: no aim view, crosshair, facing or bend). With Classic gamepad
+  controls the fixed cameras' Aim + Triangle reloads; any reload binding may share a button with
+  another action as Aim + button ([USER_GUIDE.md](USER_GUIDE.md#reload)).
 * **Bindings**: the gamepad set has its own third-person rows (ini `pad_tps_aim`, `pad_tps_fire`,
   `pad_tps_action`, `pad_tps_cancel`, `pad_tps_run`, `pad_tps_inventory`, `pad_tps_map`,
   `pad_tps_reload`, `pad_tps_quickturn`, `pad_tps_knife`, `pad_tps_recenter`). They play only

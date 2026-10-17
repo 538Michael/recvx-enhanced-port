@@ -132,6 +132,7 @@ static void build_report(unsigned char* r)
     const bool* k = bind_keys();
 
     ensure_gamepad();
+    bind_combo_frame(input_enabled && !g_lobby_io.text_on, k, tps_mouse_buttons());   /* the reload combination first: it takes its presses from the rows */
     if (input_enabled) {
         int mouse = tps_mouse_buttons(), qt;
         /* keyboard and gamepad through the bindings (bindings.c; by default arrows = d-pad,
@@ -188,7 +189,8 @@ int pad_quick_knife(void)
 }
 
 /* reload (pc/glue/reload_glue.c), game thread: its row is held on the keyboard/mouse or the gamepad, or in
-   third person the third-person reload row (keyboard/mouse; the gamepad's in third-person play with the modern scheme) */
+   third person the third-person reload row (keyboard/mouse; the gamepad's in third-person play with the modern scheme);
+   a binding shared with another row only as Aim + that button (bindings.c bind_combo) */
 int pad_reload(void)
 {
     const bool* k = bind_keys();
