@@ -97,7 +97,7 @@ All PC settings are available in two places that edit the same values:
 
 Every setting of the table below is in both. Changes apply at once and are saved shortly after.
 The defaults of a first start are the PC-friendly ones: enhanced mode, widescreen, native
-renderer, skipped intro and door animations. Turn these off for a presentation closer to the PS2.
+renderer, skipped intro and door animations (Skip door animations: Instant). Turn these off for a presentation closer to the PS2.
 
 ### Display
 
@@ -136,7 +136,7 @@ visible, and Contrast until the right square on the white strip is barely visibl
 | Setting | ini key | Effect |
 |---|---|---|
 | Skip intro | `skip_intro` | on: boot straight into the title menu (next start) |
-| Skip door animations | `skip_doors` | on: room transitions use the game's load screen instead of the door/stairs/ladder animation (and its sounds) |
+| Skip door animations | `skip_doors` | the door, stairs, ladder and lift animations between rooms. Off (0): always played, as the original; **Instant** (1): the game's load screen instead (no animation, so no door sounds); Skippable (2): the animation plays, and any key, mouse button or gamepad button pressed while it runs ends it and the next room follows at once. The press that opened the door does not count; a press made while the next room is still loading ends the animation as soon as the room is ready. In co-op each player's own choice counts for its own doors; following the host always uses the load screen |
 | Battle Game unlocked | `battle_unlocked` | **on**: the title menu offers BATTLE GAME without a finished playthrough (Claire to start with; the other characters unlock as in the original). Saves and system data are not changed; off: only after a cleared game, as the original |
 | Quick knife | `quick_knife` | on: hold the quick-knife key to draw the combat knife without opening the inventory; release to get the previous weapon back |
 | **Saves** | | |

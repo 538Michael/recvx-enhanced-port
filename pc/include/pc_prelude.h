@@ -80,7 +80,8 @@ int   pc_rtex_bind(const void* image, unsigned int image_adr, unsigned int clut_
 void  pc_native_strip(const unsigned short* idx_uv, int n, const struct VU1_STRIP_BUF* vbuf, unsigned int prim,
                       int color_mode, int single, float uv_scale);   /* enhanced mode: clip volume enlarged into the GS guard band */
 int   pc_screen_filter_mode(void);
-int   pc_skip_door_demo(void);
+int   pc_skip_door_demo(void);       /* "Skip door animations" Instant: the load screen, no demo */
+int   pc_door_skip_pressed(int start);   /* Skippable: a press since the demo began (start: it begins now) */
 /* mods folder (pc/src/audio/adx.c, docs/modding/README.md "The mods folder"): size of <mods>/name or -1; ADXF handle or NULL */
 int   pc_mod_file_size(const char* name);
 void* pc_mod_open(const char* name);

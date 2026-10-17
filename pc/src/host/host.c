@@ -28,7 +28,17 @@ void audio_init(void);
 void gs_renderer_init(void);
 
 int pc_screen_filter_mode(void) { return g_config.screen_filter; }
-int pc_skip_door_demo(void) { return g_config.skip_doors; }
+/* "Skip door animations" (decomp system.c bhSysCallDoordemo): 0 the animation, 1 instant (the
+   load screen), 2 the animation until a key, mouse button or gamepad button is pressed */
+int pc_skip_door_demo(void) { return g_config.skip_doors == 1; }
+static SDL_AtomicInt presses;   /* key, mouse and gamepad button presses (host_pump_events) */
+int pc_door_skip_pressed(int start)
+{
+    static int at;   /* game thread */
+    int n = SDL_GetAtomicInt(&presses);
+    if (start) at = n;   /* the demo begins: the press that opened the door is older */
+    return g_config.skip_doors == 2 && n != at;
+}
 int pc_quick_knife_on(void) { return g_config.quick_knife; }
 int pc_cfg_no_ink_ribbon(void) { return g_config.no_ink_ribbon; }   /* in co-op the host's counts (coop_glue.c pc_no_ink_ribbon) */
 /* the game tests a few joints of a model against the screen; with a wide or moving free
@@ -107,6 +117,8 @@ void host_pump_events(void)
         if (ev.type == SDL_EVENT_GAMEPAD_ADDED || ev.type == SDL_EVENT_GAMEPAD_REMOVED) { extern void pad_devices_changed(void); pad_devices_changed(); }
         if (bind_event(&ev)) continue;   /* a "press a key" of the settings */
         if (overlay_event(&ev)) continue;
+        if ((ev.type == SDL_EVENT_KEY_DOWN && !ev.key.repeat) || ev.type == SDL_EVENT_MOUSE_BUTTON_DOWN || ev.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN)
+            SDL_AddAtomicInt(&presses, 1);
         tps_input_event(&ev);
         menu_mouse_event(&ev);
         lobby_io_event(&ev);
@@ -155,7 +167,8 @@ static void usage(void)
         "  --fullscreen\n"
         "  --enhanced         display-rate frames (60+ FPS) blended from the 30 FPS game (default)\n"
         "  --vanilla          original 30 FPS presentation\n"
-        "  --skip-doors       room transitions (doors, stairs, ladders) without their animation (default on)\n"
+        "  --skip-doors       room transitions (doors, stairs, ladders) without their animation (default;\n"
+        "                     skip_doors in recvx.ini: 0 played, 1 instant, 2 played until a key is pressed)\n"
         "  --skip-intro       boot straight into the title menu (default on)\n"
         "  --third-person     over-the-shoulder camera, mouse/keyboard controls (toggle: F5)\n"
         "  --coop-host PORT   online co-op: wait for a partner on this UDP port (F3: co-op window)\n"
