@@ -189,7 +189,7 @@ const Setting g_settings[] = {
     { SP_GAMEPLAY, "Skip door animations", V(g_config.skip_doors), 0, 2, 1, (const char* const[]){ "Off", "Instant", "Skippable" },
       .help = "Door, stairs and ladder animations. Off: always played. Instant: the game's load screen instead. Skippable: played, any key or button ends it." },
     { SP_GAMEPLAY, "Battle Game unlocked", V(g_config.battle_unlocked), 0, 1, 1,
-      .help = "The title menu offers BATTLE GAME without a finished playthrough. Saves and records stay as they are; off: only after a cleared game, as the original." },
+      .help = "The title menu offers BATTLE GAME without a finished playthrough, with all five characters. Saves and records stay as they are; off: as the original." },
     { SP_GAMEPLAY, "Quick knife", V(g_config.quick_knife), 0, 1, 1,
       .help = "Hold the quick-knife key (Space, right trigger; see CONTROLS) to draw the knife without the inventory; release it for the weapon before." },
     { SP_GAMEPLAY, "Save system", V(g_config.save_system), 0, 1, 1, save_systems,

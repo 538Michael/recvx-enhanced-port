@@ -11,6 +11,12 @@
   right away. The button you opened the door with does not count, so holding it does not skip.
   Your old setting carries over (on is Instant, off is Off). In co-op each player chooses for their
   own doors.
+- **Battle Game: every character from the start**: with "Battle Game unlocked" on (the default),
+  the Battle Game's character select now offers Claire, Claire in her other costume, Chris, Steve
+  and Wesker right away, so the whole Battle Game can be played without unlocking anything first.
+  Nothing is written to your system data: characters and best times you earn are saved as before,
+  and turned off the select shows only the characters you really unlocked. The Linear Launcher
+  still needs an A rank with every character.
 
 ### Menus
 
