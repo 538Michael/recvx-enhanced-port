@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- **Crash at the title with "You appear as"**: with your model set to one of the other playable
+  characters, the game no longer crashes when you go back to the title from a co-op game (as host
+  or partner, also after a game over), or when you open or leave the co-op lobby after playing.
+  The story's character switches and the Battle Game no longer crash with it either.
+
 ## 0.6.0 (2026-10-17)
 
 ### Gameplay

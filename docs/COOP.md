@@ -579,7 +579,9 @@ around `bhJumpEnemy` (`coop_enemy_begin/end`), `event.c bhControlEvent` (`coop_s
 `bhScenarioCheck(scd1)`), `effect.c` / `effsub3.c` (effect mirroring), `sub1.c GetItem`
 (`coop_item_granted`), `event.c bhItmCk` (`coop_item_taken`: a pickup, for important items),
 `pad.c bhSetPad` (trade input; `coop_skip_pad`: the skip button), `sdfunc.c` (the partner's voice bank),
-`ps2_NaTextureFunction.c njReleaseTextureAll` (`coop_textures_released`), and the title menu in
+`ps2_NaTextureFunction.c njReleaseTextureAll` (`coop_textures_released`), `system.c
+bhSysCallMonitor` before a character switch releases the player's textures (`coop_player_unload`,
+also without co-op), and the title menu in
 `adv.c` / `system.c` (the MULTIPLAYER row and the lobby mode). Not co-op only: `event.c
 bhPlItemCheck` and `ps2_McSaveFile.c mcWriteStartSaveFile` ask `pc_no_ink_ribbon()` (the setting,
 in co-op the host's rule) whether a typewriter needs and uses an ink ribbon.
