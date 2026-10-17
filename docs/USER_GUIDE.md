@@ -139,7 +139,7 @@ renderer, skipped intro and door animations (Skip door animations: Instant). Tur
 | **HD textures** | | see [HD texture packs](#hd-texture-packs) |
 | HD textures | `hd_textures` | **on**: a PCSX2 HD texture pack in `mods/textures` replaces the textures it covers (after a restart). Without a pack nothing changes |
 | HD textures: font | `hd_textures_font` | **off**: the game's font stays; on: the pack's font too |
-| HD textures: UI | `hd_textures_ui` | **off**; on: also replacements that show something else than the original, such as redesigned menus. Not properly supported yet |
+| HD textures: UI | `hd_textures_ui` | **on**: also replacements that show something else than the original, such as redesigned menus, title and inventory (the port's own menu entries keep the original letters); off: only replacements of the original picture |
 
 Brightness, contrast and gamma change the game's picture (menus and movies included), not the F1
 overlay; at the neutral values the picture is exactly the original. While one of them is chosen,
@@ -450,14 +450,14 @@ the pack comes:
 Rooms show the replacements from their first visible frame; the first time a room is entered its
 replacements are also checked against the original pictures, which can make that room take a
 moment longer to appear. Settings (Display): **HD textures** (on), **HD textures: font** (off)
-and **HD textures: UI** (off).
+and **HD textures: UI** (on).
 
-- A replacement is used only if it shows the same picture as the original. Packs made on another
-  disc version (for example a translation) or with redesigned menus change text and layouts there;
-  those replacements are skipped (the log names each) unless **HD textures: UI** is on. UI
-  elements are not properly supported yet: a redesigned menu may not fit the game's layout. The
-  port's own menu entries (MULTIPLAYER, ENHANCED SETTINGS, RETURN TO TITLE) always keep the
-  original letters.
+- Packs made on another disc version (for example a translation) or with redesigned menus
+  change text and layouts there. With **HD textures: UI** on (the default) those replacements are
+  used too; off, only replacements that show the same picture as the original are (the log names
+  each one skipped). Broken replacements (transparent where the original shows something) are
+  never used. The port's own menu entries (MULTIPLAYER, ENHANCED SETTINGS, RETURN TO TITLE) always
+  keep the original letters.
 - The game's font is kept unless **HD textures: font** is on.
 - Packs usually come without mipmaps, as PCSX2 uses them: very large textures shimmer a little in
   the distance.

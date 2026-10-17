@@ -104,6 +104,8 @@ every check; `RECVX_HD_DUMP=dir` writes each looked-up original as PNG under its
   distant surfaces shimmer.
 - The content check is a threshold: a replacement that changes a few small letters in a big
   texture can pass, a heavily repainted one fail.
-- Menus and other 2D: replacements that change a layout do not fit the game's (and the port's)
-  coordinates, so `hd_textures_ui` is off by default and not properly supported yet.
+- Menus and other 2D: with `hd_textures_ui` (on by default) redesigned menus are used; the
+  textures the port cuts its own menu entries from keep the original (`NTEX_KEEP`). A layout
+  that moves things the game draws at fixed coordinates can still look off; turn the option
+  off to keep the original menus.
 - Without a pack nothing changes (frame-identical, `pc/tools/layout_check.sh`).

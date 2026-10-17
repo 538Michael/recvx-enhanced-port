@@ -48,7 +48,7 @@ typedef struct {
     int  native_tex;         /* rendering rework: TIM2 textures uploaded once, bound afterwards (pc/glue/texture_glue.c) */          /* rendering rework: chunk models drawn by the GPU (pc/glue/native_glue.c) */         /* room transitions (doors, stairs, ladders) without their animation */
     int  hd_textures;        /* PCSX2 HD texture pack from mods/textures or hd_textures_dir (pc/src/gs/hdpack.c) */
     int  hd_textures_font;   /* the pack may replace the game's font pages too (default 0: the original font) */
-    int  hd_textures_ui;     /* the pack's replacements that differ from the original (redesigned menus) are used too (default 0) */
+    int  hd_textures_ui;     /* the pack's replacements that differ from the original (redesigned menus) are used too (default 1) */
     char hd_textures_dir[1024];   /* ini hd_textures_dir, --hd-textures DIR: the pack folder instead of mods/textures */
 } HostConfig;
 extern HostConfig g_config;

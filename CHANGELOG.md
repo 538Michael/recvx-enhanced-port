@@ -86,9 +86,8 @@
   inventory stop at the edge of the menu, as on a 4:3 screen.
 - **HD texture packs**: put a PCSX2 HD texture pack for the game into `mods/textures` and the
   game uses it, as the pack comes. Rooms show the HD textures from their first frame; replacements
-  that do not show the original picture are skipped. Replacing the font and redesigned menus is
-  off by default (DISPLAY: HD textures: font / UI); UI elements still have issues and are not
-  properly supported yet.
+  that are broken are skipped. Redesigned menus, title and inventory from a pack are used too
+  (DISPLAY: HD textures: UI); replacing the font is off by default (HD textures: font).
 
 ### Cheats
 

@@ -189,7 +189,7 @@ const Setting g_settings[] = {
     { SP_DISPLAY, "HD textures: font", V(g_config.hd_textures_font), 0, 1, 1,
       .help = "The pack may replace the game's font (messages, item names and descriptions). Off: the original font. Takes effect for text loaded afterwards." },
     { SP_DISPLAY, "HD textures: UI", V(g_config.hd_textures_ui), 0, 1, 1,
-      .help = "Also use replacements that show something else than the original, such as redesigned menus, title and inventory. Not properly supported yet: layouts may not fit. The port's own menu entries keep the original letters." },
+      .help = "Also use replacements that show something else than the original, such as redesigned menus, title and inventory. Off: only replacements of the original picture. The port's own menu entries keep the original letters." },
 
     { SP_GAMEPLAY, "Skip intro", V(g_config.skip_intro), 0, 1, 1, .flags = SET_RESTART, .help = "Boot straight into the title menu: no warning screen, logos or intro movie. Off: any button skips each of them.", .group = "GENERAL" },
     { SP_GAMEPLAY, "Skip door animations", V(g_config.skip_doors), 0, 2, 1, (const char* const[]){ "Off", "Instant", "Skippable" },
