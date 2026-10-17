@@ -32,6 +32,10 @@ extern int g_appear_anim;
    double shown as a cast model moves its own face with the double's lip sync; a player file shown
    there is replaced by the same character's cutscene model (which has a face) */
 extern int g_appear_face;
+/* "Your model in cutscenes" (ini appear_in_cutscenes, default 1): the cutscene doubles of the
+   character played are shown as the chosen model; 0: as the game has them (the real Claire or
+   Chris with their own hands, faces and voice), the chosen model only while the player is shown */
+extern int g_appear_cutscene;
 /* the character (ply_id) whose motion set a model with `anim` (ANIM_*) moves with while character
    `played` (0 Claire, 1 Chris, 2 Steve, 3 Wesker) is played: Chris for a man while Claire is
    played, Claire for a woman while a man is played, else -1 (the played character's own) */
@@ -73,6 +77,7 @@ int  actor_hand_free(int who, int node);   /* 1: the source's hand node (9, 13) 
 int  actor_head(int who, float* out);   /* world position of its head node (else its highest node); 0 when none is shown */
 void actor_doubles(int idx);            /* at the hand-off: the appearance for the cutscene doubles */
 void actor_double_tick(void);           /* every tick before the objects follow their links: the double's pose, hands, face */
+int  actor_double_acting(void);         /* a cutscene double of the character played is shown (a cutscene) */
 /* before actor_pose(who, src) (slots 0, 1): src shows the mesh of player character `mesh` (0..3, a
    part-file mesh on the real skeleton; -1: a catalogue model is shown) and plays the motions of
    character `motion`. Gender-matched animations need it; without it src's own motions are used. */

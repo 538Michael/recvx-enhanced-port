@@ -242,6 +242,7 @@ static struct {
     int mdl_n, mlw;
 } self_orig;
 static int self_mesh = -1, self_fail = -1, self_tex_gone;
+static int self_cine;                   /* self_cine_hair: the character's own head part is up for a cutscene double */
 /* What a cutscene leaves on the played character's model, set up for that character: scripts
    re-attach the head part sys->obwp[2] with its offsets (ObjLinkSetPly; Claire's ponytail at
    0, 1.58, 0.77, behind the head: Wesker's sunglasses ended up there) and a few room motions
@@ -270,6 +271,7 @@ static void self_restore(void)
         self_release(NULL, plp->mdl, plp->mdl_n);
         self_put_back();
         setup_hair(sys->obwp, plp, sys->ply_id);
+        self_cine = 0;
     } else {
         for (i = 0; i < self_orig.mdl_n; i++) self_orig.txp[i] = self_orig.mdl[i].texP;
         self_release(self_orig.txp, NULL, self_orig.mdl_n);   /* the old model's textures we kept */
@@ -332,6 +334,7 @@ static int self_load(int mesh)
     plp->mlwP->owP[11].flg |= 0x8;
     self_carry_pose(&self_orig.mdl[self_orig.mlw]);
     setup_hair(sys->obwp, plp, mesh & 3);
+    self_cine = 0;
     {
         O_WRK* op = &sys->obwp[2];
         self_part.objP = (op->flg & 0x1) ? op->mdl[0].objP : NULL;
@@ -349,15 +352,47 @@ static int self_load(int mesh)
 static void self_actor(int idx)
 {
     int was = actor_shown(0);
-    if (actor_set(0, idx)) sys->obwp[2].flg = 0;
-    else if (was) setup_hair(sys->obwp, plp, self_mesh >= 0 ? self_mesh & 3 : sys->ply_id);
+    if (actor_set(0, idx)) { if (!self_cine) sys->obwp[2].flg = 0; }
+    else if (was) { setup_hair(sys->obwp, plp, self_mesh >= 0 ? self_mesh & 3 : sys->ply_id); self_cine = 0; }
+}
+
+/* "Your model in cutscenes" off (g_appear_cutscene): while a cutscene double of the character played
+   acts, sys->obwp[2] is the character's own head part (Claire's ponytail: the scripts link it to the
+   double, ObjLinkSet), from its own model; when the double is gone, ours again. Where the script
+   linked it (work, node, x offset) is kept. Every tick before the objects follow their links. */
+extern ETTY_WORK lkmtab[2];             /* player.c: the head parts (both sub-model 4) */
+static void self_cine_hair(void)
+{
+    O_WRK* op = &sys->obwp[2];
+    int mesh = self_mesh >= 0 && self_ours(), want = !g_appear_cutscene && (actor_shown(0) || mesh) && actor_double_acting();
+    int v = lkmtab[0].mdlver, n = plp->mdl_n, ono = op->lkono, *s = plp->skp[v];
+    unsigned char* lk = op->lkwkp;
+    float lox = op->lox;
+    ML_WORK m;
+    if (want == self_cine) return;
+    self_cine = want;
+    m = plp->mdl[v];
+    if (want && mesh) {   /* the head part of the model the game loaded (self_orig) */
+        plp->mdl[v] = self_orig.mdl[v]; plp->skp[v] = self_orig.skp[v]; plp->mdl_n = self_orig.mdl_n;
+    }
+    if (want || mesh) setup_hair(sys->obwp, plp, want ? sys->ply_id : self_mesh & 3);   /* (as bhSetPlayer / self_load) */
+    else op->flg = 0;   /* (as self_actor) */
+    plp->mdl[v] = m; plp->skp[v] = s; plp->mdl_n = n;
+    op->lkwkp = lk; op->lkono = ono; op->lox = lox;
+    if (want && op->id == 1211) {   /* the ponytail's work: the player's, as bhObjClpn takes it linked to plp
+                                       (linked to the double it took it from sys->memp, under a pending disc read) */
+        op->flg |= 0x100000;
+        op->exp0 = &sys->pletcp[4096];
+        op->exp3 = sys->pletcp;
+    }
 }
 
 /* every tick after bhControlPlayer (before the objects follow their links) */
 static void self_keep(void)
 {
     O_WRK* op = &sys->obwp[2];
-    if (actor_shown(0)) op->flg &= ~0x1;   /* also when the game set up the player again (story switch) */
+    self_cine_hair();
+    if (actor_shown(0) && !self_cine) op->flg &= ~0x1;   /* also when the game set up the player again (story switch) */
     actor_source(0, plp, self_mesh >= 0 && self_ours() ? self_mesh & 3 : actor_shown(0) ? -1 : sys->ply_id, sys->ply_id);   /* gender-matched animations */
     actor_pose(0, plp);
     if (self_mesh < 0 || !self_ours()) return;
@@ -393,6 +428,7 @@ void coop_textures_released(void)
     forget();   /* njReleaseTextureAll freed them; the model is reloaded when next needed */
     actor_textures_released();
     self_tex_gone = 1;
+    self_cine = 0;
     /* the game ended (bhExitGame: continue, title, load): our player is not in a game until
        coop_control_remote runs again. Set in this frame before the exit, it made the hand-off load
        the appearance and write sys->obwp[2] of the zeroed game state (NULL): the crash on continue. */
@@ -756,7 +792,7 @@ int pc_player_voice(int se)
     if (partner_voice)
         v = voice_of(rx.chr >= 4 ? COOP_CHR_ACTOR + rx.chr - 4 : rx.chr + 1, rx.mfile & 3);   /* (pose chr 0..3: the player files) */
     else {
-        v = voice_of(g_coop.chr, own);
+        v = !g_appear_cutscene && actor_double_acting() ? own : voice_of(g_coop.chr, own);   /* "Your model in cutscenes" off: the double's own */
         tx.voice = (unsigned char)se;
         tx.voice_n++;
     }

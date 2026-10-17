@@ -9,6 +9,7 @@
 
 int g_appear_anim = 1;
 int g_appear_face = 0;
+int g_appear_cutscene = 1;
 
 const ActorModel actor_models[] = {
     /* the story cast, moved by the player's motions (a man's or a woman's, section 8) */
