@@ -17,11 +17,8 @@
 
 ### Gameplay
 
-- **Skip the intro screens one by one**: with "Skip intro" off, the warning screen, the ADX and
-  Capcom logos and the intro movie can now each be cut short with any key, mouse button or
-  gamepad button (the intro movie used to take only Start). One press skips the screen you are
-  looking at and the next one plays as usual; holding a button down does not skip them all, and
-  the press never carries over into the title menu.
+- **Skippable intro**: with "Skip intro" off, the intro screens and the intro movie can now be
+  skipped with any button.
 - **Skip door animations: Off, Instant or Skippable** (GAMEPLAY): the setting is now a choice.
   Off plays every door, stairs, ladder and lift animation as the original; Instant (the default,
   as before) goes straight to the load screen; Skippable plays the animation, and pressing any
@@ -29,12 +26,8 @@
   right away. The button you opened the door with does not count, so holding it does not skip.
   Your old setting carries over (on is Instant, off is Off). In co-op each player chooses for their
   own doors.
-- **Battle Game: every character from the start**: with "Battle Game unlocked" on (the default),
-  the Battle Game's character select now offers Claire, Claire in her other costume, Chris, Steve
-  and Wesker right away, so the whole Battle Game can be played without unlocking anything first.
-  Nothing is written to your system data: characters and best times you earn are saved as before,
-  and turned off the select shows only the characters you really unlocked. The Linear Launcher
-  still needs an A rank with every character.
+- **Battle Game: every character from the start**: all Battle Game characters are unlocked
+  right away (with "Battle Game unlocked" on, the default).
 - **Fast loading** (GAMEPLAY, on by default): room changes, starting a new game and loading a
   save are much quicker. The game no longer waits for the PS2's disc and sound chip, which the PC
   does not have: the next room's sounds and textures are ready at once, so the load screen is gone
@@ -84,12 +77,7 @@
   Rockfort's yards, the airport or the Antarctic base, or all the way to remove the fog. Many
   rooms also use a black fog as darkness, so these get lighter too. The change shows at once.
   Suggested by fmil95 of the decompilation project.
-- **Widescreen menus**: on widescreen and ultrawide monitors the picture strips at the top and
-  bottom of the OPTION screen now run across the whole window, without ending at the edge of the
-  picture. In the inventory, the item box, the files and the map, things the game keeps off-screen
-  stay hidden at the sides: no more blue box beside a file or manual, and when you turn a page the
-  next one no longer shows up at the right before it slides in. Panels sliding in and out of the
-  inventory stop at the edge of the menu, as on a 4:3 screen.
+- **Widescreen menus**: menus now properly support widescreen and ultrawide.
 - **HD texture packs**: put a PCSX2 HD texture pack for the game into `mods/textures` and the
   game uses it, as the pack comes. Rooms show the HD textures from their first frame; replacements
   that are broken are skipped. Redesigned menus, title and inventory from a pack are used too
