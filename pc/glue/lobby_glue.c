@@ -180,12 +180,15 @@ void pc_title_menu_init(void)
     ap->CursorMax[0] = n + 1;
 }
 
+void pc_tex_keep_original(int texno);
+
 /* DisplayGameModePlate with the MULTIPLAYER row (the game's 3 or 4 rows moved up to make room) */
 void pc_title_plates(int cursor, int n, float fade, int flag)
 {
     static const float vdef[2][4] = { { 64.0f, 96.0f, 128.0f, 224.0f }, { 64.0f, 96.0f, 224.0f, 128.0f } };
     ADV_WORK* ap = &AdvWork;
     int i, extra = ap->ExtraFlag != 0;
+    pc_tex_keep_original(1);   /* MULTIPLAYER is cut from it: no HD replacement (texture_glue.c) */
     for (i = 0; i < n; i++) {
         unsigned int alpha = fade, col = 0x7F7F7F;
         float y = title_row_y(i, n);

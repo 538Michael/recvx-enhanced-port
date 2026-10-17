@@ -184,6 +184,12 @@ const Setting g_settings[] = {
     { SP_DISPLAY, "Native 3D renderer", V(g_config.native_3d), 0, 1, 1, .help = "3D models projected and clipped by the GPU instead of the emulated VU1 and GS.", .group = "RENDERER" },
     { SP_DISPLAY, "Native textures", V(g_config.native_tex), 0, 1, 1, .help = "Textures uploaded once and bound afterwards instead of re-uploaded on every switch." },
     { SP_DISPLAY, "Cull off-screen models", V(g_config.model_cull), 0, 1, 1, .help = "As on the PS2. Off: models no longer pop at the screen edges. Third person never culls." },
+    { SP_DISPLAY, "HD textures", V(g_config.hd_textures), 0, 1, 1, .flags = SET_RESTART,
+      .help = "A PCSX2 HD texture pack in mods/textures (as PCSX2 ships it) replaces the textures it covers. Off: the original textures." },
+    { SP_DISPLAY, "HD textures: font", V(g_config.hd_textures_font), 0, 1, 1,
+      .help = "The pack may replace the game's font (messages, item names and descriptions). Off: the original font. Takes effect for text loaded afterwards." },
+    { SP_DISPLAY, "HD textures: UI", V(g_config.hd_textures_ui), 0, 1, 1,
+      .help = "Also use replacements that show something else than the original, such as redesigned menus, title and inventory. Not properly supported yet: layouts may not fit. The port's own menu entries keep the original letters." },
 
     { SP_GAMEPLAY, "Skip intro", V(g_config.skip_intro), 0, 1, 1, .flags = SET_RESTART, .help = "Boot straight into the title menu: no warning screen, logos or intro movie. Off: any button skips each of them.", .group = "GENERAL" },
     { SP_GAMEPLAY, "Skip door animations", V(g_config.skip_doors), 0, 2, 1, (const char* const[]){ "Off", "Instant", "Skippable" },

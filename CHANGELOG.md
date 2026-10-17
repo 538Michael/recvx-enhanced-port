@@ -84,6 +84,11 @@
   stay hidden at the sides: no more blue box beside a file or manual, and when you turn a page the
   next one no longer shows up at the right before it slides in. Panels sliding in and out of the
   inventory stop at the edge of the menu, as on a 4:3 screen.
+- **HD texture packs**: put a PCSX2 HD texture pack for the game into `mods/textures` and the
+  game uses it, as the pack comes. Rooms show the HD textures from their first frame; replacements
+  that do not show the original picture are skipped. Replacing the font and redesigned menus is
+  off by default (DISPLAY: HD textures: font / UI); UI elements still have issues and are not
+  properly supported yet.
 
 ### Cheats
 

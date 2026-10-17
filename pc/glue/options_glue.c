@@ -55,6 +55,7 @@ static unsigned int cancel_button(void) { return (sys->keytype & 3) < 3 ? AdvGet
 
 /* Adv_GameOptionScreen, every frame: the OS cursor shows while the option screen is up */
 void pc_options_frame(void) { g_menu_mouse.active = 1; }
+void pc_tex_keep_original(int texno);   /* texture_glue.c: our entries are cut from the option textures */
 
 /* ---------------------------------------------------------------- level 0: ENHANCED SETTINGS, RETURN TO TITLE
    ENHANCED SETTINGS: on EXIT's row, at the right, like STEREO / MONO and ON / OFF: left/right move
@@ -98,6 +99,7 @@ static float word_w(const Glyph* g, int n)
 static void word(const Glyph* g, int n, float x, float y, unsigned int col, float z)
 {
     QUAD* q = &Qtex[15];
+    pc_tex_keep_original(0);
     for (int i = 0; i < n; i++) {
         if (g[i].u >= 0) {
             SetQuadPos(x, y, g[i].dw, 32.0f, q);
@@ -500,6 +502,7 @@ static void draw(void)
     QUAD* q = &Qtex[1];
     SetQuadPos(96.0f, 96.0f, 448.0f, 48.0f, q);   /* the OPTION title, as level 0 */
     SetQuadUv2(0, 320.0f, 448.0f, 48.0f, 2, q);
+    pc_tex_keep_original(1);
     AdvEasyDrawTexture(1, -1, q, 0.05f, 1);
     FlushPlate();
     pc_ui_rect(28, 146, 612, Y_BOTTOM, 0xA0000000, Z_PANEL);

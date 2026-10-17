@@ -136,6 +136,10 @@ renderer, skipped intro and door animations (Skip door animations: Instant). Tur
 | Native 3D renderer | `native_3d` | **on**: 3D models projected and clipped by the GPU instead of the emulated VU1/GS path |
 | Native textures | `native_tex` | **on**: textures uploaded once instead of on every switch |
 | Cull off-screen models | `model_cull` | **on** (as on the PS2); off stops models popping at the screen edges |
+| **HD textures** | | see [HD texture packs](#hd-texture-packs) |
+| HD textures | `hd_textures` | **on**: a PCSX2 HD texture pack in `mods/textures` replaces the textures it covers (after a restart). Without a pack nothing changes |
+| HD textures: font | `hd_textures_font` | **off**: the game's font stays; on: the pack's font too |
+| HD textures: UI | `hd_textures_ui` | **off**; on: also replacements that show something else than the original, such as redesigned menus. Not properly supported yet |
 
 Brightness, contrast and gamma change the game's picture (menus and movies included), not the F1
 overlay; at the neutral values the picture is exactly the original. While one of them is chosen,
@@ -431,6 +435,35 @@ The F2 window (also the EXTRAS page of ENHANCED SETTINGS) is meant for testing a
   crash.
 
 In co-op, enemy spawning is host-only. Actions chosen in ENHANCED SETTINGS run when the menu closes.
+
+## HD texture packs
+
+The game can use an HD texture pack made for the PCSX2 emulator (SLUS-20184, the US release), as
+the pack comes:
+
+1. Put it into the folder `textures` inside the `mods` folder (next to `save/`): the game's folder
+   from PCSX2's `textures` directory (`mods/textures/SLUS-20184/replacements/...`), only its
+   `replacements` folder, or the files themselves all work. A folder elsewhere:
+   `hd_textures_dir = <path>` in `recvx.ini`, or `--hd-textures <path>`.
+2. Start the game. The log says `hd textures: N replacements in <folder>`.
+
+Rooms show the replacements from their first visible frame; the first time a room is entered its
+replacements are also checked against the original pictures, which can make that room take a
+moment longer to appear. Settings (Display): **HD textures** (on), **HD textures: font** (off)
+and **HD textures: UI** (off).
+
+- A replacement is used only if it shows the same picture as the original. Packs made on another
+  disc version (for example a translation) or with redesigned menus change text and layouts there;
+  those replacements are skipped (the log names each) unless **HD textures: UI** is on. UI
+  elements are not properly supported yet: a redesigned menu may not fit the game's layout. The
+  port's own menu entries (MULTIPLAYER, ENHANCED SETTINGS, RETURN TO TITLE) always keep the
+  original letters.
+- The game's font is kept unless **HD textures: font** is on.
+- Packs usually come without mipmaps, as PCSX2 uses them: very large textures shimmer a little in
+  the distance.
+- Checked files are remembered in `save/hd_textures.txt`; delete it after changing the pack.
+- Memory: up to 1 GB of loaded replacements stays on the graphics card, the least recently used
+  are dropped. Details: [HD_PACK.md](HD_PACK.md).
 
 ## Mods
 

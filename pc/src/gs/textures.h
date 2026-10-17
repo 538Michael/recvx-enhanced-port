@@ -10,7 +10,10 @@
 #define NTEX_ID_SLOTS (1u << NTEX_ID_BITS)
 
 /* render thread, from the stream */
-void ntex_define_begin(uint32_t id, uint32_t tbp, uint32_t cbp, uint32_t image_pages);
+/* tags of a definition (game thread, texture_glue.c), for HD texture packs (hdpack.c) */
+#define NTEX_FONT 1   /* one of the game's font pages */
+#define NTEX_KEEP 2   /* the port cuts its own menu entries from it */
+void ntex_define_begin(uint32_t id, uint32_t tbp, uint32_t cbp, uint32_t image_pages, int flags);
 int  ntex_defining(void);
 void ntex_define_reg(int reg, uint64_t v);
 void ntex_define_image(const uint8_t* data, uint32_t len);

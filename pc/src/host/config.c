@@ -41,6 +41,9 @@ static const struct { const char* key; int* val; int lo, hi; } keys[] = {
     { "save_system", &g_config.save_system, 0, 1 },     /* 0 native files, 1 memory card */
     { "native_3d", &g_config.native_3d, 0, 1 },
     { "native_tex", &g_config.native_tex, 0, 1 },
+    { "hd_textures", &g_config.hd_textures, 0, 1 },
+    { "hd_textures_font", &g_config.hd_textures_font, 0, 1 },
+    { "hd_textures_ui", &g_config.hd_textures_ui, 0, 1 },
     { "interpolate", &g_config.interpolate, 0, 1 },
     { "frame_blend", &g_config.frame_blend, -1, 1 },
     { "coop_port", &g_coop.port, 1, 65535 },
@@ -118,6 +121,8 @@ static char* trim(char* s)
     return s;
 }
 
+static char ini_hd_dir[1024];
+
 static void path(char* out, size_t n) { SDL_snprintf(out, n, "%s/recvx.ini", g_config.save_dir); }
 
 void config_load(void)
@@ -134,6 +139,7 @@ void config_load(void)
         else if (!strncmp(line, "coop_server =", 13)) { if (sscanf(line + 13, " %127s", g_coop.server) != 1) g_coop.server[0] = 0; continue; }   /* empty: no server */
         else if (sscanf(line, " coop_name = %15[^\r\n]", g_coop.name) == 1) continue;
         else if (sscanf(line, " iso = %1023[^\r\n]", g_config.iso_path) == 1) continue;
+        else if (sscanf(line, " hd_textures_dir = %1023[^\r\n]", ini_hd_dir) == 1) { SDL_strlcpy(g_config.hd_textures_dir, ini_hd_dir, sizeof(ini_hd_dir)); continue; }
         else if (sscanf(line, " %63[a-z_0-9] = %127[^\r\n]", k, val) == 2 && bind_ini_line(k, trim(val))) continue;
         else if (sscanf(line, " %63[a-z_0-9] = %d", k, &v) == 2)
             for (size_t i = 0; i < SDL_arraysize(keys); i++)
@@ -179,6 +185,7 @@ static int write_ini(FILE* f, void* ud)
         fprintf(f, "\n");
     }
     if (g_config.iso_path[0]) fprintf(f, "iso = %s\n", g_config.iso_path);
+    if (ini_hd_dir[0]) fprintf(f, "hd_textures_dir = %s\n", ini_hd_dir);   /* not --hd-textures */
     bind_ini_write(f);
     return 0;
 }
