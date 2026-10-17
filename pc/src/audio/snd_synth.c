@@ -124,7 +124,7 @@ static int adsr_tick(Voice* v)
         int32_t cycles = 1 << (shift > 11 ? shift - 11 : 0);
         int32_t s = step << (shift < 11 ? 11 - shift : 0);
         if (expo && inc && v->level > 0x6000) cycles *= 4;
-        if (expo && !inc) s = (int32_t)((int64_t)s * v->level / 0x8000);
+        if (expo && !inc) s = (int32_t)(((int64_t)s * v->level) >> 15);   /* rounds down as the SPU: at least -1, so a release reaches 0 (a division stalled it above 0: a looping voice sounded on after its key-off) */
         v->wait = cycles - 1;
         v->level += s;
     }
