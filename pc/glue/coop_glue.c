@@ -356,7 +356,7 @@ static void self_actor(int idx)
     else if (was) { setup_hair(sys->obwp, plp, self_mesh >= 0 ? self_mesh & 3 : sys->ply_id); self_cine = 0; }
 }
 
-/* "Your model in cutscenes" off (g_appear_cutscene): while a cutscene double of the character played
+/* "Swapped model in cutscenes" off (g_appear_cutscene): while a cutscene double of the character played
    acts, sys->obwp[2] is the character's own head part (Claire's ponytail: the scripts link it to the
    double, ObjLinkSet), from its own model; when the double is gone, ours again. Where the script
    linked it (work, node, x offset) is kept. Every tick before the objects follow their links. */
@@ -792,7 +792,7 @@ int pc_player_voice(int se)
     if (partner_voice)
         v = voice_of(rx.chr >= 4 ? COOP_CHR_ACTOR + rx.chr - 4 : rx.chr + 1, rx.mfile & 3);   /* (pose chr 0..3: the player files) */
     else {
-        v = !g_appear_cutscene && actor_double_acting() ? own : voice_of(g_coop.chr, own);   /* "Your model in cutscenes" off: the double's own */
+        v = !g_appear_cutscene && actor_double_acting() ? own : voice_of(g_coop.chr, own);   /* "Swapped model in cutscenes" off: the double's own */
         tx.voice = (unsigned char)se;
         tx.voice_n++;
     }

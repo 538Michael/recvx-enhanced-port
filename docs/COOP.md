@@ -499,7 +499,7 @@ appear in the joiner's game in the same slots. Details: [ENEMIES.md](ENEMIES.md)
 "You appear as" (lobby MODEL, F3, F1 / ENHANCED SETTINGS APPEARANCE; ini `coop_char`) chooses your model: the
 character you play, Claire, Chris, Steve, Wesker, Claire's second costume, or a story-cast, creature
 or zombie model. Your partner sees you as that model, and so do you (also in single player). The
-partner's voice follows its model. Both players need the same build. "Your model in cutscenes"
+partner's voice follows its model. Both players need the same build. "Swapped model in cutscenes"
 (`appear_in_cutscenes`) counts for your own screen: off, your cutscenes (also one replayed from
 the partner's event) show the real Claire or Chris. Models, voices and cutscene behaviour:
 [ACTORS.md](ACTORS.md).

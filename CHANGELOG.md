@@ -51,14 +51,14 @@
 - **Return to the title**: during a game the OPTION screen has a new entry, RETURN TO TITLE, on
   the DEFAULT row above ENHANCED SETTINGS.
 - **ENHANCED SETTINGS tidied up**: your model settings ("You appear as", gender-matched
-  animations, your model in cutscenes, talking faces) moved from the CO-OP page to a new
+  animations, swapped model in cutscenes, talking faces) moved from the CO-OP page to a new
   APPEARANCE page, since they apply in single player too; F1 has the same section and can now
   change "You appear as" as well. The DISPLAY page has new WIDESCREEN and FOG AND BRIGHTNESS
   headings. Your settings stay as they were.
 
 ### Appearance
 
-- **Your model in cutscenes** (APPEARANCE page, on by default): turn it off to keep playing as the
+- **Swapped model in cutscenes** (APPEARANCE page, on by default): turn it off to keep playing as the
   model you chose while the cutscenes show the real Claire or Chris, with their own hands, faces
   and voice, ponytail included. Your model is back as soon as you are in control again. Scenes in
   which the character you play acts as itself, without a stand-in, keep your model. In co-op each

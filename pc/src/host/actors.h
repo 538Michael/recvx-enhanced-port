@@ -32,7 +32,7 @@ extern int g_appear_anim;
    double shown as a cast model moves its own face with the double's lip sync; a player file shown
    there is replaced by the same character's cutscene model (which has a face) */
 extern int g_appear_face;
-/* "Your model in cutscenes" (ini appear_in_cutscenes, default 1): the cutscene doubles of the
+/* "Swapped model in cutscenes" (ini appear_in_cutscenes, default 1): the cutscene doubles of the
    character played are shown as the chosen model; 0: as the game has them (the real Claire or
    Chris with their own hands, faces and voice), the chosen model only while the player is shown */
 extern int g_appear_cutscene;

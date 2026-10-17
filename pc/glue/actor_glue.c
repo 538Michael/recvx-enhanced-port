@@ -1437,7 +1437,7 @@ void actor_double_tick(void)
 
 /* at the hand-off: the model for the cutscene doubles of the character played (appearance: a
    catalogue index, ACTOR_PART + part file - 10, or -1); loaded only while the room has one.
-   "Your model in cutscenes" off: none, the game draws its doubles (hands, face, all their own) */
+   "Swapped model in cutscenes" off: none, the game draws its doubles (hands, face, all their own) */
 void actor_doubles(int idx)
 {
     int i, j, pid = sys->ply_id & 3, any = 0;

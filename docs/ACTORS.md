@@ -347,7 +347,7 @@ loader ([ENEMIES.md](ENEMIES.md) "Enemy spawner (F2)").
 our player as one of the player files or one of 62 models found in the room files: the story
 cast, the creatures, the zombie variants (`pc/src/host/actors.c`). It applies in single player and
 co-op (the partner sees it too) and in cutscenes to the event double of the character played
-(unless "Your model in cutscenes" is off, see "Cutscene doubles").
+(unless "Swapped model in cutscenes" is off, see "Cutscene doubles").
 
 ### The list
 
@@ -563,7 +563,7 @@ weapon of a hand the model lacks floated at the invisible source's hand.
   table are not shown; expressions are not copied. A player file chosen as the appearance is shown
   on the double as the same character's cutscene model. `face_src` copies rest meshes to 64-byte
   boundaries (the morph reads them with `lq`). A mask that does not fit leaves the model without.
-* **Your model in cutscenes** (APPEARANCE page and F1, ini `appear_in_cutscenes`, default 1). Off: the
+* **Swapped model in cutscenes** (APPEARANCE page and F1, ini `appear_in_cutscenes`, default 1). Off: the
   doubles stay the game's own (the real Claire or Chris, their hand pieces, face mask, lip sync);
   the chosen model is shown only while the player itself is. What counts as a cutscene is the
   double: a scene (story cutscene or a short in-game event) counts while an event double of the
