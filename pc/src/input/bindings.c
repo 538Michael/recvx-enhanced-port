@@ -429,9 +429,10 @@ static void parse_keys(void)
         if (*e != ':') break;
         p = e + 1;
         if (*p == '@') {
-            st->click = 1;
+            st->click = SDL_BUTTON_LEFT;
             st->x = strtof(p + 1, &e);
             st->y = *e == ':' ? strtof(e + 1, &e) : 0;
+            if (*e == ':' && e[1] == 'r') { st->click = SDL_BUTTON_RIGHT; e += 2; }
             p = e;
         } else
             while (*p && *p != ',') {
@@ -691,7 +692,7 @@ int bind_event(const void* e)
 /* ---------------------------------------------------------------- test aids (main thread)
    RECVX_KEYS="<frame>:<key>+<key>,<frame>:-,<frame>:@<x>:<y>": hold keyboard keys (SDL names,
    '_' for a space) from that presented frame on, as key state and key events; @x:y clicks the
-   left mouse button at window pixel x/y (as events: the overlay).
+   left mouse button at window pixel x/y (as events: the overlay), @x:y:r the right one.
    RECVX_VPAD="<frame>:<input>+<input>,...": a virtual SDL gamepad (RECVX_VPAD_TYPE xbox, ps5 or
    generic; default xbox) holding gamepad inputs in the ini spelling (south, dpup, +lefttrigger),
    or an axis at a value from -1 to 1 (leftx=0.5, lefty=-1: the left stick half right, all up). */
@@ -708,7 +709,7 @@ static void push_key(int sc, int down)
     SDL_PushEvent(&e);
 }
 
-static void push_click(float x, float y, int down)
+static void push_click(float x, float y, int down, int button)
 {
     extern SDL_Window* g_window;
     SDL_Event e;
@@ -721,7 +722,7 @@ static void push_click(float x, float y, int down)
     SDL_zero(e);
     e.type = down ? SDL_EVENT_MOUSE_BUTTON_DOWN : SDL_EVENT_MOUSE_BUTTON_UP;
     e.button.windowID = SDL_GetWindowID(g_window);
-    e.button.button = SDL_BUTTON_LEFT;
+    e.button.button = (Uint8)button;
     e.button.down = down;
     e.button.clicks = 1;
     e.button.x = x; e.button.y = y;
@@ -745,9 +746,9 @@ static void keys_frame(uint64_t now)
     static float cx, cy;
     const KeyStep* st;
     parse_keys();
-    if (click_up) { push_click(cx, cy, 0); click_up = 0; }
+    if (click_up) { push_click(cx, cy, 0, click_up); click_up = 0; }
     for (; next < nsteps && steps[next].at <= now; next++)
-        if (steps[next].click) { cx = steps[next].x; cy = steps[next].y; push_click(cx, cy, 1); click_up = 1; }
+        if (steps[next].click) { cx = steps[next].x; cy = steps[next].y; push_click(cx, cy, 1, steps[next].click); click_up = steps[next].click; }
     if (!nsteps) return;
     st = key_step(now);
     for (int i = 0; i < SDL_SCANCODE_COUNT; i++) {
