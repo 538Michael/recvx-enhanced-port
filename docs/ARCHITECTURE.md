@@ -360,6 +360,11 @@ village, collision. The render thread (GS emulation, replays: `r_exec`, `r_inter
     three planes once per new frame and converts them on the GPU (BT.601 video range, MPEG-2
     chroma siting, interpolated chroma) into the texture the sprite samples. The PS2 path's
     upload of the IPU's macroblock output into GS memory (`setImageTag`) is gone.
+  - The streams have no letterbox bars of their own: the game draws them 640 x 320 (2:1) at
+    Y 64 (`sdfunc.c MovieDef`), the 4:3 credits 640 x 448. **Movie zoom** (`movie_zoom`)
+    scales that sprite evenly about the screen centre until it reaches the widened view's width
+    or the 480 displayed lines, whichever comes first, so only black leaves the screen; at 4:3
+    the factor is 1 and the sprite is the game's.
   - Movie frames have no tagged 3D, so the in-between path never blends or replays them: each
     display refresh shows the latest executed frame.
 

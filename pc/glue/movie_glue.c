@@ -140,7 +140,7 @@ void vbrank_draw(void)
     unsigned long* tag;
     const unsigned long giftag_eop[2] = { SCE_GIF_SET_TAG(0, 1, 0, 0, 0, 1), 0x000000000000000EL };
     int u, v;
-    int y;
+    int x, y;
     int w, h;
 
     if (skip_movies || frame_shown < 0) return;
@@ -156,6 +156,20 @@ void vbrank_draw(void)
 
     w = mdSize.sWidth * 16;
     h = mdSize.sHeight * 16;
+    x = 27648;
+    if (pc_movie_zoom() && w > 0 && h > 0) {
+        /* option: the sprite scaled evenly about the screen centre until it fills the widened
+           view's width or the 480 displayed lines (Y 1808..2288). The streams have no bars of
+           their own: the game letterboxes by drawing them 640 x 320 (2:1), so what leaves the
+           screen is only black */
+        float sw = 640.0f * pc_hor_scale() / mdSize.sWidth, sh = 480.0f / mdSize.sHeight, s = sw < sh ? sw : sh;
+        if (s > 1.0f) {
+            w = (int)(w * s + 0.5f);
+            h = (int)(h * s + 0.5f);
+            x = (1728 + 320) * 16 - w / 2;
+            y = (1824 + 224) * 16 - h / 2;
+        }
+    }
 
     *tag++ = DMAend | 0x9;
     *tag++ = 0;
@@ -178,13 +192,13 @@ void vbrank_draw(void)
     *tag++ = SCE_GS_SET_UV(8, 8);
     *tag++ = SCE_GS_UV;
 
-    *tag++ = SCE_GS_SET_XYZ2(27648, y, 0);
+    *tag++ = SCE_GS_SET_XYZ2(x, y, 0);
     *tag++ = SCE_GS_XYZ2;
 
     *tag++ = SCE_GS_SET_UV(u + 8, v + 8);
     *tag++ = SCE_GS_UV;
 
-    *tag++ = SCE_GS_SET_XYZ2(w + 27648, y + h, 0);
+    *tag++ = SCE_GS_SET_XYZ2(w + x, y + h, 0);
     *tag++ = SCE_GS_XYZ2;
 
     SyncPath();
