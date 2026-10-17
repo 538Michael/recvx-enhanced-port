@@ -119,6 +119,7 @@ extern int coop_on;
 void  coop_control_remote(void);
 void  coop_draw_remote(void);
 void  coop_textures_released(void);
+void  coop_player_unload(void);                /* system.c bhSysCallMonitor: the player's textures go, another character loads (story switch, Battle Game rooms) */
 struct BH_PWORK;
 int   coop_enemy_begin(struct BH_PWORK* ep);   /* 1 = step done (client puppet) */
 void  coop_enemy_end(struct BH_PWORK* ep);

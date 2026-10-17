@@ -10,6 +10,10 @@
 
 ### Fixes
 
+- **Crash at the title with "You appear as"**: with your model set to one of the other playable
+  characters, the game no longer crashes when you go back to the title from a co-op game (as host
+  or partner, also after a game over), or when you open or leave the co-op lobby after playing.
+  The story's character switches and the Battle Game no longer crash with it either.
 - **Over-the-shoulder camera on stairs and ledges**: the camera now stays with the character
   while climbing stairs and climbing up or down a ledge, as it does while walking, instead of
   standing still and then jumping forward every few steps.

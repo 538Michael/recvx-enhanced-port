@@ -265,7 +265,11 @@ co-op partner):
    object is set up for the new mesh. Putting the original back copies the saved `ML_WORK`s.
 
 * When the game reloads the player (game start, load, continue, story switch) the mesh is applied
-  again at the next frame in control.
+  again at the next frame in control. The original is put back before the game lets go of the
+  player: when a game ends (`coop_textures_released`) and before a character switch (the story's,
+  each Battle Game room) releases the player's textures (`system.c bhSysCallMonitor`,
+  `coop_player_unload`). The game then releases the original's textures and we the mesh's; the
+  original's texture lists are gone after that (the new load overwrites them).
 * Keeping `sys->ply_id` keeps everything else: `PlyInfo` size, weapons (they sit in the new hand
   node 9), inventory, enemy grab motions, room event motions. The voice follows the model shown
   ("Voices").
