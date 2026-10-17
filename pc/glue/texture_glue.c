@@ -6,6 +6,8 @@
 #include "../../decomp/include/ps2/veronica/prog/types.h"
 #include "../src/gs/stream.h"
 #include "../src/gs/textures.h"
+#include "../../decomp/include/ps2/veronica/prog/main.h"
+#include "../../decomp/include/ps2/veronica/prog/ps2_NaTextureFunction.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -74,6 +76,46 @@ static uint32_t check_of(const TIM2_PICTUREHEADER* ph)
     return h;
 }
 
+/* one of the game's font pages: the first four textures of the effect list, which
+   bhDispFont/bhDispFontEx (message.c) draw every message, item name and description from
+   (bhSetFontTexture); HD texture packs replace them only with hd_textures_font */
+static int is_font(const void* tim2)
+{
+    if (!(sys->ss_flg & 0x40)) return 0;   /* not loaded (the title and other screens release it, and the
+                                              texture slots its list points to are reused) */
+    for (int i = 0; i < 4; i++) {
+        const NJS_TEXMEMLIST* m = (const NJS_TEXMEMLIST*)(uintptr_t)sys->ef_tex[i].texaddr;
+        if (m && m->texinfo.texsurface.pSurface == tim2) return 1;
+    }
+    return 0;
+}
+
+/* TIM2s the port cuts its own menu entries from (MULTIPLAYER, ENHANCED SETTINGS, RETURN TO
+   TITLE: letters of the title and option textures): HD texture packs keep them original even with
+   hd_textures_ui, so the port's entries match the letters around them. Forgotten with a disc
+   read over them (pc_tex_invalidate). */
+#define NKEEP 8
+static const void* keep[NKEEP];
+static int nkeep;
+
+void pc_tex_keep_original(int texno)
+{
+    const NJS_TEXMEMLIST* m;
+    const void* t;
+    if (!Ps2_current_texlist || texno < 0 || texno >= (int)Ps2_current_texlist->nbTexture) return;
+    m = (const NJS_TEXMEMLIST*)(uintptr_t)Ps2_current_texlist->textures[texno].texaddr;
+    if (!m || !(t = m->texinfo.texsurface.pSurface)) return;
+    for (int i = 0; i < NKEEP; i++) if (keep[i] == t) return;
+    keep[nkeep++ % NKEEP] = t;
+}
+
+static unsigned int tex_flags(const void* tim2)
+{
+    unsigned int f = is_font(tim2) ? NTEX_FONT : 0;
+    for (int i = 0; i < NKEEP; i++) if (keep[i] == tim2) f |= NTEX_KEEP;
+    return f;
+}
+
 /* returns the identity; *is_new: record a definition now (uploads between this and
    pc_tex_end) */
 uint32_t pc_tex_begin(const void* tim2, const void* phead, unsigned int image_adr, unsigned int clut_adr, int* is_new)
@@ -81,7 +123,8 @@ uint32_t pc_tex_begin(const void* tim2, const void* phead, unsigned int image_ad
     const TIM2_PICTUREHEADER* ph = (const TIM2_PICTUREHEADER*)phead;
     uintptr_t p = (uintptr_t)tim2;
     Known* set = &known[(((uint32_t)(p >> 4) * 2654435761u) >> (32 - KNOWN_SET_BITS)) * KNOWN_WAYS], *k = set;
-    uint32_t c = check_of(ph);
+    unsigned int flags = tex_flags(tim2);
+    uint32_t c = check_of(ph) ^ flags * 0x9E3779B9u;   /* a tag that changes makes a new definition */
     known_clock++;
     for (int i = 0; i < KNOWN_WAYS; i++)   /* this address, else a free or the least recently used way */
         if (set[i].ptr == p && set[i].id) { k = &set[i]; break; }
@@ -98,7 +141,7 @@ uint32_t pc_tex_begin(const void* tim2, const void* phead, unsigned int image_ad
     k->bytes = ph->TotalSize + 256u;
     known_bytes += k->bytes;
     *is_new = 1;
-    stream_tex_def_begin(k->id, image_adr, clut_adr, (ph->ImageSize + 8191u) / 8192u + 1u);
+    stream_tex_def_begin(k->id, image_adr, clut_adr, (ph->ImageSize + 8191u) / 8192u + 1u, flags);
     return k->id;
 }
 
@@ -173,6 +216,7 @@ void pc_tex_invalidate(const void* dst, unsigned int bytes)
 {
     uintptr_t lo = (uintptr_t)dst, hi = lo + bytes;
     for (int i = 0; i < NKNOWN; i++) if (known[i].id && known[i].ptr >= lo && known[i].ptr < hi) forget(&known[i]);
+    for (int i = 0; i < NKEEP; i++) if ((uintptr_t)keep[i] >= lo && (uintptr_t)keep[i] < hi) keep[i] = NULL;
     for (int i = 0; i < NRTEX; i++)
         if (rtex[i].id && rtex[i].ptr >= lo && rtex[i].ptr < hi) { id_release(rtex[i].id); rtex[i].id = 0; }
 }

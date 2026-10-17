@@ -30,6 +30,7 @@
  */
 #include "gs.h"
 #include "textures.h"
+#include "hdpack.h"
 #include "../render/gl_loader.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -48,6 +49,7 @@ typedef struct {
     uint32_t tbp, cbp;            /* image / CLUT upload base addresses (blocks) */
     uint32_t image_pages;         /* pages covered from tbp */
     int valid;
+    int flags;                    /* NTEX_FONT, NTEX_KEEP (texture_glue.c) */
     GLuint capture;               /* a render texture (StoreRenderTex): this texture, no GS data */
     int cw, ch;                   /* its size in GS texels */
 } Def;
@@ -117,11 +119,11 @@ static void push_op(Def* d, DefOp op)
     d->op[d->nop++] = op;
 }
 
-void ntex_define_begin(uint32_t id, uint32_t tbp, uint32_t cbp, uint32_t image_pages)
+void ntex_define_begin(uint32_t id, uint32_t tbp, uint32_t cbp, uint32_t image_pages, int flags)
 {
     cur = def_get(id);
     cur->nop = 0; cur->ndata = 0; cur->valid = 0; cur->clut_end = 0; cur->oom = 0;
-    cur->tbp = tbp; cur->cbp = cbp; cur->image_pages = image_pages ? image_pages : 1;
+    cur->tbp = tbp; cur->cbp = cbp; cur->image_pages = image_pages ? image_pages : 1; cur->flags = flags;
     cur_in_clut = 0; cur_seen_xfer = 0;
 }
 
@@ -394,6 +396,12 @@ int ntex_lookup(uint64_t tex0, uint64_t texa, unsigned int* out_tex, int* out_w,
     }
     e->tex = decode(d, tex0, texa, &e->w, &e->h);
     if (!e->tex) return 0;
+    if (hdpack_active()) {   /* the PCSX2 key hashes GS memory as the GS would sample it */
+        uint32_t tw = (tex0 >> 26) & 0xF, th = (tex0 >> 30) & 0xF;
+        uint32_t p1 = gs_pixel_addr((int)psm, tbp, (tex0 >> 14) & 0x3F, (1u << (tw > 10 ? 10 : tw)) - 1, (1u << (th > 10 ? 10 : th)) - 1) / (psm == PSMT4 ? 2 : 1) / 8192 + 1;
+        ntex_before_access(tbp / 32, p1 > 511 ? 511 : p1);
+        hdpack_note(e->tex, tex0, texa, d->flags);
+    }
     e->used = 1; e->id = a->id; e->key = key; e->texa = texa; e->pal = pal; e->last = use_clock;
     ntex_bytes += (uint64_t)e->w * e->h * 4;
     *out_tex = e->tex; *out_w = e->w; *out_h = e->h;

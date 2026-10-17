@@ -95,7 +95,7 @@ float pc_overlay_x(float x)
 }
 
 HostConfig g_config = { .window_w = 1280, .window_h = 960, .vsync = 1, .log_level = 1, .music_volume = 100, .sfx_volume = 100, .interpolate = 1, .frame_blend = 0, .aspect = 2, .show_fps = 1, .show_ping = 1,
-                       .screen_filter = 1, .cinema_bars = 1, .screen_effects = 1, .native_3d = 1, .model_cull = 1, .native_tex = 1, .quick_knife = 1,
+                       .screen_filter = 1, .cinema_bars = 1, .screen_effects = 1, .native_3d = 1, .model_cull = 1, .native_tex = 1, .hd_textures = 1, .quick_knife = 1,
                        .skip_doors = 1, .skip_intro = 1, .battle_unlocked = 1, .contrast = 100, .gamma = 10, .fog_intensity = 100 };   /* first-start defaults; recvx.ini overrides */
 SDL_Window* g_window;
 SDL_GLContext g_gl;
@@ -182,6 +182,7 @@ static void usage(void)
         "  --skip-doors       room transitions (doors, stairs, ladders) without their animation (default;\n"
         "                     skip_doors in recvx.ini: 0 played, 1 instant, 2 played until a key is pressed)\n"
         "  --skip-intro       boot straight into the title menu (default on)\n"
+        "  --hd-textures DIR  PCSX2 HD texture pack folder (default mods/textures)\n"
         "  --third-person     over-the-shoulder camera, mouse/keyboard controls (toggle: F5)\n"
         "  --coop-host PORT   online co-op: wait for a partner on this UDP port (F3: co-op window)\n"
         "  --coop-join HOST:PORT#CODE | ROOM  online co-op: join a host, or a room through the co-op server\n"
@@ -236,6 +237,7 @@ static void parse_args(int argc, char** argv)
         else if (!strcmp(argv[i], "--vanilla")) g_config.interpolate = 0;
         else if (!strcmp(argv[i], "--skip-doors")) g_config.skip_doors = 1;
         else if (!strcmp(argv[i], "--skip-intro")) g_config.skip_intro = 1;
+        else if (!strcmp(argv[i], "--hd-textures") && i + 1 < argc) { SDL_strlcpy(g_config.hd_textures_dir, argv[++i], sizeof(g_config.hd_textures_dir)); }
         else if (!strcmp(argv[i], "--third-person")) g_tps.on = 1;
         else if (!strcmp(argv[i], "--quiet")) g_config.log_level = 0;
         else if (!strcmp(argv[i], "--coop-host") && i + 1 < argc) { g_coop.port = atoi(argv[++i]); g_coop.request = COOP_REQ_HOST; }

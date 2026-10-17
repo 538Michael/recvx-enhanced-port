@@ -14,6 +14,7 @@
 #include "gs.h"
 #include "native.h"
 #include "textures.h"
+#include "hdpack.h"
 #include "../host/prof.h"
 #include "stream.h"
 #include "../ps2_platform.h"
@@ -698,6 +699,7 @@ static GLuint tex_get(uint64_t tex0, uint64_t texa, int* out_w, int* out_h, floa
         glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, (GLsizei)w, (GLsizei)h, 0, GL_RGBA, GL_UNSIGNED_BYTE, px);
         free(px);
+        hdpack_note(e->tex, tex0, texa, 0);   /* (only native textures carry tags) */
     }
     e->used = 1; e->tex0_key = key; e->texa = texa; e->clut_hash = ch; e->page0 = page0; e->page1 = page1;
     e->content = content; e->w = (int)w; e->h = (int)h; e->last_use = frame_no;
@@ -1241,7 +1243,7 @@ void gs_flush(void)
                 t = tex_get(tex0, st->texa, &w, &h, &ascale);
                 if (record_memo && record_memo->rt < 0) { record_memo->tex = t; record_memo->w = w; record_memo->h = h; record_memo->ascale = ascale; }
             }
-            glBindTexture(GL_TEXTURE_2D, t);
+            glBindTexture(GL_TEXTURE_2D, hdpack_bind(t, &ascale));   /* a replacement keeps the texture's UV space */
             uni4f(u_texofs, 1.0f / (float)w, 1.0f / (float)h, 0.0f, 0.0f);
             uni1f(u_tex_alpha_scale, ascale);
             uni4f(u_rt16, 0, 0, 0, 0);
@@ -1858,7 +1860,7 @@ void gs_frame_begin(void)
 {
     gt_exec_begin();
     if (++memo_gen == 0) memo_gen = 1;   /* resources of the frame about to execute */
-    if (ndoomed) { glDeleteTextures((GLsizei)ndoomed, doomed); ndoomed = 0; }
+    if (ndoomed) { for (size_t i = 0; i < ndoomed; i++) hdpack_forget(doomed[i]); glDeleteTextures((GLsizei)ndoomed, doomed); ndoomed = 0; }
     nreloads = 0;
     mv_tbp = UINT32_MAX;   /* a movie frame binds it again (EV_MOVIE) */
     snapshot_valid = 0;   /* no replays of the previous frame while this one is half executed (download) */

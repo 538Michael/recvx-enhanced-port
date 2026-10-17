@@ -178,6 +178,10 @@ headless.
   monitor, `PS2_Render_Tex_Sub`) is a GS copy into FBP 476 sampled as a texture; a target's drawn
   area is its scissor cut to the vertices of 2D batches, so a CLUT upload in the pages below that
   copy does not make it stale.
+- **HD texture packs** (`gs/hdpack.c`, [HD_PACK.md](HD_PACK.md)): every texture decode computes
+  PCSX2's replacement key (XXH3 of the texture's GS memory and palette); a file of that name in
+  `mods/textures` is checked against the original once and then bound in its place, in the same
+  UV space.
 - Still emulated: the GS register/state model, GS memory (render-to-texture, CLUTs, non-native
   textures), render targets, VIF/DMA for the remaining packets.
 
@@ -708,6 +712,8 @@ and game frames for game-state aids, as noted. Co-op test aids (`RECVX_COOP_*`,
 | `RECVX_DUMP_FRAMES=dir` | every 30th frame (and its in-between predecessor) and all render targets as BMP, with frame statistics |
 | `RECVX_DUMP_EVERY=n`, `RECVX_DUMP_FROM=n`, `RECVX_DUMP_OVERLAY=1` | with `RECVX_DUMP_FRAMES`: also every n-th frame; nothing before frame n; also the window image with the overlay |
 | `RECVX_DUMP_TEX=dir` | dump decoded textures |
+| `RECVX_HD_TEXTURES=dir`, `RECVX_HD_CACHE_MB=n` | HD texture pack folder (instead of `mods/textures`), memory budget of loaded replacements (default 1024) |
+| `RECVX_TRACE_HD=1`, `RECVX_HD_DUMP=dir` | log every HD texture lookup and check; write each looked-up original as PNG under its PCSX2 name |
 | `RECVX_INTERP_T=t` | the first refresh after each game frame shows the in-between image at t (comparable dumps) |
 | `RECVX_INTERP_STATS=1` | per-frame interpolation matching statistics |
 | `RECVX_REPLAY_CHECK=1` (or `=n`), `RECVX_REPLAY_CHECK_DIR=dir` | replay each interpolated frame at t = 1, which must reproduce it; log and save differing frames |
