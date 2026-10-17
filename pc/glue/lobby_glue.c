@@ -582,10 +582,10 @@ enum { R_MODE, R_HOSTSTEP, R_JOINSTEP,
        R_SERVER, R_PORT, R_ADDR, R_PW, R_RELAY,
        R_NAME, R_CHAR,
        R_START, R_ITEMS, R_FOLLOW, R_RULES,
-       R_LOOT, R_IMP, R_TFREEZE, R_SKIPS, R_RIBBON, R_EXTRA, R_PLACE, R_RAND, R_SEED, R_RSEED,
+       R_LOOT, R_IMP, R_TFREEZE, R_SKIPS, R_RIBBON, R_EXTRA, R_PLACE, R_RAND, R_VARIETY, R_EVENTS, R_SEED, R_RSEED,
        R_HOST, R_GO, R_COPY, R_RCOPY, R_KICK, R_STOP, R_JOIN,
        R_BACK, R_N };
-static const unsigned char row_group[R_N] = { 0, 1, 1, 0, 0, 0, 0, 0, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 6 };
+static const unsigned char row_group[R_N] = { 0, 1, 1, 0, 0, 0, 0, 0, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 6 };
 enum { F_NONE, F_NAME, F_ADDR, F_PORT, F_SEED, F_SERVER, F_PW };
 
 static struct {
@@ -606,11 +606,15 @@ static int session_on(void) { return g_coop.state != COOP_OFF; }
 static int hosting(void) { return session_on() && g_coop.host; }
 static int joining(void) { return session_on() && !g_coop.host; }
 
+/* the enemy options the rules show: joining, the host's (EV_EOPTS) */
+static const EnemyOpts* shown_eo(void) { return lb.role ? enemy_opts() : &g_enemy_opts; }
+
 static int row_visible(int r)
 {
     int host = lb.role == 0, srv = lb.mode;
     if (r == R_BACK) return 1;
     if (lb.step == 1) return r == R_MODE || r == R_HOSTSTEP || r == R_JOINSTEP;
+    if (r == R_VARIETY || r == R_EVENTS) return lb.step == 3 && shown_eo()->rand;   /* only the randomizer has them */
     if (lb.step == 3) return (r >= R_EXTRA && r <= R_SEED) || ((r == R_LOOT || r == R_TFREEZE || r == R_SKIPS || r == R_RIBBON || r == R_RSEED) && host) ||
                              (r == R_IMP && host && !g_coop.loot);   /* only shared loot has it */
     switch (r) {
@@ -636,7 +640,7 @@ static int row_locked(int r)
     case R_MODE: case R_PORT: case R_LOOT: case R_IMP: case R_ADDR: case R_RELAY: case R_SERVER: case R_PW: return session_on();
     case R_HOSTSTEP: return joining();
     case R_JOINSTEP: return hosting();
-    case R_EXTRA: case R_PLACE: case R_RAND: case R_SEED: return lb.role != 0;   /* the host's choice */
+    case R_EXTRA: case R_PLACE: case R_RAND: case R_VARIETY: case R_EVENTS: case R_SEED: return lb.role != 0;   /* the host's choice */
     case R_RCOPY: return !g_coop.room[0];
     default: return 0;
     }
@@ -783,6 +787,8 @@ static void change(int r, int dir)
     case R_EXTRA: settings_step(eset(&g_enemy_opts.extra), dir); break;
     case R_PLACE: settings_step(eset(&g_enemy_opts.place), dir); break;
     case R_RAND: settings_step(eset(&g_enemy_opts.rand), dir); break;
+    case R_VARIETY: settings_step(eset(&g_enemy_opts.variety), dir); break;
+    case R_EVENTS: settings_step(eset(&g_enemy_opts.events), dir); break;
     default: return;
     }
     CallSystemSe(0, 2);
@@ -792,7 +798,7 @@ static void change(int r, int dir)
 static int has_value(int r)
 {
     return r == R_MODE || r == R_RELAY || r == R_CHAR || r == R_LOOT || r == R_IMP || r == R_TFREEZE || r == R_SKIPS || r == R_RIBBON || r == R_START || r == R_ITEMS || r == R_FOLLOW ||
-           r == R_EXTRA || r == R_PLACE || r == R_RAND;
+           r == R_EXTRA || r == R_PLACE || r == R_RAND || r == R_VARIETY || r == R_EVENTS;
 }
 
 /* the joining player's items for coop_glue.c (own inventory on join) */
@@ -975,7 +981,7 @@ static const char* heading(void)
 static void row_text(int r, char* label, char* val, int n)
 {
     static const char* loots[] = { "Shared (one pickup)", "Individual (each their own)" };
-    const EnemyOpts* eo = lb.role ? enemy_opts() : &g_enemy_opts;   /* joining: the host's (EV_EOPTS) */
+    const EnemyOpts* eo = shown_eo();
     *val = 0;
     switch (r) {
     case R_MODE: strcpy(label, "CONNECT"); snprintf(val, n, "%s", lb.mode ? "Via server" : "Direct (P2P)"); break;
@@ -1013,6 +1019,8 @@ static void row_text(int r, char* label, char* val, int n)
     case R_EXTRA: strcpy(label, "EXTRA ENEMIES"); snprintf(val, n, "%s", eset(&g_enemy_opts.extra)->names[eo->extra & 3]); break;
     case R_PLACE: strcpy(label, "REARRANGED"); snprintf(val, n, "%s", eo->place ? "On" : "Off"); break;
     case R_RAND: strcpy(label, "RANDOMIZER"); snprintf(val, n, "%s", eo->rand ? "On" : "Off"); break;
+    case R_VARIETY: strcpy(label, "VARIETY"); snprintf(val, n, "%s", eset(&g_enemy_opts.variety)->names[eo->variety & 1]); break;
+    case R_EVENTS: strcpy(label, "EVENT ENEMIES"); snprintf(val, n, "%s", eo->events ? "On" : "Off"); break;
     case R_SEED: strcpy(label, "SEED"); if (lb.edit == F_SEED) snprintf(val, n, "%s", lb.buf); else snprintf(val, n, "%d", eo->seed); break;
     case R_RSEED: strcpy(label, "NEW RANDOM SEED"); break;
     case R_JOIN: strcpy(label, session_on() ? "LEAVE" : "JOIN"); break;
@@ -1042,7 +1050,7 @@ static const char* row_help(int r)
     case R_START: return "What the game starts from: a new game (normal, easy, very easy) or one of your saves.";
     case R_ITEMS: return "The inventory you join with: the one the host kept for you from your last visit, a new inventory, or that of one of your saves.";
     case R_FOLLOW: return eset(&g_coop.follow)->help;
-    case R_RULES: return host ? "Loot, enemies freezing while you trade, cutscene skips, ink ribbons and the enemy options (extra enemies, rearranged, randomizer, seed)."
+    case R_RULES: return host ? "Loot, enemies freezing while you trade, cutscene skips, ink ribbons and the enemy options (extra enemies, rearranged, randomizer and its variety and event enemies, seed)."
                               : "The host's enemy options (read-only).";
     case R_LOOT: return "Shared: each item lies there once - whoever takes it has it, so you split the supplies; one item box. Individual: each finds their own copy and has their own box. Keys and story go to both.";
     case R_TFREEZE: return eset(&g_coop.trade_freeze)->help;
@@ -1052,6 +1060,8 @@ static const char* row_help(int r)
     case R_EXTRA: return eset(&g_enemy_opts.extra)->help;
     case R_PLACE: return eset(&g_enemy_opts.place)->help;
     case R_RAND: return eset(&g_enemy_opts.rand)->help;
+    case R_VARIETY: return eset(&g_enemy_opts.variety)->help;
+    case R_EVENTS: return eset(&g_enemy_opts.events)->help;
     case R_SEED: return eset(&g_enemy_opts.seed)->help;
     case R_RSEED: return "Picks a new random seed.";
     case R_HOST: return lb.mode ? "Opens your lobby and a room on the co-op server; give your partner the room code that appears."

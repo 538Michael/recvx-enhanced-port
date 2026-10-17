@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Co-op
+
+- **Lobby game rules: randomizer variety and event enemies**: the host can now set the
+  randomizer's variety (Wild or Mild) and whether event enemies change too in the lobby's GAME
+  RULES, and the joining player sees them there. Both show while the randomizer is on.
+
 ### Fixes
 
 - **Over-the-shoulder camera on stairs and ledges**: the camera now stays with the character
