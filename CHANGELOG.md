@@ -19,13 +19,9 @@
 
 - **Skippable intro**: with "Skip intro" off, the intro screens and the intro movie can now be
   skipped with any button, and any key or click gets past PRESS START.
-- **Skip door animations: Off, Instant or Skippable** (GAMEPLAY): the setting is now a choice.
-  Off plays every door, stairs, ladder and lift animation as the original; Instant (the default,
-  as before) goes straight to the load screen; Skippable plays the animation, and pressing any
-  key, mouse button or gamepad button while it runs cuts it short and takes you into the next room
-  right away. The button you opened the door with does not count, so holding it does not skip.
-  Your old setting carries over (on is Instant, off is Off). In co-op each player chooses for their
-  own doors.
+- **Skip door animations: Off, Instant or Skippable** (GAMEPLAY): Off plays the original door,
+  stairs and ladder animations, Instant (the default) skips them, Skippable plays them but any
+  button cuts them short.
 - **Battle Game: every character from the start**: all Battle Game characters are unlocked
   right away (with "Battle Game unlocked" on, the default).
 - **Fast loading** (GAMEPLAY, on by default): room changes, starting a new game and loading a
@@ -85,18 +81,9 @@
 
 ### Cheats
 
-- **Teleport by name**: the teleport cheat (F2, and ENHANCED SETTINGS EXTRAS) no longer asks for
-  stage, room and position numbers. You pick an area (marked as Claire's or Chris's part of the
-  game), then a room, then where to arrive. Every room has a name: the game's own save menu name
-  where it has one, otherwise one of ours after its area and what you find there ("Prison: Shower
-  room", "Palace: Gold Luger room", "Antarctic Base: Mansion hall"). Claire's and Chris's visits of
-  the same place share a name, the Battle Game's rooms say which story room they copy, and rooms
-  that only play a cutscene start with "Cutscene:". Each arrival point says which room's door
-  leads there. In F2 you can type part of a name to search all rooms, and a "Raw ids" switch keeps
-  the old number fields; on the EXTRAS page the names leave out the area the location row already
-  shows ("Pool" instead of "Military Training Facility: Pool"), so they stay readable. Rooms you
-  added in the mods folder are listed too. The list is read from your disc the first time you open
-  it, which takes a few seconds.
+- **Teleport by name**: the teleport cheat (F2 and ENHANCED SETTINGS EXTRAS) now lets you pick an
+  area, a room and an arrival point by name instead of numbers. In F2 you can also search rooms
+  by name.
 
 ### Fixes
 
