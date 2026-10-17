@@ -18,7 +18,7 @@
 ### Gameplay
 
 - **Skippable intro**: with "Skip intro" off, the intro screens and the intro movie can now be
-  skipped with any button.
+  skipped with any button, and any key or click gets past PRESS START.
 - **Skip door animations: Off, Instant or Skippable** (GAMEPLAY): the setting is now a choice.
   Off plays every door, stairs, ladder and lift animation as the original; Instant (the default,
   as before) goes straight to the load screen; Skippable plays the animation, and pressing any
