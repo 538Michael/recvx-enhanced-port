@@ -83,6 +83,7 @@ int  actor_double_acting(void);         /* a cutscene double of the character pl
    character `motion`. Gender-matched animations need it; without it src's own motions are used. */
 void actor_source(int who, struct BH_PWORK* src, int mesh, int motion);
 int  actor_put_body(int who, struct BH_PWORK* src);   /* draw src (bhPutModel), in its gender-matched pose if it has one */
+int  actor_frame(const struct BH_PWORK* p);   /* the motion frame p shows this tick (our player: before bhSetMotion's advance) */
 void actor_textures_released(void);     /* njReleaseTextureAll */
 
 /* game thread: where a catalogue-format model is in its room file (read and expanded into a buffer

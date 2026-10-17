@@ -860,7 +860,7 @@ over its datagrams.
 | 0-15 | `magic` "COOP" (0x504F4F43), `version` u16, `type` u8, `flags` u8, `sid` (sender's session), `auth` (`coop_auth(join code, sid)`): all a relay needs |
 | 16-31 | `seq` (sender's frame counter; older poses dropped), `t_ms`, `echo_ms`, `echo_age` (ping) |
 | 32-39 | `chr`, `costume`, `stg`, `rom`, `pos` (room entry point), `opts` (host's game rules: `OPT_INDIVIDUAL` 1, `OPT_TRADE_FREEZE` 2, `OPT_IMPORTANT` 4, `OPT_NO_RIBBON` 8, `OPT_SKIP_SYNC` 16), `regroup` (host counter), `mfile` (sender's own part file - 10) |
-| 40-91 | position (3 floats), angles (3 ints), `mtn_no`, `frm_no`, `mtn_md`, `hokan_count`, `hokan_rate`, `wpnr_no`, `hp`, `mode0`, `mode1`, `nev`, `nene` |
+| 40-91 | position (3 floats), angles (3 ints), `mtn_no`, `frm_no` (the frame shown, before the step's advance: `actor_frame`), `mtn_md`, `hokan_count`, `hokan_rate`, `wpnr_no`, `hp`, `mode0`, `mode1`, `nev`, `nene` |
 | 92-107 | `stflg`, `ev_ack` (highest event id applied from the peer), `mset` (`MSET_OWN` -1, `MSET_ROOM` -2, `MSET_NONE` -3, or an enemy slot), `busy` (`BUSY_NONE/EVENT/MENU/BOX/TRADE`), `reject`, `voice_n`, `voice`, `pflg` (`flg & 6`: hit / held), `flr` (`flr_no + 3`, 0 not sent) |
 
 `flags`: `PF_IN_GAME` 1, `PF_VISIBLE` 2, `PF_ROOM_MTN` 4, `PF_WANT_BLOB` 8 (joiner asks for the

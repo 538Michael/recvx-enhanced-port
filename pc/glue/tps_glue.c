@@ -903,7 +903,7 @@ void tps_calc_model(void)
            knife (no barrel). Raising, shots, recoil and slashes keep the last correction, which is eased:
            solved on a moving hand the upper body jumped back and forth. */
         static int still;   /* ticks the aim pose has stood still (the hand read is last tick's) */
-        float h[16], t0 = a * 2 / w, t = t0, goal = aim_corr;
+        float h[16], t0 = a * 2 / w, t = t0, goal = aim_corr, pt = t, pe = 1e9f;
         int it, steady;
         still = plp->mode2 == 65 && !plp->hokan_count && !(WpnTab[plp->wpnr_no].flg & 0x40000000) ? still + 1 : 0;
         steady = still >= 2;
@@ -916,6 +916,10 @@ void tps_calc_model(void)
             sg = dx * h[0] + (aim_t.y - m[1]) * h[1] + dz * h[2] < 0 ? -1.0f : 1.0f;   /* (the barrel's way along the axis) */
             e = atan2f(aim_t.y - m[1], sqrtf(dx * dx + dz * dz)) - atan2f(sg * h[1], sqrtf(h[0] * h[0] + h[2] * h[2]));
             if (fabsf(e) < 0.002f) break;
+            if (fabsf(e) >= pe) { t = pt; break; }   /* not converging (a target a few units from the muzzle: each step
+                moves the muzzle as much as the line; the solve swung to 50 degrees and the upper body jumped
+                when an enemy stepped into the crosshair): the best step so far */
+            pe = fabsf(e); pt = t;
             t += e;
             t = t > 1.047f ? 1.047f : t < -1.047f ? -1.047f : t;
             bhCalcModel(plp);   /* (unbent) */

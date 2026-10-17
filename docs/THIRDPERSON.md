@@ -295,7 +295,10 @@ Room ambient and lights 0..3 (muzzle flash, lighter, ...) do not change per cut.
   for the knife (it has no barrel). Its correction to the hand's pitch eases in (0.35 per frame)
   and is kept through raising, shots, recoil and slashes. Solved every tick on a moving hand, it
   bent the upper body back and forth from one tick to the next (the twitch when raising a weapon,
-  firing or slashing).
+  firing or slashing). A step that does not bring the barrel closer to the line ends the solve with the best
+  step so far: for a target a few units from the muzzle (an enemy stepping into the crosshair) each
+  step moved the muzzle as much as the line, the solve swung to 50 degrees and the upper body jumped
+  up for a tick and settled back.
 * Sniper rifle and linear launcher switch to the game's scope (first person); no bend.
 
 ### Aim height
