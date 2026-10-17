@@ -22,6 +22,14 @@
 - **Co-op**: when the host goes back to the title during a game, the partner now reads "The host
   left the game" instead of "The host closed the lobby".
 
+### Appearance
+
+- **Your model in cutscenes** (CO-OP page, on by default): turn it off to keep playing as the
+  model you chose while the cutscenes show the real Claire or Chris, with their own hands, faces
+  and voice, ponytail included. Your model is back as soon as you are in control again. Scenes in
+  which the character you play acts as itself, without a stand-in, keep your model. In co-op each
+  player chooses this for their own screen.
+
 ### Display
 
 - **Movie zoom** (DISPLAY, off by default): in widescreen the movies grow, without being

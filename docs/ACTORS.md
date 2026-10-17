@@ -346,7 +346,8 @@ loader ([ENEMIES.md](ENEMIES.md) "Enemy spawner (F2)").
 "You appear as" (F3 window, the lobby's MODEL row, ENHANCED SETTINGS -> CO-OP; ini `coop_char`) shows
 our player as one of the player files or one of 62 models found in the room files: the story
 cast, the creatures, the zombie variants (`pc/src/host/actors.c`). It applies in single player and
-co-op (the partner sees it too) and in cutscenes to the event double of the character played.
+co-op (the partner sees it too) and in cutscenes to the event double of the character played
+(unless "Your model in cutscenes" is off, see "Cutscene doubles").
 
 ### The list
 
@@ -562,6 +563,28 @@ weapon of a hand the model lacks floated at the invisible source's hand.
   table are not shown; expressions are not copied. A player file chosen as the appearance is shown
   on the double as the same character's cutscene model. `face_src` copies rest meshes to 64-byte
   boundaries (the morph reads them with `lq`). A mask that does not fit leaves the model without.
+* **Your model in cutscenes** (CO-OP page and F1, ini `appear_in_cutscenes`, default 1). Off: the
+  doubles stay the game's own (the real Claire or Chris, their hand pieces, face mask, lip sync);
+  the chosen model is shown only while the player itself is. What counts as a cutscene is the
+  double: a scene (story cutscene or a short in-game event) counts while an event double of the
+  character played is shown (`actor_double_acting`: an enemy record of `doubles[ply_id]`, active,
+  not hidden). Scenes the player model acts in itself (the 77 rooms above, room motions on the
+  player) keep the chosen model, as gameplay does. How:
+  * `actor_doubles` loads no model for `ACTOR_DOUBLE`, so `actor_put_enemy` and
+    `actor_double_tick` leave the doubles alone (no hand or face work at all).
+  * The head part: the scripts link the player's `sys->obwp[2]` (Claire's ponytail) to the double
+    (`ObjLinkSet`), and the appearance had disabled it (catalogue model) or replaced it (player
+    file). `coop_glue.c self_cine_hair`, every tick before the objects follow their links, sets
+    up the played character's own head part (from `self_orig` under a player file) when a double
+    starts acting and the chosen model's again when none does; the script's link (work, node, x
+    offset) is kept. The ponytail's work is the player's (`pletcp`, as `bhObjClpn` takes it when
+    linked to the player): linked to the double it would come from `sys->memp`, which broke a
+    pending disc read (weapon change). Its swing restarts at the cutscene's start.
+  * Voices: `pc_player_voice` keeps the played character's voice while a double acts. Cutscene
+    dialogue is streamed and never swapped.
+  * Co-op: each game decides for its own screen (the doubles are local; the partner is not drawn
+    during a cutscene of ours, `local_visible`), so each player chooses what they see; a replayed
+    cutscene follows the replaying player's setting.
 
 ### Voices
 

@@ -190,7 +190,9 @@ Music and voice (`music_volume`) and Sound effects (`sfx_volume`), 0-100%.
 ### Co-op
 
 The CO-OP page (also in F3) holds your appearance ("You appear as", see
-[ACTORS.md](ACTORS.md)), name tags, the ping display, follow host; the host's game rules: loot
+[ACTORS.md](ACTORS.md); "Your model in cutscenes", `appear_in_cutscenes`, default on: off keeps the
+real Claire or Chris in cutscenes, with their own hands, faces and voice, and shows your model only
+while you play; in co-op each player chooses for their own screen), name tags, the ping display, follow host; the host's game rules: loot
 mode (Shared: each item lies there once and whoever takes it has it, so you split the supplies; key
 items go to both. Individual: each player takes their own copy), "Important items for both" (with
 shared loot, on by default: weapons and ink ribbons lie there for each player), "Synchronized cutscene skip" (a cutscene both watch is skipped once both pressed skip),

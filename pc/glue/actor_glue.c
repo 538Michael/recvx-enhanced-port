@@ -1399,19 +1399,34 @@ static void face_step(Disguise* d, const BH_PWORK* ep)
     bhControlMask(&d->w);
 }
 
+/* ep is a shown cutscene double of the character played */
+static int double_acting(const BH_PWORK* ep, int pid)
+{
+    int j;
+    if (!(ep->flg & 0x1) || (ep->stflg & 0x41000000) || !ep->id || !ep->mlwP) return 0;
+    for (j = 0; j < 3 && doubles[pid][j] != ep->id; j++);
+    return j < 3;
+}
+
+/* a cutscene: a double of the character played is shown (whether as our model or as itself) */
+int actor_double_acting(void)
+{
+    int i;
+    for (i = 0; i < (int)sys->ewk_n && i < 128; i++) if (double_acting(&ene[i], sys->ply_id & 3)) return 1;
+    return 0;
+}
+
 /* coop_control_remote, every tick after the enemies moved and before the objects follow their links:
    the double of the character played posed as our model, its face and hands with it */
 void actor_double_tick(void)
 {
     Disguise* d = &dg[ACTOR_DOUBLE];
-    int i, j, pid = sys->ply_id & 3;
+    int i, pid = sys->ply_id & 3;
     dbl_posed = NULL;
     if (d->model < 0 || !d->rig.ok) return;
     for (i = 0; i < (int)sys->ewk_n && i < 128; i++) {
         BH_PWORK* ep = &ene[i];
-        if (!(ep->flg & 0x1) || (ep->stflg & 0x41000000) || !ep->id || !ep->mlwP) continue;
-        for (j = 0; j < 3 && doubles[pid][j] != ep->id; j++);
-        if (j == 3) continue;
+        if (!double_acting(ep, pid)) continue;
         if (d->face) face_step(d, ep);
         dbl_tick = 1;
         actor_pose(ACTOR_DOUBLE, ep);
@@ -1421,11 +1436,13 @@ void actor_double_tick(void)
 }
 
 /* at the hand-off: the model for the cutscene doubles of the character played (appearance: a
-   catalogue index, ACTOR_PART + part file - 10, or -1); loaded only while the room has one */
+   catalogue index, ACTOR_PART + part file - 10, or -1); loaded only while the room has one.
+   "Your model in cutscenes" off: none, the game draws its doubles (hands, face, all their own) */
 void actor_doubles(int idx)
 {
     int i, j, pid = sys->ply_id & 3, any = 0;
     static const signed char twin[5] = { 0, 1, 3, 5, -1 };   /* the player files' cutscene models (a face mask): Claire, Chris, Steve, Wesker */
+    if (!g_appear_cutscene) idx = -1;
     if (g_appear_face && idx >= ACTOR_PART && idx < ACTOR_PART + 5 && twin[idx - ACTOR_PART] >= 0) idx = twin[idx - ACTOR_PART];
     if (idx >= 0)
         for (i = 0; i < (int)sys->ewk_n && i < 128 && !any; i++)

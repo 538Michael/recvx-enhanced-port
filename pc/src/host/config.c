@@ -46,6 +46,7 @@ static const struct { const char* key; int* val; int lo, hi; } keys[] = {
     { "coop_char", &g_coop.chr, 0, COOP_CHR_MAX },
     { "appear_gender_anim", &g_appear_anim, 0, 1 },
     { "appear_cutscene_face", &g_appear_face, 0, 1 },
+    { "appear_in_cutscenes", &g_appear_cutscene, 0, 1 },
     { "coop_loot", &g_coop.loot, 0, 1 },
     { "coop_follow", &g_coop.follow, 0, 1 },
     { "coop_upnp", &g_coop.upnp, 0, 1 },
