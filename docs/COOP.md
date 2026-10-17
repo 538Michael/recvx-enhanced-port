@@ -69,7 +69,8 @@ drawn in the game's own style; your model turns in a 3D preview on the left. It 
 **Step 3: GAME RULES** (host): **LOOT** (Shared (one pickup) / Individual (each their own)),
 **IMPORTANT ITEMS** (For both / Shared; only with shared loot, see "Loot modes"), **FREEZE ON TRADE**, **CUTSCENE SKIP** (Together /
 Each alone, see "Cutscenes"), **INK RIBBONS** (Needed / Not needed, see "Saving without ink
-ribbons"), and the enemy options **EXTRA ENEMIES**, **REARRANGED**, **RANDOMIZER**, **SEED**, **NEW
+ribbons"), and the enemy options **EXTRA ENEMIES**, **REARRANGED**, **RANDOMIZER**, **VARIETY**
+(Wild / Mild) and **EVENT ENEMIES** (both shown only with the randomizer on), **SEED**, **NEW
 RANDOM SEED**. The joiner
 sees the host's values read-only (THE HOST'S RULES) once connected.
 
@@ -488,9 +489,8 @@ grabbed by is released on the host, an unanswered trade item returns to its owne
 
 ## Enemy options in co-op
 
-The host's enemy options (EXTRA ENEMIES, REARRANGED, RANDOMIZER, SEED; F1 / ENHANCED SETTINGS GAMEPLAY,
-lobby GAME RULES; "Randomizer variety" and "Randomize event enemies" in F1 / ENHANCED SETTINGS
-only) count for both. The joiner's lobby shows them (read-only) before the game
+The host's enemy options (EXTRA ENEMIES, REARRANGED, RANDOMIZER, VARIETY, EVENT ENEMIES, SEED; F1 /
+ENHANCED SETTINGS GAMEPLAY, lobby GAME RULES) count for both. The joiner's lobby shows them (read-only) before the game
 starts; changes in game take effect at the next room load on both sides. Enemies the host adds
 appear in the joiner's game in the same slots. Details: [ENEMIES.md](ENEMIES.md).
 
