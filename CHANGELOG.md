@@ -20,6 +20,9 @@
 - **Borderless fullscreen under Windows**: it behaved like exclusive fullscreen, with a black
   screen when switching to other programs and nothing shown over the game. It is now a real
   borderless window: Alt+Tab is instant, and popups and overlays show over the game.
+- **Quick knife after standing still**: once your character started the idle animation (after
+  standing still for a few seconds, for example right after loading a save), the quick knife did
+  nothing until you moved. It now draws the knife right away.
 
 ## 0.6.2 (2026-10-18)
 
