@@ -47,6 +47,35 @@ static inline int pc_dual_arm(int i, int aim_e, int prev, float dy, float dp)
     return dy > 0 ? 2 : 1;
 }
 
+/* ---------------------------------------------------------------- free knife aim (tps_glue.c) */
+/* the knife's pitch (radians, > 0 up) from the angle a of the hand to the point under the crosshair and
+   the camera's pitch cam: a, but no higher than the camera looks up and level while it looks down (an
+   enemy right in front puts its head under a level crosshair, far above the hand); at a point below knee
+   height (low: a crawler, the floor) as steep as the camera looks down (the slash reaches it from a hand
+   swung forward and down: the angle from the raised hand fell short). Within 60 degrees. */
+static inline float pc_knife_pitch(float a, float cam, int low)
+{
+    float cap = cam > 0 ? cam : 0;
+    a = a < cap ? a : cap;
+    if (low && cam < a) a = cam;
+    return a < -1.047f ? -1.047f : a > 1.047f ? 1.047f : a;
+}
+
+#define PC_KNIFE_UP (22.5f * (65536.0f / 360.0f))   /* half the original's 45 degrees, as the guns' aim height */
+#define PC_KNIFE_HYST (5.0f * (65536.0f / 360.0f))
+
+/* the knife's aim height (at_flg 4 up, 2 straight, 8 down) for the camera pitch p (65536 per turn, > 0
+   up), the height h of the point under the crosshair above the player's floor, and last tick's (prev):
+   up/down beyond 22.5 degrees, down at anything below knee height (6 units: crawlers, legs). A height
+   is kept until the pitch is 5 degrees (the point 2 units) back inside, so a crosshair on an edge does
+   not switch slashes from tick to tick. */
+static inline int pc_knife_height(float p, float h, int prev)
+{
+    if (h < (prev == 8 ? 8.0f : 6.0f) || p < -PC_KNIFE_UP + (prev == 8 ? PC_KNIFE_HYST : 0)) return 8;
+    if (p > PC_KNIFE_UP - (prev == 4 ? PC_KNIFE_HYST : 0)) return 4;
+    return 2;
+}
+
 /* ---------------------------------------------------------------- music on a warp (cheat_glue.c) */
 /* after the entry script of a room reached without a door, with the music that played before it
    (was, was_vol) stopped as a door does: the new music request. The same music asked for again plays
