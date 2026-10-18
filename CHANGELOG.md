@@ -22,6 +22,13 @@
   The middle of the picture stays exactly as the original, and walls the camera looks through
   stay hidden.
 
+### Performance
+
+- **Smoother rendering**: the game's constant texture switches cost much less time per frame, in
+  every room, fight, menu and cutscene, which leaves more headroom for high frame rates.
+- **No hitch when a game starts**: the short freeze when going from the title into the game is
+  gone.
+
 ### Fixes
 
 - **Stuck after Alexia's flames**: after being set on fire by Alexia's first form, your character

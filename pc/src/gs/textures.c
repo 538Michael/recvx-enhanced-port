@@ -16,7 +16,8 @@
  * native lookup reads or overwrites their GS memory (other TEX0s, transfers, downloads,
  * render target reloads, real uploads) - earlier queued uploads overlapping them first, so
  * GS memory ends up as it would have been. A queued upload superseded by a later one to the
- * same slot is dropped.
+ * same slot (not larger) is dropped, also when uploads queued in between overlap it, so the
+ * queue holds about one upload per slot and the game's texture switches write nothing.
  *
  * A TEX0 whose TBP is a bound slot is decoded from the definition: its image uploads are
  * replayed into a scratch copy of GS memory at the definition's own address (so
@@ -253,13 +254,15 @@ void ntex_bind(uint32_t id, uint32_t tbp, uint32_t cbp)
         ntex_before_access(cbp / 32, cbp / 32 + 1);
         run_ops(d, 0, d->clut_end, tbp, cbp);
     }
-    /* the image: queued; a queued upload to the same slot, not larger, is superseded */
-    for (int i = 0; i < npending; i++)
-        if (pending[i].tbp == tbp && pending[i].page1 <= page1) {
-            int later = 0;   /* unless something queued after it overlaps it */
-            for (int j = i + 1; j < npending; j++) if (overlaps(pending[j].page0, pending[j].page1, pending[i].page0, pending[i].page1)) later = 1;
-            if (!later) { memmove(&pending[i], &pending[i + 1], (size_t)(npending - i - 1) * sizeof(Pending)); npending--; i--; }
-        }
+    /* the image: queued. A queued upload to the same slot, not larger, is superseded: this one
+       overwrites all its pages, and nothing read them since (that would have written it), so
+       uploads queued in between that overlap it end up under this one as well */
+    {
+        int m = 0;
+        for (int i = 0; i < npending; i++)
+            if (pending[i].tbp != tbp || pending[i].page1 > page1) pending[m++] = pending[i];
+        npending = m;
+    }
     if (npending == MAX_PENDING) execute_pending(0);
     pending[npending++] = (Pending){ id, tbp, page0, page1 };
     for (int i = 0; i < MAX_ALIAS; i++) if (alias[i].used && alias[i].tbp == tbp) { a = &alias[i]; break; }
@@ -290,7 +293,8 @@ void ntex_forget(uint32_t id)
     if (d->id == id) def_drop(d);
 }
 
-/* everything of a definition: queued uploads run, slots unbound, decodes deleted, memory freed */
+/* everything of a definition: its queued uploads still in the queue (not superseded) run, slots
+   unbound, decodes deleted, memory freed */
 static void def_drop(Def* d)
 {
     uint32_t id = d->id;
