@@ -203,6 +203,10 @@ void cheat_warp_sound(int after)
         else if (CurrentBgSeNo[i] < 0 && warp_bgse[i] >= 0) StopBackGroundSeEx(i, 400);
 }
 
+/* a warp that never reached its room's entry script (the game ended in the transition: game over, the
+   title, a co-op session closing) must not make the next ordinary door take the warp's music rule */
+void cheat_game_exit(void) { warp_sound = 0; }
+
 /* the game's own door transition (door type 255: no animation), for the teleport, the co-op
    follow and test aids. An enemy grab plays the player on the enemy's motion set (en01sub.c);
    the new room frees it, and the room change would animate from it (crash in bhSetMotion), so

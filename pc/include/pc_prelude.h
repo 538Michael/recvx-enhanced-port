@@ -104,6 +104,7 @@ int   pc_inf_ammo(void);      /* F2 cheat (pc/glue/cheat_glue.c): bhCheckBullet/
 int   pc_unlock_held(int item);
 int   pc_unlock_examine(void);
 void  pc_unlock_scd1(int after);
+void  cheat_game_exit(void);   /* system.c bhExitGame: the game ends (continue, title, load); cheat state of that game goes */
 float pc_fog_scale(void);              /* option: njCalcFogPower's fog density x this (ps2_NaFog.c), 1 = original */
 int   pc_movie_zoom(void);               /* option: movies zoomed until their letterbox bars leave the screen */
 int   pc_skip_intro(void);               /* option: boot straight to the title menu */
