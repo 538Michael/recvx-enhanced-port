@@ -606,6 +606,8 @@ unsigned int tps_pad(unsigned int pad)
     if (k & TPS_K_RIGHT) pad |= 0x8;
     if (k & TPS_K_AIM) pad |= 0x10;
     if (k & TPS_K_RUN) pad |= 0x400;
+    /* the scope (sniper rifle, linear launcher): run zooms in, as L1 does, which Q (cancel here) no longer presses */
+    if ((k & TPS_K_RUN) && plp && plp->mode1 == 1 && plp->mode2 == 71) pad |= 0x80;
     if (k & (TPS_K_ACTION | TPS_K_FIRE)) pad |= 0xB00;   /* fire/examine/confirm, like Cross */
     if (k & TPS_K_CANCEL) pad |= 0x1000;
     if (k & TPS_K_MAP) pad |= 0x2000;
@@ -819,6 +821,47 @@ static void trace_shot(void)
     }
 }
 
+/* the scope of the sniper rifle and linear launcher (playpch2.c bhCPM2_act_scp, mode2 71: first
+   person, our camera off; the game's view is cam.ay = -ay, cam.ax = -wax, and the shot leaves along
+   them from the same point). The mouse turns ay and wax as the game's stick does, at the aiming
+   sensitivity scaled by the zoom (the field of view shown against the aiming one), wax within the
+   game's +-45 degrees. During a shot's recoil (mode3 3) the game sets wax to ct3 plus the kick each
+   frame: the mouse moves ct3. */
+#define SCOPE_PITCH 8192   /* bhCPM2_act_scp's clamp */
+static void scope_look(void)
+{
+    static float fy, fp;   /* the turn below one game unit, kept for the next frame */
+    float k = TURN_PER_PIXEL * g_tps.aim_sens / 100.0f * cam.pers / DEG((float)g_tps.aim_fov);
+    int dy, dp, p;
+    fy -= mouse_dx * k * g_tps.sens_x / 100.0f;
+    fp += (g_tps.invert_y ? mouse_dy : -mouse_dy) * k * g_tps.sens_y / 100.0f;
+    mouse_dx = mouse_dy = 0;
+    dy = (int)fy; fy -= dy;
+    dp = (int)fp; fp -= dp;
+    plp->ay += dy;
+    p = (plp->mode3 == 3 ? plp->ct3 : plp->wax) + dp;
+    p = p > SCOPE_PITCH ? SCOPE_PITCH : p < -SCOPE_PITCH ? -SCOPE_PITCH : p;
+    if (plp->mode3 == 3) plp->ct3 = p;
+    else plp->wax = plp->waxp = p;
+    if (trace) {   /* and the live enemy nearest the scope's centre: its hit capsule's middle seen from the eye
+                      (cam.p*: the scope's camera last drawn), degrees off the centre */
+        float best = -1, oy = 0, op = 0, hp = 0;
+        int near = -1;
+        for (int i = 0; i < sys->ewk_n; i++) {
+            const NJS_CAPSULE* c = &ene[i].watr;
+            float x = (c->c1.x + c->c2.x) / 2 - cam.px, y = (c->c1.y + c->c2.y) / 2 - cam.py, z = (c->c1.z + c->c2.z) / 2 - cam.pz, ey, ep;
+            if (!(ene[i].flg & 1)) continue;
+            hp += ene[i].hp;
+            ey = wrap(atan2f(-x, -z) * (32768.0f / 3.14159265f) - plp->ay);
+            ep = atan2f(y, sqrtf(x * x + z * z)) * (32768.0f / 3.14159265f) - plp->wax;
+            if (best < 0 || ey * ey + ep * ep < best) { best = ey * ey + ep * ep; oy = ey; op = ep; near = i; }
+        }
+        printf("tps: scope frame %u wpn %d mode3 %d ay %.2f wax %.2f fov %.1f (turn %d %d) enemy %d %.2f %.2f deg off, enemy hp %.0f\n",
+               (unsigned)gs_frame_count(), plp->wpnr_no, plp->mode3, (short)plp->ay * (360.0f / 65536.0f), plp->wax * (360.0f / 65536.0f),
+               cam.pers * (360.0f / 65536.0f), dy, dp, near, oy * (360.0f / 65536.0f), op * (360.0f / 65536.0f), hp);
+    }
+}
+
 /* player.c bhControlPlayer, right after the mode handler (before the auto-turn, the motion
    and bhCalcModel): mouse X turns the character, or the camera while aiming freely */
 void tps_player(void)
@@ -827,6 +870,8 @@ void tps_player(void)
     float d;
     int n;
     if (trace && tps_cam_active && plp->mode1 == 1) trace_shot();
+    /* (the scope's first tick still has our camera: the free aim below points the scope at the crosshair's target) */
+    if (!tps_cam_active && plp->mode0 == 1 && plp->mode1 == 1 && plp->mode2 == 71) { scope_look(); return; }
     if (!tps_cam_active || plp->mode0 != 1 || (plp->mode1 == 0 && plp->mode2 > 13) || reload_at_rest()) { frac = 0; return; }
     if (trace && plp->mode1 == 1)
         printf("tps: weapon mode %d/%d motion %d frame %d/%d at (%.1f %.1f) ay %.1f hand y %.1f\n", plp->mode2, plp->mode3, plp->mtn_no, plp->frm_no >> 16,
@@ -1038,5 +1083,5 @@ void tps_frame(void)
     g_tps.pad_play = on && g_tps.pad_modern && tps_cam_active && sys && (sys->sp_flg & 0x40) && !(sys->ss_flg & 0x400000);
     /* with or without third person: the player has control, so no menu has the mouse (menu_mouse.c);
        the co-op trade screen is open in play */
-    g_menu_mouse.play = pc_in_game() && plp && pc_in_play(plp, 0) && !pc_trade_screen();
+    g_menu_mouse.play = pc_in_game() && plp && pc_in_play(plp, 1) && !pc_trade_screen();   /* (the scope too: its mouse aim) */
 }

@@ -244,8 +244,10 @@ Aim (R1 / RB) + Triangle (Y) reloads ([Reload](#reload)).
 The game's own key types (OPTION -> KEY CONFIG) still decide what each PS2 button does.
 
 Third person (keyboard and mouse): W/S/A/D move and turn, Shift run, E action, Q cancel,
-Tab inventory, M map, right mouse aim, left mouse fire, R reload ([Reload](#reload)). With a
-gamepad see [Third person with a gamepad](#third-person-with-a-gamepad).
+Tab inventory, M map, right mouse aim, left mouse fire, R reload ([Reload](#reload)). The sniper
+rifle and the linear launcher aim through their scope: the mouse turns it (at the aiming
+sensitivity, slower while zoomed in), Shift held zooms in, left mouse fires, letting go of right
+mouse leaves it. With a gamepad see [Third person with a gamepad](#third-person-with-a-gamepad).
 
 ### Third person with a gamepad
 
