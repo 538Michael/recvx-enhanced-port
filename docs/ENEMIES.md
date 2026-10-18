@@ -135,6 +135,10 @@ With these budgets 25..30 foreign types fit in one room before the slots run out
 * Watchdog (`coop_glue.c pc_enemy_watch`): an alive enemy unchanged for 150 steps is logged; a
   zombie stuck in a grab state is released.
 
+* A Tyrant added to a room (a corridor) that turned beside a player lying next to it pushed the
+  player through the wall in one tick (its body is an oval up to 16 units long); in rooms with added
+  enemies a push across a wall is left out (`en19.c pc_ty_push_ok`).
+
 Mixing types the PS2 never mixed can still show odd behaviour (a Hunter may leap out of a room).
 
 ### What breaks when a type the room did not load is added
@@ -226,7 +230,8 @@ items given after a scripted kill, enemies on the entry position or in a door's 
 F2 -> "Spawn enemy" (also the EXTRAS page): "Enemy" picks one of 58 entries (the "You appear as"
 catalogue entries with ids up to 30, plus Gulp Worm, Alexia 2 and 3, Alexia's baby, tentacle,
 both knights, ceiling trap, Nosferatu's core, Alfred, the ants, the baby spider, the exploding
-prop); "Spawn in front of me" puts it 3 m in front of the player, facing it. Code:
+prop), then the custom enemies, marked "[C] " ("Enemy variants": the built-in ones, then those of
+`mods/enemies.ini`); "Spawn in front of me" puts it 3 m in front of the player, facing it. Code:
 `pc/glue/spawn_glue.c`.
 
 Steps, as the room loader does it for a record:
@@ -303,6 +308,128 @@ this room has not loaded (`sys->ef_tn[fx] == 0`), the entry is read from the sou
 counted in `ef_extn`), so `bhReleaseMainTexture` releases it with the room's. Fallback
 (`effect.c`): an effect whose room texture is not loaded gets the "not drawn" flag
 (`flg 0x1000000`) instead of drawing texture 0, logged once per effect id.
+
+## Enemy variants (custom enemies)
+
+A variant is a spawnable enemy made of parts the game already has: a **base** type (its AI,
+hit capsules, collision, motions; the spawner's entry of that type and model version), optionally
+**another model** drawn in its place, factors on its stats, motion and sound mappings, and
+randomizer metadata. Each has a **stable id** (1..99 built in, 100..999 from the mods file), which
+the F2 spawner, the randomizer and co-op spawn notes carry. Code: `pc/src/host/variants.c` (the
+table and the file reader, no game state; ctest `variants`), `pc/glue/variant_glue.c` (in the
+game).
+
+### Built in: Mutated Steve
+
+Monster Steve's model on Tyrant 1's AI (id 1, F2 "[C] Mutated Steve").
+
+* **Why the Tyrant's AI**: Monster Steve's own code (`en17.c`) is written for the Antarctic
+  chase: its Die mode is empty and nothing ever moves him to it (HP 250, damage only staggers
+  him), his swing kills outright and his other blows kill below 120 hit points, and it drives room
+  light 2 (`bhEne17_SetLight`) and the camera. The Tyrant (`en19.c`, form 0, the randomizer's
+  Tyrant) walks, swings, staggers, kneels, falls and dies in any room.
+* **The look**: Monster Steve (catalogue model "Monster Steve", RM_9280 record 0) posed every time
+  it is drawn from the Tyrant's skeleton by the appearance system's humanoid retargeting
+  ([ACTORS.md](ACTORS.md) "Retargeting": the Tyrant's 26 nodes mapped as the source, Steve's 24 as
+  the model), plus his two arm pieces (sub-models 3 and 4: his claw and the axe arm, which his own
+  code links to nodes 9 and 13 as enemies 31/32) on his hands. The Tyrant itself is not drawn; it
+  stays what the game moves, hits and collides with.
+* **Death**: the Tyrant's own (damage 17, fall 18, lying 2; `flg & 2` set, the body stays down for
+  the visit), played by the Tyrant's skeleton and mapped onto Steve like every other motion: he
+  falls forward and stays face down. A record the randomizer turned into him keeps its kill bit,
+  so `DieCk` counts the kill; a spawned one has none (as every spawned enemy).
+* **Numbers** (Tyrant 1: 500 HP normal, 300 easy): hp x1.3 (650 / 390), damage x1.25 (the
+  Tyrant's blows 30/40/40/50 become 38/50/50/63; the player has 200), speed and size the Tyrant's.
+  Measured in the lift hall (3/0) from 4 m with auto-aim: 40 handgun hits, 9 grenade rounds (25
+  hits); the shotgun took him from 650 to 70 in 24 shells (about 28 in all). The Tyrant there: 30
+  handgun hits, 7 grenade rounds, 21 shells.
+* **Sounds** from his room's bank (RM_9280 bank 3, an extra bank): his steps, roar and axe striking
+  for the Tyrant's steps (program 0), swing (8, motion 9) and fall (5, motion 18); his hurt cry
+  (program 2, as `en17.c bhEne17_DamageAdd`) on every hit, which the Tyrant makes no sound for. The
+  Tyrant's other sound (6, a heavy stagger) stays the Tyrant's.
+* **Hits on the player** are the Tyrant's (the player plays the Tyrant's damage motions 30..45 from
+  its set with the busy flag set, released at the end); checked with Claire, Chris played, and
+  "You appear as" Chris's file and Monster Steve: each hit 70 steps in mode 5, then back in
+  control.
+* Randomizer: weight 1 in Wild, never in Mild, heavy (below).
+
+### What is applied where
+
+| Field | Applied | Where |
+|---|---|---|
+| base | the spawner entry of that type and model version is realized (`spawn_at`), the variant remembered by its slot | `spawn_glue.c` -> `variant_spawned` |
+| model, attach | drawn instead of the base (and of its linked parts), posed from the base's skeleton every time it is drawn; a display slot of the appearance system per model in the room (`ACTOR_VARIANT`, 2 slots), released with the room's textures; a model with no humanoid node map, or one that does not load: the base is drawn | `eneset.c bhDrawEnemy` -> `pc_variant_draw` |
+| hp, armour | the damage a hit is about to deal (`ep->dam[]`, which `bhEne_CalcDamage` sums) x armour / hp, before its step; its own HP number, thresholds and HP tables stay the base's (so each difficulty keeps its ratio) | `eneset.c bhControlEnemy` -> `pc_variant_pre` |
+| damage | the player's hit points its step took, x damage (a blow the game made fatal stays fatal) | `pc_variant_post` |
+| speed | steps per frame (0.5..2: AI, motions and movement together; below 1 a step is skipped, never one with a hit) | `pc_variant_pre` |
+| scale | drawn size (node matrices scaled about its position); hits and collision stay the base's | `pc_variant_draw` |
+| motions | its own copy of the base's motion set with entries swapped (`a:b`: it plays b where the base asks for a); 4 such sets per room | `variant_spawned` |
+| sounds, sound_map, hurt_sound | that room's bank 3 as an extra bank ("Sounds of added types"); a request of a mapped base program plays the other program from it; the hurt sound is requested on a hit, on the voice channel (whose bank is kept apart from the other channel's, `sdfunc.c`) | `sdfunc.c RequestEnemySeBasic` -> `pc_variant_sound` |
+
+Its parts and children (linked to it) count as the variant. With no variant in the room
+(`pc_variant_n` 0) none of the hooks is called: rooms, saves and frames are as before.
+
+### mods/enemies.ini
+
+Read once at start from the mods folder (`RECVX_MODS`, else `./mods`); the log names each problem
+(`enemies.ini line N: ...`) and how many enemies were added. One `[Name]` section per enemy (the
+name is shown as "[C] Name" in F2 and logged by the randomizer); `;` and `#` start comments.
+
+```ini
+[Brute zombie]
+id = 100                 ; required, 100..999, unique: co-op and the randomizer use it
+base = Zombie: soldier   ; required: an F2 entry's name, or type[.model version] (1.2)
+model = Nosferatu        ; a "You appear as" model drawn instead (humanoids; none = the base's)
+attach = 3:9, 4:13       ; sub-model:node of that model drawn on its nodes (up to 4)
+hp = 2                   ; times the base's hit points (0.05..50)
+armour = 1               ; damage taken: weapon damage x armour / hp
+damage = 1.5             ; damage dealt to the player
+speed = 1.5              ; 0.5..2
+scale = 1.4              ; drawn size, 0.25..4
+motions = 4:2            ; up to 8 pairs: plays motion 2 of its set where the base asks for 4
+sounds = 9280            ; room file whose enemy sound bank sound_map and hurt_sound use
+sound_map = 0:0, 8:9     ; up to 16 pairs of sound programs: the base's -> that bank's
+hurt_sound = 2           ; that bank's program played when a hit lands
+wild = 3                 ; randomizer weight in Wild (0, the default: never)
+mild = 2                 ; in Mild
+slots = 4                ; enemy slots it reserves (default: the base's with its children)
+big = 1                  ; needs open space (as the Tyrant)
+heavy = 1                ; boss-like: Wild only, one per room, open space, not in kill-count rooms
+stages = 0-3, 9          ; stages (areas) the randomizer may place it in; default all
+```
+
+Keys are case-insensitive; a key that is not understood is reported and ignored; a section without
+an id or a base, or with a taken id, is left out. To find sound programs, `RECVX_TRACE_SND=1` logs
+every sound a variant requests with its motion and frame.
+
+### Randomizer and co-op
+
+* The randomizer ("Randomizer" below) adds every variant with a weight as a kind of its own after
+  the built-in kinds: its rules are its base kind's (another base type's: not in kill-count rooms,
+  not where the script uses `rm_flg` bits 29..31), plus `big`, `heavy` (one per room) and `stages`;
+  its slot cost is the larger of `slots` and the base's. It replaces free and script-shown records
+  only (event-driven records keep their type), never in boss rooms (the whole room is kept). The
+  log says `-> Mutated Steve (variant 1: type 19 model 0)`. In tours of 81 rooms with enemies (6
+  seeds, Wild) he took one record in 0..1 rooms per seed (3060, 3170, 7130), none in the 16 boss
+  rooms reached. Extra enemies copy a randomized
+  record's variant too. Its grab family is its base type's (the hold rule keys on the type).
+* **Co-op**: the spawn note's `variant` field (formerly padding; the protocol is unchanged) carries
+  the id; the guest realizes the base into the same slot and applies the same variant (model,
+  motions, sounds), after which the enemy is an ordinary puppet; its hits on the guest come from
+  the host's step (damage already scaled). The randomizer draws the same variants on both sides
+  **only if both have the same variants**: partners need the same `mods/enemies.ini`. An unknown
+  id plays as its base type (logged).
+* Test aid: `RECVX_SPAWN="frame:v<id>[@dist]"` spawns a variant.
+
+### Limits
+
+* The model is only drawn: hits, collision, the shadow and the camera follow the base's skeleton
+  (a model much larger than its base is hit where the base is).
+* Motions map within the base's set. A model gets the base's motions through the retargeting, so
+  another type's death plays by choosing that type as the base.
+* Two different models per room (a third: its base is drawn); 4 swapped motion sets per room.
+* Sound programs are per type: `sound_map` must name programs of the bank it uses; nothing checks
+  that they fit.
 
 ## Enemy options
 
@@ -381,6 +508,7 @@ weight, then one of its looks (the spawner's entries of that type, from any stag
 | Giant Black Widow | 1 | - / 1 | as the Tyrant (writes `rm_flg & 1`) |
 | bat, Spotter | 1 each | - / 3, 2 | only for bat/Spotter records (fliers hover where they are placed; ground enemies never become fliers and back); not in kill-count rooms; `rm_flg` as above |
 
+* Then the enemy variants with a randomizer weight ("Enemy variants"): Mutated Steve, 1 in Wild.
 * Not in the pool: the adult albinoid (its code drives its own room's light 2 and an effect linked
   to it: two of them in a prison room crashed in `en22.c bhEne22_MV04`), moths (their eggs use
   Claire's sub-models and 16 slots), bosses, water and wall types.
@@ -552,7 +680,7 @@ Test aids:
 
 | Env var | Effect |
 |---|---|
-| `RECVX_SPAWN="gameframe:id[.mdlver][@dist],..."` | spawns the first spawner entry of that type/model version at that game frame; traces its state every 30 frames, HP changes and hits on the player |
+| `RECVX_SPAWN="gameframe:id[.mdlver][@dist],..."` | spawns the first spawner entry of that type/model version at that game frame (`v<id>`: an enemy variant); traces its state every 30 frames, HP changes and hits on the player |
 | `RECVX_SPAWN_SURVEY="stg:rom,..."` | tries every spawner entry in each room and logs the result; `RECVX_SPAWN_SURVEY_ALL=1` keeps the spawns |
 | `RECVX_ENEMY_EXTRA`, `_PLACE`, `_RANDOM`, `_SEED`, `_VARIETY`, `_EVENTS` | override the enemy options |
 | `RECVX_ENEMY_KILL=n` | from n game frames into each room, every 20 frames each living, shown enemy of the room's records (ids 1..30, in its AI) takes a heavy hit as from the player's weapon; logs each death (`flg & 2`, what `DieCk` turns into the kill bit) and per room how many died (Black Widows take damage through their body parts and do not die from it) |

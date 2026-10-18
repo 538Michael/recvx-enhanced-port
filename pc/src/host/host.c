@@ -316,6 +316,7 @@ int main(int argc, char** argv)
 #endif
     config_load();
     parse_args(argc, argv);   /* command line overrides the saved settings */
+    { extern void variants_load(void); variants_load(); }   /* mods/enemies.ini: custom enemies (variants.h) */
     ps2_memory_init();
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD))
