@@ -98,8 +98,11 @@ void tps_player_mode(void)
     aim_h = 0;
 }
 
+static int dual_e;   /* (dual weapons, below) */
+extern int enemy_room_gen;   /* enemyopt_glue.c: room loads so far */
 static void deactivate(void)
 {
+    dual_e = -1;
     atmos_off();
     tps_player_mode();
     if (!tps_cam_active) return;
@@ -780,7 +783,7 @@ static void aim_at_crosshair(void)
    stay the crosshair target's, so the other enemy must take the same aim height. */
 #define DUAL_YAW DEG(45.0f)
 #define DUAL_PITCH DEG(15.0f)
-static int dual_e = -1;   /* the other arm's enemy, -1: none (trace) */
+static int dual_e = -1;   /* the other arm's enemy this tick, -1: none (also the trace's) */
 
 /* the muzzle of the weapon in hand `node` as drawn last tick, turned about the player with its facing since (ay0) */
 static void muzzle(int node, int ay0, float* m)
@@ -798,14 +801,14 @@ static int arm_yaw(const float* m, const float* t)
     return (int)(a > DUAL_YAW ? DUAL_YAW : a < -DUAL_YAW ? -DUAL_YAW : a);
 }
 
-static void dual_aim(int ay0)
+/* prev: last tick's dual_e when dual_aim ran then (tps_player), else -1 */
+static void dual_aim(int ay0, int prev)
 {
     PP_WORK* pp = (PP_WORK*)plp->exp2;
     float r[3], l[3], t[3], best = 0;
-    int cls = plp->at_flg & 0xE, left = 0, prev = dual_e, keep = 0;
+    int cls = plp->at_flg & 0xE, left = 0, keep = 0;
     muzzle(9, ay0, r);
     muzzle(13, ay0, l);
-    dual_e = -1;
     for (int i = 0; i < sys->ewk_n; i++) {
         BH_PWORK* e = &ene[i];
         const NJS_CAPSULE* c = &e->watr;
@@ -990,7 +993,10 @@ void tps_player(void)
 {
     static float frac;
     float d;
-    int n;
+    static int dual_gen;
+    int n, dual_prev = dual_gen == enemy_room_gen ? dual_e : -1;
+    dual_e = -1;   /* kept only from one tick of dual_aim to the next in a room: not across a gap or another weapon */
+    dual_gen = enemy_room_gen;
     if (trace && tps_cam_active && plp->mode1 == 1) trace_shot();
     /* (the scope's first tick still has our camera: the free aim below points the scope at the crosshair's target) */
     if (!tps_cam_active && plp->mode0 == 1 && plp->mode1 == 1 && plp->mode2 == 71) { scope_look(); return; }
@@ -1026,7 +1032,7 @@ void tps_player(void)
             int ay0 = plp->ay;
             aim_at_crosshair();
             if ((WpnTab[plp->wpnr_no].flg & 0x800) && plp->exp2) {   /* dual weapons; lowering them: the game's */
-                if (plp->mode2 != 68) dual_aim(ay0);
+                if (plp->mode2 != 68) dual_aim(ay0, dual_prev);
                 if (trace) trace_dual();
             }
         }
