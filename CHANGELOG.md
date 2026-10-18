@@ -4,11 +4,8 @@
 
 ### Third person
 
-- **Dual weapons aim where you aim**: with the Gold Lugers and the sub machine guns, one gun now
-  always fires where the crosshair points, and the other turns to a second enemy only when one
-  stands close beside your target; otherwise both aim at the crosshair. The guns are held to the
-  front instead of out to the sides, and the enemy you aim at no longer goes unhurt when others
-  are around. The fixed cameras, and "Game auto-aim" with the mouse, keep the original targeting.
+- **Adjusted dual weapons in over-the-shoulder**: with dual weapons one gun now always shoots
+  where you are aiming, and the other aims at nearby enemies up to 45 degrees away.
 
 ## 0.6.1 (2026-10-18)
 
