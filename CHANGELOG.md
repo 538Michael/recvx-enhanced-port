@@ -25,6 +25,10 @@
   floors and props the original leaves out for each camera angle, as the third-person views do.
   The middle of the picture stays exactly as the original, and walls the camera looks through
   stay hidden.
+- **Scope fills the screen in widescreen**: the sniper rifle's and the linear launcher's scope
+  now tints the whole picture instead of only the 4:3 middle, so the sides no longer look like
+  dark bars. The reticle stays round in the middle and shots still go to its centre. "Screen
+  effects" set to Original keeps the old look.
 
 ### Controls
 

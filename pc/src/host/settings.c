@@ -235,7 +235,7 @@ const Setting g_settings[] = {
     { SP_DISPLAY, "Frame blend (trail)", V(g_config.frame_blend), -1, 1, 1, onoff_auto, .help = "As on the PS2: each frame mixed over the previous one. Auto: on in vanilla, off with display-rate frames." },
     { SP_DISPLAY, "Cutscene bars", V(g_config.cinema_bars), 0, 2, 1, modes3, .help = "Original keeps them 4:3 in widescreen; fades always fill the screen.", .group = "WIDESCREEN" },
     { SP_DISPLAY, "Camera vignette", V(g_config.screen_filter), 0, 2, 1, modes3, .help = "Original keeps it 4:3 in widescreen." },
-    { SP_DISPLAY, "Screen effects", V(g_config.screen_effects), 0, 2, 1, modes3, .help = "Full-screen effect layers. Original keeps them 4:3 in widescreen." },
+    { SP_DISPLAY, "Screen effects", V(g_config.screen_effects), 0, 2, 1, modes3, .help = "Full-screen effect layers and the scope's tint. Original keeps them 4:3 in widescreen." },
     { SP_DISPLAY, "Movie zoom", V(g_config.movie_zoom), 0, 1, 1, .help = "Widescreen: movies grow, without stretching, until their black bars leave the screen (or the picture fills the width)." },
     { SP_DISPLAY, "Fog intensity", V(g_config.fog_intensity), 0, 100, 5, .fmt = "%d%%", .group = "FOG AND BRIGHTNESS",
       .help = "The fog and the black fog of dark rooms: 100% as on the PS2, 50% pushes it twice as far away, 0% removes it." },

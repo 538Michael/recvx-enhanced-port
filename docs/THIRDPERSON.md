@@ -90,6 +90,9 @@ from the same point along the same angles, so it goes where the scope's centre i
   zoom ends with the scope. Run (X) held zooms too, as Shift does.
 * **Gamepad, Classic**: the game's own scope controls, unchanged (R1 aims, the left stick and d-pad
   turn it, L1 zooms).
+* **Widescreen**: the view through the scope is hor+ as the normal view, and its tint fills the
+  width as the DISPLAY setting "Screen effects" says (Original keeps it 4:3, Off leaves it out);
+  the reticle stays round in the middle, where the shots go.
 * With the fixed cameras the scope keeps the original controls: the mouse is captured only in
   third person, and the fixed cameras have no mouse aim or fire.
 
