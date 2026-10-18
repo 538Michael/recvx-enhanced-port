@@ -25,15 +25,99 @@ extern SDL_Window* g_window;
 const char* const settings_pages[SP_COUNT] = { "DISPLAY", "GAMEPLAY", "CONTROLS", "THIRD PERSON", "AUDIO", "APPEARANCE", "CO-OP", "EXTRAS" };
 
 /* ---------------------------------------------------------------- appliers (main thread) */
-/* Display mode, F11, the start: fullscreen with no SDL fullscreen mode is borderless (the desktop's
-   size on the window's display); with a display mode it is exclusive (that display switches to it,
-   and SDL's VIDEO_MINIMIZE_ON_FOCUS_LOSS "auto" minimises it on Alt+Tab, restoring the desktop,
-   while borderless stays). Leaving fullscreen, SDL puts the window back where and how big it was. */
+/* Display mode, F11, the start. Exclusive: SDL fullscreen with a display mode (that display switches
+   to it, and SDL's VIDEO_MINIMIZE_ON_FOCUS_LOSS "auto" minimises it on Alt+Tab, restoring the
+   desktop). Borderless under Linux: SDL fullscreen with no mode (the window manager's fullscreen at
+   the desktop's size). Borderless under Windows: not SDL's fullscreen, which there is a WS_POPUP
+   window exactly covering the monitor, the shape the OpenGL drivers promote to their own
+   exclusive-like fullscreen (a black flash on Alt+Tab, nothing shown over the game): it behaved as
+   exclusive. Instead a plain borderless window borderless_extra pixels (default 1) bigger than the
+   monitor, towards an edge with no other monitor, which the drivers leave to the desktop
+   compositor. SDL declares the process per-monitor DPI aware (v2) in SDL_Init, so display bounds
+   and window rects are all pixels there. Leaving fullscreen of either kind, the window goes back
+   where and how big it was. */
+static bool bl_on, bl_max;   /* the borderless window is up; the window was maximised before it */
+static SDL_Rect bl_rect;     /* the window before it */
+
+static bool borderless_window(void)   /* the env: Linux tests of the Windows path */
+{
+    return !SDL_strcmp(SDL_GetCurrentVideoDriver(), "windows") || SDL_getenv("RECVX_BORDERLESS_WINDOW");
+}
+#ifdef _WIN32
+/* dwmapi's DwmSetWindowAttribute without windows.h: Windows 11's rounded corners and window border
+   off while borderless, as SDL does for its fullscreen (an error, harmless, before Windows 11) */
+__declspec(dllimport) long __stdcall DwmSetWindowAttribute(void* hwnd, unsigned long attr, const void* val, unsigned long size);
+static void dwm_square(bool on)
+{
+    void* hwnd = SDL_GetPointerProperty(SDL_GetWindowProperties(g_window), SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
+    unsigned int corner = on ? 1 : 0, border = on ? 0xFFFFFFFEu : 0xFFFFFFFFu;   /* DWMWCP_DONOTROUND / DEFAULT, DWMWA_COLOR_NONE / DEFAULT */
+    if (!hwnd) return;
+    DwmSetWindowAttribute(hwnd, 33, &corner, sizeof(corner));   /* DWMWA_WINDOW_CORNER_PREFERENCE */
+    DwmSetWindowAttribute(hwnd, 34, &border, sizeof(border));   /* DWMWA_BORDER_COLOR */
+}
+#else
+static void dwm_square(bool on) { (void)on; }
+#endif
+static bool display_at(const SDL_Rect* strip)   /* a display overlaps this strip */
+{
+    int n = 0;
+    bool hit = false;
+    SDL_DisplayID* ds = SDL_GetDisplays(&n);
+    for (int i = 0; i < n && !hit; i++) {
+        SDL_Rect r;
+        hit = SDL_GetDisplayBounds(ds[i], &r) && SDL_HasRectIntersection(strip, &r);
+    }
+    SDL_free(ds);
+    return hit;
+}
+static void borderless_enter(void)
+{
+    SDL_Rect b;
+    int e = g_config.borderless_extra;
+    if (!SDL_GetDisplayBounds(SDL_GetDisplayForWindow(g_window), &b)) { host_log("display: %s\n", SDL_GetError()); return; }
+    if (!bl_on) {   /* the window to come back to */
+        bl_max = (SDL_GetWindowFlags(g_window) & SDL_WINDOW_MAXIMIZED) != 0;
+        if (bl_max) { SDL_RestoreWindow(g_window); SDL_SyncWindow(g_window); }
+        SDL_GetWindowPosition(g_window, &bl_rect.x, &bl_rect.y);
+        SDL_GetWindowSize(g_window, &bl_rect.w, &bl_rect.h);
+    }
+    bl_on = true;
+    if (e) {   /* past the bottom, else the right, the top, the left edge; all next to a monitor: the bottom */
+        const SDL_Rect strip[4] = { { b.x, b.y + b.h, b.w, e }, { b.x + b.w, b.y, e, b.h }, { b.x, b.y - e, b.w, e }, { b.x - e, b.y, e, b.h } };
+        int i = 0;
+        while (i < 4 && display_at(&strip[i])) i++;
+        if (i == 4) i = 0;
+        if (i & 1) b.w += e; else b.h += e;
+        if (i == 2) b.y -= e;
+        if (i == 3) b.x -= e;
+    }
+    SDL_SetHint("SDL_BORDERLESS_WINDOWED_STYLE", "0");   /* Windows: a plain WS_POPUP, no caption style the taskbar stays above */
+    SDL_SetWindowResizable(g_window, false);
+    SDL_SetWindowBordered(g_window, false);
+    SDL_SetWindowPosition(g_window, b.x, b.y);
+    SDL_SetWindowSize(g_window, b.w, b.h);
+    SDL_SyncWindow(g_window);
+    dwm_square(true);
+}
+static void borderless_leave(void)
+{
+    if (!bl_on) return;
+    bl_on = false;
+    dwm_square(false);
+    SDL_SetWindowBordered(g_window, true);
+    SDL_SetWindowResizable(g_window, true);
+    SDL_SetWindowSize(g_window, bl_rect.w, bl_rect.h);
+    SDL_SetWindowPosition(g_window, bl_rect.x, bl_rect.y);
+    if (bl_max) SDL_MaximizeWindow(g_window);
+    SDL_SyncWindow(g_window);
+}
+
 void settings_apply_display(void)
 {
     SDL_DisplayID d = SDL_GetDisplayForWindow(g_window);
     SDL_DisplayMode m;
     int excl = g_config.fullscreen_exclusive && g_config.fullscreen;
+    bool bl;
     if (excl) {   /* the chosen mode, or the closest this display has; 0: the desktop's */
         const SDL_DisplayMode* desk = SDL_GetDesktopDisplayMode(d);
         int w = g_config.fullscreen_w, h = g_config.fullscreen_h;
@@ -42,10 +126,27 @@ void settings_apply_display(void)
         excl = w && SDL_GetClosestFullscreenDisplayMode(d, w, h, hz, false, &m);
         if (!excl) host_log("display: no %dx%d mode for exclusive fullscreen (%s), borderless instead\n", w, h, SDL_GetError());
     }
-    if (!SDL_SetWindowFullscreenMode(g_window, excl ? &m : NULL)) host_log("display: %s\n", SDL_GetError());
-    if (!SDL_SetWindowFullscreen(g_window, g_config.fullscreen != 0)) host_log("display: fullscreen: %s\n", SDL_GetError());
-    if (excl) host_log("display: exclusive fullscreen %d x %d @ %.2f Hz\n", m.w, m.h, m.refresh_rate);
-    else host_log("display: %s\n", g_config.fullscreen ? "borderless fullscreen" : "windowed");
+    bl = g_config.fullscreen && !excl && borderless_window();
+    SDL_SetHint(SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS, excl ? "auto" : "0");   /* SDL's "auto" spares borderless already; said outright */
+    if (!bl) borderless_leave();   /* first, so exclusive keeps the bordered window as the one to come back to */
+    if (g_config.fullscreen && !bl) {
+        if (!SDL_SetWindowFullscreenMode(g_window, excl ? &m : NULL)) host_log("display: %s\n", SDL_GetError());
+        if (!SDL_SetWindowFullscreen(g_window, true)) host_log("display: fullscreen: %s\n", SDL_GetError());
+    } else {   /* out of SDL's fullscreen, then no mode: the display has the desktop's mode back */
+        if (!SDL_SetWindowFullscreen(g_window, false)) host_log("display: fullscreen: %s\n", SDL_GetError());
+        if (!SDL_SetWindowFullscreenMode(g_window, NULL)) host_log("display: %s\n", SDL_GetError());
+        SDL_SyncWindow(g_window);
+    }
+    if (bl) borderless_enter();
+    {
+        int x, y, w, h;
+        char kind[64];
+        SDL_GetWindowPosition(g_window, &x, &y);
+        SDL_GetWindowSize(g_window, &w, &h);
+        if (excl) snprintf(kind, sizeof(kind), "exclusive fullscreen %d x %d @ %.2f Hz", m.w, m.h, m.refresh_rate);
+        else snprintf(kind, sizeof(kind), "%s", !g_config.fullscreen ? "windowed" : bl ? "borderless window" : "borderless fullscreen");
+        host_log("display: %s, window %d,%d %d x %d\n", kind, x, y, w, h);
+    }
 }
 void settings_apply_window(void) { if (!g_config.fullscreen) SDL_SetWindowSize(g_window, g_config.window_w, g_config.window_h); }
 static void apply_vsync(void) { SDL_GL_SetSwapInterval(g_config.vsync ? 1 : 0); }
@@ -89,6 +190,7 @@ void settings_display_modes(void)
         fs_n++;
     }
     SDL_free(m);
+    if (bl_on) borderless_enter();   /* the borderless window moved (Win+Shift+arrow) or its desktop resized: cover that display */
 }
 static int fsres_n(void) { return fs_n + 1; }
 static int fsres_get(void)
