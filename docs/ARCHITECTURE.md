@@ -134,7 +134,17 @@ Render targets get GS-pixel margins on both sides. The game's clip matrix
 (`_Make_ClipMatrix`) and CPU culling cone (`Ps2CalcScreenCone`) are widened by `pc_hor_scale()`
 while the projection is untouched, so 3D fills the margins and 2D drawn at x 0..639 stays 4:3 in
 the middle. Model culling is widened the same way (`fNaViwHalfW`, the joint window of
-`bhCheckClipModel`/`bhCheckClipPoint`). Room cameras hide room parts they cannot see (`hidobj`
+`bhCheckClipModel`/`bhCheckClipPoint`). The bounding-sphere test of every chunk model
+(`njCnkDrawModelLocal`: room parts, objects, effects) is replaced in widescreen and in third
+person (`view_glue.c pc_model_clip`): the original compares the sphere's on-axis screen radius
+(`r * dist / z`) with the screen edge, which falls short away from the axis by
+`sqrt(1 + tan^2)` of the angle, so at 21:9 and 32:9 large parts near the camera vanished at the
+edges while they still reached into the picture. The sphere is tested against the view's
+planes instead, widened by `PC_CULL_MARGIN` (1.5) of the half width and height, the same share
+of the view in every aspect; the margin also covers models whose sphere does not hold all of
+them (effects near the camera) and parts turning into view. A part only this test draws with a
+fixed camera is cut to the margins as below, so the 4:3 picture stays the original (without
+the native 3D renderer it stays culled); 4:3 with a fixed camera keeps the original test. Room cameras hide room parts they cannot see (`hidobj`
 lists, authored for 4:3). In widescreen such a part is drawn anyway, but only in the margins
 (`ps2_NinjaCnk.c pc_show_hidden` -> `view_glue.c pc_margin_part` -> `pc_margin_next`): its
 triangles carry `NativeVertex.cull` bit 2 and `stream.c native_draw` cuts them to the parts

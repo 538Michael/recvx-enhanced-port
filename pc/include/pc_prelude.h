@@ -60,6 +60,7 @@ float pc_hor_scale(void);
 float pc_clip_guard(void);
 int   pc_is_room_object(const void* obj);   /* part of the current room's model */
 int   pc_margin_part(const void* obj);      /* hor+, fixed camera: a room part its cut hides is drawn (view_glue.c) */
+int   pc_model_clip(const void* center, float r);   /* third person, hor+: model sphere test (view_glue.c) */
 /* rendering rework: chunk-model strips drawn natively (pc/glue/native_glue.c) */
 int   pc_native_3d(void);
 struct VU1_STRIP_BUF;
