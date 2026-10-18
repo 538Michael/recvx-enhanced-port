@@ -304,7 +304,7 @@ all 205 rooms, camera version 0, from `pc/tools/rdx.py`):
 | light set: lights 4.. hidden per cut (`hidlgt`); the first directional and first three point lights that are on fill the VU1 slots | `light.c bhControlLight` | 181 |
 | point lights only if on screen (`flg & 0x10`) | `bhControlLight` | 9 |
 | screen filter (`flg & 0x8000`, `fil_no`, `fil_rt`) | `effsub1.c bhEffFil` | 62 |
-| full-screen distortion (`flg & 0x400`, `bhEff110`) | | 2 |
+| under-water view: full-screen distortion (`flg & 0x400` -> `cam.flg 0x20`, room effect 110 type 1 `bhEff110`) | `gm_flg 0x100`: `bhDrawFullScreenRenderTexture` | 2 |
 | `ts_flg & 0x200` rooms: view clip, background colour per cut | `event.c`, `ps2_event.c` | (third person keeps its own clip) |
 
 Room ambient and lights 0..3 (muzzle flash, lighter, ...) do not change per cut.
@@ -326,9 +326,23 @@ Room ambient and lights 0..3 (muzzle flash, lighter, ...) do not change per cut.
 * Fog: density fades for on/off; range and colour ease (8% per game frame); the colour follows the
   denser fog faster. The range is measured from our camera (the camera-relative shift otherwise
   made fog come and go as the camera turned).
-* Screen filter: alpha fades over 0.8 s. Not faded: the distortion of 2 rooms, the per-cut
-  background colour of `ts_flg & 0x200` rooms.
+* Screen filter: alpha fades over 0.8 s. Not faded: the per-cut background colour of
+  `ts_flg & 0x200` rooms.
 * When our camera stops, lights are recomputed and the fog is re-applied (`gm_flg 0x10`).
+
+**Under-water views** (both settings). Cut flag `0x400` marks a cut whose camera looks in from
+under the water: only the submarine dock (RM_4030 and RM_8050, cuts 0, 2 and 5 of 6, whose
+cameras sit in the water outside the windows). `bhSetCut` turns it into `cam.flg 0x20`; the
+room's effect 110 of type 1 (`effsub1.c bhEff110`) follows it every frame: the frame is drawn
+into a render texture (`StoreRenderTex`) and back as a waving 16x16 grid
+(`bhDrawFullScreenRenderTexture`, `gm_flg 0x100`), stretched to 1.25 times the height. That
+look belongs to the fixed camera's place; ours is always in the room's air (there is no
+diving), so while it is the view (`tps_own_view`, asked before `tps_camera` takes over that
+frame) the effect stays off. `cam.flg` itself is unchanged, so the fixed camera, the F5
+toggle, events and first person show it as the original. Effect 110 of type 0 (room 1/5) does
+not follow the cut and is unchanged. The other per-cut screen layer, the
+camera vignette (`fil_no`), is a lens effect of every camera and stays (above). `RECVX_ATMOS_TRACE`
+shows the cut's flag (`eff110`) and whether the distortion is drawn (`drawn`).
 
 ## Effects (blood, hits)
 
