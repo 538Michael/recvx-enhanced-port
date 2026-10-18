@@ -22,6 +22,12 @@
   The middle of the picture stays exactly as the original, and walls the camera looks through
   stay hidden.
 
+### Controls
+
+- **Modern fixed-camera controls by default**: on a first start the fixed cameras use the modern,
+  camera-relative controls. Classic tank controls are one setting away (CONTROLS); an existing
+  settings file keeps your choice.
+
 ### Fixes
 
 - **Stuck after Alexia's flames**: after being set on fire by Alexia's first form, your character

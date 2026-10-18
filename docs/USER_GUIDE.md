@@ -174,7 +174,7 @@ menus, the typewriter's save screen and LOAD GAME (with either save system: poin
 selects it, a click picks it, the wheel or a click on the arrows scrolls, YES / NO and the memory
 cards too) and the game's questions such as "Use an ink ribbon?"; right click goes back; drag to
 rotate and wheel to zoom when examining an item), **Fixed
-camera controls** (`fixed_cam_controls`: **Classic (tank)** 0, Modern (camera-relative) 1; see
+camera controls** (`fixed_cam_controls`: Classic (tank) 0, **Modern (camera-relative)** 1; see
 [Modern controls](#modern-controls-fixed-cameras)), then the bindings ([Rebinding](#rebinding)).
 
 ### Third person
@@ -338,7 +338,8 @@ reload and the ammo stays in your inventory.
 ### Modern controls (fixed cameras)
 
 F1 -> Controls or ENHANCED SETTINGS -> CONTROLS: **Fixed camera controls** = Modern
-(camera-relative), ini `fixed_cam_controls = 1`. Off (Classic, tank controls) by default. Like the
+(camera-relative), ini `fixed_cam_controls = 1`, the default on a first start (an existing
+`recvx.ini` keeps its choice); Classic (tank controls) is `fixed_cam_controls = 0`. Like the
 alternate controls of the Resident Evil HD remasters:
 
 - The **left stick** or the **d-pad** (arrow keys on the keyboard) points where the character
