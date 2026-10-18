@@ -96,6 +96,17 @@ static void margins(void)
     v[0].fVx = -30; v[1].fVx = -20; v[2].fVx = -15; v[0].fVz = v[1].fVz = v[2].fVz = 10;
     CHECK(pc_margin_rule(3, v, 3, 320, 2048, 1, pl_far) == 0);
     CHECK(pc_margin_rule(3, v, 3, 320, 2048, 1, pl_left) == 1);
+    /* a part left out takes along what lies in its box (2/5: the cabinet's dolls), not its neighbours */
+    {
+        float box[6];
+        const float doll[3] = { -20, 1, 12 }, pot[3] = { -20, 5, 12 };
+        v[0].fVx = -30; v[0].fVy = -4; v[0].fVz = 10; v[1].fVx = -15; v[1].fVy = 2; v[1].fVz = 14; v[2].fVx = -25; v[2].fVy = 0; v[2].fVz = 11;
+        pc_margin_bounds(v, 3, box);
+        CHECK(box[0] == -30 && box[1] == -4 && box[2] == 10 && box[3] == -15 && box[4] == 2 && box[5] == 14);
+        CHECK(pc_margin_inside(doll, 1, box) == 1);
+        CHECK(pc_margin_inside(doll, 2.5f, box) == 0);   /* reaching out of it */
+        CHECK(pc_margin_inside(pot, 1, box) == 0);
+    }
 }
 
 static NativeVertex nv(float x, float w, float near_d)

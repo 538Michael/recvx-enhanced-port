@@ -29,6 +29,9 @@
 - **Black screen at Chris's oil pressure puzzle**: with "Screen effects" set to Off, the puzzle
   screen was hidden along with the effects, leaving it black. The puzzle now always shows; Off
   shows it in 4:3.
+- **Floating dolls in Alexia's room (widescreen)**: from the camera by the doll cabinet, the
+  dolls stood in mid-air at the side of the picture, without the shelves they sit on. They now
+  stay hidden together with their shelves, as in 4:3.
 
 ## 0.6.2 (2026-10-18)
 
