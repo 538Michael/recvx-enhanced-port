@@ -181,7 +181,7 @@ add_executable(recvx ${LAYOUT_PAD_SRC} ${RECVX_RES} $<TARGET_OBJECTS:recvx_game>
                $<$<TARGET_EXISTS:glibc_compat>:$<TARGET_OBJECTS:glibc_compat>>)
 target_link_libraries(recvx PRIVATE imgui SDL3::SDL3 miniupnpc::miniupnpc natpmp monocypher m)
 if(WIN32)
-    target_link_libraries(recvx PRIVATE ws2_32 pthread shell32)   # co-op UDP (src/net); clock_gettime (winpthreads)
+    target_link_libraries(recvx PRIVATE ws2_32 pthread shell32 dwmapi)   # co-op UDP (src/net); clock_gettime (winpthreads); borderless corners (settings.c)
     # Same address window as Linux: fixed image base, no ASLR relocation; large-address-aware
     # gives the 32-bit exe 4 GB on 64-bit Windows (Linux already uses addresses above 2 GB). -static: libstdc++,
     # libgcc and winpthread go into the exe, only system DLLs (UCRT, opengl32, ...) remain.

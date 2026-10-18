@@ -20,6 +20,7 @@ static const struct { const char* key; int* val; int lo, hi; } keys[] = {
     { "fullscreen_w", &g_config.fullscreen_w, 0, 16384 },   /* exclusive: 0 = the desktop's resolution and refresh */
     { "fullscreen_h", &g_config.fullscreen_h, 0, 16384 },
     { "fullscreen_hz", &g_config.fullscreen_hz, 0, 1000 },
+    { "borderless_extra", &g_config.borderless_extra, 0, 16 },   /* Windows borderless: 1 px past the monitor, 0 = exactly it */
     { "vsync", &g_config.vsync, 0, 1 },
     { "fps_limit", &g_config.fps_limit, 0, 5 },
     { "scale", &g_config.scale, 0, 8 },

@@ -96,7 +96,7 @@ float pc_overlay_x(float x)
     return overlay_stretch ? 320.0f + (x - 320.0f) * pc_hor_scale() : x;
 }
 
-HostConfig g_config = { .window_w = 1280, .window_h = 960, .vsync = 1, .log_level = 1, .music_volume = 100, .sfx_volume = 100, .interpolate = 1, .frame_blend = 0, .aspect = 2, .show_fps = 1, .show_ping = 1,
+HostConfig g_config = { .window_w = 1280, .window_h = 960, .borderless_extra = 1,.vsync = 1, .log_level = 1, .music_volume = 100, .sfx_volume = 100, .interpolate = 1, .frame_blend = 0, .aspect = 2, .show_fps = 1, .show_ping = 1,
                        .screen_filter = 1, .cinema_bars = 1, .screen_effects = 1, .native_3d = 1, .model_cull = 1, .native_tex = 1, .hd_textures = 1, .hd_textures_ui = 1, .quick_knife = 1,
                        .skip_doors = 1, .fast_loading = 1, .skip_intro = 1, .battle_unlocked = 1, .contrast = 100, .gamma = 10, .fog_intensity = 100 };   /* first-start defaults; recvx.ini overrides */
 SDL_Window* g_window;
@@ -140,6 +140,7 @@ void host_pump_events(void)
         case SDL_EVENT_QUIT:
             exit(0);
         case SDL_EVENT_WINDOW_DISPLAY_CHANGED:   /* moved to another monitor: its modes for Fullscreen resolution */
+        case SDL_EVENT_DISPLAY_CURRENT_MODE_CHANGED:   /* the desktop resized: a borderless window covers it again */
             settings_display_modes();
             break;
         case SDL_EVENT_KEY_DOWN:

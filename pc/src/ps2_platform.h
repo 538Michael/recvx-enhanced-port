@@ -19,6 +19,7 @@ typedef struct {
     int  fullscreen;         /* F11 flips it; the kind: fullscreen_exclusive */
     int  fullscreen_exclusive;   /* 0 borderless (the desktop's size), 1 exclusive (a display mode, settings.c) */
     int  fullscreen_w, fullscreen_h, fullscreen_hz;   /* exclusive: the mode (Hz rounded); 0 = the desktop's */
+    int  borderless_extra;   /* Windows borderless: pixels the window reaches past the monitor (settings.c), 0 = exactly it */
     int  vsync;
     int  fps_limit;          /* presents per second: 0 display rate, else index into render.c fps_limits (30/60/90/120/144) */
     int  log_level;

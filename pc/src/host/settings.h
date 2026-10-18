@@ -58,7 +58,7 @@ void settings_poll(void);                       /* main thread, per pumped frame
 void settings_save_later(void);                 /* any thread: recvx.ini is written by settings_poll (or at exit) */
 void settings_apply_window(void);               /* main thread: the window size from g_config (windowed) */
 void settings_apply_display(void);              /* main thread: windowed / borderless / exclusive from g_config (F11, Display mode) */
-void settings_display_modes(void);              /* main thread: reread the window's display's modes (start, display change) */
+void settings_display_modes(void);              /* main thread: reread the window's display's modes, refit a borderless window (start, display change) */
 
 /* game thread glue (options_glue.c) */
 int  pc_in_game(void);

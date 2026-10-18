@@ -21,6 +21,9 @@
 - **Silent movies after skipping the intro**: skipping the intro movie at start-up left every
   later movie without its sound, such as the one in the graveyard. Movies now always play their
   sound, and the intro no longer gets louder for a moment when you skip it.
+- **Borderless fullscreen under Windows**: it behaved like exclusive fullscreen, with a black
+  screen when switching to other programs and nothing shown over the game. It is now a real
+  borderless window: Alt+Tab is instant, and popups and overlays show over the game.
 
 ## 0.6.2 (2026-10-18)
 

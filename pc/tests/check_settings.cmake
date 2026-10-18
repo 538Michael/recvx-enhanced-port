@@ -6,6 +6,7 @@ set(NOT_IN_TABLE
     coop_items   # lobby ITEMS / F3 "Items when joining": the joiner's save list, chosen per session
     coop_start   # lobby START: the host's save to start from, chosen per session
     tps_key      # CONTROLS bindings, "Third person on/off" (bindings.c, its first keyboard slot)
+    borderless_extra   # ini only: the Windows borderless window's overhang past the monitor (settings.c), a driver workaround
 )
 file(READ "${SRC}/src/host/config.c" config)
 file(READ "${SRC}/src/host/settings.c" table)   # rows, and the get/set helpers of rows such as Window size
