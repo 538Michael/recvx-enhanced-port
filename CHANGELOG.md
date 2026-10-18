@@ -10,8 +10,6 @@
 
 ### Menus
 
-- **Title screen**: the "Online co-op" hint in the corner is gone; MULTIPLAYER in the menu is the
-  way in.
 - **Mouse on the save and load screens**: at a typewriter and in LOAD GAME, point at a save to
   select it and click to pick it, scroll with the wheel, and right click to go back. Yes/No
   questions such as "Use an ink ribbon?" and the memory card screens work with the mouse too.
