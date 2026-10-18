@@ -363,6 +363,12 @@ static void cheat_window(void)
                               "Fly: R / Page Up / R2 up, F / Page Down / L2 down.\n"
                               "Turning it off after flying puts you on the floor level below.");
     }
+    b = c->unlock;
+    if (ImGui::Checkbox("Unlock all", &b)) c->unlock = b;
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Examining a locked door, card reader or key slot uses its key there, as if you carried it.\n"
+                          "Nothing is added to the inventory. Doors locked by the story stay locked.\n"
+                          "Turned on inside a room, some doors notice it only after you enter the room again.");
 
     ImGui::SeparatorText("Give item");
     char label[48];
