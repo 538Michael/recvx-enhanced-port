@@ -8,6 +8,13 @@
   randomizer's variety (Wild or Mild) and whether event enemies change too in the lobby's GAME
   RULES, and the joining player sees them there. Both show while the randomizer is on.
 
+### Display
+
+- **Fuller rooms in widescreen**: with the fixed cameras, the side margins now show the walls,
+  floors and props the original leaves out for each camera angle, as the third-person views do.
+  The middle of the picture stays exactly as the original, and walls the camera looks through
+  stay hidden.
+
 ### Fixes
 
 - **Crash at the title with "You appear as"**: with your model set to one of the other playable

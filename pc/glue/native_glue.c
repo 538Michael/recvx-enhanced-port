@@ -27,6 +27,7 @@
 
 extern float fVu1AspectH, fVu1Projection, fVu1OffsetX, fVu1OffsetY;
 extern float Ps2_zbuff_b;
+extern int pc_margin_mesh;   /* view_glue.c: the mesh being drawn shows only in the hor+ margins (2: in front of the player) */
 
 /* hor+ widescreen, while a menu task runs (main.c njUserMain): its 2D is kept inside the 4:3
    screen, GS x 1728..2368 where the Ninja 2D calls put it, as the PS2's 640-wide display shows
@@ -55,6 +56,21 @@ static void clip_sprite(NativeRawVertex* a, NativeRawVertex* b, int tme)
         float k = (h.x - x1) / d;
         hi->x = (uint16_t)x1; hi->u = (uint16_t)(h.u + (l.u - h.u) * k + 0.5f); hi->s = h.s + (l.s - h.s) * k;
     }
+}
+
+/* hor+: a hidden room part in front of the player, drawn in the margins (view_glue.c
+   pc_margin_part, pc_margin_mesh 2), is left out when one of its n vertices (the model's vertex
+   buffer, after its vertex chunk) lies in front of the camera inside the 4:3 screen: cut there,
+   it would end in a straight edge at the 4:3 border */
+int pc_margin_reaches_43(const VU1_STRIP_BUF* v, int n)
+{
+    const float kx = fVu1AspectW * fVu1Projection;
+    if (pc_margin_mesh != 2) return 0;
+    for (int i = 0; i < n; i++) {
+        float x = fVu1OffsetX * v[i].fVz + kx * v[i].fVx;   /* screen x times Vz */
+        if (v[i].fVz > _fNaViwClipNear && x > NATIVE_43_X0 * v[i].fVz && x < NATIVE_43_X1 * v[i].fVz) return 1;
+    }
+    return 0;
 }
 
 static float clamp01(float v) { return v < 0.0f ? 0.0f : v > 1.0f ? 1.0f : v; }
@@ -120,7 +136,7 @@ void pc_native_strip(const unsigned short* idx_uv, int n, const VU1_STRIP_BUF* v
         o->fog = p->fFog;   /* wrapped to the GS's 8 bits only when drawn: clipping and blending use the real value */
         o->near_d = w - _fNaViwClipNear;
         o->far_d = _fNaViwClipFar - w;
-        o->cull = single && p->fNz > 0.0f;
+        o->cull = (single && p->fNz > 0.0f) | (pc_margin_mesh ? 4 : 0);
     }
     native_strip(prim, v, n);
 }
@@ -154,7 +170,7 @@ uint32_t pc_native_prim3d(unsigned int prim, const VU1_PRIM_BUF* in, int n, int 
         o->fog = p->fF;
         o->near_d = w - _fNaViwClipNear;
         o->far_d = _fNaViwClipFar - w;
-        o->cull = (p->ulKick & 0x8001) == 0x8001 ? 2 : 0;
+        o->cull = ((p->ulKick & 0x8001) == 0x8001 ? 2 : 0) | (pc_margin_mesh ? 4 : 0);
     }
     *zavg = n ? zsum / (float)n : 0.0f;
     return native_defer(prim, v, n < 64 ? n : 64, deferred ? pc_cur_mesh : 0, pc_cur_mesh & 1 ? pc_cur_strip++ : pc_cur_strip);

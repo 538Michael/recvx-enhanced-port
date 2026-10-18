@@ -10,8 +10,12 @@ typedef struct {
     float near_d, far_d;        /* clip distances: >= 0 inside the near/far planes */
     uint8_t r, g, b, a;         /* GS colour (0x80 = 1.0) */
     uint8_t cull;               /* bit 0: normal faces away (a triangle of three such is skipped,
-                                   SingleMain); bit 1: the triangle ending here is skipped */
+                                   SingleMain); bit 1: the triangle ending here is skipped;
+                                   bit 2 (on the last vertex): the triangle is drawn only outside
+                                   the 4:3 screen, in the hor+ margins (NATIVE_43_X0..X1) */
 } NativeVertex;
+#define NATIVE_43_X0 1728.0f   /* the 4:3 screen (the PS2's 640-wide display), GS x */
+#define NATIVE_43_X1 2368.0f
 
 /* game thread: triangles with GS PRIM bits (type 3 list, 4 strip, 5 fan; TME/FGE/ABE/IIP/
    FST/CTXT); see NativeVertex.cull */
