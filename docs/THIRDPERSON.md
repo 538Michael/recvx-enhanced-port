@@ -77,7 +77,19 @@ from the same point along the same angles, so it goes where the scope's centre i
 * **Fire, leave, reload**: left mouse fires (the fire row), letting go of aim leaves the scope and
   our camera comes back behind the direction the scope looked; reload (R) works in the scope
   ([USER_GUIDE.md](USER_GUIDE.md#reload)).
-* The gamepad works the scope as before (the game's stick and d-pad); the mouse adds to it.
+* **Gamepad, Modern**: its third-person buttons keep playing in the scope (`pad_play` while
+  `in_scope`: `mode2` 71, or `st_flg 0x800000` through the scope's reload), so the held LT keeps
+  the scope up, RT fires and RB reloads. Before, the scope turned `pad_play` off with our camera,
+  and an input held through that change counts for neither set until let go (`bindings.c
+  pad_row_reads`): the held LT was no aim any more and the scope closed as it opened. The right
+  stick turns the scope as the mouse does (`scope_look`: `stick_yaw` / `stick_pitch` from
+  `pad_sticks`, with the stick speed, invert Y and "Stick aiming speed", scaled by the zoom); the
+  left stick and d-pad up / left / right still turn it the game's way. The right stick click
+  (`pad_tps_recenter`, which has nothing to recenter there) switches the zoom on and off: the
+  stick that aims holds no button well, and LB, the game's zoom (L1), is the quick knife here. The
+  zoom ends with the scope. Run (X) held zooms too, as Shift does.
+* **Gamepad, Classic**: the game's own scope controls, unchanged (R1 aims, the left stick and d-pad
+  turn it, L1 zooms).
 * With the fixed cameras the scope keeps the original controls: the mouse is captured only in
   third person, and the fixed cameras have no mouse aim or fire.
 
@@ -169,7 +181,7 @@ unit (the character is about 17 units tall).
 |---|---|
 | `RECVX_TPS_MOUSE="frame:dx:dy,..."` | moves the mouse dx/dy counts per game frame from that presented frame on |
 | `RECVX_VPAD="frame:input+input,..."` | a virtual gamepad ([ARCHITECTURE.md](ARCHITECTURE.md)): sticks as `leftx=0.5+lefty=-1` (up is negative), triggers `+lefttrigger`; a trigger after another input needs its own `+` (`+lefttrigger++righttrigger`) |
-| `RECVX_TPS_TRACE=1` | logs the gamepad per frame ("tps: pad": the sticks past their dead zones, the walk direction, facing, camera, quick turn, the enemy nearest the crosshair) and its aim assist ("tps: assist"), the free aim per frame, each shot's direction and wall hit against the crosshair target ("SHOT"), the drawn weapon's barrel with "You appear as", the camera ("tps: cam A\|B": yaw, pitch, the player's position, the model's root, the point followed and the eye), the aim height given to the game, the scope per frame ("tps: scope": `ay`, `wax`, the field of view, the mouse's turn in game units, the enemy nearest the centre in degrees, the enemies' health); `=2` also keeps the camera on the enemy the game locked on to (the middle of its hit capsule, or `RECVX_TPS_AIM_AT=f` along it: 0 = `c1`, for a zombie the head, 1 = `c2`, its legs) |
+| `RECVX_TPS_TRACE=1` | logs the gamepad per frame ("tps: pad": the sticks past their dead zones, the walk direction, facing, camera, quick turn, the enemy nearest the crosshair) and its aim assist ("tps: assist"), the free aim per frame, each shot's direction and wall hit against the crosshair target ("SHOT"), the drawn weapon's barrel with "You appear as", the camera ("tps: cam A\|B": yaw, pitch, the player's position, the model's root, the point followed and the eye), the aim height given to the game, the scope per frame ("tps: scope": `ay`, `wax`, the field of view, the turn of the mouse and right stick in game units, the enemy nearest the centre in degrees, the enemies' health); `=2` also keeps the camera on the enemy the game locked on to (the middle of its hit capsule, or `RECVX_TPS_AIM_AT=f` along it: 0 = `c1`, for a zombie the head, 1 = `c2`, its legs) |
 | `RECVX_TPS_ORBIT=degrees` | turns only the view about the player (side views; aim unchanged, camera ignores walls) |
 | `RECVX_ATMOS_TRACE=1` | logs each game frame's cut, the game's fog, lights and filter and what "smooth" shows |
 | `RECVX_EFF_TRACE=1` | logs effects spawned and queued |

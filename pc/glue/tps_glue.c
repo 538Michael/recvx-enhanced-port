@@ -63,6 +63,11 @@ static int recenter;              /* game frames left of the camera easing behin
 /* the game's lock-on instead of free aim ("Game auto-aim"); with the gamepad it is the gentle aim assist */
 static int lock_aim(void) { return g_tps.auto_aim && !pad_cam; }
 
+/* the sniper rifle's or linear launcher's scope is up (bhCPM2_act_scp sets st_flg 0x800000 until the cut is
+   set up again after it; also its reload, mode2 70, in between): our camera is off, the gamepad keeps its
+   third-person rows (pad_play) */
+static int in_scope(void) { return sys && plp && plp->mode0 == 1 && plp->mode1 == 1 && (plp->mode2 == 71 || (sys->st_flg & 0x800000)); }
+
 static float wrap(float a)
 {
     a = fmodf(a, 65536.0f);
@@ -96,7 +101,8 @@ static void deactivate(void)
     atmos_off();
     tps_player_mode();
     if (!tps_cam_active) return;
-    tps_cam_active = g_tps.cam_active = g_tps.aiming = g_tps.pad_play = 0;
+    tps_cam_active = g_tps.cam_active = g_tps.aiming = 0;
+    g_tps.pad_play = g_tps.pad_play && in_scope();   /* (a held aim trigger stays held into the scope) */
     /* the room camera resumes: the game's own re-initialisation of the current cut */
     if (sys && !(sys->st_flg & 0x1)) sys->gm_flg |= 0x800;
 }
@@ -583,12 +589,23 @@ static int pad_sticks(unsigned int* pad)
 unsigned int tps_pad(unsigned int pad)
 {
     unsigned k;
+    int scope;
     if (sys->ss_flg & 0x400000) return pad;   /* attract demo playback */
     k = tps_input_keys(plp && pad_sticks(&pad));
     pad_steer = (pad & 0xF) != 0 && !pad_cam;   /* (the gamepad: its stick, or a d-pad turn: the camera stays) */
-    {   /* the gamepad: recenter, and a quick turn swings the camera round with the character */
+    scope = in_scope();
+    {   /* the scope: the recenter row (right stick click) switches the zoom (the game's "change aim" bit 0x80,
+           held: L1, the quick knife's button here); run (Shift) zooms while held */
         static unsigned was;
-        unsigned now = pad_cam ? k & (TPS_K_RECENTER | TPS_K_QUICKTURN) : 0;
+        static int zoom;
+        if (scope && (k & TPS_K_RECENTER) && !(was & TPS_K_RECENTER)) zoom = !zoom;
+        if (!scope) zoom = 0;
+        was = k;
+        if (scope && (zoom || (k & TPS_K_RUN))) pad |= 0x80;
+    }
+    {   /* the gamepad: recenter, and a quick turn swings the camera round with the character (not in the scope) */
+        static unsigned was;
+        unsigned now = pad_cam && !scope ? k & (TPS_K_RECENTER | TPS_K_QUICKTURN) : 0;
         if (now & ~was) { recenter = 20; swings++; }
         was = now;
     }
@@ -606,8 +623,6 @@ unsigned int tps_pad(unsigned int pad)
     if (k & TPS_K_RIGHT) pad |= 0x8;
     if (k & TPS_K_AIM) pad |= 0x10;
     if (k & TPS_K_RUN) pad |= 0x400;
-    /* the scope (sniper rifle, linear launcher): run zooms in, as L1 does, which Q (cancel here) no longer presses */
-    if ((k & TPS_K_RUN) && plp && plp->mode1 == 1 && plp->mode2 == 71) pad |= 0x80;
     if (k & (TPS_K_ACTION | TPS_K_FIRE)) pad |= 0xB00;   /* fire/examine/confirm, like Cross */
     if (k & TPS_K_CANCEL) pad |= 0x1000;
     if (k & TPS_K_MAP) pad |= 0x2000;
@@ -823,19 +838,22 @@ static void trace_shot(void)
 
 /* the scope of the sniper rifle and linear launcher (playpch2.c bhCPM2_act_scp, mode2 71: first
    person, our camera off; the game's view is cam.ay = -ay, cam.ax = -wax, and the shot leaves along
-   them from the same point). The mouse turns ay and wax as the game's stick does, at the aiming
-   sensitivity scaled by the zoom (the field of view shown against the aiming one), wax within the
+   them from the same point). The mouse (and the Modern gamepad's right stick) turns ay and wax as the
+   game's stick does, at the aiming sensitivity scaled by the zoom (the field of view shown against the aiming one), wax within the
    game's +-45 degrees. During a shot's recoil (mode3 3) the game sets wax to ct3 plus the kick each
    frame: the mouse moves ct3. */
 #define SCOPE_PITCH 8192   /* bhCPM2_act_scp's clamp */
 static void scope_look(void)
 {
     static float fy, fp;   /* the turn below one game unit, kept for the next frame */
-    float k = TURN_PER_PIXEL * g_tps.aim_sens / 100.0f * cam.pers / DEG((float)g_tps.aim_fov);
+    float z = cam.pers / DEG((float)g_tps.aim_fov), k = TURN_PER_PIXEL * g_tps.aim_sens / 100.0f * z;
     int dy, dp, p;
     fy -= mouse_dx * k * g_tps.sens_x / 100.0f;
     fp += (g_tps.invert_y ? mouse_dy : -mouse_dy) * k * g_tps.sens_y / 100.0f;
-    mouse_dx = mouse_dy = 0;
+    /* the gamepad's right stick (pad_sticks: its speed and invert Y) at the stick aiming speed, likewise scaled */
+    fy += stick_yaw * g_tps.pad_aim_sens / 100.0f * z;
+    fp += stick_pitch * g_tps.pad_aim_sens / 100.0f * z;
+    mouse_dx = mouse_dy = stick_yaw = stick_pitch = 0;
     dy = (int)fy; fy -= dy;
     dp = (int)fp; fp -= dp;
     plp->ay += dy;
@@ -1080,7 +1098,7 @@ void tps_frame(void)
     /* the gamepad's third-person rows play while our camera is, the game not frozen (menus,
        messages, pick-ups, their fades), through hits, grabs and weapon loads (a held trigger or
        quick knife stays held) */
-    g_tps.pad_play = on && g_tps.pad_modern && tps_cam_active && sys && (sys->sp_flg & 0x40) && !(sys->ss_flg & 0x400000);
+    g_tps.pad_play = on && g_tps.pad_modern && (tps_cam_active || in_scope()) && sys && (sys->sp_flg & 0x40) && !(sys->ss_flg & 0x400000);
     /* with or without third person: the player has control, so no menu has the mouse (menu_mouse.c);
        the co-op trade screen is open in play */
     g_menu_mouse.play = pc_in_game() && plp && pc_in_play(plp, 1) && !pc_trade_screen();   /* (the scope too: its mouse aim) */
