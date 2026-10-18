@@ -45,6 +45,10 @@
 
 ### Fixes
 
+- **Music after a teleport**: teleporting out of a save room, or out of any room with its own
+  music, kept that music playing in the new room. The music now stops or changes as it does when
+  you walk through the door, and carries on when both rooms share it. The same goes for a room's
+  background sounds, and for the partner following you in co-op.
 - **Scope with a gamepad in third person**: with the Modern gamepad controls, the sniper rifle's
   and linear launcher's scope closed again as soon as it opened. Holding LT now keeps it up: aim
   with the right stick, click the right stick to zoom, RT fires and RB reloads.
