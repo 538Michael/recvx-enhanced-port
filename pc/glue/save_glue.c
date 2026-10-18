@@ -10,6 +10,7 @@
 #include "../../decomp/include/ps2/veronica/prog/main.h"
 #include "../../decomp/include/ps2/veronica/prog/bup_00.h"
 #include "../../decomp/include/ps2/veronica/prog/sdfunc.h"
+#include "../../decomp/include/ps2/veronica/prog/message.h"
 #include "../../decomp/include/ps2/veronica/prog/vibman.h"
 #include "../../decomp/include/ps2/veronica/prog/ps2_MemoryCard..h"
 #include "../../decomp/include/ps2/veronica/prog/ps2_McSaveFile.h"
@@ -25,6 +26,7 @@
 #include <string.h>
 
 static int native;          /* the open save/load screen's save system, taken when it (re)starts */
+static int listing_save;    /* it is the save screen (pc_save_list) */
 static SaveEntry* saves;    /* the files of its rows; a row past them is a new save */
 static int saves_n, rows_n;
 static SELECTFILEINFO* rows;
@@ -41,6 +43,7 @@ void pc_save_list(SELECTFILEWINDOW* win, MEMORYCARDSTATE* mc, int saving)
 {
     const char* dir = save_native_dir();
     int i, n, cur = 0, top;
+    listing_save = saving;
     free(saves);
     saves_n = savestore_list(dir, &saves);
     n = saves_n + (saving || !saves_n);   /* loading with no saves: one empty row ("no save data") */
@@ -65,6 +68,24 @@ void pc_save_list(SELECTFILEWINDOW* win, MEMORYCARDSTATE* mc, int saving)
     win->sMesCur = cur;
     win->sCursol = cur - win->slDispTopNumber;
     SetMemoryCardFileNumber(mc, cur);
+}
+
+/* mcDisplayFileSelectWindow's header (MEMORY CARD and the slot, messages 463 and 464 + port, at
+   y 32): with native saves "Load Game" / "Save Game" instead, as a message in the game's font
+   (codes: ASCII - 32, 0xFF01 a space) drawn by bhDispMessage the same way, centred above the list */
+int pc_save_header(void)
+{
+    const char* s = listing_save ? "Save Game" : "Load Game";
+    unsigned short mes[16];
+    void* keep = sys->mes_tp;
+    int i;
+    if (!native) return 0;
+    for (i = 0; s[i]; i++) mes[i] = s[i] == ' ' ? 0xFF01 : s[i] - 32;
+    mes[i] = 0xFFFF;
+    sys->mes_tp = mes;
+    bhDispMessage(320.0f - bhMesLen(mes) / 2, 32.0f, 0, 2, 0, 0, 0);
+    sys->mes_tp = keep;
+    return 1;
 }
 
 /* the cursor one row up or down, wrapping around as the card's list does */
