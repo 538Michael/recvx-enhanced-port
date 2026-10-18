@@ -401,7 +401,8 @@ cutscene double ("Swapped model in cutscenes" on) and the lobby previews (`actor
   head at node 5, which `bhObjClpn` reads). Per pose its position follows the model's head; the
   ponytail runs the game's own simulation (`bhObjClpn`, `bhCalcHair`: the same joints, from the
   display actor's retargeted angles) once per tick (our player and the partner: the pose after
-  control; the double: `actor_double_tick`), in work of its own (`exp0`/`exp3`, 20 KB per slot,
+  control; the double: `actor_double_tick`; of two doubles shown the first steps it, the other
+  shows the same swing), in work of its own (`exp0`/`exp3`, 20 KB per slot,
   flag `0x100000`), so it never takes `bhGetFreeMemory` (the earlier crash: memory under a pending
   weapon read). Drawn right after the display actor.
 * **Memory**: per display slot (3) 34 KB of static buffers (103 KB in all, not the game's arena); per shown head part one texture

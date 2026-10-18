@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- **Music after an interrupted co-op follow**: if the game ended (game over, quitting) while you
+  were being moved to the host's room, the next door you used could get its music wrong.
+- **Swapped cutscene models**: Claire's ponytail no longer swings twice as fast when two of her
+  cutscene doubles are on screen.
+
 ## 0.6.2 (2026-10-18)
 
 ### Third person
