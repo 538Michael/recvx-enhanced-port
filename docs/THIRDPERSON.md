@@ -268,9 +268,14 @@ Room ambient and lights 0..3 (muzzle flash, lighter, ...) do not change per cut.
 * A change in a frame where the cut changed (`cam.ncut`/`camver`) fades; any other change
   (scripts, flicker, muzzle flash, event fog) applies at once. Lights 0..3 are never faded.
 * Lights: a weight per room light, 0 -> 1 in 24 game frames (0.8 s), applied to the values the
-  game computed this frame. A point light fading in waits for a free slot (at most three in use);
-  meanwhile the outgoing ones fade twice as fast (a short dip). The on-screen test of
-  `flg & 0x10` is not applied.
+  game computed this frame. The target is what `bhControlLight` shows: the first directional
+  light that is on and the first three point lights that are on. A light that is on behind those
+  gets no weight: the palace main hall's normal version (RM_1020) keeps the red alarm light of
+  its alarm version (RM_1021, `ev_flg` 181, which turns the room's directional lights off and the
+  red one on) switched on behind the room's directional light, and it showed during every fade.
+  The outgoing and incoming directional light cross-fade. A point light fading in waits for a
+  free slot (at most three in use); meanwhile the outgoing ones fade twice as fast (a short dip).
+  The on-screen test of `flg & 0x10` is not applied.
 * Fog: density fades for on/off; range and colour ease (8% per game frame); the colour follows the
   denser fog faster. The range is measured from our camera (the camera-relative shift otherwise
   made fog come and go as the camera turned).
