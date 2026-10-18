@@ -11,6 +11,7 @@
 #include "../../decomp/include/ps2/veronica/prog/hitchk.h"
 #include "../src/host/cheat.h"
 #include "../src/host/coop.h"
+#include "pc_rules.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -60,9 +61,7 @@ unsigned int pc_noclip(void)
    - A door with a question ("Will you use the Silver Key?") is chosen by the script's PlItemCheck: scd0 sets
      the door's message by it, scd1 opens the door on "Yes" when it still holds. pc_unlock_held passes such a
      check for a key item (itemdata type 0x40: no weapon, ammo, herb, ribbon or lighter) that has a use spot in
-     this room, in scd0/scd1 only (event tasks check items to give or take them, RM_9160's jewels), not when the
-     check guards a model change (RM_3160 hides its zombies once the Emblem Card is carried), and never in 0/9,
-     where the metal detector checks every metal item (keys and emblems among them) with the same op.
+     this room, as pc_rules.h pc_unlock_rule says.
    No item is added; the scripts' PlItemLost/PlItemLostEx of a key the player does not have find nothing. */
 static int key_item(int id) { return id > 0 && id < 156 && (itemdata[id].type & 0x40); }
 static int carried(int id)
@@ -72,25 +71,22 @@ static int carried(int id)
     return 0;
 }
 
-extern unsigned char* bhScePtr;   /* event.c */
-extern BH_SCEWORK bhEtask[16];
-int pc_unlock_held(int item)
+static int has_spot(int item)
 {
-    const unsigned int* t = (const unsigned int*)rom->evtp;
-    unsigned int ofs, first, lo = ~0u;
-    if (!g_cheat.unlock || !key_item(item) || (sys->stg_no == 0 && sys->rom_no == 9) || *bhScePtr == 36 /* InitModelSet */) return 0;
-    first = t[0];   /* the offset table (scd0, scd1, events) ends where the first script begins */
-    for (unsigned int i = 0; i * 4 < first; i++)
-        if (t[i] && t[i] < first) first = t[i];
-    for (unsigned int i = 2; i * 4 < first; i++)
-        if (t[i] && t[i] < lo) lo = t[i];
-    ofs = (unsigned int)(bhScePtr - (const unsigned char*)t);
-    if (ofs >= lo) return 0;   /* an event (they follow scd0 and scd1) */
     for (int i = 0; i < rom->flr_n; i++) {
         const ATR_WORK* z = &rom->flrp[i];
         if (z->type == 0 && (z->prm0 == item || z->prm1 == item || z->prm2 == item || z->prm3 == item)) return 1;
     }
     return 0;
+}
+
+extern unsigned char* bhScePtr;   /* event.c */
+extern BH_SCEWORK bhEtask[16];
+int pc_unlock_held(int item)
+{
+    const unsigned int* t = (const unsigned int*)rom->evtp;
+    if (!g_cheat.unlock || !key_item(item)) return 0;
+    return pc_unlock_rule(1, pc_script_part(t, (unsigned int)(bhScePtr - (const unsigned char*)t)), *bhScePtr, sys->stg_no, sys->rom_no, has_spot(item));
 }
 
 static int unlock_item, unlock_sb;
@@ -187,7 +183,7 @@ static int warp_sound, warp_bgm, warp_vol, warp_bgse[2];
 
 void cheat_warp_sound(int after)
 {
-    int i;
+    int i, r;
     if (!warp_sound) return;
     if (!after) {
         warp_bgm = CurrentBgmNo; warp_vol = CurrentBgmVolume;
@@ -196,11 +192,11 @@ void cheat_warp_sound(int after)
         return;
     }
     warp_sound = 0;
-    if ((ReqFadeBgmNo & 0x8) && CurrentBgmNo == warp_bgm) ReqFadeBgmNo = CurrentBgmVolume != warp_vol ? 0x2 : 0;   /* as PlayBgm2 */
-    else if (CurrentBgmNo < 0 && warp_bgm >= 0 && AdxPlayFlag[0]) StopBgm(400);
+    if ((r = pc_warp_bgm(ReqFadeBgmNo, CurrentBgmNo, CurrentBgmVolume, warp_bgm, warp_vol, AdxPlayFlag[0] != 0)) < 0) StopBgm(400);
+    else ReqFadeBgmNo = r;
     for (i = 0; i < 2; i++)
-        if ((ReqFadeBgSe[i] & 0x2) && CurrentBgSeNo[i] == warp_bgse[i]) ReqFadeBgSe[i] = 0;   /* as CallBackGroundSe2 */
-        else if (CurrentBgSeNo[i] < 0 && warp_bgse[i] >= 0) StopBackGroundSeEx(i, 400);
+        if ((r = pc_warp_bgse(ReqFadeBgSe[i], CurrentBgSeNo[i], warp_bgse[i])) < 0) StopBackGroundSeEx(i, 400);
+        else ReqFadeBgSe[i] = r;
 }
 
 /* a warp that never reached its room's entry script (the game ended in the transition: game over, the

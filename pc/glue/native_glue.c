@@ -21,6 +21,7 @@
 #include "../../decomp/include/ps2/veronica/prog/ps2_NaView.h"
 #include "../../decomp/include/ps2/veronica/prog/ps2_NaDraw2D.h"
 #include "../src/gs/native.h"
+#include "pc_rules.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -60,40 +61,10 @@ static void clip_sprite(NativeRawVertex* a, NativeRawVertex* b, int tme)
 }
 
 /* hor+: is a hidden room part drawn in the margins (view_glue.c pc_margin_part) left out? v: its
-   n vertices (the model's vertex buffer after its vertex chunk) in view space; x below is the GS
-   screen x times Vz, so each test is against a plane through the camera.
-   pc_margin_mesh 3 (its sphere reaches the camera or the line to the player): unless all vertices
-   lie on one side of the 4:3 view, widened to take in the player (PLAYER_HALF either side of its
-   spot), or behind the near plane. Their hull then misses that view at every depth, so the part
-   neither ends in a straight edge at the 4:3 border nor crosses the line to the player.
-   pc_margin_mesh 2 (in front of the player): when a vertex lies in front of the camera inside the
-   4:3 screen; cut there, it would end in a straight edge at the 4:3 border. */
-#define PLAYER_HALF 8.0f   /* the player's collision radius (O_WRK ar) is 3.5 */
+   n vertices (the model's vertex buffer after its vertex chunk) in view space (pc_rules.h) */
 int pc_margin_reaches_43(const VU1_STRIP_BUF* v, int n)
 {
-    const float kx = fVu1AspectW * fVu1Projection;
-    if (pc_margin_mesh == 3) {
-        float x0 = NATIVE_43_X0, x1 = NATIVE_43_X1, pz = pc_margin_player[1];
-        int left = 1, right = 1, behind = 1;
-        if (pz > _fNaViwClipNear) {
-            float xp = fVu1OffsetX + kx * pc_margin_player[0] / pz, pad = kx * PLAYER_HALF / pz;
-            if (xp - pad < x0) x0 = xp - pad;
-            if (xp + pad > x1) x1 = xp + pad;
-        }
-        for (int i = 0; i < n; i++) {
-            float x = fVu1OffsetX * v[i].fVz + kx * v[i].fVx;
-            if (x > x0 * v[i].fVz) left = 0;
-            if (x < x1 * v[i].fVz) right = 0;
-            if (v[i].fVz > _fNaViwClipNear) behind = 0;
-        }
-        return !(left || right || behind);
-    }
-    if (pc_margin_mesh != 2) return 0;
-    for (int i = 0; i < n; i++) {
-        float x = fVu1OffsetX * v[i].fVz + kx * v[i].fVx;   /* screen x times Vz */
-        if (v[i].fVz > _fNaViwClipNear && x > NATIVE_43_X0 * v[i].fVz && x < NATIVE_43_X1 * v[i].fVz) return 1;
-    }
-    return 0;
+    return pc_margin_rule(pc_margin_mesh, v, n, fVu1AspectW * fVu1Projection, fVu1OffsetX, _fNaViwClipNear, pc_margin_player);
 }
 
 static float clamp01(float v) { return v < 0.0f ? 0.0f : v > 1.0f ? 1.0f : v; }

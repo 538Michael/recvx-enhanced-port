@@ -16,6 +16,7 @@
 #include "../src/host/modern.h"
 #include "../src/host/bindings.h"
 #include "../src/host/menu_mouse.h"
+#include "pc_rules.h"
 
 TpsConfig g_tps = { .fov = 75, .aim_fov = 65, .dist = 140, .aim_dist = 100, .height = 165, .shoulder = 35,
                     .sens_x = 100, .sens_y = 100, .aim_sens = 70, .crosshair = 1, .atmos = 1, .key = 62 /* F5 */,
@@ -777,12 +778,11 @@ static void aim_at_crosshair(void)
    then (between two enemies in front of it, each arm on one). Free aim turns the character to the crosshair
    instead, so the arms stayed turned by those offsets: held outwards, firing past the crosshair at where the
    enemies had been. Free aim sets them every tick: one arm at the crosshair target, the other at the nearest
-   other enemy within DUAL_YAW / DUAL_PITCH of the crosshair direction and in range, on the side of that arm
+   other enemy within 45 degrees (yaw) / 15 (pitch) of the crosshair direction and in range, on the side of that arm
    (as the game, which gives the left arm the enemy further left), else at the crosshair target too; each
    yaw from its own muzzle (the shot's origin), within DUAL_YAW. The pitch (wax, the bend) and the aim height
    stay the crosshair target's, so the other enemy must take the same aim height. */
-#define DUAL_YAW DEG(45.0f)
-#define DUAL_PITCH DEG(15.0f)
+#define DUAL_YAW PC_DUAL_YAW   /* (pc_rules.h pc_dual_arm) */
 static int dual_e = -1;   /* the other arm's enemy this tick, -1: none (also the trace's) */
 
 /* the muzzle of the weapon in hand `node` as drawn last tick, turned about the player with its facing since (ay0) */
@@ -813,22 +813,22 @@ static void dual_aim(int ay0, int prev)
         BH_PWORK* e = &ene[i];
         const NJS_CAPSULE* c = &e->watr;
         float x = (c->c1.x + c->c2.x) / 2 - plp->px, y = (c->c1.y + c->c2.y) / 2 - plp->py, z = (c->c1.z + c->c2.z) / 2 - plp->pz;
-        float h = sqrtf(x * x + z * z), d = sqrtf(h * h + y * y), dy, p, w = i == prev ? 1.15f : 1.0f;
-        int k;
+        float h = sqrtf(x * x + z * z), d = sqrtf(h * h + y * y), dy, p;
+        int k, arm;
         NJS_CAPSULE cap;
         NJS_POINT3 apos;
         ATR_WORK* ahtp;
         /* what the game's own search takes (playpch.c bhSearchEnemy) */
-        if (i == aim_e || !aimable(e) || (e->flg2 & 0x10) || (e->stflg & 0x40000000) ||
+        if (!aimable(e) || (e->flg2 & 0x10) || (e->stflg & 0x40000000) ||
             ((e->flg & 0x80) && (((O_WRK*)e->lkwkp)->stflg & 0x1000000)) || h < 1.0f || d > WpnTab[plp->wpnr_no].l || (i != prev && (keep || (best > 0 && d >= best))))
             continue;   /* (the last tick's enemy is kept while it stays in a slightly wider cone: else two at the
                            cone's edge or at the same distance took turns, and the arms swung between them) */
         dy = wrap(atan2f(-x, -z) * (32768.0f / 3.14159265f) - (short)plp->ay);   /* > 0: left of the crosshair */
         p = atan2f(y - 11.0f, h) * (32768.0f / 3.14159265f);
         k = p > 4096 ? 4 : p < -4096 || y < 6.0f ? 8 : 2;   /* its aim height, as aim_at_crosshair */
-        if (fabsf(dy) > DUAL_YAW * w || fabsf(p - plp->wax) > DUAL_PITCH * w || (cls && k != cls)) continue;
+        if (!(arm = pc_dual_arm(i, aim_e, prev, dy, p - plp->wax)) || (cls && k != cls)) continue;   /* (not the crosshair's enemy) */
         {   /* in sight of the arm's muzzle (the game's test from the player's head) */
-            const float* m = dy > 0 ? l : r;
+            const float* m = arm == 2 ? l : r;
             cap.c1.x = m[0]; cap.c1.y = m[1]; cap.c1.z = m[2];
             cap.c2.x = plp->px + x; cap.c2.y = plp->py + y; cap.c2.z = plp->pz + z;
             cap.r = 0.1f;
@@ -837,7 +837,7 @@ static void dual_aim(int ay0, int prev)
             sys->apos = apos; sys->ahtp = ahtp;
             if (k) continue;
         }
-        best = d; dual_e = i; left = dy > 0; keep = i == prev;
+        best = d; dual_e = i; left = arm == 2; keep = i == prev;
         t[0] = plp->px + x; t[1] = plp->py + y; t[2] = plp->pz + z;
     }
     if (dual_e < 0) t[0] = aim_t.x, t[1] = aim_t.y, t[2] = aim_t.z;

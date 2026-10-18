@@ -159,17 +159,6 @@ void stream_rtex_capture(uint32_t id, uint32_t fbp, uint32_t fbw, uint32_t w, ui
     push_ev(EV_RTEX, 0, w | (h << 16), id | ((uint64_t)(fbp & 0x1FF) << 32) | ((uint64_t)(fbw & 0x3F) << 48) | ((uint64_t)(wide != 0) << 56));
 }
 
-/* a + (b - a) * k for every attribute (all linear in view space) */
-static NativeVertex nv_lerp(const NativeVertex* a, const NativeVertex* b, float k)
-{
-    NativeVertex o = *b;
-    const float* fa = &a->x; const float* fb = &b->x; float* fo = &o.x;
-    for (int i = 0; i < 9; i++) fo[i] = fa[i] + (fb[i] - fa[i]) * k;   /* x y z w s t fog near_d far_d */
-    o.r = (uint8_t)(a->r + (b->r - a->r) * k + 0.5f); o.g = (uint8_t)(a->g + (b->g - a->g) * k + 0.5f);
-    o.b = (uint8_t)(a->b + (b->b - a->b) * k + 0.5f); o.a = (uint8_t)(a->a + (b->a - a->a) * k + 0.5f);
-    return o;
-}
-
 /* in-between vertex: only the position (and the clip distances, linear in it) is blended;
    texture coordinates, fog and colour are the current frame's, so a strip paired with
    another pass over the same geometry (e.g. the fire light over the courtyard floor and
@@ -200,25 +189,6 @@ static int nv_same_pos(const NativeVertex* a, const NativeVertex* b, uint32_t n)
         }
     }
     return 1;
-}
-
-/* distance to plane 0 near (near_d >= 0), 1 far (far_d >= 0), 2 left of the 4:3 screen, 3 right of it */
-static float plane_d(const NativeVertex* v, int plane)
-{
-    return plane == 0 ? v->near_d : plane == 1 ? v->far_d : plane == 2 ? NATIVE_43_X0 * v->w - v->x : v->x - NATIVE_43_X1 * v->w;
-}
-
-/* clip a polygon against plane_d >= 0; returns the count */
-static int clip_plane(const NativeVertex* in, int n, NativeVertex* out, int plane)
-{
-    int m = 0;
-    for (int i = 0; i < n; i++) {
-        const NativeVertex *a = &in[i], *b = &in[(i + 1) % n];
-        float da = plane_d(a, plane), db = plane_d(b, plane);
-        if (da >= 0) out[m++] = *a;
-        if ((da >= 0) != (db >= 0)) out[m++] = nv_lerp(a, b, da / (da - db));
-    }
-    return m;
 }
 
 /* a convex polygon of n vertices as triangles at tri[m]; returns the new count */
@@ -262,10 +232,10 @@ static void native_draw(unsigned int prim, const NativeVertex* v, int n, long ev
             tri[m++] = *t3[0]; tri[m++] = *t3[1]; tri[m++] = *t3[2];
         } else {
             NativeVertex p0[3] = { *t3[0], *t3[1], *t3[2] }, p1[4], p2[5], p3[6];
-            int k = clip_plane(p0, 3, p1, 0);
-            k = k ? clip_plane(p1, k, p2, 1) : 0;
+            int k = native_clip_plane(p0, 3, p1, 0);
+            k = k ? native_clip_plane(p1, k, p2, 1) : 0;
             if (!margin) m = fan(tri, m, p2, k);
-            else for (int side = 2; side < 4; side++) m = fan(tri, m, p3, k ? clip_plane(p2, k, p3, side) : 0);   /* left, right */
+            else for (int side = 2; side < 4; side++) m = fan(tri, m, p3, k ? native_clip_plane(p2, k, p3, side) : 0);   /* left, right */
         }
     }
     if (m) gs_draw_native(prim, tri, m, ev);
