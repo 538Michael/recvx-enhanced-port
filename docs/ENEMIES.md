@@ -98,7 +98,9 @@ texture ids 30..99 and 400+) and its **sound bank** (SE bank 3 with the sounds o
 types).
 
 Global: the effect code, effect textures 0..29, the player's part file (the moth egg uses
-Claire's sub-models 6/7 and player motions 93..95), the enemy code. An effect's *texture* id
+Claire's sub-models 6/7 and player motions 90..97; other characters lack them, and the original
+code crashed in `bhEne27_Init` on them: on the PC a moth lays no egg then, `en06.c
+pc_moth_egg_ok`), the enemy code. An effect's *texture* id
 (`O_WRK.tex_id`, through `sys->ef_tn`) is not its effect id: a few global enemy effects draw with
 a room effect texture ("Effect textures of added types").
 
@@ -114,7 +116,7 @@ a room effect texture ("Effect textures of added types").
 | Spawned types' data | room arena | **32 MB pool** (`spawn_glue.c`), emptied by `bhSetRoom` | model + motion chunk lists, 6 KB..1.1 MB per type |
 | Motion sets | 512 per type, `sys->emtp[128]` | unchanged | |
 | Enemy sound bank | one SE bank 3 per room | **31 extra banks**, one per source room, released with the room | "Sounds of added types" |
-| Helper code | `bhJumpEnemy[31..38]`, global, shared | **per creator type** (`eneset.c pc_call_enemy`) in rooms with added enemies | users: zombie 31..38, Monster Steve 31/32, Gulp Worm, Black Widow, Hunter, moth, Alexia 2, Giant Black Widow 31. A part runs its creator's function; retail rooms keep the shared table |
+| Helper code | `bhJumpEnemy[31..38]`, global, shared | **per creator type** (`eneset.c pc_call_enemy`) in rooms with added enemies; children made before the room got them keep the shared function as it was then (`pc_snap`: RM_6030's zombie parts run the moths' code) | users: zombie 31..38, Monster Steve 31/32, Gulp Worm, Black Widow, Hunter, moth, Alexia 2, Giant Black Widow 31. A part runs its creator's function; retail rooms keep the shared table |
 
 With these budgets 25..30 foreign types fit in one room before the slots run out
 (`RECVX_SPAWN_SURVEY`). Added for mixed rooms (none of it occurs in retail rooms):
@@ -126,7 +128,10 @@ With these budgets 25..30 foreign types fit in one room before the slots run out
 * **One enemy takes a player at a time** (`eneset.c pc_call_enemy`): the enemy whose code set the
   player's busy flag (`flg & 4`) owns the player until it clears; other enemies' changes to that
   player work meanwhile are undone (parts count as their parent; the co-op partner too). A zombie
-  refused this way lets go (`coop_glue.c pc_enemy_unhold`).
+  refused this way lets go (`coop_glue.c pc_enemy_unhold`). The moth's and the Black Widow's
+  leader counts as the holding body's family (`pc_family`): the body starts the grab, the type's
+  one leader (an unlinked enemy of the same id that the first body's Init makes) plays it and
+  lets go (`bhEne06_PlayerControl`, `bhEne03_PlayerControl`); refused, the player stayed grabbed.
 * Watchdog (`coop_glue.c pc_enemy_watch`): an alive enemy unchanged for 150 steps is logged; a
   zombie stuck in a grab state is released.
 
