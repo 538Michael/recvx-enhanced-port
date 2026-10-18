@@ -37,6 +37,7 @@ static struct {
     int audio_rate, audio_open, paused; uint64_t audio_put;   /* paused: movie_pause's, also before the sound opens */
     /* statistics (RECVX_MOVIE_TRACE) */
     uint64_t dec_ns, dec_max_ns, wait_ns; int late;
+    double sumsq;   /* the sound handed to the device, squared, at the stream's gain then */
 } mv;
 static uint32_t serial_next = 1;   /* frames ever decoded: a frame's identity for the render thread */
 
@@ -92,6 +93,11 @@ static void on_audio(void* user, const int16_t* s, size_t frames, int rate)
     if (!mv.audio_open) { SDL_UnlockMutex(mv.m); return; }
     audio_movie_put(s, frames);
     mv.audio_put += frames;
+    {
+        double g = audio_movie_gain(), q = 0;
+        for (size_t i = 0; i < frames * 2; i++) q += (double)s[i] * s[i];
+        mv.sumsq += q * g * g;
+    }
     SDL_UnlockMutex(mv.m);
 }
 
@@ -183,7 +189,7 @@ void movie_close(void)
     mv.f = NULL; mv.dec = NULL; mv.pss = NULL;
     mv.es = NULL; mv.es_len = mv.es_cap = 0;
     mv.lsn = mv.size = mv.off = 0;
-    mv.audio_rate = mv.audio_open = 0; mv.audio_put = 0;
+    mv.audio_rate = mv.audio_open = 0; mv.audio_put = 0; mv.sumsq = 0;
     if (mv.m) SDL_UnlockMutex(mv.m);
 }
 
@@ -248,4 +254,19 @@ void movie_stats(int* frames, double* dec_avg_ms, double* dec_max_ms, int* late)
     *dec_max_ms = mv.dec_max_ns / 1e6;
     *late = mv.late;
     SDL_UnlockMutex(mv.m);
+}
+
+int movie_sound(int* rate, double* seconds, double* rms, int* paused)
+{
+    int open;
+    *rate = *paused = 0; *seconds = *rms = 0;
+    if (!mv.m) return 0;
+    SDL_LockMutex(mv.m);
+    open = mv.audio_open;
+    *rate = mv.audio_rate;
+    *seconds = mv.audio_rate ? (double)mv.audio_put / mv.audio_rate : 0;
+    *rms = mv.audio_put ? SDL_sqrt(mv.sumsq / (mv.audio_put * 2.0)) : 0;
+    *paused = mv.paused;
+    SDL_UnlockMutex(mv.m);
+    return open;
 }

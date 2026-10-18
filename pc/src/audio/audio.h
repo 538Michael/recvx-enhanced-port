@@ -12,6 +12,7 @@ void     audio_movie_put(const int16_t* stereo, size_t frames);
 void     audio_movie_pause(int paused);
 int      audio_movie_queued(void);         /* bytes not yet played (input format) */
 void     audio_movie_volume(float gain);   /* the game's input volume, 0..1 */
+float    audio_movie_gain(void);           /* the movie stream's gain: input volume x music volume */
 void     audio_movie_close(void);
 /* an ADX stream of `size` bytes at byte `base` of a file (the disc image, a mods file); a voice id or -1 */
 int      audio_stream_start_adx(const char* path, uint64_t base, uint32_t size, int vol_cdb);

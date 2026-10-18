@@ -24,8 +24,13 @@ int    movie_frames_total(void);
 double movie_clock(double* queued);
 void   movie_size(int* w, int* h);
 void   movie_stats(int* frames, double* dec_avg_ms, double* dec_max_ms, int* late);
+int    movie_sound(int* rate, double* seconds, double* rms, int* paused);
+unsigned short snd_synth_midi_active(void);
+extern int CurrentBgmNo, CurrentBgSeNo[2];
+extern unsigned int AdxPlayFlag[2];
 void   stream_movie(uint32_t tbp, int index);
 void   audio_movie_volume(float gain);
+float  audio_movie_gain(void);
 uint64_t ps2_vblank_count(void);
 uint64_t SDL_GetTicksNS(void);
 
@@ -47,6 +52,19 @@ static uint64_t start_vblank, paused_at, paused_total;
 static int skip_movies, skip_frames, frame_shown = -1, clock_ofs;
 static FILE* trace;   /* RECVX_MOVIE_TRACE (test aid): one line per game frame of a movie */
 
+/* the trace's sound summary: the movie's own and the room's (BGM, background SE, MIDI ports) */
+static void trace_sound(const char* when)
+{
+    int rate, paused, open;
+    double s, rms;
+    open = movie_sound(&rate, &s, &rms, &paused);
+    fprintf(trace, "# %s: movie sound %s (%d Hz, %.2f s handed over, paused %d, gain %.2f, RMS at its gain %.0f); "
+            "bgm %d (adx %u), background se %d %d, midi ports %#x\n", when, open ? "open" : rate ? "no output" : "none yet",
+            rate, s, paused, audio_movie_gain(), rms, CurrentBgmNo, AdxPlayFlag[0], CurrentBgSeNo[0], CurrentBgSeNo[1],
+            snd_synth_midi_active());
+    fflush(trace);
+}
+
 void initAll(void)
 {
     memset(&rmi, 0, sizeof(rmi));
@@ -64,6 +82,7 @@ void initAll(void)
     if (getenv("RECVX_MOVIE_TRACE") && !trace) trace = fopen(getenv("RECVX_MOVIE_TRACE"), "w");
     if (!skip_movies && !movie_open(infile.fp.lsn, infile.fp.size)) printf("movie: cannot decode %u\n", infile.fp.lsn);
     movie_size(&__image_w__, &__image_h__);
+    if (trace) { fprintf(trace, "# movie at sector %u, %u bytes\n", infile.fp.lsn, infile.fp.size); trace_sound("opened"); }
 }
 
 void readMpeg(void)
@@ -77,7 +96,9 @@ void readMpeg(void)
         rmi.iMovieFrame = Ps2_vcount;
         start_vblank = now;
         skip_frames = 0;
+        changeInputVolume(0x7FFF);   /* full, as the PS2's audioDecResume: a movie skipped with a fade left it at 0 */
         movie_pause(0);
+        if (trace) trace_sound("playing");
     }
     if (rmi.uiContFlag & 2) {   /* paused by the game */
         if (!paused_at) { paused_at = now; movie_pause(1); }
@@ -120,13 +141,14 @@ void termAll(void)
         double avg, mx;
         movie_stats(&n, &avg, &mx, &late);
         fprintf(trace, "# %d frames decoded, %.2f ms average, %.2f ms longest; shown before decoded: %d\n", n, avg, mx, late);
-        fflush(trace);
+        trace_sound("end");
     }
     movie_close();
     rmi.iMovieState = 0;
 }
 
-void changeInputVolume(u_int val) { audio_movie_volume((val & 0xFFFF) / 16383.0f); }
+/* the SPU2's sound data input volume, 0..0x7FFF (full); the game's ps2mwPlySetOutVol gives 0x7FFF at 0 dB */
+void changeInputVolume(u_int val) { audio_movie_volume((val & 0xFFFF) / 32767.0f); }
 int sendToIOP(int dst, u_char* src, int size) { (void)dst; (void)src; (void)size; return 0; }
 
 /* ---- from ps2_MovieFunc.c ---- */

@@ -397,6 +397,12 @@ village, collision. The render thread (GS emulation, replays: `r_exec`, `r_inter
     the sound's position (samples handed to the device minus those still queued) is a whole
     frame or more away, the frame number follows it. The movie ends with its last video frame,
     as on the PS2.
+  - **Sound level**: the game sets the SPU2's input volume (`changeInputVolume`, 0..0x7FFF
+    full), the stream's gain; a skip with a fade (the start-up intro) lowers it to 0, and each
+    movie starts at full as the PS2's `audioDecResume` does. The room's sound is the game's:
+    `PlayStartMovieEx` stops the BGM and voice streams, and room scripts that want the background
+    SE (MIDI) gone stop it themselves before the movie (`BGSeOff`); the graveyard's rain plays on
+    under its movie, as on the PS2.
   - The game's sprite (`vbrank_draw`, as on the PS2) draws the frame, so size, position and
     the screen fades drawn over it are the game's. Before it, `stream_movie` puts the frame
     number into the GS stream; the **render thread** (`gs_gl.c gs_movie_bind`) uploads the
@@ -775,7 +781,7 @@ and game frames for game-state aids, as noted. Co-op test aids (`RECVX_COOP_*`,
 | `RECVX_REPLAY_RTSTART=0` | in-between images start from the executed frame's display image (old behaviour) |
 | `RECVX_DISPLAY_HZ=n` | assume an n Hz display (e.g. 1000 with vsync off: present as fast as possible) |
 | `RECVX_TRACE_PRESENT=file` | one line per present: frame, t, start time, swap duration |
-| `RECVX_MOVIE_TRACE=file` | one line per game frame of a movie: time, vblanks, frame shown, game-thread time, sound position and queue, sound minus picture (ms); at the end decode times and frames shown before they were decoded |
+| `RECVX_MOVIE_TRACE=file` | one line per game frame of a movie: time, vblanks, frame shown, game-thread time, sound position and queue, sound minus picture (ms); at the end decode times and frames shown before they were decoded; when the movie opens, starts and ends a `#` line with its sound (open, rate, seconds queued, paused, gain, RMS at that gain) and the room's (BGM, background SE, playing MIDI ports) |
 | `RECVX_GPU_TIME=1` | every 2 s: frames and in-between images per second, render-thread CPU and GPU time |
 | `RECVX_TRACE_NTEX=1` | log native texture binds, misses and render-texture captures |
 | `RECVX_TRACE_DMA=1` | log GIF DMA chain tags |

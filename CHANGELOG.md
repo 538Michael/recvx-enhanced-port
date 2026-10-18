@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- **Silent movies after skipping the intro**: skipping the intro movie at start-up left every
+  later movie without its sound, such as the one in the graveyard. Movies now always play their
+  sound, and the intro no longer gets louder for a moment when you skip it.
+
 ## 0.6.2 (2026-10-18)
 
 ### Third person
