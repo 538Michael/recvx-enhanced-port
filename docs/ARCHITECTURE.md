@@ -177,11 +177,13 @@ headless.
   a definition and bound on switches. CLUT uploads are executed for real; image uploads are
   deferred and written into GS memory only before something reads or overwrites them (CLUT
   loads, transfers, downloads, non-native TEX0s, render target loads, HD pack keys), earlier
-  queued uploads overlapping them first. A queued upload is dropped when a later bind to the same
-  slot covers its pages (also when uploads queued in between overlap it): nothing read it in
-  between, and the later one overwrites it. So the queue holds about one upload per slot and the
-  game's switches write nothing; a forgotten definition writes only its own upload if it is still
-  queued. Replays never write GS memory. Memory is
+  queued uploads overlapping them first. A queued upload is dropped when a later bind covers it:
+  to the same slot and not larger, or anywhere within the whole pages the later image overwrites
+  (an upload from (0, 0) as wide as its buffer to a page-aligned slot, not a 24-bit or high-bits
+  format). Nothing read it in between, so uploads queued in between that overlap it end up under
+  the later one either way. The queue stays short (about ten entries), the game's switches write
+  nothing, and a forgotten definition writes only its own upload if it is still queued. Replays
+  never write GS memory. Memory is
   capped (definitions 96 MB, decoded textures 256 MB). Texture identities are kept in an 8-way
   set-associative table.
 - **Render textures on the GPU**: the game's only GS readback is `StoreRenderTex` (full-screen

@@ -43,11 +43,28 @@ static void define(uint32_t id, char c, uint32_t pages)
     ntex_define_end();
 }
 
+/* definition `id` uploading a w x h image of format psm at the slot from (0, 0), buffer width bw */
+static void define_rect(uint32_t id, char c, uint32_t pages, uint32_t psm, uint32_t bw, uint32_t w, uint32_t h)
+{
+    static uint8_t img[64 * 128 * 4];
+    memset(img, c, sizeof(img));
+    ntex_define_begin(id, 0, 0x3FFF, pages, 0);
+    ntex_define_reg(0x50, (uint64_t)psm << 56 | (uint64_t)bw << 48);
+    ntex_define_reg(0x51, 0);
+    ntex_define_reg(0x52, (uint64_t)h << 32 | w);
+    ntex_define_reg(0x53, 0);
+    ntex_define_image(img, w * h * (psm == 0x13 ? 1 : 4));
+    ntex_define_end();
+}
+
 static const char* took(void) { static char s[64]; strcpy(s, wrote); nwrote = 0; wrote[0] = 0; return s; }
 
 int main(void)
 {
     const uint32_t X = 380 * 32, Y = 382 * 32;   /* two slots: pages 380.. and 382.. */
+    define_rect(6, 'F', 5, 0x00, 1, 64, 128);   /* PSMCT32 64 x 128: pages 0..3 entirely (5 pages from the slot as texture_glue.c counts) */
+    define_rect(7, 'H', 5, 0x1b, 1, 64, 128);   /* the same as PSMT8H: only the high bytes */
+    define_rect(8, 'G', 5, 0x00, 2, 64, 128);   /* half as wide as its buffer */
     define(1, 'A', 3); define(2, 'B', 3); define(3, 'C', 3); define(4, 'S', 1); define(5, 'D', 3);
 
     /* the game's texture slot, switched thousands of times next to an overlapping one: nothing
@@ -95,6 +112,25 @@ int main(void)
     CHECK(!strcmp(took(), ""));
     ntex_before_access(0, 511);
     CHECK(!strcmp(took(), "C"));
+
+    /* a smaller upload elsewhere within the pages a later one overwrites entirely */
+    ntex_bind(4, 381 * 32 + 8, 0x3FFF);   /* S: page 381 */
+    ntex_bind(3, 382 * 32, 0x3FFF);       /* C: 382..384, reaches past F */
+    ntex_bind(6, X, 0x3FFF);              /* F: 380..383 written */
+    ntex_before_access(0, 511);
+    CHECK(!strcmp(took(), "CF"));
+    ntex_bind(4, 381 * 32 + 8, 0x3FFF);
+    ntex_bind(6, X + 8, 0x3FFF);          /* F not page-aligned */
+    ntex_before_access(0, 511);
+    CHECK(!strcmp(took(), "SF"));
+    ntex_bind(4, 381 * 32 + 8, 0x3FFF);
+    ntex_bind(7, X, 0x3FFF);              /* H keeps the low bytes */
+    ntex_before_access(0, 511);
+    CHECK(!strcmp(took(), "SH"));
+    ntex_bind(4, 381 * 32 + 8, 0x3FFF);
+    ntex_bind(8, X, 0x3FFF);              /* G leaves half of each page */
+    ntex_before_access(0, 511);
+    CHECK(!strcmp(took(), "SG"));
 
     /* replays write nothing */
     gs_replaying = 1;

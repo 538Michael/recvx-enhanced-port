@@ -16,8 +16,9 @@
  * native lookup reads or overwrites their GS memory (other TEX0s, transfers, downloads,
  * render target reloads, real uploads) - earlier queued uploads overlapping them first, so
  * GS memory ends up as it would have been. A queued upload superseded by a later one to the
- * same slot (not larger) is dropped, also when uploads queued in between overlap it, so the
- * queue holds about one upload per slot and the game's texture switches write nothing.
+ * same slot (not larger), or lying within the pages a later one overwrites entirely, is dropped,
+ * also when uploads queued in between overlap it. So the queue stays short and the game's
+ * texture switches write nothing.
  *
  * A TEX0 whose TBP is a bound slot is decoded from the definition: its image uploads are
  * replayed into a scratch copy of GS memory at the definition's own address (so
@@ -49,6 +50,7 @@ typedef struct {
     uint8_t* data; uint32_t ndata, cdata;
     uint32_t tbp, cbp;            /* image / CLUT upload base addresses (blocks) */
     uint32_t image_pages;         /* pages covered from tbp */
+    uint32_t full_pages;          /* pages from a page-aligned slot the image overwrites entirely */
     int valid;
     int flags;                    /* NTEX_FONT, NTEX_KEEP (texture_glue.c) */
     GLuint capture;               /* a render texture (StoreRenderTex): this texture, no GS data */
@@ -156,10 +158,47 @@ void ntex_define_image(const uint8_t* data, uint32_t len)
     cur->ndata += len;
 }
 
+/* whole pages from the slot (if page-aligned) that the image uploads overwrite entirely: an upload
+   to the slot from (0, 0), as wide as its buffer, all its data there, in a format that writes whole
+   bytes (not 24-bit or the 4/8-bit formats in the high bits of 32-bit words) */
+static uint32_t full_pages(const Def* d)
+{
+    uint64_t buf = 0, pos = 0, size = 0;
+    uint32_t best = 0;
+    for (int k = d->clut_end; k < d->nop; k++) {
+        uint32_t psm, bw, pw, ph, bits, per_row, w, h, n;
+        uint64_t bytes = 0;
+        switch (d->op[k].reg) {
+        case 0x50: buf = d->op[k].v; continue;
+        case 0x51: pos = d->op[k].v; continue;
+        case 0x52: size = d->op[k].v; continue;
+        case 0x53: break;
+        default: continue;
+        }
+        psm = (buf >> 56) & 0x3F; bw = (buf >> 48) & 0x3F;
+        switch (psm) {
+        case PSMCT32: case PSMZ32: pw = 64; ph = 32; bits = 32; break;
+        case PSMCT16: case PSMCT16S: case PSMZ16: case PSMZ16S: pw = 64; ph = 64; bits = 16; break;
+        case PSMT8: pw = 128; ph = 64; bits = 8; break;
+        case PSMT4: pw = 128; ph = 128; bits = 4; break;
+        default: continue;
+        }
+        per_row = pw == 64 ? bw : bw >> 1;   /* as gs_mem.c addresses pages */
+        if (!per_row) per_row = 1;
+        w = size & 0xFFF; h = (size >> 32) & 0xFFF;
+        if ((d->op[k].v & 3) || ((buf >> 32) & 0x3FFF) != d->tbp || (pos >> 32) & 0x07FF07FF || w != per_row * pw) continue;
+        for (int j = k + 1; j < d->nop && d->op[j].reg < 0; j++) bytes += d->op[j].len;
+        n = h / ph * per_row;
+        if (bytes * 8 >= (uint64_t)w * h * bits && n > best) best = n;
+    }
+    return best;
+}
+
 void ntex_define_end(void)
 {
     if (!cur) return;
     if (cur_in_clut) cur->clut_end = cur->nop;   /* only a CLUT */
+    cur->full_pages = full_pages(cur);
     cur->valid = cur->ndata > 0 && !cur->oom;
     if (cur->oom) fprintf(stderr, "ntex: out of memory recording texture %u, drawn from GS memory\n", cur->id);
     cur = NULL;
@@ -170,7 +209,7 @@ void ntex_define_capture(uint32_t id, unsigned int gl_tex, int w, int h)
     Def* d = def_get(id);
     if (d->capture) gs_tex_delete(d->capture);   /* this frame's replays may still bind the old one */
     d->capture = gl_tex; d->cw = w; d->ch = h;
-    d->nop = 0; d->ndata = 0; d->clut_end = 0; d->oom = 0;
+    d->nop = 0; d->ndata = 0; d->clut_end = 0; d->oom = 0; d->full_pages = 0;
     d->image_pages = ((uint32_t)w * (uint32_t)h * 4u + 8191u) / 8192u;   /* CT32 */
     d->valid = 1;
 }
@@ -254,13 +293,16 @@ void ntex_bind(uint32_t id, uint32_t tbp, uint32_t cbp)
         ntex_before_access(cbp / 32, cbp / 32 + 1);
         run_ops(d, 0, d->clut_end, tbp, cbp);
     }
-    /* the image: queued. A queued upload to the same slot, not larger, is superseded: this one
-       overwrites all its pages, and nothing read them since (that would have written it), so
-       uploads queued in between that overlap it end up under this one as well */
+    /* the image: queued. A queued upload is superseded by this one if it went to the same slot and
+       is not larger, or lies within the pages this one overwrites entirely: nothing read it since
+       (that would have written it), and uploads queued in between that overlap it end up under
+       this one as well */
     {
+        uint32_t full_end = tbp % 32 ? 0 : page0 + d->full_pages;
         int m = 0;
         for (int i = 0; i < npending; i++)
-            if (pending[i].tbp != tbp || pending[i].page1 > page1) pending[m++] = pending[i];
+            if (!(pending[i].tbp == tbp && pending[i].page1 <= page1) && !(pending[i].page0 >= page0 && pending[i].page1 < full_end))
+                pending[m++] = pending[i];
         npending = m;
     }
     if (npending == MAX_PENDING) execute_pending(0);
