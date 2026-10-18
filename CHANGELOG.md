@@ -8,13 +8,6 @@
   ending movie, and press again to skip the credits. The results screen, your unlocks and the
   save after the ending still come as usual, and the next movies keep their sound.
 
-### Third person
-
-- **Free knife aim**: you can aim the knife again. Look up to slash up at tall enemies or enemies
-  above you, and aim at a crawling zombie or the floor for a low slash. Aiming at an enemy right in
-  front of you slashes level instead of flying up at its head, and the knife no longer twitches
-  during a slash.
-
 ### Fixes
 
 - **Tyrants from the spawner or the randomizer**: in a narrow room a Tyrant could push you

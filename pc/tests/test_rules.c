@@ -70,37 +70,6 @@ static void dual(void)
 }
 
 /* the 4:3 screen is GS x 1728..2368: with ox 2048 and kx 320 a vertex at x/z -1..1 */
-static void knife(void)
-{
-    float d = 65536.0f / 360.0f, r = 3.14159265f / 180.0f;
-#define NEAR(x, y) (fabsf((x) - (y)) < 1e-4f)
-    CHECK(NEAR(pc_knife_pitch(30 * r, -8 * r, 0), 0));         /* a head right in front, camera level: level */
-    CHECK(NEAR(pc_knife_pitch(-7 * r, -35 * r, 0), -7 * r));   /* a body at 10 units, looked down at: the hand's */
-    CHECK(NEAR(pc_knife_pitch(40 * r, 28 * r, 0), 28 * r));    /* above: up, no higher than the camera */
-    CHECK(NEAR(pc_knife_pitch(10 * r, 28 * r, 0), 10 * r));
-    CHECK(NEAR(pc_knife_pitch(-37 * r, -50 * r, 1), -50 * r)); /* a crawler: as steep as the camera */
-    CHECK(NEAR(pc_knife_pitch(-37 * r, -50 * r, 0), -37 * r));
-    CHECK(NEAR(pc_knife_pitch(-55 * r, -50 * r, 1), -55 * r));
-    CHECK(NEAR(pc_knife_pitch(-80 * r, -60 * r, 1), -1.047f)); /* within 60 degrees */
-    CHECK(NEAR(pc_knife_pitch(80 * r, 70 * r, 0), 1.047f));
-    CHECK(pc_knife_height(-8 * d, 14, 2) == 2);    /* the camera's rest pitch at a standing enemy: straight */
-    CHECK(pc_knife_height(0, 30, 2) == 2);
-    CHECK(pc_knife_height(23 * d, 30, 2) == 4);     /* up beyond 22.5 degrees */
-    CHECK(pc_knife_height(22 * d, 30, 2) == 2);
-    CHECK(pc_knife_height(18 * d, 30, 4) == 4);     /* kept until 17.5 */
-    CHECK(pc_knife_height(17 * d, 30, 4) == 2);
-    CHECK(pc_knife_height(-23 * d, 14, 2) == 8);    /* down beyond 22.5 */
-    CHECK(pc_knife_height(-22 * d, 14, 2) == 2);
-    CHECK(pc_knife_height(-18 * d, 14, 8) == 8);
-    CHECK(pc_knife_height(-17 * d, 14, 8) == 2);
-    CHECK(pc_knife_height(-10 * d, 3, 2) == 8);     /* below knee height: a crawler, legs */
-    CHECK(pc_knife_height(30 * d, 5, 4) == 8);
-    CHECK(pc_knife_height(-10 * d, 7, 2) == 2);
-    CHECK(pc_knife_height(-10 * d, 7, 8) == 8);     /* kept until 8 units */
-    CHECK(pc_knife_height(-10 * d, 9, 8) == 2);
-    CHECK(pc_knife_height(18 * d, 30, 8) == 2);     /* down to up passes straight */
-}
-
 static void margins(void)
 {
     VU1_STRIP_BUF v[3];
@@ -199,7 +168,6 @@ int main(void)
 {
     enemies();
     dual();
-    knife();
     margins();
     clipping();
     warp_music();
