@@ -440,7 +440,9 @@ The F2 window (also the EXTRAS page of ENHANCED SETTINGS) is meant for testing a
   item check (the detector, the typewriters' ink ribbon, weapons and ammo, the item box) uses
   what you really carry;
 - add any item to the inventory, and view the inventory;
-- spawn an enemy of any type in front of you ([ENEMIES.md](ENEMIES.md));
+- spawn an enemy of any type in front of you ([ENEMIES.md](ENEMIES.md)); custom enemies follow the
+  game's types at the end of the list, marked "[C] ": Mutated Steve (Steve's monster form that can
+  be killed: the Tyrant's moves and death, tougher than the Tyrant) and those of `mods/enemies.ini`;
 - teleport to any room through the game's door transition: choose a **location** (an area of the
   game; Claire's and Chris's halves are listed separately, Chris's are the last three), a
   **room** and an **entry** (where you arrive). Rooms carry the save menu's name where the game
@@ -495,7 +497,9 @@ and **HD textures: UI** (on).
 Files in the `mods` folder (next to where you start the game, or `RECVX_MODS=DIR`) replace disc
 files without touching the image: `mods/NAME` for files opened by name (for example room files
 `RM_xxxx.RDX`) and `mods/<archive>.AFS/<index>` for entries of AFS archives. The log names
-every replaced file. Modding reference and tools: [modding/README.md](modding/README.md).
+every replaced file. `mods/enemies.ini` adds custom enemies (a type's moves with another look,
+tougher, faster or bigger; for the spawner and the Wild randomizer), see [ENEMIES.md](ENEMIES.md)
+"Enemy variants". Modding reference and tools: [modding/README.md](modding/README.md).
 
 ## Troubleshooting
 

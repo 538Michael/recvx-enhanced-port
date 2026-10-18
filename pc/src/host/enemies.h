@@ -24,7 +24,8 @@ typedef struct SpawnNote {
     unsigned char pad;          /* SPAWN_NOTE_KEPT: not a new enemy; the host's randomizer kept record `idx` of room
                                    file `room` (stg * 1000 + rom * 10 + case) as it is (type id, model mdlver) */
     float px, py, pz;
-    short ay, pad2;
+    short ay;
+    unsigned short variant;     /* an enemy variant's id (pc/src/host/variants.h; 0: the type itself) */
 } SpawnNote;
 #define SPAWN_NOTE_KEPT 1
 

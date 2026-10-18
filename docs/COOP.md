@@ -773,7 +773,9 @@ floor or trigger, "Yes" chosen, an item used) hold only where the player did it.
 ### Added enemies and options
 
 * `EV_SPAWN` (host): every enemy that exists on the host but not in the room file (F2 spawner,
-  extra enemies) with slot, source room file and record, type, model version, variant, position.
+  extra enemies) with slot, source room file and record, type, model version, variant, position,
+  and the enemy variant's id (custom enemies, [ENEMIES.md](ENEMIES.md) "Enemy variants"; in what
+  was padding, so the protocol is unchanged; an older joiner makes its base type).
   The joiner realizes it into the same slot; one that arrives while the joiner's room does not run
   waits (up to 900 frames). It also carries the randomizer records the host had to keep.
 * `EV_EOPTS` (host): the enemy options (extra, placements, randomizer, seed, variety, event

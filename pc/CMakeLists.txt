@@ -254,6 +254,10 @@ add_test(NAME ntex COMMAND test_ntex)
 add_executable(test_appear tests/test_appear.c src/host/actors.c)
 add_test(NAME appear COMMAND test_appear)
 
+# enemy variants (pc/src/host/variants.c): the built-in table, the mods/enemies.ini reader
+add_executable(test_variants tests/test_variants.c src/host/variants.c src/host/actors.c src/host/fileio.c)
+add_test(NAME variants COMMAND test_variants)
+
 # co-op networking (pc/src/net): a busy port, the port mapping started and stopped again
 add_executable(test_net tests/test_net.c src/net/net.c src/net/portmap.c)
 target_compile_options(test_net PRIVATE $<$<COMPILE_LANGUAGE:C>:-std=gnu11>)

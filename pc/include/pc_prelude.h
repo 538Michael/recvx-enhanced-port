@@ -153,6 +153,13 @@ void  coop_fx_particle(struct BH_PWORK* ewP, int lnk, const void* offP, const vo
 extern int actor_on, appear_on;
 int   actor_put_player(void);                 /* 1 = drawn */
 int   actor_put_enemy(struct BH_PWORK* ep);   /* 1 = drawn */
+/* enemy variants (pc/glue/variant_glue.c, docs/ENEMIES.md "Enemy variants"): pc_variant_n variant enemies in
+   this room (0: none of these is called) */
+extern int pc_variant_n;
+int   pc_variant_pre(struct BH_PWORK* ep, int slot);    /* eneset.c bhControlEnemy, before ep's step: how many steps (speed) */
+void  pc_variant_post(struct BH_PWORK* ep, int slot);   /* after them */
+int   pc_variant_draw(struct BH_PWORK* ep);             /* eneset.c bhDrawEnemy, in place of bhPutModel(ep): 1 = drawn */
+int   pc_variant_sound(int enemy_no, int se, signed char* bank);   /* sdfunc.c RequestEnemySeBasic: the sound to request */
 void  actor_hands_back(void);                 /* game.c, before bhControlPlayer: the source's own head and hands back */
 /* PS2 budgets raised on the PC (docs/ENEMIES.md "Budgets on the PC"): the texture heap (the EE copies of the
    TIM2s the GS loads from; 10 MB on the PS2) and its entry table (256). Vanilla rooms use the same

@@ -63,13 +63,15 @@ int appear_canon(int chr);            /* chr, or the listed twin of a hidden one
 int appear_step(int chr, int dir);    /* the next (dir 1) or previous (-1) listed chr, wrapping */
 const char* appear_name(int chr);
 /* game thread (pc/glue/actor_glue.c). who: display slot 0 our player, 1 the co-op partner,
-   ACTOR_DOUBLE the cutscene double of the character played. idx: catalogue entry, ACTOR_PART + n
+   ACTOR_DOUBLE the cutscene double of the character played, ACTOR_VARIANT + k enemy variants. idx: catalogue entry, ACTOR_PART + n
    for player part file 10 + n, or -1. */
-#define ACTOR_SLOTS 3
+#define ACTOR_SLOTS 5
 #define ACTOR_DOUBLE 2
+#define ACTOR_VARIANT 3                 /* 3, 4: enemy variants' models (pc/glue/variant_glue.c), each posed per enemy drawn */
 #define ACTOR_PART 1000
 int  actor_set(int who, int idx);       /* 1 = shown (a failed entry is not retried) */
 int  actor_shown(int who);
+int  actor_rigged(int who);             /* its model is posed from a source's skeleton (a humanoid node map was found) */
 struct BH_PWORK;
 void actor_pose(int who, struct BH_PWORK* src);   /* after src's bhSetMotion and bhCalcModel */
 void actor_draw(int who);               /* bhPutModel: the caller sets camera matrix, lights, textures state */

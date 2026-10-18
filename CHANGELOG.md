@@ -2,8 +2,18 @@
 
 ## Unreleased
 
+### Enemies
+
+- **Custom enemies and Mutated Steve**: the enemy spawner now lists custom enemies at the end,
+  marked [C]. The first is Mutated Steve: Steve's monster form as an enemy you can kill, with the
+  Tyrant's moves and death. With the Wild randomizer he can turn up in large rooms, rarely and
+  never in boss rooms. Modders can add their own custom enemies in mods/enemies.ini (stronger,
+  faster or bigger versions, another enemy's look, other sounds), also for the randomizer.
+
 ### Fixes
 
+- **Tyrants from the spawner or the randomizer**: in a narrow room a Tyrant could push you
+  through a wall. It no longer does.
 - **Music after an interrupted co-op follow**: if the game ended (game over, quitting) while you
   were being moved to the host's room, the next door you used could get its music wrong.
 - **Swapped cutscene models**: Claire's ponytail no longer swings twice as fast when two of her

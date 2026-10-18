@@ -16,6 +16,7 @@
 #include "../../decomp/include/ps2/veronica/prog/hitchk.h"
 #include "../src/host/actors.h"
 #include "../src/host/enemies.h"
+#include "../src/host/variants.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -26,7 +27,10 @@ int coop_is_guest(void);
 const char* spawn_add(const ActorModel* am, const SpawnNote* n, int* slot_out);
 const char* spawn_at(const ActorModel* am, const SpawnNote* n, int want, int mode, int* slot_out);
 const ActorModel* spawn_entry(int i);
-int spawn_count(void);
+int spawn_base_count(void);
+const char* spawn_refused(int id);
+const ActorModel* variant_base(const EnemyVariant* v);   /* variant_glue.c */
+void variant_room(void);
 void spawn_keep_texlist(const NJS_TEXLIST* l);
 void bhCheckEneWorkNum(void);   /* eneset.h */
 
@@ -82,6 +86,7 @@ int room_file_now(void) { return sys->stg_no * 1000 + sys->rom_no * 10 + sys->rc
 enum { REC_EVENT = 1, REC_SHOWN = 2, REC_HP = 4 };
 static unsigned char rec_flags[128];
 static const ActorModel* rand_src[128];   /* randomized records: where their new type comes from */
+static unsigned short rand_var[128];    /* and which enemy variant they became (0: none) */
 static int all_dead_check;              /* the script counts kills (DieEventCk): "all dead" doors */
 static int rm_flg_used;                 /* the script tests or sets rm_flg bits 29..31 (= 0x4, 0x2, 0x1), which some types write */
 
@@ -232,7 +237,8 @@ static int boss_arena(int id)
 enum { K_BIG = 1,       /* needs open space around the record (not in corridors or small rooms) */
        K_FLIER = 2,     /* only for flier records (bats, Spotters), which hover where they are placed */
        K_RMFLG = 4,     /* its code writes rm_flg bits 0..2 (Tyrant clears them every frame): not where the script uses them */
-       K_NOCOUNT = 8 }; /* not where the doors count the kills: it may leave the room, fly out of reach or take too long */
+       K_NOCOUNT = 8,   /* not where the doors count the kills: it may leave the room, fly out of reach or take too long */
+       K_HEAVY = 16 };  /* an enemy variant marked heavy (boss-like): one per room */
 static const struct { unsigned char id, w[2], flags; } kinds[] = {
     { 1, { 5, 5 }, 0 },                         /* zombie, 24 looks */
     { 4, { 4, 4 }, 0 },                         /* Cerberus */
@@ -246,6 +252,31 @@ static const struct { unsigned char id, w[2], flags; } kinds[] = {
     { 11, { 0, 2 }, K_FLIER | K_RMFLG | K_NOCOUNT }, /* Spotter */
 };
 #define KINDS (int)(sizeof(kinds) / sizeof(kinds[0]))
+/* the kinds a room's records can become: those above, then the enemy variants with a randomizer weight
+   (docs/ENEMIES.md "Enemy variants"): a variant takes its base kind's rules (another type's: not where doors
+   count kills, nor where the script uses rm_flg bits), plus big, heavy and the stages it may appear in. The
+   same on both co-op sides as long as both have the same variants (built in; mods/enemies.ini). */
+typedef struct { unsigned char id, w[2], flags, cost; const EnemyVariant* v; } Kind;
+static int make_kinds(Kind* kd)
+{
+    int n = 0, i, j;
+    for (i = 0; i < KINDS; i++) { kd[n].id = kinds[i].id; kd[n].w[0] = kinds[i].w[0]; kd[n].w[1] = kinds[i].w[1]; kd[n].flags = kinds[i].flags;
+                                  kd[n].cost = (unsigned char)slot_cost(kinds[i].id); kd[n++].v = NULL; }
+    for (i = 0; i < variant_count(); i++) {
+        const EnemyVariant* v = variant_at(i);
+        int f = K_NOCOUNT | K_RMFLG;
+        if (!v->wild && !v->mild) continue;
+        if (!(v->stages & (1 << (sys->stg_no % 10))) || !variant_base(v) || spawn_refused(v->type)) continue;
+        for (j = 0; j < KINDS; j++) if (kinds[j].id == v->type) f = kinds[j].flags;
+        kd[n].id = v->type;
+        kd[n].w[0] = v->heavy ? 0 : v->mild;
+        kd[n].w[1] = v->wild;
+        kd[n].flags = (unsigned char)(f | (v->big || v->heavy ? K_BIG : 0) | (v->heavy ? K_NOCOUNT | K_HEAVY : 0));
+        kd[n].cost = (unsigned char)(v->slots > slot_cost(v->type) ? v->slots : slot_cost(v->type));
+        kd[n++].v = v;
+    }
+    return n;
+}
 static int ground_record(int id) { return id == 1 || id == 3 || id == 4 || id == 5 || id == 9; }
 static int flier_record(int id) { return id == 7 || id == 11; }
 static int look_ok(const ActorModel* m, int id) { return m->id == id && !(id == 9 && m->mdlver == 1); }   /* (Bandersnatch 2 is an event's arm) */
@@ -267,13 +298,13 @@ static const ActorModel* pick_look(int kd, int id, int ver, const unsigned char*
 {
     int j, n = 0, pass, pick;
     for (pass = 0; pass < 2 && !n; pass++)
-        for (j = 0; j < spawn_count(); j++) {
+        for (j = 0; j < spawn_base_count(); j++) {
             const ActorModel* m = spawn_entry(j);
             n += look_ok(m, kinds[kd].id) && !(m->id == id && m->mdlver == ver) && (pass || !used[j]);
         }
     if (!n) return NULL;
     pick = (int)(rnd() % (unsigned)n);
-    for (j = 0; j < spawn_count(); j++) {
+    for (j = 0; j < spawn_base_count(); j++) {
         const ActorModel* m = spawn_entry(j);
         if (look_ok(m, kinds[kd].id) && !(m->id == id && m->mdlver == ver) && (pass > 1 || !used[j]) && pick-- == 0) return m;
     }
@@ -288,7 +319,8 @@ static const ActorModel* pick_look(int kd, int id, int ver, const unsigned char*
 static void randomize(const EnemyOpts* o)
 {
     int k, j, cost = 0, made = 0, nc = 0, guest = coop_is_guest(), room = room_file_now(), wild = o->variety != 0;
-    int kused[KINDS] = { 0 }, room_kinds[2] = { -1, -1 };
+    Kind kt[KINDS + VARIANT_MAX];
+    int nk = make_kinds(kt), kused[KINDS + VARIANT_MAX] = { 0 }, room_kinds[2] = { -1, -1 }, heavy = 0;
     unsigned char held[128] = { 0 }, used[256] = { 0 }, cls[128] = { 0 };   /* cls: 1 another kind, 2 another look */
     char line[600];
     int ln = 0;
@@ -312,9 +344,9 @@ static void randomize(const EnemyOpts* o)
         rnd_seed((unsigned)o->seed, (unsigned)room * 977u + 0x3000u);
         for (j = 0; j < 2; j++) {
             int t = 0, r;
-            for (k = 0; k < KINDS; k++) t += k != room_kinds[0] && !(kinds[k].flags & K_NOCOUNT && all_dead_check) ? kinds[k].w[0] : 0;
-            for (r = (int)(rnd() % (unsigned)t), k = 0; k < KINDS; k++) {
-                int w = k != room_kinds[0] && !(kinds[k].flags & K_NOCOUNT && all_dead_check) ? kinds[k].w[0] : 0;
+            for (k = 0; k < nk; k++) t += k != room_kinds[0] && !(kt[k].flags & K_NOCOUNT && all_dead_check) ? kt[k].w[0] : 0;
+            for (r = (int)(rnd() % (unsigned)t), k = 0; k < nk; k++) {
+                int w = k != room_kinds[0] && !(kt[k].flags & K_NOCOUNT && all_dead_check) ? kt[k].w[0] : 0;
                 if (r < w) break;
                 r -= w;
             }
@@ -325,56 +357,61 @@ static void randomize(const EnemyOpts* o)
         BH_PWORK save = ene[k];
         SpawnNote n = { 0 };
         const ActorModel* m = NULL;
+        const EnemyVariant* v = NULL;
         const char* why;
-        int i, kd = -1;
+        int i, kd = -1, kcost;
         if (!cls[k]) continue;
         rnd_seed((unsigned)o->seed, (unsigned)room * 977u + 0x3000u + (unsigned)k * 7919u);   /* each record its own draws */
         if (cls[k] == 2) {   /* another look of its type */
             for (kd = 0; kd < KINDS && kinds[kd].id != save.id; kd++);
             if (kd < KINDS) m = pick_look(kd, save.id, save.mdlver, used);
         } else {
-            int w[KINDS], t = 0, fresh = 0, r, big = -1, mine = 0;
-            for (i = 0; i < KINDS; i++) {
-                int f = kinds[i].flags;
-                w[i] = kinds[i].w[wild];
+            int w[KINDS + VARIANT_MAX], t = 0, fresh = 0, r, big = -1, mine = 0;
+            for (i = 0; i < nk; i++) {
+                int f = kt[i].flags;
+                w[i] = kt[i].w[wild];
                 if (!(f & K_FLIER) != !flier_record(save.id)) w[i] = 0;
                 if ((f & K_NOCOUNT) && all_dead_check) w[i] = 0;
                 if ((f & K_RMFLG) && rm_flg_used) w[i] = 0;
-                if (cost - slot_cost(save.id) + slot_cost(kinds[i].id) > 128 - SPAWN_SLOTS_FREE) w[i] = 0;
+                if ((f & K_HEAVY) && heavy) w[i] = 0;
+                if (cost - slot_cost(save.id) + kt[i].cost > 128 - SPAWN_SLOTS_FREE) w[i] = 0;
                 if (w[i] && (f & K_BIG)) {
                     if (big < 0) big = open_dirs(&save, 35.0f);
                     if (big < 5) w[i] = 0;
                 }
                 mine |= w[i] && (i == room_kinds[0] || i == room_kinds[1]);
             }
-            for (i = 0; i < KINDS; i++) {
+            for (i = 0; i < nk; i++) {
                 if (mine && i != room_kinds[0] && i != room_kinds[1]) w[i] = 0;   /* Mild: the room's two kinds, if one fits */
                 fresh |= w[i] && !kused[i];
             }
-            for (i = 0; i < KINDS; i++) {   /* each kind once while unused ones are left */
+            for (i = 0; i < nk; i++) {   /* each kind once while unused ones are left */
                 if (fresh && kused[i]) w[i] = 0;
                 t += w[i];
             }
             if (t) {
-                for (r = (int)(rnd() % (unsigned)t), kd = 0; kd < KINDS && r >= w[kd]; kd++) r -= w[kd];
-                m = pick_look(kd, save.id, save.mdlver, used);
+                for (r = (int)(rnd() % (unsigned)t), kd = 0; kd < nk && r >= w[kd]; kd++) r -= w[kd];
+                if ((v = kt[kd].v)) m = variant_base(v);   /* an enemy variant: its base's entry */
+                else m = pick_look(kd, save.id, save.mdlver, used);
             }
         }
         if (!m) {   /* its own kind drawn, without another look (Cerberus, bat), or nothing else fits */
-            if (kd >= 0 && kd < KINDS) kused[kd] = 1;
+            if (kd >= 0 && kd < nk) kused[kd] = 1;
             host_log("enemies: record %d stays type %d model %d (%s)\n", k, save.id, save.mdlver, cls[k] == 2 ? "event enemy, no other look of its type"
-                     : kd >= 0 && kinds[kd].id == save.id ? "its own kind drawn" : "nothing else fits");
+                     : kd >= 0 && kd < nk && kt[kd].id == save.id ? "its own kind drawn" : "nothing else fits");
             continue;
         }
-        for (j = 0; j < spawn_count() && spawn_entry(j) != m; j++);
+        for (j = 0; j < spawn_base_count() && spawn_entry(j) != m; j++);
         used[j] = 1;
         kused[kd] = 1;
+        kcost = kd >= 0 && kd < nk ? kt[kd].cost : slot_cost(m->id);
         if (held[k]) {   /* as the host's: the original */
             host_log("enemies: record %d stays %d (as the host's)\n", k, save.id);
             continue;
         }
         n.room = m->room; n.rec = m->rec; n.id = m->id; n.mdlver = m->mdlver;
         n.type = m->id == save.id ? save.type : 0;   /* the same type keeps its variant (an event's or a lying zombie's) */
+        n.variant = v ? v->id : 0;
         n.px = save.px; n.py = save.py; n.pz = save.pz; n.ay = save.ay; n.flr = save.flr_no;
         ene[k].flg = 0;
         why = spawn_at(m, &n, k, guest ? SPAWN_LOADING | SPAWN_DICTATED : SPAWN_LOADING, NULL);
@@ -385,16 +422,19 @@ static void randomize(const EnemyOpts* o)
             bhCheckEneWorkNum();
             host_log("enemies: record %d stays %d (%s)%s\n", k, save.id, why, guest ? "; the host's may differ" : "");
             if (!guest) coop_rand_kept(k, &kn);   /* the guest keeps it too */
-            else cost += slot_cost(m->id) - slot_cost(save.id);   /* the host's budget (it made the change), so the next draws stay its */
+            else cost += kcost - slot_cost(save.id), heavy += v && v->heavy;   /* the host's budget (it made the change), so the next draws stay its */
             continue;
         }
         for (i = 0; i < save.mdl_n; i++)   /* the original's textures are released with the room's (the record now holds the new type) */
             if ((save.mdl[i].flg & 0x200) && save.mdl[i].texP) spawn_keep_texlist(save.mdl[i].texP);
         rand_src[k] = m;   /* (the room file still says the old type: extra enemies copy from here) */
-        cost += slot_cost(m->id) - slot_cost(save.id);
+        rand_var[k] = v ? v->id : 0;
+        cost += kcost - slot_cost(save.id);
+        heavy += v && v->heavy;
         made++;
-        host_log("enemies: room %04d record %d: type %d model %d -> %s (type %d model %d)%s\n", room, k, save.id, save.mdlver, m->name, m->id, m->mdlver,
-                 cls[k] == 2 ? ", event enemy: same type" : "");
+        if (v) host_log("enemies: room %04d record %d: type %d model %d -> %s (variant %d: type %d model %d)\n", room, k, save.id, save.mdlver, v->name, v->id, m->id, m->mdlver);
+        else host_log("enemies: room %04d record %d: type %d model %d -> %s (type %d model %d)%s\n", room, k, save.id, save.mdlver, m->name, m->id, m->mdlver,
+                      cls[k] == 2 ? ", event enemy: same type" : "");
     }
     for (k = 0; k < rom->ene_n && k < 128 && ln < (int)sizeof(line) - 16; k++)
         if ((ene[k].flg & 0x1) && ene[k].id < 31) ln += snprintf(line + ln, sizeof(line) - ln, " %d:%d.%d", k, ene[k].id, ene[k].mdlver);
@@ -407,11 +447,13 @@ void enemy_room_finished(void)
 {
     const EnemyOpts* o;
     enemy_room_gen++;
+    variant_room();   /* (the slots' enemy variants) */
     if (!rom || !sys) return;
     o = enemy_opts();
     if (!o->place && !o->rand && !o->extra) return;
     scan_script();
     memset(rand_src, 0, sizeof(rand_src));
+    memset(rand_var, 0, sizeof(rand_var));
     spot_player = 0;
     if (o->rand) randomize(o);
     if (o->place) place(o);
@@ -476,9 +518,9 @@ void enemy_extras_frame(void)
         const ETTY_WORK* r = &rom->enep[cand[k]];
         BH_PWORK* src = &ene[cand[k]];
         ActorModel am = { "extra enemy", (unsigned short)room_file_now(), (unsigned char)cand[k], (unsigned char)r->id, r->mdlver, 0, 0 };
-        if (rand_src[cand[k]]) am = *rand_src[cand[k]];   /* a randomized record: a copy of its new type */
         SpawnNote n = { 0 };
         const char* why;
+        if (rand_src[cand[k]]) { am = *rand_src[cand[k]]; n.variant = rand_var[cand[k]]; }   /* a randomized record: a copy of its new type (and variant) */
         n.room = am.room; n.rec = am.rec; n.id = am.id; n.mdlver = am.mdlver;
         n.py = src->py; n.flr = src->flr_no; n.ay = (short)(rnd() & 0xFFFF);
         if (!find_spot(src->px, src->py, src->pz, src->flr_no, 15.0f, 35.0f, &n.px, &n.pz)) continue;

@@ -28,6 +28,7 @@
 #include "../src/host/actors.h"
 #include "../src/host/cheat.h"
 #include "../src/host/enemies.h"
+#include "../src/host/variants.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -39,6 +40,9 @@ NJS_TEXLIST** pc_et_lp(int id, int ver);   /* room.c: sys->et_lp[id][ver] */
 extern unsigned int Ps2_texmemlist_num;
 int coop_is_guest(void);
 void enemy_extras_frame(void);          /* enemyopt_glue.c */
+void variant_spawned(int slot, int id); /* variant_glue.c */
+void variant_release(void);
+const ActorModel* variant_base(const EnemyVariant* v);
 extern int enemy_room_gen;              /* enemyopt_glue.c: room loads so far */
 
 /* types the appearance catalogue leaves out (room file, record, id, model version) */
@@ -73,8 +77,11 @@ __attribute__((constructor)) static void make_list(void)
 }
 const ActorModel* spawn_entry(int i) { return list[i] < ACTOR_MODELS ? &actor_models[list[i]] : &extra[list[i] - ACTOR_MODELS]; }
 #define entry spawn_entry
-int spawn_count(void) { return list_n; }
-const char* spawn_name(int i) { return i >= 0 && i < list_n ? entry(i)->name : ""; }
+int spawn_base_count(void) { return list_n; }
+/* the F2 list: the types' entries, then the enemy variants (custom enemies: built in, then mods/enemies.ini),
+   marked "[C] " (docs/ENEMIES.md "Enemy variants") */
+int spawn_count(void) { return list_n + variant_count(); }
+const char* spawn_name(int i) { return i >= 0 && i < list_n ? entry(i)->name : variant_at(i - list_n) ? variant_at(i - list_n)->ui : ""; }
 
 /* enemy slots a type takes with what its Init spawns (bhSetEnemy without a NULL check in the
    callers; the en*.c Inits counted). What enemies spawn later (moth eggs on the player, a
@@ -103,7 +110,7 @@ static int tl_n, tn_n;
 static int spawned[128];                /* slots we spawned into (id + 1), for the trace */
 static int room_key = -1;              /* the room the textures belong to */
 
-void spawn_release(void)                /* ps2_texture.c bhReleaseMainTexture */
+static void release_textures(void)
 {
     int i;
     for (i = 0; i < tl_n; i++) njReleaseTexture(&tl[i]);
@@ -111,6 +118,8 @@ void spawn_release(void)                /* ps2_texture.c bhReleaseMainTexture */
     tl_n = tn_n = 0;
     memset(spawned, 0, sizeof(spawned));
 }
+
+void spawn_release(void) { variant_release(); release_textures(); }   /* ps2_texture.c bhReleaseMainTexture; also the enemy variants' models */
 
 void spawn_textures_released(void) { tl_n = tn_n = 0; memset(spawned, 0, sizeof(spawned)); }   /* njReleaseTextureAll */
 
@@ -378,6 +387,7 @@ const char* spawn_at(const ActorModel* am, const SpawnNote* n, int want, int mod
     spawned[slot] = am->id + 1;
     pc_enemy_mark_added();
     if (slot_out) *slot_out = slot;
+    if (n->variant) variant_spawned(slot, n->variant);
     host_log("spawn: %s, type %d model %d variant %d from RM_%04d record %d, slot %d at %.1f %.1f %.1f, %d textures uploaded, "
              "%s (model %d KB, motions %d KB), %d KB room memory and %d KB spawn memory left, %d slots in use\n", am->name, am->id, am->mdlver, rec.type, am->room,
              am->rec, slot, rec.px, rec.py, rec.pz, texn, how, a.mlen >> 10, a.nlen >> 10, (int)(sys->endp - sys->memp) >> 10, (POOL_SIZE - pool_n) >> 10, (int)sys->ewk_n);
@@ -474,13 +484,16 @@ static const char* spawn(int i, float dist, int* slot_out)
 {
     static char msg[160];
     const ActorModel* am;
+    const EnemyVariant* v = i >= list_n ? variant_at(i - list_n) : NULL;
     SpawnNote n = { 0 };
     const char* r;
-    if (i < 0 || i >= list_n) return "no such enemy";
-    am = entry(i);
+    if (i < 0 || (i >= list_n && !v)) return "no such enemy";
+    if (v && !(am = variant_base(v))) return "refused: its base is not in the spawner list";
+    if (!v) am = entry(i);
     if (!ready()) return "can't spawn now (not in a room, a door or an event)";
     if (coop_is_guest()) return "co-op: only the host spawns enemies (it runs them)";
     n.room = am->room; n.rec = am->rec; n.id = am->id; n.mdlver = am->mdlver;
+    n.variant = v ? v->id : 0;
     /* variant 0, the free-roaming one: others wait for the room's enemy floor areas (Cerberus 1, 2),
        lie, crawl or eat (zombie 2..15) or are set pieces; ant C, tentacle and core keep theirs */
     if (am->id == 71 || am->id == 29 || am->id == 53) {
@@ -493,7 +506,7 @@ static const char* spawn(int i, float dist, int* slot_out)
     n.ay = (short)((plp->ay + 0x8000) & 0xFFFF);
     n.flr = plp->flr_no;
     if ((r = spawn_add(am, &n, slot_out))) return r;
-    snprintf(msg, sizeof(msg), "spawned %s", am->name);
+    snprintf(msg, sizeof(msg), "spawned %s", v ? v->name : am->name);
     return msg;
 }
 
@@ -579,26 +592,30 @@ static void survey(void)
 
 /* game thread, every frame in game: RECVX_SPAWN="gameframe:id[.mdlver][@dist],..." spawns the first
    list entry of type id (and model version) at that game frame (frames since start, as the other
-   test aids). With it set, what was spawned is traced: every 30 game frames, and hits/deaths. */
+   test aids); "gameframe:v<variant id>[@dist]" an enemy variant. With it set, what was spawned is traced:
+   every 30 game frames, and hits/deaths. */
 void spawn_frame(int clock)
 {
     static const char* env = (const char*)-1;
     static int trace, last_trace, last_hp, ene_hp[128], trace_room = -1;
-    int f, id, ver = -1, n = 0, k, slot_new = -1;
+    int f, id, ver = -1, n = 0, k, slot_new = -1, vid = 0;
     float dist = 30.0f;
     if (env == (const char*)-1) trace = (env = getenv("RECVX_SPAWN")) != NULL;
     if (tl_n && room_key != room_file_now() && !(sys->gm_flg & 0x9) && !(sys->cb_flg & 0x1))
-        spawn_release();   /* a new room loaded without bhReleaseMainTexture */
+        release_textures();   /* a new room loaded without bhReleaseMainTexture (enemy variants' models may be loaded for it) */
     enemy_extras_frame();
     survey();
-    if (env && sscanf(env, "%d:%d%n", &f, &id, &n) == 2 && clock >= f && ready()) {
+    if (env && (sscanf(env, "%d:%d%n", &f, &id, &n) == 2 || (sscanf(env, "%d:v%d%n", &f, &id, &n) == 2 && (vid = id))) && clock >= f && ready()) {
         const char* e = env + n;
         int m;
         if (*e == '.' && sscanf(e, ".%d%n", &ver, &m) == 1) e += m;
         if (*e == '@' && sscanf(e, "@%f%n", &dist, &m) == 1) e += m;
-        for (k = 0; k < list_n && !(entry(k)->id == id && (ver < 0 || entry(k)->mdlver == ver)); k++);
-        printf("test: spawn type %d at game frame %d: %s\n", id, clock, k < list_n ? spawn(k, dist, &slot_new) : "no such type");
+        if (vid) for (k = 0; k < variant_count() && variant_at(k)->id != vid; k++) {}
+        else for (k = 0; k < list_n && !(entry(k)->id == id && (ver < 0 || entry(k)->mdlver == ver)); k++) {}
+        if (vid) printf("test: spawn variant %d at game frame %d: %s\n", vid, clock, k < variant_count() ? spawn(list_n + k, dist, &slot_new) : "no such variant");
+        else printf("test: spawn type %d at game frame %d: %s\n", id, clock, k < list_n ? spawn(k, dist, &slot_new) : "no such type");
         if (slot_new >= 0) ene_hp[slot_new] = ene[slot_new].hp;
+        if (slot_new >= 0) g_cheat.spawn_idx = vid ? list_n + k : k;   /* F2 shows the entry spawned (screenshots) */
         env = *e == ',' ? e + 1 : NULL;
     }
     if (!trace) return;
