@@ -879,7 +879,12 @@ static void load_head(Disguise* d, int chr)
         slen = 0;
         i++;
     }
-    if (!c || !mlb_textured(c) || slen > 2048 || 2048 + 64 + clen > (int)sizeof(d->hp.keep)) { host_log("actor: head part of part file %d: no sub-model 4 (%d bytes)\n", 10 + chr, clen); return; }
+    if (!c || !mlb_textured(c)) { host_log("actor: head part of part file %d: no sub-model 4\n", 10 + chr); return; }
+    if (slen > 2048 - 64 || 2048 + 64 + clen > (int)sizeof(d->hp.keep)) {   /* skin at keep + 0..63, model at keep + 2048 + 0..63 */
+        host_log("actor: head part of part file %d does not fit (skin %d, model %d bytes)\n", 10 + chr, slen, clen);
+        return;
+    }
+    if (d->tex_n >= (int)(sizeof(d->tex) / sizeof(d->tex[0]))) { host_log("actor: head part of part file %d: no texture slot left\n", 10 + chr); return; }
     memset(&d->hp.w, 0, sizeof(d->hp.w));
     if (skin) d->hp.w.skp[4] = (int*)((unsigned char*)memcpy(d->hp.keep + ((skin - pack) & 63), skin, slen) + 4);   /* (the data's alignment kept) */
     p = memcpy(d->hp.keep + 2048 + ((c - pack) & 63), c, clen);
