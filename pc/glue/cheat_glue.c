@@ -11,6 +11,7 @@
 #include "../../decomp/include/ps2/veronica/prog/hitchk.h"
 #include "../src/host/cheat.h"
 #include "../src/host/coop.h"
+#include "../src/net/coop_proto.h"
 #include "pc_rules.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -63,6 +64,7 @@ unsigned int pc_noclip(void)
      check for a key item (itemdata type 0x40: no weapon, ammo, herb, ribbon or lighter) that has a use spot in
      this room, as pc_rules.h pc_unlock_rule says.
    No item is added; the scripts' PlItemLost/PlItemLostEx of a key the player does not have find nothing. */
+void host_log(const char* fmt, ...);
 static int key_item(int id) { return id > 0 && id < 156 && (itemdata[id].type & 0x40); }
 static int carried(int id)
 {
@@ -81,7 +83,9 @@ static int has_spot(int item)
 }
 
 extern unsigned char* bhScePtr;   /* event.c */
-extern BH_SCEWORK bhEtask[16];
+extern unsigned int (*bhScenarioJmpT[256])();
+
+static int evaluating;
 int pc_unlock_held(int item)
 {
     const unsigned int* t = (const unsigned int*)rom->evtp;
@@ -89,7 +93,7 @@ int pc_unlock_held(int item)
     return pc_unlock_rule(1, pc_script_part(t, (unsigned int)(bhScePtr - (const unsigned char*)t)), *bhScePtr, sys->stg_no, sys->rom_no, has_spot(item));
 }
 
-static int unlock_item, unlock_sb;
+static int unlock_item, unlock_sb, unlock_live, unlock_hit;
 int pc_unlock_examine(void)
 {
     static unsigned char turn;   /* a spot for several items (the proofs, the jewels): each press the next */
@@ -108,11 +112,29 @@ int pc_unlock_examine(void)
     return 1;
 }
 
+/* event.c bhUseItemCheck, bhCmpB: a script tests the item used (sb_id) and it is ours. It is taken when the
+   rest of that test holds too (the tests after it: the item screen is up, a floor, a flag). What else the
+   frame's scripts change says nothing: many change flags every frame. */
+void pc_unlock_item_tested(void)
+{
+    unsigned char* keep = bhScePtr;
+    int ok = 1;
+    if (!unlock_live || evaluating || sys->sb_id != unlock_item) return;
+    evaluating = 1;
+    while (ok && coop_op_cond(*bhScePtr)) {
+        unsigned char op = *bhScePtr;
+        if (op == 4 || op == 6 || op == 7 || op == 16 || op == 17) ok = bhScenarioJmpT[op]() != 0;   /* Ck CmpB CmpW UseItemCheck PlItemCheck */
+        else if (coop_insn_len_raw(bhScePtr) > 0) bhScePtr += coop_insn_len_raw(bhScePtr);   /* (others, e.g. RandTest, not run twice: as holding) */
+        else break;
+    }
+    evaluating = 0;
+    bhScePtr = keep;
+    unlock_hit |= ok;
+}
+
 void pc_unlock_scd1(int after)
 {
-    static struct { unsigned int st, cb, rm, sp, ev[32], ky[16]; unsigned char task[16]; } was, now;
     static int st8;
-    int taken;
     if (!unlock_item) return;
     if (!after) {   /* the frame after the item screen's Use */
         unlock_sb = sys->sb_id;
@@ -120,18 +142,16 @@ void pc_unlock_scd1(int after)
         sys->cb_flg |= 0x400;
         st8 = !(sys->st_flg & 0x8);
         sys->st_flg |= 0x8;
+        unlock_live = 1;
+        unlock_hit = 0;
+        return;
     }
-    now.st = sys->st_flg; now.cb = sys->cb_flg; now.rm = sys->rm_flg; now.sp = sys->sp_flg;
-    memcpy(now.ev, sys->ev_flg, sizeof(now.ev));
-    memcpy(now.ky, sys->ky_flg, sizeof(now.ky));
-    for (int i = 0; i < 16; i++) now.task[i] = bhEtask[i].status;
-    if (!after) { was = now; return; }
-    taken = memcmp(&was, &now, sizeof(now)) != 0;
+    unlock_live = 0;
     if (st8) sys->st_flg &= ~0x8;
     sys->cb_flg &= ~0x400;   /* StatusMain clears it on its next frame */
-    printf("unlock: item %d used in %d/%d, %s\n", unlock_item, sys->stg_no, sys->rom_no, taken ? "taken" : "nothing reacts");
+    host_log("unlock: item %d used in %d/%d, %s\n", unlock_item, sys->stg_no, sys->rom_no, unlock_hit ? "taken" : "nothing reacts");
     unlock_item = 0;
-    if (!taken) {   /* nothing here wants it: the press examines */
+    if (!unlock_hit) {   /* nothing here wants it: the press examines */
         sys->sb_id = unlock_sb;
         if (plp == &ply) bhCheckExmAtari(plp);
     }
