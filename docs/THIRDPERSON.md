@@ -411,7 +411,7 @@ shots went past the zombie under the crosshair, which took no damage.
 
 Free aim now sets them every tick (`dual_aim`, after `aim_at_crosshair`; not while lowering, mode2 68):
 
-* One arm aims at the crosshair target. The other aims at the nearest other enemy within 28 degrees
+* One arm aims at the crosshair target. The other aims at the nearest other enemy within 45 degrees
   of the crosshair direction and 15 degrees of its pitch, in the weapon's range, that the game's own
   search would take (alive, targetable, not hidden or behind a wall from that arm's muzzle,
   `bhSearchEnemy`'s tests) and that takes the same aim height as the crosshair target (one pitch,
@@ -421,7 +421,7 @@ Free aim now sets them every tick (`dual_aim`, after `aim_at_crosshair`; not whi
   at the same distance or at the edge do not take turns.
 * Without such an enemy both arms aim at the crosshair target, so the guns converge to the front.
 * Each arm's yaw is taken from its own muzzle (last tick's hand, turned with the character since)
-  and kept within 28 degrees; the arms ease there a third of the way per tick (`count` 3).
+  and kept within 45 degrees; the arms ease there a third of the way per tick (`count` 3).
 * Shots therefore go where each arm points; the pitch, bend and aim height are the crosshair
   target's as for single weapons, so lying zombies are hit the same way. The fixed cameras and
   "Game auto-aim" with the mouse keep the game's own dual targeting.

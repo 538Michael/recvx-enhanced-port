@@ -778,7 +778,7 @@ static void aim_at_crosshair(void)
    (as the game, which gives the left arm the enemy further left), else at the crosshair target too; each
    yaw from its own muzzle (the shot's origin), within DUAL_YAW. The pitch (wax, the bend) and the aim height
    stay the crosshair target's, so the other enemy must take the same aim height. */
-#define DUAL_YAW DEG(28.0f)
+#define DUAL_YAW DEG(45.0f)
 #define DUAL_PITCH DEG(15.0f)
 static int dual_e = -1;   /* the other arm's enemy, -1: none (trace) */
 
