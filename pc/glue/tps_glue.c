@@ -311,7 +311,8 @@ static float filw[4], fila[4];              /* screen filters (effects 90..92): 
 static float step(float w, int on) { w += on ? FADE : -FADE; return w < 0 ? 0 : w > 1 ? 1 : w; }
 
 /* RECVX_ATMOS_TRACE=1: one line per game frame - the cut, the game's fog (on, colour, range as
-   set, the cut's own range, camera-relative bits), the filter, the lights on, the light slots
+   set, the cut's own range, camera-relative bits), the filter, the cut's under-water
+   distortion (cam.flg 0x20) and whether it is drawn (gm_flg 0x100), the lights on, the light slots
    as drawn; with "smooth" also the fog and filters shown */
 static void atmos_log(int smooth_on)
 {
@@ -326,10 +327,10 @@ static void atmos_log(int smooth_on)
         len += snprintf(buf + len, sizeof buf - len, " (%.0f %.0f %.0f: %.2f %.2f %.2f)", sys->lg_ptb[i].ps.x, sys->lg_ptb[i].ps.y,
                         sys->lg_ptb[i].ps.z, sys->lg_ptb[i].cr, sys->lg_ptb[i].cg, sys->lg_ptb[i].cb);
     printf("atmos: frame %u room %d/%d cut %d.%d pos %.1f %.1f tps %d smooth %d | game fog %d %06x %.1f %.1f cut %.1f %.1f rel %x"
-           " | fil %d %d %02x | eff110 %d | lights%s",
+           " | fil %d %d %02x | eff110 %d drawn %d | lights%s",
            (unsigned)gs_frame_count(), sys->stg_no, sys->rom_no, cam.ncut, cam.camver, plp->px, plp->pz, tps_cam_active, smooth_on,
            (ci->flg & 8) != 0, cam.fog_col & 0xFFFFFF, cam.fog_nr, cam.fog_fr, ci->fog_nr, ci->fog_fr, ci->flg & 0xC0,
-           (cam.flg & 8) != 0, sys->fil_no, sys->fil_rt & 0xFF, (cam.flg & 0x20) != 0, buf);
+           (cam.flg & 8) != 0, sys->fil_no, sys->fil_rt & 0xFF, (cam.flg & 0x20) != 0, (sys->gm_flg & 0x100) != 0, buf);
     if (smooth_on)
         printf(" | shown fog %.2f %02x%02x%02x %.1f %.1f fil %.2f %.2f %.2f", fog.a, (int)(fog.c[0] + 0.5f), (int)(fog.c[1] + 0.5f),
                (int)(fog.c[2] + 0.5f), fog.nr, fog.fr, filw[0], filw[1], filw[2]);
@@ -516,6 +517,16 @@ int tps_filter(O_WRK* op)
     op->flg &= ~0x1000000;
     sys->ef_trs2d[sys->ef_trs2dn++] = op;
     return 1;
+}
+
+/* Our camera is this frame's view: also asked before tps_camera takes over in this frame
+   (effects run first). effsub1.c bhEff110 asks it for the under-water view of a cut (cut flag
+   0x400 -> cam.flg 0x20: the full-screen distortion of the submarine dock RM_4030/RM_8050,
+   whose cuts 0, 2 and 5 look in through the windows from the water). It belongs to the fixed
+   camera's place; ours is always in the room's air (there is no diving), so it stays off. */
+int tps_own_view(void)
+{
+    return tps_on && camera_allowed();
 }
 
 /* system.c bhSysCallScreenSaver: the game's idle check only reads the PS2 pad (p1per), so the

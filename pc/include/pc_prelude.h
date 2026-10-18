@@ -266,6 +266,7 @@ void  tps_after_cut(void);
 void  tps_atmos(void);
 struct O_WRK;
 int   tps_filter(struct O_WRK* op);
+int   tps_own_view(void);   /* our camera is this frame's view (before tps_camera too) */
 unsigned int tps_pad(unsigned int pad);
 int   pc_input_active(void);   /* any PC-side input this frame (bhSysCallScreenSaver) */
 void  tps_player_mode(void);   /* before the player's mode handler: the straight aim height back (free aim) */

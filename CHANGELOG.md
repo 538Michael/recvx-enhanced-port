@@ -23,6 +23,9 @@
 - **Quick knife after standing still**: once your character started the idle animation (after
   standing still for a few seconds, for example right after loading a save), the quick knife did
   nothing until you moved. It now draws the knife right away.
+- **Underwater look in the submarine dock**: in over-the-shoulder the screen still waved and
+  stretched as if seen from underwater, because some fixed cameras there look in from the water.
+  Over-the-shoulder now shows the dock clearly; the fixed cameras keep the underwater look.
 
 ## 0.6.2 (2026-10-18)
 
