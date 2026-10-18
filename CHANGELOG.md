@@ -8,14 +8,6 @@
   ending movie, and press again to skip the credits. The results screen, your unlocks and the
   save after the ending still come as usual, and the next movies keep their sound.
 
-### Enemies
-
-- **Custom enemies and Mutated Steve**: the enemy spawner now lists custom enemies at the end,
-  marked [C]. The first is Mutated Steve: Steve's monster form as an enemy you can kill, with the
-  Tyrant's moves and death. With the Wild randomizer he can turn up in large rooms, rarely and
-  never in boss rooms. Modders can add their own custom enemies in mods/enemies.ini (stronger,
-  faster or bigger versions, another enemy's look, other sounds), also for the randomizer.
-
 ### Fixes
 
 - **Tyrants from the spawner or the randomizer**: in a narrow room a Tyrant could push you
