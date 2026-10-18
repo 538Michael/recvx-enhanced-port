@@ -531,8 +531,7 @@ static void survey(void)
     if (sscanf(rooms, "%d:%d%n", &stg, &rno, &n) != 2) { printf("survey: done\n"); address_headroom(); fflush(NULL); _exit(0); }   /* (no GL teardown under the render thread) */
     if (!sent) {
         if (!ready()) return;
-        plp->mnwP = plp->mnwPb;   /* as cheat_glue.c teleport */
-        bhSetDoorDemo(0, stg, rno, 0, 255);
+        cheat_room_warp(stg, rno, 0);
         sent = 1; wait = in = 0;
         return;
     }

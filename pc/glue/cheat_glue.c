@@ -170,10 +170,50 @@ static void read_names(void)
     for (int k = 1; k < 19 && sys->mes_sp && sys->mes_sp[0] > 233; k++) publish(g_cheat.rooms[k], sizeof(g_cheat.rooms[k]), sys->mes_sp, 215 + k);
 }
 
-/* the game's own door transition (door type 255: no animation). An enemy grab plays the
-   player on the enemy's motion set (en01sub.c); the new room frees it, and the room change
-   would animate from it (crash in bhSetMotion), so take the player's own set back first, as
-   the game does when a grab ends. */
+/* Music on a room change without a door. The room scripts turn their music and ambience off as
+   the player uses a door to a room without them (BgmOff2, BGSeOff2), and the next room's entry
+   script (scd0) asks for its own (BgmOn2, BGSeOn2), which plays on when it is already playing.
+   With no door the first half is missing, and the music went on in rooms without their own.
+   So around the next room's entry script (sdfunc.c Com_StartInitScript, Com_FinishInitScript):
+   before it, the music and ambience are off as such a door leaves them; after it, what the
+   script asked for again plays on, and the rest fades out as at a door (Com_ExecRoomFadeOut). */
+extern int CurrentBgmNo, CurrentBgmVolume, ReqFadeBgmNo, CurrentBgSeNo[2], ReqFadeBgSe[2];
+extern unsigned int AdxPlayFlag[2];
+void StopBgm(int FadeOutRate);   /* sdfunc.h (its macros.h clashes here) */
+void StopBgm2();
+void StopBackGroundSeEx(unsigned int SlotNo, short Timer);
+void StopBackGroundSe2(unsigned int SlotNo);
+static int warp_sound, warp_bgm, warp_vol, warp_bgse[2];
+
+void cheat_warp_sound(int after)
+{
+    int i;
+    if (!warp_sound) return;
+    if (!after) {
+        warp_bgm = CurrentBgmNo; warp_vol = CurrentBgmVolume;
+        StopBgm2();
+        for (i = 0; i < 2; i++) { warp_bgse[i] = CurrentBgSeNo[i]; StopBackGroundSe2(i); }
+        return;
+    }
+    warp_sound = 0;
+    if ((ReqFadeBgmNo & 0x8) && CurrentBgmNo == warp_bgm) ReqFadeBgmNo = CurrentBgmVolume != warp_vol ? 0x2 : 0;   /* as PlayBgm2 */
+    else if (CurrentBgmNo < 0 && warp_bgm >= 0 && AdxPlayFlag[0]) StopBgm(400);
+    for (i = 0; i < 2; i++)
+        if ((ReqFadeBgSe[i] & 0x2) && CurrentBgSeNo[i] == warp_bgse[i]) ReqFadeBgSe[i] = 0;   /* as CallBackGroundSe2 */
+        else if (CurrentBgSeNo[i] < 0 && warp_bgse[i] >= 0) StopBackGroundSeEx(i, 400);
+}
+
+/* the game's own door transition (door type 255: no animation), for the teleport, the co-op
+   follow and test aids. An enemy grab plays the player on the enemy's motion set (en01sub.c);
+   the new room frees it, and the room change would animate from it (crash in bhSetMotion), so
+   take the player's own set back first, as the game does when a grab ends. */
+void cheat_room_warp(int stg, int rom, int pos)
+{
+    plp->mnwP = plp->mnwPb;
+    warp_sound = 1;
+    bhSetDoorDemo(0, stg, rom, pos, 255);
+}
+
 static void teleport(int stg, int rom, int pos)
 {
     static const char* pl = (const char*)-1;
@@ -183,8 +223,7 @@ static void teleport(int stg, int rom, int pos)
         sys->cb_flg |= 0x80;
         pl = NULL;
     }
-    plp->mnwP = plp->mnwPb;
-    bhSetDoorDemo(0, stg, rom, pos, 255);
+    cheat_room_warp(stg, rom, pos);
 }
 
 /* Testing aid for headless runs, keyed to game frames since start (frames in which the game

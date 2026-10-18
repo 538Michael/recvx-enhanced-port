@@ -2949,8 +2949,7 @@ static void follow(void)
         return;
     }
     host_log("coop: %s the host to stage %d room %d\n", follow_pending == 2 ? "regroup: pulled to" : "following", rx.stg, rx.rom);
-    plp->mnwP = plp->mnwPb;   /* the new room frees an enemy's motion set (see cheat_glue.c teleport) */
-    bhSetDoorDemo(0, rx.stg, rx.rom, (unsigned char)rx.pos, 255);
+    cheat_room_warp(rx.stg, rx.rom, (unsigned char)rx.pos);
     follow_pending = 0;
 }
 

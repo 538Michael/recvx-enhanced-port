@@ -27,6 +27,8 @@ typedef struct CheatState {
 
 extern CheatState g_cheat;
 void cheat_frame(void);             /* game thread */
+void cheat_room_warp(int stg, int rom, int pos);   /* game thread: to that room as a door without its animation */
+void cheat_warp_sound(int after);  /* sdfunc.c: around the entry script of the room it leads to */
 /* enemy spawner (pc/glue/spawn_glue.c): the list (constant, any thread) and the game-thread calls */
 int spawn_count(void);
 const char* spawn_name(int i);
