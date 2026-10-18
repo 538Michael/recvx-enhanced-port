@@ -134,26 +134,36 @@ int appear_grab_motion(int id, int mtn, int from, int to)
 }
 
 /* ---------------------------------------------------------------- "You appear as" list
-   Left out of the menus (docs/ACTORS.md "The list"): event and cutscene doubles that
-   look like an entry that stays. Their chr values keep working; each maps to the one kept. */
+   Left out of the menus (docs/ACTORS.md "The list"): event doubles that look like an entry
+   that stays. Their chr values keep working; each maps to the one kept. */
 #define M(n) (COOP_CHR_ACTOR + (n))   /* chr of catalogue entry n */
 static const struct { short hidden, kept; } twins[] = {
-    { M(0), 1 },                         /* Claire's cutscene double: Claire's player file */
-    { M(1), 2 }, { M(2), 2 },            /* Chris */
-    { M(3), 3 }, { M(4), 3 },            /* Steve */
-    { M(5), 4 }, { M(6), 4 }, { M(7), 4 },   /* Wesker (the doubles wear the glasses as a separate prop) */
+    { M(2), 2 }, { M(4), 3 },            /* Chris's and Steve's event models */
+    { M(6), 4 }, { M(7), 4 },            /* Wesker's (the doubles wear the glasses as a separate prop) */
     { M(9), M(8) }, { M(11), M(8) },     /* Alfred's other uniforms: the same look */
     { M(18), M(17) },                    /* Tyrant 2: the same with a blood stain */
     { M(23), M(22) },                    /* Bandersnatch 2: only its long arm (an event piece) */
 };
+/* listed last, after the zombies: the player characters' cutscene models (else each would follow
+   the same character's player file) */
+static const short tail[] = { M(0), M(1), M(3), M(5) };
+#define TAILS ((int)(sizeof(tail) / sizeof(tail[0])))
 
 int appear_canon(int chr)
 {
     if (chr < 0 || chr > COOP_CHR_MAX) return 0;
     for (int i = 0; i < (int)(sizeof(twins) / sizeof(twins[0])); i++)
-        if (twins[i].hidden && chr == twins[i].hidden) return twins[i].kept;
+        if (chr == twins[i].hidden) return twins[i].kept;
     return chr;
 }
+
+static int tail_at(int chr)
+{
+    for (int i = 0; i < TAILS; i++) if (tail[i] == chr) return i;
+    return -1;
+}
+
+static int head(int c) { return appear_canon(c) == c && tail_at(c) < 0; }   /* listed before the tail */
 
 int appear_count(void)
 {
@@ -165,16 +175,15 @@ int appear_count(void)
 int appear_at(int i)
 {
     for (int c = 0; c <= COOP_CHR_MAX; c++)
-        if (appear_canon(c) == c && i-- == 0) return c;
-    return 0;
+        if (head(c) && i-- == 0) return c;
+    return i >= 0 && i < TAILS ? tail[i] : 0;
 }
 
 int appear_pos(int chr)
 {
-    int n = 0;
-    chr = appear_canon(chr);
-    for (int c = 0; c < chr; c++) n += appear_canon(c) == c;
-    return n;
+    int n = 0, t = tail_at(chr = appear_canon(chr));
+    for (int c = 0; c < (t >= 0 ? COOP_CHR_MAX + 1 : chr); c++) n += head(c);
+    return n + (t >= 0 ? t : 0);
 }
 
 int appear_step(int chr, int dir)

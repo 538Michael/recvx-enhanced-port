@@ -120,6 +120,7 @@ static bool settings_imgui(int page, bool all = true)
                 for (int k = s->lo; k <= hi; k += st) {
                     char nm[96];
                     if (ImGui::Selectable(s->name ? s->name(k, nm, sizeof nm) : s->names[k - s->lo], k == v)) { settings_set(s, k); changed = true; }
+                    if (k == v) ImGui::SetItemDefaultFocus();   /* the list opens at the current value (a long one: "You appear as") */
                 }
                 ImGui::EndCombo();
             }
