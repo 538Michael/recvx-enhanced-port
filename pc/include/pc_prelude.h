@@ -158,7 +158,8 @@ int   actor_put_enemy(struct BH_PWORK* ep);   /* 1 = drawn */
    this room (0: none of these is called) */
 extern int pc_variant_n;
 int   pc_variant_pre(struct BH_PWORK* ep, int slot);    /* eneset.c bhControlEnemy, before ep's step: how many steps (speed) */
-void  pc_variant_post(struct BH_PWORK* ep, int slot);   /* after them */
+void  pc_variant_post(struct BH_PWORK* ep, int slot);   /* after them (also for a co-op puppet) */
+int   pc_variant_is(struct BH_PWORK* ep);               /* ep is (part of) an enemy variant (en17.c: Mutated Steve) */
 int   pc_variant_draw(struct BH_PWORK* ep);             /* eneset.c bhDrawEnemy, in place of bhPutModel(ep): 1 = drawn */
 int   pc_variant_sound(int enemy_no, int se, signed char* bank);   /* sdfunc.c RequestEnemySeBasic: the sound to request */
 void  actor_hands_back(void);                 /* game.c, before bhControlPlayer: the source's own head and hands back */

@@ -20,7 +20,8 @@ typedef struct EnemyVariant {
     char name[40];                      /* logs and the randomizer's lines; the spawner list shows ui */
     char ui[48];                        /* "[C] " + name */
     unsigned char type, mdlver;         /* base: the spawner entry of this enemy type and model version (AI, hits, motions) */
-    short model;                        /* "You appear as" catalogue entry drawn instead, retargeted onto the base's skeleton; -1: the base's own */
+    short model;                        /* "You appear as" catalogue entry drawn instead, retargeted onto the base's skeleton; -1: the base's own
+                                           (and, while a donor motion plays, the base's catalogue model posed from the donor) */
     unsigned char attach_n, attach[4][2];   /* sub-models of that model drawn on its nodes ({sub-model, node}): Monster Steve's arms */
     float hp;                           /* times the base's hit points (of each difficulty) */
     float armour;                       /* damage taken: weapon damage x armour / hp */
@@ -29,6 +30,10 @@ typedef struct EnemyVariant {
     float scale;                        /* drawn size (hits and collision stay the base's) */
     unsigned char motion_n;
     short motion[8][2];                 /* the base asks for motion [0], plays [1] of its own set */
+    unsigned char donor_type, donor_mdlver;  /* another enemy whose motions it borrows (0: none): its skeleton plays them, */
+    unsigned char dmotion_n, death_n;   /*   retargeted onto the drawn model (the base's own or `model`) */
+    short dmotion[8][2];                /* while the base plays motion [0], the body shows the donor's motion [1] (same phase) */
+    short death[4];                     /* when the base dies (flg & 2): these donor motions in turn, the last one's end held */
     unsigned short sound_room;          /* RM_<room>'s enemy sound bank for the mapped sounds (0: none) */
     unsigned char sound_n, sound[16][2];/* base sound program [0] -> program [1] of that bank */
     unsigned char hurt;                 /* program of that bank played as its voice when a hit lands (0: none) */

@@ -12,19 +12,18 @@
 
 void host_log(const char* fmt, ...);
 
-/* Mutated Steve: Monster Steve's model on Tyrant 1's AI. Monster Steve's own code (en17.c) cannot die
-   (an empty Die mode, nothing moves him there), kills the player in one blow below 120 hit points (his
-   swing outright), drives room light 2 and the camera; it is written for the Antarctic chase. The
-   Tyrant (en19.c, form 0) walks, swings, staggers, falls and dies anywhere (the randomizer's Tyrant).
-   His death is the Tyrant's fall, played by the Tyrant's skeleton and mapped onto Steve's like every
-   motion. Sounds: from Steve's room's bank (RM_9280), his steps, roar, axe and hurt cry for the Tyrant's steps,
-   swing and fall (the Tyrant makes no sound when hit). */
+/* Mutated Steve: Monster Steve himself (en17.c: his walk, swings, charge, sounds, his arms) spawned as an enemy
+   that can die. His code is written for the Antarctic chase: no hit takes his hit points, his Die mode is empty,
+   his swing kills outright and his other heavy blows kill below 120 hit points, it drives room light 2 and shakes
+   the camera. For this variant only (en17.c pc_variant_is): hits take his hit points and kill him (flg & 2, as
+   every enemy), the killing blows are heavy ones (50, x damage), no light and no camera shake. He has no death
+   motion: the Tyrant's (donor 19.0: its fall 18 and lying 2, en19.c TY_BR0_DIE) is played by the Tyrant's
+   skeleton and retargeted onto his model, which then lies where he fell. */
 static EnemyVariant table[VARIANT_MAX] = {
-    { .id = 1, .name = "Mutated Steve", .type = 19, .mdlver = 0, .model = 19,   /* catalogue: "Monster Steve" */
-      .attach_n = 2, .attach = { { 3, 9 }, { 4, 13 } },   /* his claw and his axe arm (en17.c bhEne17_SetLinkWork) */
-      .hp = 1.3f, .armour = 1.0f, .damage = 1.25f, .speed = 1.0f, .scale = 1.0f,
-      .sound_room = 9280, .hurt = 2,   /* his bank: 0 steps, 2 hurt (en17.c bhEne17_DamageAdd), 3 the axe striking, 7 a swing, 9 his roar */
-      .sound_n = 3, .sound = { { 0, 0 }, { 8, 9 }, { 5, 3 } },   /* the Tyrant's steps, swing (motion 9) and fall (motion 18) */
+    { .id = 1, .name = "Mutated Steve", .type = 17, .mdlver = 0, .model = -1,
+      .attach_n = 2, .attach = { { 3, 9 }, { 4, 13 } },   /* his claw and his axe arm on the posed model (en17.c bhEne17_SetLinkWork) */
+      .hp = 3.4f, .armour = 1.0f, .damage = 1.25f, .speed = 1.0f, .scale = 1.0f,
+      .donor_type = 19, .donor_mdlver = 0, .death_n = 2, .death = { 18, 2 },
       .wild = 1, .mild = 0, .heavy = 1, .big = 1, .stages = VARIANT_STAGES_ALL },
 };
 static int builtin_n = 1, n = 1;
@@ -97,6 +96,52 @@ static int stage_bits(const char* s)
     return bits;
 }
 
+/* the variant's one donor (another enemy whose motions it borrows): type t, model version ver */
+static int donor(EnemyVariant* v, int t, int ver, const char** why)
+{
+    if (t < 1 || t > 99 || ver < 0 || ver > 63) return 0;
+    if (v->donor_type && (v->donor_type != t || v->donor_mdlver != ver)) { *why = "one donor enemy per variant"; return 0; }
+    v->donor_type = (unsigned char)t;
+    v->donor_mdlver = (unsigned char)ver;
+    return 1;
+}
+
+/* "a:b" (its own motion b where the base asks for a) or "a:T[.v]:b" (enemy T's motion b), comma separated */
+static int motions(EnemyVariant* v, char* val, const char** why)
+{
+    char* tok;
+    v->motion_n = v->dmotion_n = 0;
+    for (tok = strtok(val, ","); tok; tok = strtok(NULL, ",")) {
+        int a, t, ver = 0, b, m = -1, len = (int)strlen(tok);
+        if ((sscanf(tok, " %d : %d . %d : %d %n", &a, &t, &ver, &b, &m) == 4 && m == len) ||
+            (m = -1, ver = 0, sscanf(tok, " %d : %d : %d %n", &a, &t, &b, &m) == 3 && m == len)) {
+            if (a < 0 || a > 511 || b < 0 || b > 511 || v->dmotion_n == 8 || !donor(v, t, ver, why)) return 0;
+            v->dmotion[v->dmotion_n][0] = (short)a; v->dmotion[v->dmotion_n++][1] = (short)b;
+        } else if (m = -1, sscanf(tok, " %d : %d %n", &a, &b, &m) == 2 && m == len) {
+            if (a < 0 || a > 511 || b < 0 || b > 511 || v->motion_n == 8) return 0;
+            v->motion[v->motion_n][0] = (short)a; v->motion[v->motion_n++][1] = (short)b;
+        } else return 0;
+    }
+    return 1;
+}
+
+/* "T[.v]: m1, m2, ...": enemy T's motions played in turn when it dies, the last one's end held */
+static int death(EnemyVariant* v, char* val, const char** why)
+{
+    int t, ver = 0, m = -1, b;
+    char* tok;
+    if (!(sscanf(val, " %d . %d : %n", &t, &ver, &m) == 2 && m > 0) && (m = -1, ver = 0, !(sscanf(val, " %d : %n", &t, &m) == 1 && m > 0)))
+        return 0;
+    if (!donor(v, t, ver, why)) return 0;
+    v->death_n = 0;
+    for (tok = strtok(val + m, ","); tok; tok = strtok(NULL, ",")) {
+        int n2 = -1;
+        if (sscanf(tok, " %d %n", &b, &n2) != 1 || n2 != (int)strlen(tok) || b < 0 || b > 511 || v->death_n == 4) return 0;
+        v->death[v->death_n++] = (short)b;
+    }
+    return v->death_n > 0;
+}
+
 static int number(const char* s, float* out, float lo, float hi)
 {
     char* end;
@@ -142,11 +187,8 @@ static int key(EnemyVariant* v, const char* k, char* val, const char** why, int*
     if (!strcmp(k, "damage")) return number(val, &v->damage, 0.0f, 20.0f);
     if (!strcmp(k, "speed")) return number(val, &v->speed, 0.5f, 2.0f);
     if (!strcmp(k, "scale")) return number(val, &v->scale, 0.25f, 4.0f);
-    if (!strcmp(k, "motions")) {
-        if ((c = pairs(val, v->motion, 8, 511)) < 0) return 0;
-        v->motion_n = (unsigned char)c;
-        return 1;
-    }
+    if (!strcmp(k, "motions")) return motions(v, val, why);
+    if (!strcmp(k, "death")) return death(v, val, why);
     if (!strcmp(k, "sounds")) { if (!number(val, &f, 0, 9999) || f != (int)f) return 0; v->sound_room = (unsigned short)f; return 1; }
     if (!strcmp(k, "sound_map")) {
         if ((c = pairs(val, pr, 16, 255)) < 0) return 0;

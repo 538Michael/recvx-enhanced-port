@@ -442,7 +442,7 @@ Models not in the catalogue:
   fewer than 32 texture entries or 2 MB of heap left.
 * **Display actor**: a `BH_PWORK` per slot (our player, the co-op partner, the cutscene double, and
   two for enemy variants' models: [ENEMIES.md](ENEMIES.md) "Enemy variants", posed from each such
-  enemy's skeleton when it is drawn, a Tyrant's as the source),
+  enemy's skeleton, or from another enemy's (a donor) playing a borrowed motion, when it is drawn),
   drawn in place of the source (`game.c actor_put_player`, `coop_draw_remote`,
   `eneset.c actor_put_enemy`). The source stays what the game animates, collides with and links
   weapons and effects to; it is only not drawn. The head part (`sys->obwp[2]`) is disabled while a
