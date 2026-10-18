@@ -463,8 +463,9 @@ village, collision. The render thread (GS emulation, replays: `r_exec`, `r_inter
 
 One table, `g_settings[]` in `pc/src/host/settings.c`, drives both the F1 overlay and the
 in-game ENHANCED SETTINGS pages. Each entry has a page, label, variable (or get/set), range and
-step, value names or a printf format, flags, help text, an applier, a `locked()` reason and an
-optional `.group` heading. Rows are in menu order; the pages (`SP_*`, `settings_pages[]`) are
+step, value names or a printf format, flags, help text, an applier, a `locked()` reason, an
+optional `shown()` (the row is left out of both menus while it returns 0, e.g. Fullscreen
+resolution outside exclusive fullscreen) and an optional `.group` heading. Rows are in menu order; the pages (`SP_*`, `settings_pages[]`) are
 DISPLAY, GAMEPLAY, CONTROLS, THIRD PERSON, AUDIO, APPEARANCE, CO-OP, EXTRAS. `recvx.ini` keys live in `keys[]`
 in `pc/src/host/config.c`.
 
@@ -488,7 +489,7 @@ labels and value names must be plain ASCII the font has (no `&`, `*`, `#`, `@`).
   .help = "...", .locked = in_session },
 ```
 
-ENHANCED SETTINGS shows every row of its page; F1 shows every row too, except on the CO-OP and
+ENHANCED SETTINGS shows every shown row of its page; F1 shows the same rows, except on the CO-OP and
 EXTRAS pages (their own windows are F3 and F2), where only `SET_F1` rows appear. ctest `settings`
 (`pc/tests/check_settings.cmake`) fails when an ini key in `config.c` has no row (by its variable),
 unless the key is listed there with where it is set instead (the lobby's per-session choices, the

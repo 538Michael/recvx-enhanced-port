@@ -26,7 +26,8 @@ nothing is extracted or copied.
 |---|---|
 | `--save-dir DIR` | where saves and `recvx.ini` go (default `./save`) |
 | `--size WxH` | window size (default 1280x960) |
-| `--fullscreen` | start in fullscreen |
+| `--fullscreen` | start in fullscreen, of the kind chosen in Display mode (borderless unless you chose exclusive) |
+| `--borderless`, `--exclusive`, `--windowed` | start in that display mode |
 | `--enhanced` / `--vanilla` | display-rate frames on / off |
 | `--skip-doors` | room transitions without door, stairs and ladder animations |
 | `--skip-intro` | boot straight into the title menu |
@@ -113,8 +114,9 @@ renderer, skipped intro and door animations (Skip door animations: Instant) and 
 | Setting | ini key | Values (default in bold) |
 |---|---|---|
 | **Window** | | |
-| Fullscreen | `fullscreen` | also F11 |
-| Window size | `window_w`, `window_h` | presets 1280x960 to 3840x2160 (incl. 3440x1440), or any size by resizing the window |
+| Display mode | `fullscreen` (0 windowed, 1 fullscreen), `fullscreen_exclusive` (0 borderless, 1 exclusive) | **Windowed**, Borderless fullscreen, Exclusive fullscreen. Borderless: a window covering the whole screen the game window is on, at the desktop's resolution; switching to other programs (Alt+Tab) is instant and the game stays on screen. Exclusive: that screen switches to the Fullscreen resolution; on Alt+Tab the game minimises and the desktop gets its own resolution back (under Wayland the screen keeps its mode and the game is scaled to it, without minimising). F11 switches between windowed and the fullscreen kind chosen last. Leaving fullscreen puts the window back where it was, at its size |
+| Fullscreen resolution | `fullscreen_w`, `fullscreen_h`, `fullscreen_hz` (all 0: Desktop) | exclusive fullscreen only (the row is hidden otherwise): **Desktop** (the desktop's resolution and refresh rate) or one of the screen's modes, e.g. 1920 x 1080, 144 Hz. A mode the screen lacks (another monitor) becomes the closest one it has |
+| Window size | `window_w`, `window_h` | windowed only: presets 1280x960 to 3840x2160 (incl. 3440x1440), or any size by resizing the window |
 | VSync | `vsync` | **on**, off |
 | Frame rate limit | `fps_limit` | **Off (display rate)**, 30, 60, 90, 120, 144. Caps the images shown per second, in-between frames included; the game itself always runs at 30 |
 | Show frame rate | `show_fps` | **on**: counter at the top right |
@@ -368,7 +370,7 @@ Hotkeys:
 | F2 | cheat menu |
 | F3 | co-op window |
 | F5 | third-person camera on/off |
-| F11 | fullscreen |
+| F11 | windowed / fullscreen (borderless or exclusive, as chosen in Display mode) |
 | Page Up, F / Page Down | noclip fly up / down (when flying is on; R reloads now) |
 
 ### Rebinding

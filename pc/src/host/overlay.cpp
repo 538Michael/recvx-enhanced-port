@@ -103,7 +103,7 @@ static bool settings_imgui(int page, bool all = true)
     bool changed = false;
     for (int i = 0; i < g_settings_n; i++) {
         const Setting* s = &g_settings[i];
-        if (s->page != page || !(all || (s->flags & SET_F1))) continue;
+        if (s->page != page || !(all || (s->flags & SET_F1)) || (s->shown && !s->shown())) continue;
         if (s->group && all) ImGui::SeparatorText(s->group);
         const char* lock = settings_locked(s);
         char label[96], val[96];

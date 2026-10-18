@@ -25,11 +25,29 @@ extern SDL_Window* g_window;
 const char* const settings_pages[SP_COUNT] = { "DISPLAY", "GAMEPLAY", "CONTROLS", "THIRD PERSON", "AUDIO", "APPEARANCE", "CO-OP", "EXTRAS" };
 
 /* ---------------------------------------------------------------- appliers (main thread) */
-void settings_apply_window(void)
+/* Display mode, F11, the start: fullscreen with no SDL fullscreen mode is borderless (the desktop's
+   size on the window's display); with a display mode it is exclusive (that display switches to it,
+   and SDL's VIDEO_MINIMIZE_ON_FOCUS_LOSS "auto" minimises it on Alt+Tab, restoring the desktop,
+   while borderless stays). Leaving fullscreen, SDL puts the window back where and how big it was. */
+void settings_apply_display(void)
 {
-    SDL_SetWindowFullscreen(g_window, g_config.fullscreen != 0);
-    if (!g_config.fullscreen) SDL_SetWindowSize(g_window, g_config.window_w, g_config.window_h);
+    SDL_DisplayID d = SDL_GetDisplayForWindow(g_window);
+    SDL_DisplayMode m;
+    int excl = g_config.fullscreen_exclusive && g_config.fullscreen;
+    if (excl) {   /* the chosen mode, or the closest this display has; 0: the desktop's */
+        const SDL_DisplayMode* desk = SDL_GetDesktopDisplayMode(d);
+        int w = g_config.fullscreen_w, h = g_config.fullscreen_h;
+        float hz = w ? (float)g_config.fullscreen_hz : 0.0f;   /* 0: the desktop's refresh */
+        if (!w && desk) { w = desk->w; h = desk->h; }
+        excl = w && SDL_GetClosestFullscreenDisplayMode(d, w, h, hz, false, &m);
+        if (!excl) host_log("display: no %dx%d mode for exclusive fullscreen (%s), borderless instead\n", w, h, SDL_GetError());
+    }
+    if (!SDL_SetWindowFullscreenMode(g_window, excl ? &m : NULL)) host_log("display: %s\n", SDL_GetError());
+    if (!SDL_SetWindowFullscreen(g_window, g_config.fullscreen != 0)) host_log("display: fullscreen: %s\n", SDL_GetError());
+    if (excl) host_log("display: exclusive fullscreen %d x %d @ %.2f Hz\n", m.w, m.h, m.refresh_rate);
+    else host_log("display: %s\n", g_config.fullscreen ? "borderless fullscreen" : "windowed");
 }
+void settings_apply_window(void) { if (!g_config.fullscreen) SDL_SetWindowSize(g_window, g_config.window_w, g_config.window_h); }
 static void apply_vsync(void) { SDL_GL_SetSwapInterval(g_config.vsync ? 1 : 0); }
 static void apply_volume(void) { audio_apply_volumes(); }
 
@@ -48,7 +66,51 @@ static const char* size_name(int v, char* b, int n)
     else snprintf(b, n, "%d x %d", sizes[v].w, sizes[v].h);
     return b;
 }
-static const char* fullscreen_on(void) { return g_config.fullscreen ? "Fullscreen is on." : NULL; }
+static const char* fullscreen_on(void) { return g_config.fullscreen ? "Only in windowed mode." : NULL; }
+/* Display mode: windowed / borderless / exclusive over fullscreen + fullscreen_exclusive (F11 flips
+   only the first, so it returns to the kind chosen last) */
+static int dmode_get(void) { return !g_config.fullscreen ? 0 : g_config.fullscreen_exclusive ? 2 : 1; }
+static void dmode_set(int v) { g_config.fullscreen = v > 0; if (v > 0) g_config.fullscreen_exclusive = v == 2; }
+/* Fullscreen resolution: "Desktop", then the modes of the window's display (filled on the main
+   thread, settings_display_modes; SDL's order: largest first, the highest refresh first) */
+static struct { int w, h, hz; } fs_modes[128];
+static int fs_n;
+void settings_display_modes(void)
+{
+    int n = 0;
+    SDL_DisplayMode** m = SDL_GetFullscreenDisplayModes(SDL_GetDisplayForWindow(g_window), &n);
+    fs_n = 0;   /* ponytail: the game thread's menu may read this while a display change refills it; one odd row name at worst */
+    for (int i = 0; m && i < n && fs_n < (int)SDL_arraysize(fs_modes); i++) {
+        int hz = (int)(m[i]->refresh_rate + 0.5f), dup = m[i]->pixel_density > 1.0f;
+        for (int k = 0; k < fs_n; k++)   /* the same in another pixel format, or 59.94 next to 60 */
+            dup |= fs_modes[k].w == m[i]->w && fs_modes[k].h == m[i]->h && fs_modes[k].hz == hz;
+        if (dup) continue;
+        fs_modes[fs_n].w = m[i]->w; fs_modes[fs_n].h = m[i]->h; fs_modes[fs_n].hz = hz;
+        fs_n++;
+    }
+    SDL_free(m);
+}
+static int fsres_n(void) { return fs_n + 1; }
+static int fsres_get(void)
+{
+    if (!g_config.fullscreen_w) return 0;
+    for (int i = 0; i < fs_n; i++)
+        if (fs_modes[i].w == g_config.fullscreen_w && fs_modes[i].h == g_config.fullscreen_h && fs_modes[i].hz == g_config.fullscreen_hz) return i + 1;
+    return -1;   /* not a mode of this display: SDL takes the closest */
+}
+static void fsres_set(int v)
+{
+    if (v <= 0 || v > fs_n) g_config.fullscreen_w = g_config.fullscreen_h = g_config.fullscreen_hz = 0;
+    else { g_config.fullscreen_w = fs_modes[v - 1].w; g_config.fullscreen_h = fs_modes[v - 1].h; g_config.fullscreen_hz = fs_modes[v - 1].hz; }
+}
+static const char* fsres_name(int v, char* b, int n)
+{
+    if (v == 0) snprintf(b, n, "Desktop");
+    else if (v > 0 && v <= fs_n) snprintf(b, n, "%d x %d, %d Hz", fs_modes[v - 1].w, fs_modes[v - 1].h, fs_modes[v - 1].hz);
+    else snprintf(b, n, "%d x %d, %d Hz", g_config.fullscreen_w, g_config.fullscreen_h, g_config.fullscreen_hz);
+    return b;
+}
+static int exclusive_on(void) { return g_config.fullscreen && g_config.fullscreen_exclusive; }
 static const char* scale_name(int v, char* b, int n)
 {
     if (v) snprintf(b, n, "%dx (%d x %d)", v, 640 * v, 448 * v);
@@ -141,6 +203,7 @@ static void spawn_set(int v) { g_cheat.spawn_idx = v; }
 static const char* spawn_nm(int v, char* b, int n) { snprintf(b, n, "%s", spawn_name(v)); return b; }
 
 static const char* const onoff_auto[] = { "Auto", "Off", "On" };
+static const char* const display_modes[] = { "Windowed", "Borderless fullscreen", "Exclusive fullscreen" };
 static const char* const modes3[] = { "Original (4:3)", "Stretch to width", "Off" };
 static const char* const fps_limits[] = { "Off (display rate)", "30", "60", "90", "120", "144" };   /* render.c present_hz */
 static const char* const aspects[] = { "4:3 (original)", "Stretch to window", "Widescreen (hor+)" };
@@ -158,7 +221,10 @@ static const char* const varieties[] = { "Mild", "Wild" };
 
 #define V(x) ((int*)&(x))
 const Setting g_settings[] = {
-    { SP_DISPLAY, "Fullscreen", V(g_config.fullscreen), 0, 1, 1, .help = "Also F11.", .apply = settings_apply_window, .group = "WINDOW" },
+    { SP_DISPLAY, "Display mode", NULL, 0, 2, 1, display_modes, .get = dmode_get, .set = dmode_set, .apply = settings_apply_display, .group = "WINDOW",
+      .help = "Borderless: a window covering the screen, quick to Alt+Tab. Exclusive: the screen switches to the Fullscreen resolution. F11: windowed and back." },
+    { SP_DISPLAY, "Fullscreen resolution", NULL, 0, 0, 1, .get = fsres_get, .set = fsres_set, .name = fsres_name, .count = fsres_n, .shown = exclusive_on, .apply = settings_apply_display,
+      .help = "Exclusive fullscreen: the screen's resolution and refresh rate. Desktop: as the desktop." },
     { SP_DISPLAY, "Window size", NULL, 0, 5, 1, .get = size_get, .set = size_set, .name = size_name, .locked = fullscreen_on, .apply = settings_apply_window },
     { SP_DISPLAY, "VSync", V(g_config.vsync), 0, 1, 1, .apply = apply_vsync },
     { SP_DISPLAY, "Frame rate limit", V(g_config.fps_limit), 0, 5, 1, fps_limits, .help = "Caps the images shown per second (enhanced in-between frames included) below the display rate, e.g. 60 on a 175 Hz monitor. The game itself always runs at 30." },

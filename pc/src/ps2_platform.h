@@ -16,7 +16,9 @@ typedef struct {
     char iso_path[1024];
     char save_dir[1024];
     int  window_w, window_h;
-    int  fullscreen;
+    int  fullscreen;         /* F11 flips it; the kind: fullscreen_exclusive */
+    int  fullscreen_exclusive;   /* 0 borderless (the desktop's size), 1 exclusive (a display mode, settings.c) */
+    int  fullscreen_w, fullscreen_h, fullscreen_hz;   /* exclusive: the mode (Hz rounded); 0 = the desktop's */
     int  vsync;
     int  fps_limit;          /* presents per second: 0 display rate, else index into render.c fps_limits (30/60/90/120/144) */
     int  log_level;
