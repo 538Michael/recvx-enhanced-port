@@ -21,7 +21,7 @@
   Borderless fullscreen (as fullscreen was before) or Exclusive fullscreen, which switches the
   screen to a resolution and refresh rate you pick, the desktop's by default. F11 switches
   between windowed and the fullscreen you chose last, and the window comes back where it was.
-- **Fuller rooms in widescreen**: with the fixed cameras, the side margins now show the walls,
+- **Adjusted culling in widescreen**: with the fixed cameras, the side margins now show the walls,
   floors and props the original leaves out for each camera angle, as the third-person views do.
   The middle of the picture stays exactly as the original, and walls the camera looks through
   stay hidden.
@@ -42,15 +42,6 @@
   every room, fight, menu and cutscene, which leaves more headroom for high frame rates.
 - **No hitch when a game starts**: the short freeze when going from the title into the game is
   gone.
-
-### Appearance
-
-- **Cutscene models are back in "You appear as"**: Claire, Chris, Steve and Wesker as they look
-  in the cutscenes can be chosen again, in F1, F3, ENHANCED SETTINGS and the lobby. They are at the
-  end of the list, so each character no longer shows up twice in a row. Claire keeps her ponytail,
-  which swings as when you play her, and Wesker his sunglasses, whoever you play, also in
-  cutscenes, in the lobby and for your partner. Choosing the cutscene model of the character you
-  play keeps the game's own cutscenes, with faces and lip sync.
 
 ### Fixes
 
