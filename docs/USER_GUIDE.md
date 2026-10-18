@@ -60,7 +60,8 @@ local co-op on one PC works ([COOP.md](COOP.md)).
 
 The typewriter's save screen and LOAD GAME look as on the PS2, but by default (**Save system:
 Native files**) they list save files instead of the memory card's 15 slots, without the memory
-card screens ("which memory card slot", "checking memory card", "not enough space"):
+card screens ("which memory card slot", "checking memory card", "not enough space"); the list's
+heading reads "Load Game" or "Save Game" instead of "MEMORY CARD slot 1":
 
 - Each save is its own file in `save/saves`, named by its number and what the menu shows, e.g.
   `001_Claire_Prison-front.sav`, `002_Chris_Ant-Base-CR.sav`, ... `1000_...` There is no limit.
