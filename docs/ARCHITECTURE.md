@@ -33,7 +33,7 @@ settings menus) hook into the game through small glue functions.
 | Path | Contents |
 |---|---|
 | `decomp/` | the decomp as a submodule (fork, branch `pc-port`). PC changes are inside `#ifdef TARGET_PC` blocks: asm replacements, PS2-address idioms, hooks into the glue, and fixes of undefined behaviour, with the PS2 original kept under `#else` |
-| `pc/include/` | `pc_prelude.h` (force-included into every decomp file: host headers, `long` as 64-bit, declarations of all PC hooks) and replacement SDK headers (`sdk/`) |
+| `pc/include/` | `pc_prelude.h` (force-included into every decomp file: host headers, `long` as 64-bit, declarations of all PC hooks), `pc_rules.h` (pure decisions of the hooks, checked by the ctest `rules`) and replacement SDK headers (`sdk/`) |
 | `pc/glue/` | PC code that needs the decomp's types: co-op, lobby, trade screen, third person, model swaps, cheats, enemy options and spawner, native renderer hooks, ENHANCED SETTINGS menu, mouse in menus, quick knife, reload button, native saves |
 | `pc/src/ps2/` | EE/IOP layer: kernel, DMA, VIF1, VU0/VU1 (static microcode and interpreter), libcdvd, libpad, libmc, SIF, the address window |
 | `pc/src/gs/` | GS emulation (GIF parser, register file, local memory), the OpenGL rasterizer, the frame stream, native textures, in-between frames |
@@ -742,7 +742,7 @@ and game frames for game-state aids, as noted. Co-op test aids (`RECVX_COOP_*`,
 | `RECVX_TEST_TYPEWRITER="f,..."` | open the typewriter's save screen at game frame f (as its ink ribbon question's "yes"; no ribbon needed) |
 | `RECVX_TEST_COMPUTER="f:n,..."` | open computer terminal n at game frame f, as the room scripts' `EvtComSet n` (1 self-destruct lock, 2 security lock, 3 Albinoid file, 4-6 3D scanner, 7 password; rooms 9/31, 1/2, 3/12, 0/9, 1/9) |
 | `RECVX_FLAGS="set:bit,..."` | set story flags at the first game frame (1 `ev_flg`, 2 `ky_flg`, 3 `ed_flg`, 7 `it_flg`, 8 `mp_flg`) |
-| `RECVX_INF_AMMO=1`, `RECVX_INF_HEALTH=1`, `RECVX_UNLOCK=1` | infinite ammo / health / unlock all cheats on (unlock all logs each key it uses: `unlock: item N used in S/R, taken` or `nothing reacts`) |
+| `RECVX_INF_AMMO=1`, `RECVX_INF_HEALTH=1`, `RECVX_UNLOCK=1` | infinite ammo / health / unlock all cheats on (unlock all logs each key it uses: `unlock: item N used in S/R, taken` or `nothing reacts`). `RECVX_UNLOCK="f:0/1,..."` switches unlock all at game frame f; a switch in a room logs each lock the entry script set up by the key: `unlock: S/R entry script block X now takes its then/else part` |
 | `RECVX_NOCLIP="f:mode,..."` | noclip mode 0/1/2 from game frame f, logs position every 15 frames |
 | `RECVX_APPEAR="f:chr,..."` | set "You appear as" (`coop_char` value) at game frame f |
 | `RECVX_EFFECT="f:effno:type:mode1"` | spawn effect effno at the player (e.g. `60:110:0:1`: full-screen distortion) |

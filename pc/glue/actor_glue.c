@@ -92,7 +92,8 @@ static Disguise dg[ACTOR_SLOTS] __attribute__((aligned(64)));
 static unsigned char pack[6 << 20] __attribute__((aligned(64)));
 static unsigned char room[12 << 20] __attribute__((aligned(64)));   /* the game's arena size: any room it loads fits */
 int actor_on;                           /* a display actor is shown (game.c hooks) */
-static int dbl_tick;                    /* actor_double_tick is posing the double (its hands go to the model's) */
+static int dbl_tick;                    /* actor_double_tick is posing the double (its hands go to the model's); 2: a second
+                                           double of the tick, which takes the ponytail as the first one swung it */
 static BH_PWORK* dbl_posed;             /* the double the display actor's current pose was taken from */
 static void face_init(Disguise* d, int idx);
 /* the retargeting of docs/ACTORS.md "Retargeting" (limb roles along each chain, the root's height
@@ -879,7 +880,12 @@ static void load_head(Disguise* d, int chr)
         slen = 0;
         i++;
     }
-    if (!c || !mlb_textured(c) || slen > 2048 || 2048 + 64 + clen > (int)sizeof(d->hp.keep)) { host_log("actor: head part of part file %d: no sub-model 4 (%d bytes)\n", 10 + chr, clen); return; }
+    if (!c || !mlb_textured(c)) { host_log("actor: head part of part file %d: no sub-model 4\n", 10 + chr); return; }
+    if (slen > 2048 - 64 || 2048 + 64 + clen > (int)sizeof(d->hp.keep)) {   /* skin at keep + 0..63, model at keep + 2048 + 0..63 */
+        host_log("actor: head part of part file %d does not fit (skin %d, model %d bytes)\n", 10 + chr, slen, clen);
+        return;
+    }
+    if (d->tex_n >= (int)(sizeof(d->tex) / sizeof(d->tex[0]))) { host_log("actor: head part of part file %d: no texture slot left\n", 10 + chr); return; }
     memset(&d->hp.w, 0, sizeof(d->hp.w));
     if (skin) d->hp.w.skp[4] = (int*)((unsigned char*)memcpy(d->hp.keep + ((skin - pack) & 63), skin, slen) + 4);   /* (the data's alignment kept) */
     p = memcpy(d->hp.keep + 2048 + ((c - pack) & 63), c, clen);
@@ -1376,7 +1382,7 @@ void actor_pose(int who, BH_PWORK* src)
                 for (k = 9; k <= 13; k += 4)
                     if (d->rig.map[k] >= 0 && sr.map[k] >= 0) memcpy(&src->mlwP->owP[(int)sr.map[k]].mtx[12], &m->owP[(int)d->rig.map[k]].mtx[12], 12);
             }
-            head_pose(d, who == ACTOR_DOUBLE ? dbl_tick : !redraw);
+            head_pose(d, who == ACTOR_DOUBLE ? dbl_tick == 1 : !redraw);   /* (one head part, one swing per tick) */
             return;
         }
     }
@@ -1544,7 +1550,7 @@ void actor_double_tick(void)
         BH_PWORK* ep = &ene[i];
         if (!double_acting(ep, pid)) continue;
         if (d->face) face_step(d, ep);
-        dbl_tick = 1;
+        dbl_tick = dbl_posed ? 2 : 1;
         actor_pose(ACTOR_DOUBLE, ep);
         dbl_tick = 0;
         if (d->mapped) dbl_posed = ep;

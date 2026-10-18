@@ -11,6 +11,8 @@
 #include "../../decomp/include/ps2/veronica/prog/hitchk.h"
 #include "../src/host/cheat.h"
 #include "../src/host/coop.h"
+#include "../src/net/coop_proto.h"
+#include "pc_rules.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -60,10 +62,9 @@ unsigned int pc_noclip(void)
    - A door with a question ("Will you use the Silver Key?") is chosen by the script's PlItemCheck: scd0 sets
      the door's message by it, scd1 opens the door on "Yes" when it still holds. pc_unlock_held passes such a
      check for a key item (itemdata type 0x40: no weapon, ammo, herb, ribbon or lighter) that has a use spot in
-     this room, in scd0/scd1 only (event tasks check items to give or take them, RM_9160's jewels), not when the
-     check guards a model change (RM_3160 hides its zombies once the Emblem Card is carried), and never in 0/9,
-     where the metal detector checks every metal item (keys and emblems among them) with the same op.
+     this room, as pc_rules.h pc_unlock_rule says.
    No item is added; the scripts' PlItemLost/PlItemLostEx of a key the player does not have find nothing. */
+void host_log(const char* fmt, ...);
 static int key_item(int id) { return id > 0 && id < 156 && (itemdata[id].type & 0x40); }
 static int carried(int id)
 {
@@ -72,20 +73,8 @@ static int carried(int id)
     return 0;
 }
 
-extern unsigned char* bhScePtr;   /* event.c */
-extern BH_SCEWORK bhEtask[16];
-int pc_unlock_held(int item)
+static int has_spot(int item)
 {
-    const unsigned int* t = (const unsigned int*)rom->evtp;
-    unsigned int ofs, first, lo = ~0u;
-    if (!g_cheat.unlock || !key_item(item) || (sys->stg_no == 0 && sys->rom_no == 9) || *bhScePtr == 36 /* InitModelSet */) return 0;
-    first = t[0];   /* the offset table (scd0, scd1, events) ends where the first script begins */
-    for (unsigned int i = 0; i * 4 < first; i++)
-        if (t[i] && t[i] < first) first = t[i];
-    for (unsigned int i = 2; i * 4 < first; i++)
-        if (t[i] && t[i] < lo) lo = t[i];
-    ofs = (unsigned int)(bhScePtr - (const unsigned char*)t);
-    if (ofs >= lo) return 0;   /* an event (they follow scd0 and scd1) */
     for (int i = 0; i < rom->flr_n; i++) {
         const ATR_WORK* z = &rom->flrp[i];
         if (z->type == 0 && (z->prm0 == item || z->prm1 == item || z->prm2 == item || z->prm3 == item)) return 1;
@@ -93,7 +82,187 @@ int pc_unlock_held(int item)
     return 0;
 }
 
-static int unlock_item, unlock_sb;
+/* Switched in a room, the cheat changes at once what the entry script (scd0) decided by such a check,
+   instead of at the next entry: the check's block (the IfelCk it is a test of) is noted as scd0 runs
+   it, with what its parts write. Blocks whose then-part and optional else part only set rm_flg bits
+   and the room's trigger and floor records (EtcAtariSet(2), FlrAtariSet(2)) qualify: the door's
+   message and the bit scd1 asks for before it opens the door. Nothing else of scd0 runs again
+   (enemies, items, cutscenes, music). On a switch the block's tests are evaluated again (the game's
+   own handlers, in place); when they now choose the other part, its writes are made, and what only
+   the part taken before wrote goes back to the value from before the block. A block whose records
+   changed since (its door was opened meanwhile) is left as it is. */
+#define SITES 16
+#define SITE_W 12
+enum { W_RM, W_ETC, W_ETC_ON, W_FLR, W_FLR_ON };
+typedef struct { unsigned int attr, prm; unsigned char type; } Val;
+typedef struct {
+    unsigned int ifel, then0, els, end;   /* offsets in the event block: IfelCk, its then-part, the else part (0: none), the end */
+    int part, n;                          /* the part that ran last (1 then, 0 else; -1: left alone) */
+    struct { unsigned char kind, ix, set[2]; Val pre, val[2]; } w[SITE_W];
+} Site;
+static Site site[SITES];
+static int nsite, recording, evaluating, unlock_applied;
+
+extern unsigned char* bhScePtr;   /* event.c */
+extern unsigned int* G_Sp;
+extern int bhIfelFlg;
+extern unsigned int (*bhScenarioJmpT[256])();
+
+static void note_site(int item);
+int pc_unlock_held(int item)
+{
+    const unsigned int* t = (const unsigned int*)rom->evtp;
+    int part, ok;
+    if (!key_item(item)) return 0;
+    part = pc_script_part(t, (unsigned int)(bhScePtr - (const unsigned char*)t));
+    ok = pc_unlock_rule(1, part, *bhScePtr, sys->stg_no, sys->rom_no, has_spot(item));
+    if (ok && part == 0 && recording && !evaluating) note_site(item);
+    return ok && g_cheat.unlock;
+}
+
+static ATR_WORK* atr(int kind, int ix)
+{
+    int etc = kind == W_ETC || kind == W_ETC_ON;
+    if (kind == W_RM || ix >= (etc ? rom->etc_n : rom->flr_n)) return NULL;
+    return etc ? &rom->etcp[ix] : &rom->flrp[ix];
+}
+static Val get(int kind, int ix)
+{
+    ATR_WORK* a = atr(kind, ix);
+    Val v = { 0, 0, 0 };
+    if (kind == W_RM) v.attr = sys->rm_flg >> (31 - ix) & 1;
+    else if (kind == W_ETC_ON || kind == W_FLR_ON) v.attr = a->flg & 1;
+    else { v.attr = a->attr; v.type = a->type; v.prm = a->prm0 | a->prm1 << 8 | a->prm2 << 16 | (unsigned int)a->prm3 << 24; }
+    return v;
+}
+static void put(int kind, int ix, Val v)
+{
+    ATR_WORK* a = atr(kind, ix);
+    if (kind == W_RM) sys->rm_flg = (sys->rm_flg & ~(0x80000000u >> ix)) | v.attr << (31 - ix);
+    else if (kind == W_ETC_ON || kind == W_FLR_ON) a->flg = (a->flg & ~1) | v.attr;
+    else { a->attr = v.attr; a->type = v.type; a->prm0 = v.prm; a->prm1 = v.prm >> 8; a->prm2 = v.prm >> 16; a->prm3 = v.prm >> 24; }
+}
+static int same(Val a, Val b) { return a.attr == b.attr && a.prm == b.prm && a.type == b.type; }
+
+/* what part k (1 then, 0 else) of s writes from d + o to d + e; 0: an instruction that does not qualify */
+static int parse_part(Site* s, const unsigned char* d, unsigned int o, unsigned int e, int k)
+{
+    while (o < e) {
+        const unsigned char* p = d + o;
+        int len = coop_insn_len_raw(p), kind, ix, j;
+        Val v = { 0, 0, 0 };
+        if (len <= 0 || o + len > e) return 0;
+        switch (p[0]) {
+        case 5:   /* Set rm_flg bit: set (0) or clear (1) */
+            if (p[1] != 4 || (p[2] | p[3] << 8) > 31 || p[5] > 1) return 0;
+            kind = W_RM; ix = p[2]; v.attr = !p[5];
+            break;
+        case 11: case 12:   /* EtcAtariSet, FlrAtariSet: on (0) or off */
+            kind = p[0] == 11 ? W_ETC_ON : W_FLR_ON; ix = p[1]; v.attr = !p[2];
+            break;
+        case 37: case 124: {   /* EtcAtariSet2, FlrAtariSet2: type, attr, prm */
+            AtrSet a;
+            coop_atr_set(p, &a);
+            kind = p[0] == 37 ? W_ETC : W_FLR; ix = a.ix;
+            v.attr = a.attr; v.type = a.type; v.prm = a.prm[0] | a.prm[1] << 8 | a.prm[2] << 16 | (unsigned int)a.prm[3] << 24;
+            break;
+        }
+        default: return 0;
+        }
+        if (kind != W_RM && !atr(kind, ix)) return 0;
+        for (j = 0; j < s->n && (s->w[j].kind != kind || s->w[j].ix != ix); j++) {}
+        if (j == s->n) {
+            if (s->n == SITE_W) return 0;
+            s->n++;
+            s->w[j].kind = kind; s->w[j].ix = ix;
+            s->w[j].pre = get(kind, ix);   /* (as before the block: noted at its tests) */
+        }
+        s->w[j].set[k] = 1;
+        s->w[j].val[k] = v;
+        o += len;
+    }
+    return 1;
+}
+
+/* the block's tests hold now */
+static int tests_hold(const Site* s)
+{
+    unsigned char *keep = bhScePtr, *d = (unsigned char*)rom->evtp;
+    unsigned int* sp = G_Sp;
+    int fl = bhIfelFlg, ok = 1;
+    evaluating = 1;
+    for (bhScePtr = d + s->ifel + 2; ok && bhScePtr < d + s->then0;) ok = bhScenarioJmpT[*bhScePtr]() != 0;
+    evaluating = 0;
+    bhScePtr = keep; G_Sp = sp; bhIfelFlg = fl;
+    return ok;
+}
+
+/* scd0's check of `item` at bhScePtr - 2 (pc_unlock_held): its block. IfelCk n at o jumps to o + 2 + n when a
+   test fails (G_Sp - 1): behind its Endif, or into the else part behind an ElseCk m, which ends m further */
+static void note_site(int item)
+{
+    unsigned char* d = (unsigned char*)rom->evtp;
+    unsigned int q = (unsigned int)(bhScePtr - 2 - d), f = (unsigned int)((unsigned char*)(G_Sp - 1) - d), o, p;
+    Site* s = &site[nsite];
+    int i;
+    if (nsite == SITES || f <= q + 2 || f - q > 0x200) return;
+    for (i = 0; i < nsite; i++)
+        if (site[i].ifel < q && site[i].then0 > q) return;   /* (the block's second check) */
+    for (o = q; o >= 2 && o + 64 > q; o--) {   /* its IfelCk: tests only from there to the check */
+        if (d[o - 2] != 1 || o + d[o - 1] != f) continue;
+        for (p = o; p < q && coop_op_cond(d[p]) && coop_insn_len_raw(d + p) > 0; p += coop_insn_len_raw(d + p)) {}
+        if (p == q) break;
+    }
+    if (o < 2 || o + 64 <= q) return;
+    memset(s, 0, sizeof(*s));
+    s->ifel = o - 2;
+    for (p = q; coop_op_cond(d[p]) && coop_insn_len_raw(d + p) > 0; p += coop_insn_len_raw(d + p)) {}
+    s->then0 = p;
+    if (d[f - 2] == 2) { s->els = f; s->end = f - 2 + d[f - 1]; }
+    else if (d[f - 2] == 3 && !d[f - 1]) s->end = f;
+    else return;
+    if (s->then0 > f - 2 || !parse_part(s, d, s->then0, f - 2, 1) || (s->els && !parse_part(s, d, s->els, s->end, 0))) {
+        host_log("unlock: %d/%d entry script block %04x (item %d) does more than set records: not switched in the room\n",
+                 sys->stg_no, sys->rom_no, s->ifel, item);
+        return;
+    }
+    s->part = tests_hold(s);
+    nsite++;
+}
+
+/* event.c bhInitEvent: a room's entry script is about to run */
+void pc_unlock_room(void)
+{
+    nsite = 0;
+    recording = 1;
+    unlock_applied = g_cheat.unlock;
+}
+
+/* at the hand-off: the cheat was switched in this room */
+static void unlock_switch(void)
+{
+    int i, j, want;
+    if (g_cheat.unlock == unlock_applied || recording) return;
+    if (!sys->tk_flg || !(sys->sp_flg & 0x2) || (sys->cb_flg & 0x1) || (sys->gm_flg & 0x9) || !rom || !rom->evtp) return;   /* in a room, not leaving it */
+    unlock_applied = g_cheat.unlock;
+    for (i = 0; i < nsite; i++) {
+        Site* s = &site[i];
+        if (s->part < 0 || (want = tests_hold(s)) == s->part) continue;
+        for (j = 0; j < s->n && (!s->w[j].set[s->part] || same(get(s->w[j].kind, s->w[j].ix), s->w[j].val[s->part])); j++) {}
+        if (j < s->n) {
+            host_log("unlock: %d/%d entry script block %04x changed since: left as it is\n", sys->stg_no, sys->rom_no, s->ifel);
+            s->part = -1;
+            continue;
+        }
+        for (j = 0; j < s->n; j++)
+            if (s->w[j].set[want]) put(s->w[j].kind, s->w[j].ix, s->w[j].val[want]);
+            else if (s->w[j].set[s->part]) put(s->w[j].kind, s->w[j].ix, s->w[j].pre);
+        host_log("unlock: %d/%d entry script block %04x now takes its %s part\n", sys->stg_no, sys->rom_no, s->ifel, want ? "then" : "else");
+        s->part = want;
+    }
+}
+
+static int unlock_item, unlock_sb, unlock_live, unlock_hit;
 int pc_unlock_examine(void)
 {
     static unsigned char turn;   /* a spot for several items (the proofs, the jewels): each press the next */
@@ -112,11 +281,30 @@ int pc_unlock_examine(void)
     return 1;
 }
 
+/* event.c bhUseItemCheck, bhCmpB: a script tests the item used (sb_id) and it is ours. It is taken when the
+   rest of that test holds too (the tests after it: the item screen is up, a floor, a flag). What else the
+   frame's scripts change says nothing: many change flags every frame. */
+void pc_unlock_item_tested(void)
+{
+    unsigned char* keep = bhScePtr;
+    int ok = 1;
+    if (!unlock_live || evaluating || sys->sb_id != unlock_item) return;
+    evaluating = 1;
+    while (ok && coop_op_cond(*bhScePtr)) {
+        unsigned char op = *bhScePtr;
+        if (op == 4 || op == 6 || op == 7 || op == 16 || op == 17) ok = bhScenarioJmpT[op]() != 0;   /* Ck CmpB CmpW UseItemCheck PlItemCheck */
+        else if (coop_insn_len_raw(bhScePtr) > 0) bhScePtr += coop_insn_len_raw(bhScePtr);   /* (others, e.g. RandTest, not run twice: as holding) */
+        else break;
+    }
+    evaluating = 0;
+    bhScePtr = keep;
+    unlock_hit |= ok;
+}
+
 void pc_unlock_scd1(int after)
 {
-    static struct { unsigned int st, cb, rm, sp, ev[32], ky[16]; unsigned char task[16]; } was, now;
     static int st8;
-    int taken;
+    recording = 0;   /* (the entry script is done) */
     if (!unlock_item) return;
     if (!after) {   /* the frame after the item screen's Use */
         unlock_sb = sys->sb_id;
@@ -124,18 +312,16 @@ void pc_unlock_scd1(int after)
         sys->cb_flg |= 0x400;
         st8 = !(sys->st_flg & 0x8);
         sys->st_flg |= 0x8;
+        unlock_live = 1;
+        unlock_hit = 0;
+        return;
     }
-    now.st = sys->st_flg; now.cb = sys->cb_flg; now.rm = sys->rm_flg; now.sp = sys->sp_flg;
-    memcpy(now.ev, sys->ev_flg, sizeof(now.ev));
-    memcpy(now.ky, sys->ky_flg, sizeof(now.ky));
-    for (int i = 0; i < 16; i++) now.task[i] = bhEtask[i].status;
-    if (!after) { was = now; return; }
-    taken = memcmp(&was, &now, sizeof(now)) != 0;
+    unlock_live = 0;
     if (st8) sys->st_flg &= ~0x8;
     sys->cb_flg &= ~0x400;   /* StatusMain clears it on its next frame */
-    printf("unlock: item %d used in %d/%d, %s\n", unlock_item, sys->stg_no, sys->rom_no, taken ? "taken" : "nothing reacts");
+    host_log("unlock: item %d used in %d/%d, %s\n", unlock_item, sys->stg_no, sys->rom_no, unlock_hit ? "taken" : "nothing reacts");
     unlock_item = 0;
-    if (!taken) {   /* nothing here wants it: the press examines */
+    if (!unlock_hit) {   /* nothing here wants it: the press examines */
         sys->sb_id = unlock_sb;
         if (plp == &ply) bhCheckExmAtari(plp);
     }
@@ -187,7 +373,7 @@ static int warp_sound, warp_bgm, warp_vol, warp_bgse[2];
 
 void cheat_warp_sound(int after)
 {
-    int i;
+    int i, r;
     if (!warp_sound) return;
     if (!after) {
         warp_bgm = CurrentBgmNo; warp_vol = CurrentBgmVolume;
@@ -196,12 +382,16 @@ void cheat_warp_sound(int after)
         return;
     }
     warp_sound = 0;
-    if ((ReqFadeBgmNo & 0x8) && CurrentBgmNo == warp_bgm) ReqFadeBgmNo = CurrentBgmVolume != warp_vol ? 0x2 : 0;   /* as PlayBgm2 */
-    else if (CurrentBgmNo < 0 && warp_bgm >= 0 && AdxPlayFlag[0]) StopBgm(400);
+    if ((r = pc_warp_bgm(ReqFadeBgmNo, CurrentBgmNo, CurrentBgmVolume, warp_bgm, warp_vol, AdxPlayFlag[0] != 0)) < 0) StopBgm(400);
+    else ReqFadeBgmNo = r;
     for (i = 0; i < 2; i++)
-        if ((ReqFadeBgSe[i] & 0x2) && CurrentBgSeNo[i] == warp_bgse[i]) ReqFadeBgSe[i] = 0;   /* as CallBackGroundSe2 */
-        else if (CurrentBgSeNo[i] < 0 && warp_bgse[i] >= 0) StopBackGroundSeEx(i, 400);
+        if ((r = pc_warp_bgse(ReqFadeBgSe[i], CurrentBgSeNo[i], warp_bgse[i])) < 0) StopBackGroundSeEx(i, 400);
+        else ReqFadeBgSe[i] = r;
 }
+
+/* a warp that never reached its room's entry script (the game ended in the transition: game over, the
+   title, a co-op session closing) must not make the next ordinary door take the warp's music rule */
+void cheat_game_exit(void) { warp_sound = 0; nsite = recording = 0; }
 
 /* the game's own door transition (door type 255: no animation), for the teleport, the co-op
    follow and test aids. An enemy grab plays the player on the enemy's motion set (en01sub.c);
@@ -236,7 +426,8 @@ static void teleport(int stg, int rom, int pos)
    RECVX_WARP="stage:room:frame:x:z:angle,..." puts the player at x/z facing `angle` once it has
    been `frame` game frames in that room (independent of how the room was reached, e.g. a
    co-op join).
-   RECVX_INF_AMMO=1 turns the infinite ammo cheat on, RECVX_UNLOCK=1 "Unlock all"; RECVX_NOCLIP="frame:mode,..." sets the
+   RECVX_INF_AMMO=1 turns the infinite ammo cheat on, RECVX_UNLOCK=1 "Unlock all" (RECVX_UNLOCK="frame:0/1,..." switches
+   it at those game frames); RECVX_NOCLIP="frame:mode,..." sets the
    noclip mode (0/1/2) at that game frame; it also logs the position every 15 game frames and any jump
    of more than 2 units in one tick ("test: JUMP").
    RECVX_EFFECT="frame:effno:type:mode1" spawns effect effno at the player at that game frame
@@ -251,7 +442,7 @@ static void teleport(int stg, int rom, int pos)
    scripts: 1 ev_flg, 2 ky_flg, 3 ed_flg, 7 it_flg, 8 mp_flg; e.g. "1:183,1:184"). */
 static void scripted(unsigned int* inv)
 {
-    static const char *tp = (const char*)-1, *eq, *wp, *ef, *nc, *ap;
+    static const char *tp = (const char*)-1, *eq, *wp, *ef, *nc, *ap, *ul;
     static int ef_slot = -1, ef_frame, nclog;
     float x, z;
     static int last, clock, prev, room, in_room;
@@ -259,7 +450,8 @@ static void scripted(unsigned int* inv)
     if (tp == (const char*)-1) {
         tp = getenv("RECVX_TELEPORT"); eq = getenv("RECVX_EQUIP"); wp = getenv("RECVX_WARP"); ef = getenv("RECVX_EFFECT");
         if (getenv("RECVX_INF_AMMO")) g_cheat.inf_ammo = 1;
-        if (getenv("RECVX_UNLOCK")) g_cheat.unlock = 1;
+        ul = getenv("RECVX_UNLOCK");
+        if (ul && !strchr(ul, ':')) { g_cheat.unlock = atoi(ul) != 0; ul = NULL; }
         nc = getenv("RECVX_NOCLIP");
         nclog = nc != NULL;
         ap = getenv("RECVX_APPEAR");
@@ -393,6 +585,11 @@ static void scripted(unsigned int* inv)
             hp = hp[n] == ',' ? hp + n + 1 : NULL;
         }
     }
+    if (ul && sscanf(ul, "%d:%d%n", &f, &a, &n) == 2 && clock >= f) {
+        printf("test: unlock all %d at game frame %d in %d/%d\n", a, clock, sys->stg_no, sys->rom_no);
+        g_cheat.unlock = a != 0;
+        ul = ul[n] == ',' ? ul + n + 1 : NULL;
+    }
     if (ap && sscanf(ap, "%d:%d%n", &f, &a, &n) == 2 && clock >= f) {
         printf("test: appear as %d at game frame %d\n", a, clock);
         g_coop.chr = a;
@@ -457,6 +654,7 @@ void cheat_frame(void)
     if (sys->mes_ip) read_names();
     item_trace(inv);
     if (sys->tk_flg && (sys->sp_flg & 0x2)) scripted(inv);   /* in game */
+    unlock_switch();
 
     g_cheat.hp = plp->hp;
     g_cheat.stg = sys->stg_no; g_cheat.rom = sys->rom_no; g_cheat.pos = sys->pos_no;

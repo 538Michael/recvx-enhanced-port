@@ -17,6 +17,36 @@ typedef struct {
 #define NATIVE_43_X0 1728.0f   /* the 4:3 screen (the PS2's 640-wide display), GS x */
 #define NATIVE_43_X1 2368.0f
 
+/* a + (b - a) * k for every attribute (all linear in view space) */
+static inline NativeVertex native_lerp(const NativeVertex* a, const NativeVertex* b, float k)
+{
+    NativeVertex o = *b;
+    const float* fa = &a->x; const float* fb = &b->x; float* fo = &o.x;
+    for (int i = 0; i < 9; i++) fo[i] = fa[i] + (fb[i] - fa[i]) * k;   /* x y z w s t fog near_d far_d */
+    o.r = (uint8_t)(a->r + (b->r - a->r) * k + 0.5f); o.g = (uint8_t)(a->g + (b->g - a->g) * k + 0.5f);
+    o.b = (uint8_t)(a->b + (b->b - a->b) * k + 0.5f); o.a = (uint8_t)(a->a + (b->a - a->a) * k + 0.5f);
+    return o;
+}
+
+/* distance to plane 0 near (near_d >= 0), 1 far (far_d >= 0), 2 left of the 4:3 screen, 3 right of it */
+static inline float native_plane_d(const NativeVertex* v, int plane)
+{
+    return plane == 0 ? v->near_d : plane == 1 ? v->far_d : plane == 2 ? NATIVE_43_X0 * v->w - v->x : v->x - NATIVE_43_X1 * v->w;
+}
+
+/* clip a polygon against native_plane_d >= 0; returns the count */
+static inline int native_clip_plane(const NativeVertex* in, int n, NativeVertex* out, int plane)
+{
+    int m = 0;
+    for (int i = 0; i < n; i++) {
+        const NativeVertex *a = &in[i], *b = &in[(i + 1) % n];
+        float da = native_plane_d(a, plane), db = native_plane_d(b, plane);
+        if (da >= 0) out[m++] = *a;
+        if ((da >= 0) != (db >= 0)) out[m++] = native_lerp(a, b, da / (da - db));
+    }
+    return m;
+}
+
 /* game thread: triangles with GS PRIM bits (type 3 list, 4 strip, 5 fan; TME/FGE/ABE/IIP/
    FST/CTXT); see NativeVertex.cull */
 void native_strip(unsigned int prim, const NativeVertex* v, int n);
