@@ -152,11 +152,15 @@ lists, authored for 4:3). In widescreen such a part is drawn anyway, but only in
 (`ps2_NinjaCnk.c pc_show_hidden` -> `view_glue.c pc_margin_part` -> `pc_margin_next`): its
 triangles carry `NativeVertex.cull` bit 2 and `stream.c native_draw` cuts them to the parts
 left and right of the 4:3 screen (GS x 1728..2368), so the 4:3 picture stays exactly the
-original, also for parts that reach across its edge. Parts that would cover the view are left
-out: those whose bounding sphere reaches the camera or the line from the camera to the player
-(the walls a cut looks through), and parts nearer than the player with a vertex inside the 4:3
-view (they would end in a straight edge at its border; `native_glue.c pc_margin_reaches_43`,
-checked after the model's vertex chunk). Without the native 3D renderer a hidden part is
+original, also for parts that reach across its edge. Parts that would cover the player or end
+in a straight edge at the 4:3 border are left out (`native_glue.c pc_margin_reaches_43`, checked
+on the model's vertices after its vertex chunk): a part whose bounding sphere reaches the camera
+or the line from the camera to the player (a wall the cut looks through, or one running past
+the camera) unless all its vertices lie on one side of the 4:3 view widened to take in the
+player, so that their hull misses it at every depth (the courtyard walls running from the
+camera's corner, 0/3 and 0/10, were missing at 32:9), and other parts nearer than the player
+with a vertex inside the 4:3 view. A part next to the camera can so cover some of a margin, as
+a wider lens would show it. Without the native 3D renderer a hidden part is
 only drawn when its bounding sphere lies entirely outside the 4:3 view and away from the
 camera. "Cull off-screen models" (`model_cull`) is unrelated: it only skips actors and objects
 whose test points are off the (widened) screen. Full-width scissors, fills and render-target

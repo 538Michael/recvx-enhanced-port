@@ -122,8 +122,8 @@ void  pc_menu_clip(int on);
 void  pc_mesh_begin(const void* model);
 void  pc_mesh_end(void);
 void  pc_mesh_strip(const void* strip);   /* within a mesh: the following output is this strip */
-void  pc_margin_next(int front);   /* the next mesh is drawn only outside the 4:3 screen (native 3D, hor+); front: nearer than the player */
-int   pc_margin_reaches_43(const struct VU1_STRIP_BUF* v, int n);   /* such a front mesh reaches into the 4:3 screen: left out */
+void  pc_margin_next(int mode);   /* the next mesh is drawn only outside the 4:3 screen (native 3D, hor+); mode: view_glue.c pc_margin_mesh */
+int   pc_margin_reaches_43(const struct VU1_STRIP_BUF* v, int n);   /* such a mesh would cover the view (native_glue.c): left out */
 void  pc_effect_tag(const void* op);      /* effect.c: the following output is this effect (O_WRK*, NULL: none) */
 unsigned long long pc_effect_poly(void); /* ps2_dummy.c Ps2AddOT: STREAM_TAG_REG value for an effect polygon (0: none) */
 /* online co-op (pc/glue/coop_glue.c, docs/COOP.md): the hooks are only called while coop_on */
