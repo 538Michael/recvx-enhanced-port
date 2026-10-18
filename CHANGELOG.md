@@ -34,6 +34,10 @@
 
 ### Fixes
 
+- **Mouse stuck after a puzzle**: backing out of a puzzle that asks you to pick a button or a
+  number (the switch panel in the Gold Luger room, the dial in the Palace office, the door keypad
+  at the bio-lab) left the mouse cursor showing, and in third person the camera would not turn
+  until you left the room. The mouse now goes back to the camera as soon as you have control again.
 - **Stuck after Alexia's flames**: after being set on fire by Alexia's first form, your character
   could freeze in the next hit, aim or step and never get control back. Also with "You appear as",
   the body no longer jumps to a wrong pose for a moment when an enemy grabs or burns you.

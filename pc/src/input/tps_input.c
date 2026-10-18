@@ -43,6 +43,8 @@ void tps_update_mouse_mode(void* window, int overlay_open)
     if (!want) __atomic_store_n(&buttons, 0, __ATOMIC_RELAXED);
 }
 
+int tps_mouse_captured(void) { return relative; }
+
 /* Test automation: RECVX_TPS_MOUSE="<frame>:<dx>:<dy>,..." moves the mouse by dx/dy pixels
    per game frame from that presented frame until the next entry. */
 uint64_t gs_frame_count(void);
