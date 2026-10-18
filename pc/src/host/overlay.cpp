@@ -683,12 +683,12 @@ static void name_tag(void)
     dl->AddText(font, bs, ImVec2(tx, ty), IM_COL32(255, 255, 255, 230), name);
 }
 
-/* the title screen's way into co-op: a hint, and what the session waits for */
+/* the title screen: what a co-op session started from F3 waits for (no hint without one: the menu has MULTIPLAYER) */
 static const char* lobby_hint(void)
 {
     if (!cs.at_title || coop_visible || cs.lobby) return nullptr;
     switch (cs.state) {
-    case COOP_OFF: return "Online co-op: MULTIPLAYER in the menu, or F3";
+    case COOP_OFF: return nullptr;
     case COOP_HOSTING: return "Co-op: hosting - choose New Game or Load Game; your partner joins it (F3)";
     case COOP_CONNECTED: return "Co-op: connected - the host starts or loads a game, the client joins it (F3)";
     default: return "Co-op: waiting for the host (F3)";
