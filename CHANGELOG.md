@@ -7,6 +7,16 @@
 - **Adjusted dual weapons in over-the-shoulder**: with dual weapons one gun now always shoots
   where you are aiming, and the other aims at nearby enemies up to 45 degrees away.
 
+### Fixes
+
+- **Stuck after a moth or Black Widow grabbed you**: when a giant moth or a Black Widow caught
+  you in a room with enemies from the enemy spawner, "Extra enemies" or the enemy randomizer, the
+  attack never played and you could no longer move. The grab now plays out and you get control
+  back. Playing someone other than Claire, a moth's attack crashed the game when it laid its egg
+  on you; such a moth now lays none, as the egg only exists for Claire.
+- **Crash when spawning an enemy in the moth corridor**: using the enemy spawner in the Antarctic
+  base corridor with the moth nest crashed the game. It now works there.
+
 ## 0.6.1 (2026-10-18)
 
 ### Co-op
