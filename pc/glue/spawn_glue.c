@@ -376,7 +376,7 @@ const char* spawn_at(const ActorModel* am, const SpawnNote* n, int want, int mod
     sound_load(am);
     fx_load(am, rec.type);
     spawned[slot] = am->id + 1;
-    pc_enemy_added = 1;
+    pc_enemy_mark_added();
     if (slot_out) *slot_out = slot;
     host_log("spawn: %s, type %d model %d variant %d from RM_%04d record %d, slot %d at %.1f %.1f %.1f, %d textures uploaded, "
              "%s (model %d KB, motions %d KB), %d KB room memory and %d KB spawn memory left, %d slots in use\n", am->name, am->id, am->mdlver, rec.type, am->room,
