@@ -32,6 +32,13 @@
   camera-relative controls. Classic tank controls are one setting away (CONTROLS); an existing
   settings file keeps your choice.
 
+### Performance
+
+- **Smoother rendering**: the game's constant texture switches cost much less time per frame, in
+  every room, fight, menu and cutscene, which leaves more headroom for high frame rates.
+- **No hitch when a game starts**: the short freeze when going from the title into the game is
+  gone.
+
 ### Fixes
 
 - **Mouse stuck after a puzzle**: backing out of a puzzle that asks you to pick a button or a

@@ -229,6 +229,11 @@ add_test(NAME modern COMMAND test_modern)
 # every recvx.ini key has a row in the settings table (F1 and OPTION > ENHANCED SETTINGS) or is listed
 add_test(NAME settings COMMAND ${CMAKE_COMMAND} -DSRC=${CMAKE_CURRENT_SOURCE_DIR} -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_settings.cmake)
 
+# native texture queue (pc/src/gs/textures.c): superseded uploads never written, the rest only when read
+add_executable(test_ntex tests/test_ntex.c src/gs/textures.c)
+target_compile_options(test_ntex PRIVATE -std=gnu11)
+add_test(NAME ntex COMMAND test_ntex)
+
 # "You appear as" list (pc/src/host/actors.c): event doubles hidden, indices kept
 add_executable(test_appear tests/test_appear.c src/host/actors.c)
 add_test(NAME appear COMMAND test_appear)
