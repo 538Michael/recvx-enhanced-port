@@ -23,6 +23,7 @@ void pc_view_changed(void)
 /* enhanced frame interpolation: tags for the renderer (gs/stream.c) */
 #include "../../decomp/include/ps2/veronica/prog/main.h"
 #include "../src/gs/stream.h"
+#include "pc_rules.h"
 #include <string.h>
 
 uint32_t pc_cur_mesh, pc_cur_strip;   /* identity of what is being drawn (native_glue.c) */
@@ -78,14 +79,44 @@ int pc_is_room_object(const void* obj)
    only if it lies entirely beside the 4:3 view and the player, like the walls running from the
    camera's corner of a courtyard (0/3, 0/10). Other parts in front of the player (2) are left
    out when a vertex lies inside the 4:3 view. Without the native renderer, only a part
-   entirely outside the 4:3 view. Called with the part's model matrix current. */
+   entirely outside the 4:3 view. Called with the part's model matrix current.
+   A part left out takes along the hidden parts below it that lie in its box (pc_rules.h
+   pc_margin_inside; ps2_NinjaCnk.c -> pc_margin_children): the dolls on the shelves of Alexia's
+   cabinet (2/5, cut 1) stood in the margin in front of an empty frame when the cabinet, which
+   reaches the camera and into the 4:3 view, was left out. */
+static const void* margin_obj;   /* the last part tested */
+int pc_margin_out;               /* it was left out (also native_glue.c pc_margin_reaches_43) */
+float pc_margin_box[6];          /* its view-space box, of its vertices (native_glue.c; none without the native renderer) */
+static float margin_group[32][6];   /* the boxes of the left-out parts whose children are being drawn */
+static int margin_groups;
+static int margin_part(const void* obj);
 int pc_margin_part(const void* obj)
+{
+    int shown = margin_part(obj);
+    margin_obj = obj;
+    pc_margin_out = !shown;
+    return shown;
+}
+/* njCnkEasy*DrawObject, before the children of the node obj: the number of
+   groups to restore after them (pc_margin_children_end) */
+int pc_margin_children(const void* obj)
+{
+    int n = margin_groups;
+    if (obj == margin_obj && pc_margin_out && n < 32) memcpy(margin_group[margin_groups++], pc_margin_box, sizeof(pc_margin_box));
+    margin_obj = NULL;
+    return n;
+}
+void pc_margin_children_end(int n) { margin_groups = n; }
+static int margin_part(const void* obj)
 {
     const NJS_CNK_MODEL* m = ((const NJS_CNK_OBJECT*)obj)->model;
     NJS_POINT3 ctr = m->center, c, pw, p;
     float z, r, sx, half, t, pl, dx, dy, dz;
+    pc_margin_box[0] = 1; pc_margin_box[3] = 0;   /* none (without the native renderer there are no vertices) */
     if (m->r <= 0) return 0;
     njCalcPoint(NULL, &ctr, &c);
+    for (int i = 0; i < margin_groups; i++)
+        if (pc_margin_inside(&c.x, m->r, margin_group[i])) return 0;
     if (pc_native_3d()) {
         pw.x = plp->px; pw.y = plp->py; pw.z = plp->pz;
         njCalcPoint(cam.mtx, &pw, &p);

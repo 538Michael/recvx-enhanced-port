@@ -160,7 +160,12 @@ the camera) unless all its vertices lie on one side of the 4:3 view widened to t
 player, so that their hull misses it at every depth (the courtyard walls running from the
 camera's corner, 0/3 and 0/10, were missing at 32:9), and other parts nearer than the player
 with a vertex inside the 4:3 view. A part next to the camera can so cover some of a margin, as
-a wider lens would show it. Without the native 3D renderer a hidden part is
+a wider lens would show it. A part left out takes along the hidden parts below it in the room's
+tree whose bounding sphere lies inside its box (of its vertices in view space; `ps2_NinjaCnk.c`
+`njCnkEasy*DrawObject` -> `view_glue.c pc_margin_children`, `pc_rules.h pc_margin_inside`): what
+it holds, so the dolls on the shelves of Alexia's cabinet (2/5, second cut) no longer stand in
+the margin in front of an empty frame. Trees also group parts that only stand beside each other
+(a flower pot under a terrace part in 1/0, pillars along a wall in 1/7); those stay. Without the native 3D renderer a hidden part is
 only drawn when its bounding sphere lies entirely outside the 4:3 view and away from the
 camera. "Cull off-screen models" (`model_cull`) is unrelated: it only skips actors and objects
 whose test points are off the (widened) screen. Full-width scissors, fills and render-target

@@ -26,6 +26,9 @@
 - **Underwater look in the submarine dock**: in over-the-shoulder the screen still waved and
   stretched as if seen from underwater, because some fixed cameras there look in from the water.
   Over-the-shoulder now shows the dock clearly; the fixed cameras keep the underwater look.
+- **Floating dolls in Alexia's room (widescreen)**: from the camera by the doll cabinet, the
+  dolls stood in mid-air at the side of the picture, without the shelves they sit on. They now
+  stay hidden together with their shelves, as in 4:3.
 
 ## 0.6.2 (2026-10-18)
 

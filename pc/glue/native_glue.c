@@ -64,7 +64,12 @@ static void clip_sprite(NativeRawVertex* a, NativeRawVertex* b, int tme)
    n vertices (the model's vertex buffer after its vertex chunk) in view space (pc_rules.h) */
 int pc_margin_reaches_43(const VU1_STRIP_BUF* v, int n)
 {
-    return pc_margin_rule(pc_margin_mesh, v, n, fVu1AspectW * fVu1Projection, fVu1OffsetX, _fNaViwClipNear, pc_margin_player);
+    extern int pc_margin_out;        /* view_glue.c: what lies in its box goes with it */
+    extern float pc_margin_box[6];
+    if (!pc_margin_rule(pc_margin_mesh, v, n, fVu1AspectW * fVu1Projection, fVu1OffsetX, _fNaViwClipNear, pc_margin_player)) return 0;
+    pc_margin_out = 1;
+    pc_margin_bounds(v, n, pc_margin_box);
+    return 1;
 }
 
 static float clamp01(float v) { return v < 0.0f ? 0.0f : v > 1.0f ? 1.0f : v; }
