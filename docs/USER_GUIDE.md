@@ -430,7 +430,7 @@ The F2 window (also the EXTRAS page of ENHANCED SETTINGS) is meant for testing a
 
 - infinite health, heal now, infinite ammo;
 - noclip: Through walls, or Walls + fly (fly with the noclip keys, or R2/L2);
-- unlock all: locks act as if you carried their key, without it entering your inventory.
+- unlock all: locks act as if you carried their key, without it entering your inventory. Switching it on or off takes effect at once, also in the room you are in.
   Examining a locked door, a card reader or the spot where an emblem, plate or jewel goes uses
   the key there, as the item screen's Use would (or the game asks "Will you use ...?" as it does
   when you carry the key); a spot already done is examined as usual. Turned on inside a room,

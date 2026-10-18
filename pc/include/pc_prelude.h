@@ -101,11 +101,12 @@ extern void* pc_plp_set;
 int   pc_inf_ammo(void);      /* F2 cheat (pc/glue/cheat_glue.c): bhCheckBullet/bhCountBullet as for an unlimited weapon */
 /* F2 cheat "Unlock all" (pc/glue/cheat_glue.c): bhPlItemCheck passes for a key at its lock; bhControlPlayer's examine
    press in a key's use spot (1: taken) and bhControlEvent around scd1 (0 before, 1 after) use the key there;
-   bhUseItemCheck / bhCmpB found the key used tested */
+   bhUseItemCheck / bhCmpB found the key used tested; bhInitEvent: a room's entry script is about to run */
 int   pc_unlock_held(int item);
 int   pc_unlock_examine(void);
 void  pc_unlock_scd1(int after);
 void  pc_unlock_item_tested(void);
+void  pc_unlock_room(void);
 void  cheat_game_exit(void);   /* system.c bhExitGame: the game ends (continue, title, load); cheat state of that game goes */
 float pc_fog_scale(void);              /* option: njCalcFogPower's fog density x this (ps2_NaFog.c), 1 = original */
 int   pc_movie_zoom(void);               /* option: movies zoomed until their letterbox bars leave the screen */
