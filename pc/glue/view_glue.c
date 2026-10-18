@@ -101,6 +101,39 @@ int pc_margin_part(const void* obj)
     return sx - r > half || sx + r < -half;
 }
 
+/* The bounding-sphere test of njCnkDrawModelLocal (ps2_NinjaCnk.c) with the third-person camera
+   or in hor+: -1 culled, 1 drawn, 0 the original test (4:3 with a fixed camera). The original
+   compares the sphere's screen radius on the view axis (r * dist / z) with the screen edge, but
+   away from the axis a sphere's outline reaches further, by sqrt(1 + tan^2) of the angle: at the
+   edges of the wide 21:9 and 32:9 views, large room parts near the camera were culled while they
+   still reached into the picture. Here the sphere is tested against the view's side, top and
+   bottom planes, widened by PC_CULL_MARGIN of the half width and height (the same share of the
+   view in every aspect). The margin covers the models whose sphere does not hold all of them
+   (some effects near the camera, 0/3 and 1/2) and parts entering the view while the camera
+   turns, which are then already in the frame the in-between images blend from. With a fixed
+   camera, a part only this test draws (the original culls it, so it is outside the 4:3 view as
+   the original sees it) is drawn only in the margins (pc_margin_mesh, as pc_margin_part), so the
+   4:3 picture stays the original; without the native renderer it stays culled. Called with the
+   model's matrix current. */
+#define PC_CULL_MARGIN 1.5f
+int pc_model_clip(const void* center, float r)
+{
+    extern float fNaViwHalfW, fNaViwHalfH, fNaViwAspectW, fNaViwAspectH;
+    const NJS_POINT3* c = (const NJS_POINT3*)center;
+    float tx, ty, z;
+    if (!tps_cam_active && pc_hor_scale() <= 1.0f) return 0;
+    tx = fNaViwHalfW / (fNaViwAspectW * _nj_screen_.dist) * PC_CULL_MARGIN;   /* tan of the half angles */
+    ty = fNaViwHalfH / (fNaViwAspectH * _nj_screen_.dist) * PC_CULL_MARGIN;
+    if (fabsf(c->x) - tx * c->z > r * sqrtf(1.0f + tx * tx) || fabsf(c->y) - ty * c->z > r * sqrtf(1.0f + ty * ty)) return -1;
+    if (tps_cam_active) return 1;
+    z = fabsf(_nj_screen_.dist / c->z);   /* the original test */
+    if (fabsf(c->x * z) - r * z * fNaViwAspectW > fNaViwHalfW || fabsf(c->y * z) - r * z * fNaViwAspectH > fNaViwHalfH) {
+        if (!pc_native_3d()) return -1;
+        if (!pc_margin_mesh) pc_margin_mesh = 1;
+    }
+    return 1;
+}
+
 /* Frames of different scenes or camera cuts are never blended. Taken when the frame's first mesh
    is drawn (else at its end), which is the cut the picture shows: game.c bhCheckCut changes the
    cut after drawing, so at the frame's end it is the next frame's. The scene: stage, room and,

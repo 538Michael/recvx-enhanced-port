@@ -49,6 +49,12 @@
 
 ### Fixes
 
+- **Room parts popping at the screen edges**: in third person and with the fixed cameras in
+  widescreen, walls, floors and props near the left and right edges could vanish and pop back
+  while the camera turned, most visibly on ultrawide screens (in the prison courtyard the
+  building beside the door to the right of the big gate was cut off). They now stay in the
+  picture until they have really left it. The middle of the fixed cameras' picture stays as
+  the original.
 - **Mouse stuck after a puzzle**: backing out of a puzzle that asks you to pick a button or a
   number (the switch panel in the Gold Luger room, the dial in the Palace office, the door keypad
   at the bio-lab) left the mouse cursor showing, and in third person the camera would not turn

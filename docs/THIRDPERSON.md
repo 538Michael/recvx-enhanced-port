@@ -185,7 +185,11 @@ unit (the character is about 17 units tall).
 * Third person draws every room part while its camera is active (`ps2_NinjaCnk.c
   pc_show_hidden`), except nodes without a model: they carry the hide flag for good (`bhSetCut`
   only changes it on nodes with a model; rooms 6/8, 7/25, 9/8 and 9/17 have such nodes). Room records with `flg 0x40000000` (drawn only in the cuts in `hide[0..3]`)
-  are drawn too (`objitm.c`). Model culling uses the active view.
+  are drawn too (`objitm.c`). Model culling uses the active view: the bounding-sphere test of
+  chunk models (`njCnkDrawModelLocal`) is `view_glue.c pc_model_clip`, the sphere against the
+  view's planes with a margin of half the view's half width and height, so room parts do not
+  pop at the screen edges while turning (the original test ignores how far an off-axis
+  sphere's outline reaches; see ARCHITECTURE.md "Widescreen").
 * Rooms are modelled for their camera angles: from elsewhere some walls are missing, single-sided
   or untextured. The camera is kept inside the collision walls (`bhCheckL2Wall`): the shoulder
   point is pulled in sideways if it is in a wall, the eye slides forward along the view ray in
