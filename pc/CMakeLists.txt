@@ -175,6 +175,7 @@ endif()
 if(WIN32)
     enable_language(RC)
     set(RECVX_RES res/recvx.rc)   # the program icon
+    set_source_files_properties(res/recvx.rc PROPERTIES OBJECT_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/res/recvx-enhanced.ico)
 endif()
 add_executable(recvx ${LAYOUT_PAD_SRC} ${RECVX_RES} $<TARGET_OBJECTS:recvx_game> $<TARGET_OBJECTS:recvx_platform>
                $<$<TARGET_EXISTS:glibc_compat>:$<TARGET_OBJECTS:glibc_compat>>)
