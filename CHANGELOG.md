@@ -31,6 +31,10 @@
 - **Modern fixed-camera controls by default**: on a first start the fixed cameras use the modern,
   camera-relative controls. Classic tank controls are one setting away (CONTROLS); an existing
   settings file keeps your choice.
+- **Mouse aiming through the scope**: in third person the sniper rifle's and the linear
+  launcher's scope (Nosferatu, the final battle) now turns with the mouse, smoothly and slower
+  while zoomed in, and the left mouse button fires. Hold Shift to zoom in. The gamepad and the
+  fixed cameras work as before.
 
 ### Performance
 

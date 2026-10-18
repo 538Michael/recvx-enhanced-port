@@ -16,7 +16,7 @@ a puzzle with mouse support free it until you are back in control).
 |---|---|
 | W / S | walk forward / back (back + Shift = quick turn, as in the original); with "Game auto-aim" also aim up / down while the weapon is raised, as the original's up / down |
 | A / D | turn |
-| Shift | run |
+| Shift | run; in the scope ([Scope](#scope)): zoom in while held |
 | mouse | X turns the character, Y looks up/down |
 | right mouse (hold) | ready weapon; the mouse now aims (camera closer, narrower FOV, crosshair) |
 | left mouse | fire while aiming; otherwise action like E |
@@ -52,6 +52,34 @@ Setting "Mouse/keyboard camera" (THIRD PERSON page, ini `tps_free_camera`):
 
 Doors, events and cutscenes put the camera behind the character again in both. A/B are this
 option's own letters, not the game's KEY CONFIG types.
+
+### Scope
+
+The sniper rifle and the linear launcher aim through the game's own first-person scope
+(`playpch2.c bhCPM2_act_scp`, `mode2` 71, both weapons); our camera is off there
+(`st_flg 0x800000`). The game turns it with the d-pad and the left stick only: `ay`, and `wax`
+within +-45 degrees. The view is `cam.ay = -ay`, `cam.ax = -wax` from the head
+(`cut.c bhSetPlEyeCamera`), and the shot (the rifle's bullet ray, the launcher's beam) leaves
+from the same point along the same angles, so it goes where the scope's centre is.
+
+* **Mouse** (`tps_player` -> `scope_look`, after the mode handler): X turns `ay`, Y pitches `wax`
+  (invert Y as set), straight in game units with the part below one unit kept for the next frame,
+  so it turns smoothly rather than in the stick's steps. Speed: the aiming sensitivity (X / Y
+  times "Aiming sensitivity") scaled by the field of view shown against "Field of view aiming"
+  (`cam.pers`): the scope's 65 degrees turn as third-person aiming does, zoomed in (20 degrees)
+  about a third as fast, and in between while the zoom moves. `wax` is clamped as the game clamps
+  it. During a shot's recoil (`mode3` 3, a second) the game sets `wax` to its base `ct3` plus the
+  kick every frame and ignores the stick; the mouse moves `ct3`, so it keeps aiming under the
+  kick. The scope's first tick still has our camera, whose free aim points the scope at what the
+  crosshair was on (as before).
+* **Zoom**: the game zooms while its "change aim" bit (`0x80`, L1) is held. L1's key is Q, the
+  third-person cancel, so in the scope run (Shift) presses it (`tps_pad`).
+* **Fire, leave, reload**: left mouse fires (the fire row), letting go of aim leaves the scope and
+  our camera comes back behind the direction the scope looked; reload (R) works in the scope
+  ([USER_GUIDE.md](USER_GUIDE.md#reload)).
+* The gamepad works the scope as before (the game's stick and d-pad); the mouse adds to it.
+* With the fixed cameras the scope keeps the original controls: the mouse is captured only in
+  third person, and the fixed cameras have no mouse aim or fire.
 
 ### Gamepad
 
@@ -141,7 +169,7 @@ unit (the character is about 17 units tall).
 |---|---|
 | `RECVX_TPS_MOUSE="frame:dx:dy,..."` | moves the mouse dx/dy counts per game frame from that presented frame on |
 | `RECVX_VPAD="frame:input+input,..."` | a virtual gamepad ([ARCHITECTURE.md](ARCHITECTURE.md)): sticks as `leftx=0.5+lefty=-1` (up is negative), triggers `+lefttrigger`; a trigger after another input needs its own `+` (`+lefttrigger++righttrigger`) |
-| `RECVX_TPS_TRACE=1` | logs the gamepad per frame ("tps: pad": the sticks past their dead zones, the walk direction, facing, camera, quick turn, the enemy nearest the crosshair) and its aim assist ("tps: assist"), the free aim per frame, each shot's direction and wall hit against the crosshair target ("SHOT"), the drawn weapon's barrel with "You appear as", the camera ("tps: cam A\|B": yaw, pitch, the player's position, the model's root, the point followed and the eye), the aim height given to the game; `=2` also keeps the camera on the enemy the game locked on to (the middle of its hit capsule, or `RECVX_TPS_AIM_AT=f` along it: 0 = `c1`, for a zombie the head, 1 = `c2`, its legs) |
+| `RECVX_TPS_TRACE=1` | logs the gamepad per frame ("tps: pad": the sticks past their dead zones, the walk direction, facing, camera, quick turn, the enemy nearest the crosshair) and its aim assist ("tps: assist"), the free aim per frame, each shot's direction and wall hit against the crosshair target ("SHOT"), the drawn weapon's barrel with "You appear as", the camera ("tps: cam A\|B": yaw, pitch, the player's position, the model's root, the point followed and the eye), the aim height given to the game, the scope per frame ("tps: scope": `ay`, `wax`, the field of view, the mouse's turn in game units, the enemy nearest the centre in degrees, the enemies' health); `=2` also keeps the camera on the enemy the game locked on to (the middle of its hit capsule, or `RECVX_TPS_AIM_AT=f` along it: 0 = `c1`, for a zombie the head, 1 = `c2`, its legs) |
 | `RECVX_TPS_ORBIT=degrees` | turns only the view about the player (side views; aim unchanged, camera ignores walls) |
 | `RECVX_ATMOS_TRACE=1` | logs each game frame's cut, the game's fog, lights and filter and what "smooth" shows |
 | `RECVX_EFF_TRACE=1` | logs effects spawned and queued |
@@ -326,7 +354,7 @@ Room ambient and lights 0..3 (muzzle flash, lighter, ...) do not change per cut.
   step so far: for a target a few units from the muzzle (an enemy stepping into the crosshair) each
   step moved the muzzle as much as the line, the solve swung to 50 degrees and the upper body jumped
   up for a tick and settled back.
-* Sniper rifle and linear launcher switch to the game's scope (first person); no bend.
+* Sniper rifle and linear launcher switch to the game's scope (first person, [Scope](#scope)); no bend.
 
 ### Aim height
 
