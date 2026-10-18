@@ -420,6 +420,15 @@ The F2 window (also the EXTRAS page of ENHANCED SETTINGS) is meant for testing a
 
 - infinite health, heal now, infinite ammo;
 - noclip: Through walls, or Walls + fly (fly with the noclip keys, or R2/L2);
+- unlock all: locks act as if you carried their key, without it entering your inventory.
+  Examining a locked door, a card reader or the spot where an emblem, plate or jewel goes uses
+  the key there, as the item screen's Use would (or the game asks "Will you use ...?" as it does
+  when you carry the key); a spot already done is examined as usual. Turned on inside a room,
+  some doors notice it only once you enter the room again. If the game then asks whether to
+  discard the key, nothing is removed. Doors the story keeps shut (locked from the other side,
+  opened by a cutscene) stay shut, and the prison's metal detector room is left out: every other
+  item check (the detector, the typewriters' ink ribbon, weapons and ammo, the item box) uses
+  what you really carry;
 - add any item to the inventory, and view the inventory;
 - spawn an enemy of any type in front of you ([ENEMIES.md](ENEMIES.md));
 - teleport to any room through the game's door transition: choose a **location** (an area of the
@@ -438,7 +447,7 @@ The F2 window (also the EXTRAS page of ENHANCED SETTINGS) is meant for testing a
   A room may not work in every story state (wrong case, missing scripts); an unlisted number may
   crash.
 
-In co-op, enemy spawning is host-only. Actions chosen in ENHANCED SETTINGS run when the menu closes.
+In co-op, enemy spawning is host-only; the other cheats, unlock all among them, work for whoever turns them on, and a lock opened so opens for the partner as usual. Actions chosen in ENHANCED SETTINGS run when the menu closes.
 
 ## HD texture packs
 

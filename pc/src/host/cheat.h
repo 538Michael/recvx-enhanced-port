@@ -13,6 +13,7 @@ typedef struct CheatState {
     /* set by the overlay */
     volatile int inf_health, inf_ammo;
     volatile int noclip;            /* 0 off, 1 through walls at the current height, 2 also up/down */
+    volatile int unlock;            /* locks open as if their key were carried (pc/glue/cheat_glue.c) */
     int give_id, give_count, tp_stg, tp_rom, tp_pos;
     int spawn_idx;                  /* enemy spawner list entry (spawn_name) */
     volatile int request;           /* CHEAT_* bits, cleared by the game thread */

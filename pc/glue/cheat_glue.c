@@ -7,6 +7,8 @@
 #include "../../decomp/include/ps2/veronica/prog/effect.h"
 #include "../../decomp/include/ps2/veronica/prog/sub1.h"
 #include "../../decomp/include/ps2/veronica/prog/pwksub.h"
+#include "../../decomp/include/ps2/veronica/prog/item.h"
+#include "../../decomp/include/ps2/veronica/prog/hitchk.h"
 #include "../src/host/cheat.h"
 #include "../src/host/coop.h"
 #include <stdio.h>
@@ -47,6 +49,96 @@ unsigned int pc_noclip(void)
         flew = 0;
     }
     return mode ? 0x18 : 0;
+}
+
+/* Unlock all: the game opens a lock in one of two ways, both kept, with the key taken as carried only there.
+   - A use spot is a floor record of type 0 listing up to four items (prm0..3): standing in it, the item screen's
+     Use (sub1.c ItemUse/Use_05) sets sb_id and cb_flg 0x400, and the room script, which runs on in the item
+     screen (st_flg 0x8), tests "on floor N, item X used" and plays the unlock. Here the examine press in such a
+     spot uses the spot's key item instead (pc_unlock_examine): the next scd1 sees exactly that state. When the
+     script does nothing with it (a spot already done), the press examines as usual, one frame later.
+   - A door with a question ("Will you use the Silver Key?") is chosen by the script's PlItemCheck: scd0 sets
+     the door's message by it, scd1 opens the door on "Yes" when it still holds. pc_unlock_held passes such a
+     check for a key item (itemdata type 0x40: no weapon, ammo, herb, ribbon or lighter) that has a use spot in
+     this room, in scd0/scd1 only (event tasks check items to give or take them, RM_9160's jewels), not when the
+     check guards a model change (RM_3160 hides its zombies once the Emblem Card is carried), and never in 0/9,
+     where the metal detector checks every metal item (keys and emblems among them) with the same op.
+   No item is added; the scripts' PlItemLost/PlItemLostEx of a key the player does not have find nothing. */
+static int key_item(int id) { return id > 0 && id < 156 && (itemdata[id].type & 0x40); }
+static int carried(int id)
+{
+    for (int c = sys->ply_id * 16 + 1; c < sys->ply_id * 16 + 12; c++)   /* as bhPlItemCheck */
+        if ((unsigned char)(sys->itm[c] >> 16) == id) return 1;
+    return 0;
+}
+
+extern unsigned char* bhScePtr;   /* event.c */
+extern BH_SCEWORK bhEtask[16];
+int pc_unlock_held(int item)
+{
+    const unsigned int* t = (const unsigned int*)rom->evtp;
+    unsigned int ofs, first, lo = ~0u;
+    if (!g_cheat.unlock || !key_item(item) || (sys->stg_no == 0 && sys->rom_no == 9) || *bhScePtr == 36 /* InitModelSet */) return 0;
+    first = t[0];   /* the offset table (scd0, scd1, events) ends where the first script begins */
+    for (unsigned int i = 0; i * 4 < first; i++)
+        if (t[i] && t[i] < first) first = t[i];
+    for (unsigned int i = 2; i * 4 < first; i++)
+        if (t[i] && t[i] < lo) lo = t[i];
+    ofs = (unsigned int)(bhScePtr - (const unsigned char*)t);
+    if (ofs >= lo) return 0;   /* an event (they follow scd0 and scd1) */
+    for (int i = 0; i < rom->flr_n; i++) {
+        const ATR_WORK* z = &rom->flrp[i];
+        if (z->type == 0 && (z->prm0 == item || z->prm1 == item || z->prm2 == item || z->prm3 == item)) return 1;
+    }
+    return 0;
+}
+
+static int unlock_item, unlock_sb;
+int pc_unlock_examine(void)
+{
+    static unsigned char turn;   /* a spot for several items (the proofs, the jewels): each press the next */
+    unsigned char ids[4];
+    int n = 0;
+    if (!g_cheat.unlock || plp != &ply || !(sys->cb_flg & 0x200) || sys->flr_idx >= (unsigned int)rom->flr_n) return 0;
+    {
+        const ATR_WORK* z = &rom->flrp[sys->flr_idx];
+        const unsigned char p[4] = { z->prm0, z->prm1, z->prm2, z->prm3 };
+        if (z->type != 0) return 0;
+        for (int i = 0; i < 4; i++)
+            if (key_item(p[i]) && !carried(p[i])) ids[n++] = p[i];
+    }
+    if (!n) return 0;   /* carried: the item screen uses it as usual */
+    unlock_item = ids[turn++ % n];
+    return 1;
+}
+
+void pc_unlock_scd1(int after)
+{
+    static struct { unsigned int st, cb, rm, sp, ev[32], ky[16]; unsigned char task[16]; } was, now;
+    static int st8;
+    int taken;
+    if (!unlock_item) return;
+    if (!after) {   /* the frame after the item screen's Use */
+        unlock_sb = sys->sb_id;
+        sys->sb_id = unlock_item;
+        sys->cb_flg |= 0x400;
+        st8 = !(sys->st_flg & 0x8);
+        sys->st_flg |= 0x8;
+    }
+    now.st = sys->st_flg; now.cb = sys->cb_flg; now.rm = sys->rm_flg; now.sp = sys->sp_flg;
+    memcpy(now.ev, sys->ev_flg, sizeof(now.ev));
+    memcpy(now.ky, sys->ky_flg, sizeof(now.ky));
+    for (int i = 0; i < 16; i++) now.task[i] = bhEtask[i].status;
+    if (!after) { was = now; return; }
+    taken = memcmp(&was, &now, sizeof(now)) != 0;
+    if (st8) sys->st_flg &= ~0x8;
+    sys->cb_flg &= ~0x400;   /* StatusMain clears it on its next frame */
+    printf("unlock: item %d used in %d/%d, %s\n", unlock_item, sys->stg_no, sys->rom_no, taken ? "taken" : "nothing reacts");
+    unlock_item = 0;
+    if (!taken) {   /* nothing here wants it: the press examines */
+        sys->sb_id = unlock_sb;
+        if (plp == &ply) bhCheckExmAtari(plp);
+    }
 }
 
 /* item and room names from the game's own message data: glyph = ASCII - 32, 0xFF01 = space. Built when the data
@@ -105,7 +197,7 @@ static void teleport(int stg, int rom, int pos)
    RECVX_WARP="stage:room:frame:x:z:angle,..." puts the player at x/z facing `angle` once it has
    been `frame` game frames in that room (independent of how the room was reached, e.g. a
    co-op join).
-   RECVX_INF_AMMO=1 turns the infinite ammo cheat on; RECVX_NOCLIP="frame:mode,..." sets the
+   RECVX_INF_AMMO=1 turns the infinite ammo cheat on, RECVX_UNLOCK=1 "Unlock all"; RECVX_NOCLIP="frame:mode,..." sets the
    noclip mode (0/1/2) at that game frame; it also logs the position every 15 game frames and any jump
    of more than 2 units in one tick ("test: JUMP").
    RECVX_EFFECT="frame:effno:type:mode1" spawns effect effno at the player at that game frame
@@ -128,6 +220,7 @@ static void scripted(unsigned int* inv)
     if (tp == (const char*)-1) {
         tp = getenv("RECVX_TELEPORT"); eq = getenv("RECVX_EQUIP"); wp = getenv("RECVX_WARP"); ef = getenv("RECVX_EFFECT");
         if (getenv("RECVX_INF_AMMO")) g_cheat.inf_ammo = 1;
+        if (getenv("RECVX_UNLOCK")) g_cheat.unlock = 1;
         nc = getenv("RECVX_NOCLIP");
         nclog = nc != NULL;
         ap = getenv("RECVX_APPEAR");
