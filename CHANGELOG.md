@@ -17,6 +17,10 @@
 
 ### Display
 
+- **Borderless or exclusive fullscreen**: the Fullscreen setting is now Display mode: Windowed,
+  Borderless fullscreen (as fullscreen was before) or Exclusive fullscreen, which switches the
+  screen to a resolution and refresh rate you pick, the desktop's by default. F11 switches
+  between windowed and the fullscreen you chose last, and the window comes back where it was.
 - **Fuller rooms in widescreen**: with the fixed cameras, the side margins now show the walls,
   floors and props the original leaves out for each camera angle, as the third-person views do.
   The middle of the picture stays exactly as the original, and walls the camera looks through

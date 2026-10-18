@@ -231,11 +231,11 @@ static int nrows;
 
 static const char* const heads[] = { "", "THIRD PERSON (KEYBOARD AND MOUSE)", "HOTKEYS" };
 
-/* every row of the page (none is left out: what F1 shows of a page, this shows too), headings first */
+/* every row of the page that is shown now (what F1 shows of a page, this shows too), headings first */
 static void page_rows(void)
 {
     for (int i = 0; i < g_settings_n && nrows < MAX_ROWS - 3; i++)
-        if (g_settings[i].page == st.page) {
+        if (g_settings[i].page == st.page && (!g_settings[i].shown || g_settings[i].shown())) {
             if (g_settings[i].group) rows[nrows++] = (Row){ K_GROUP, i };
             rows[nrows++] = (Row){ K_SET, i };
         }

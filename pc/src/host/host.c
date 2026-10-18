@@ -139,10 +139,13 @@ void host_pump_events(void)
         switch (ev.type) {
         case SDL_EVENT_QUIT:
             exit(0);
+        case SDL_EVENT_WINDOW_DISPLAY_CHANGED:   /* moved to another monitor: its modes for Fullscreen resolution */
+            settings_display_modes();
+            break;
         case SDL_EVENT_KEY_DOWN:
             if (bind_hotkey(&ev, B_FULLSCREEN)) {
-                g_config.fullscreen = !g_config.fullscreen;
-                SDL_SetWindowFullscreen(g_window, g_config.fullscreen);
+                g_config.fullscreen = !g_config.fullscreen;   /* of the kind chosen last (Display mode) */
+                settings_apply_display();
                 settings_save_later();
             }
             if (bind_hotkey(&ev, B_TPS_TOGGLE) && !g_lobby_io.text_on) {
@@ -178,7 +181,8 @@ static void usage(void)
         "  --save-dir <dir>   settings and memory card directory (default: ./save if it exists,\n"
         "                     else save/ next to the program, which also holds mods/ and logs)\n"
         "  --size WxH         window size (default 1280x960)\n"
-        "  --fullscreen\n"
+        "  --fullscreen       start in fullscreen (borderless, or exclusive if chosen in the settings)\n"
+        "  --borderless / --exclusive / --windowed   start in that display mode\n"
         "  --enhanced         display-rate frames (60+ FPS) blended from the 30 FPS game (default)\n"
         "  --vanilla          original 30 FPS presentation\n"
         "  --skip-doors       room transitions (doors, stairs, ladders) without their animation (default;\n"
@@ -234,7 +238,10 @@ static void parse_args(int argc, char** argv)
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--save-dir") && i + 1 < argc) { SDL_strlcpy(g_config.save_dir, argv[++i], sizeof(g_config.save_dir)); save_given = 1; }
         else if (!strcmp(argv[i], "--size") && i + 1 < argc) sscanf(argv[++i], "%dx%d", &g_config.window_w, &g_config.window_h);
-        else if (!strcmp(argv[i], "--fullscreen")) g_config.fullscreen = 1;
+        else if (!strcmp(argv[i], "--fullscreen")) g_config.fullscreen = 1;   /* the kind of recvx.ini (borderless by default) */
+        else if (!strcmp(argv[i], "--borderless")) { g_config.fullscreen = 1; g_config.fullscreen_exclusive = 0; }
+        else if (!strcmp(argv[i], "--exclusive")) { g_config.fullscreen = 1; g_config.fullscreen_exclusive = 1; }
+        else if (!strcmp(argv[i], "--windowed")) g_config.fullscreen = 0;
         else if (!strcmp(argv[i], "--enhanced")) g_config.interpolate = 1;
         else if (!strcmp(argv[i], "--vanilla")) g_config.interpolate = 0;
         else if (!strcmp(argv[i], "--skip-doors")) g_config.skip_doors = 1;
@@ -330,8 +337,11 @@ int main(int argc, char** argv)
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     g_window = SDL_CreateWindow("Resident Evil Code: Veronica X", g_config.window_w, g_config.window_h,
-                                SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | (g_config.fullscreen ? SDL_WINDOW_FULLSCREEN : 0));
+                                SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN);
     if (!g_window) host_fatal("SDL_CreateWindow: %s", SDL_GetError());
+    settings_display_modes();
+    settings_apply_display();   /* hidden: fullscreen (and its mode) are taken when it is shown */
+    SDL_ShowWindow(g_window);
     g_gl = SDL_GL_CreateContext(g_window);
     if (!g_gl) host_fatal("SDL_GL_CreateContext: %s", SDL_GetError());
     SDL_GL_SetSwapInterval(g_config.vsync ? 1 : 0);

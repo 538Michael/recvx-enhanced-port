@@ -16,6 +16,10 @@ static const struct { const char* key; int* val; int lo, hi; } keys[] = {
     { "window_w", &g_config.window_w, 320, 16384 },
     { "window_h", &g_config.window_h, 240, 16384 },
     { "fullscreen", &g_config.fullscreen, 0, 1 },
+    { "fullscreen_exclusive", &g_config.fullscreen_exclusive, 0, 1 },   /* 0 borderless, 1 exclusive */
+    { "fullscreen_w", &g_config.fullscreen_w, 0, 16384 },   /* exclusive: 0 = the desktop's resolution and refresh */
+    { "fullscreen_h", &g_config.fullscreen_h, 0, 16384 },
+    { "fullscreen_hz", &g_config.fullscreen_hz, 0, 1000 },
     { "vsync", &g_config.vsync, 0, 1 },
     { "fps_limit", &g_config.fps_limit, 0, 5 },
     { "scale", &g_config.scale, 0, 8 },
