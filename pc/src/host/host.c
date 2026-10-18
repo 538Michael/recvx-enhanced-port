@@ -84,9 +84,8 @@ static int overlay_stretch;
 int pc_overlay_begin(int kind)
 {
     int mode = kind == PC_OVL_CINEMA ? g_config.cinema_bars : kind == PC_OVL_EFFECT ? g_config.screen_effects : 1;
-    if (mode == 2) return 0;
     overlay_stretch = mode == 1;
-    return 1;
+    return mode != 2;   /* Off: the caller skips the layer, or (the oil pressure puzzle) draws it 4:3 */
 }
 void pc_overlay_end(void) { overlay_stretch = 0; }
 int pc_overlay_wide(void) { return overlay_stretch; }

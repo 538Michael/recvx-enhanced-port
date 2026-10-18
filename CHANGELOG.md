@@ -26,6 +26,9 @@
 - **Underwater look in the submarine dock**: in over-the-shoulder the screen still waved and
   stretched as if seen from underwater, because some fixed cameras there look in from the water.
   Over-the-shoulder now shows the dock clearly; the fixed cameras keep the underwater look.
+- **Black screen at Chris's oil pressure puzzle**: with "Screen effects" set to Off, the puzzle
+  screen was hidden along with the effects, leaving it black. The puzzle now always shows; Off
+  shows it in 4:3.
 
 ## 0.6.2 (2026-10-18)
 
