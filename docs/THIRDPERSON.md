@@ -418,7 +418,8 @@ Free aim now sets them every tick (`dual_aim`, after `aim_at_crosshair`; not whi
   `wax`, and one aim height, `at_flg`, serve both arms). The arm on that enemy's side takes it, as
   the game gives the left arm the enemy further left; the head follows the other one (`hed_rate`).
   The enemy of the last tick is kept while it stays within 1.15 times those limits, so two enemies
-  at the same distance or at the edge do not take turns.
+  at the same distance or at the edge do not take turns (only from one aiming tick to the next in
+  the same room: after a gap, a room change or another weapon the choice starts afresh).
 * Without such an enemy both arms aim at the crosshair target, so the guns converge to the front.
 * Each arm's yaw is taken from its own muzzle (last tick's hand, turned with the character since)
   and kept within 45 degrees; the arms ease there a third of the way per tick (`count` 3).
