@@ -27,7 +27,8 @@
 
 extern float fVu1AspectH, fVu1Projection, fVu1OffsetX, fVu1OffsetY;
 extern float Ps2_zbuff_b;
-extern int pc_margin_mesh;   /* view_glue.c: the mesh being drawn shows only in the hor+ margins (2: in front of the player) */
+extern int pc_margin_mesh;   /* view_glue.c: the mesh being drawn shows only in the hor+ margins (2, 3: pc_margin_reaches_43) */
+extern float pc_margin_player[2];
 
 /* hor+ widescreen, while a menu task runs (main.c njUserMain): its 2D is kept inside the 4:3
    screen, GS x 1728..2368 where the Ninja 2D calls put it, as the PS2's 640-wide display shows
@@ -58,13 +59,35 @@ static void clip_sprite(NativeRawVertex* a, NativeRawVertex* b, int tme)
     }
 }
 
-/* hor+: a hidden room part in front of the player, drawn in the margins (view_glue.c
-   pc_margin_part, pc_margin_mesh 2), is left out when one of its n vertices (the model's vertex
-   buffer, after its vertex chunk) lies in front of the camera inside the 4:3 screen: cut there,
-   it would end in a straight edge at the 4:3 border */
+/* hor+: is a hidden room part drawn in the margins (view_glue.c pc_margin_part) left out? v: its
+   n vertices (the model's vertex buffer after its vertex chunk) in view space; x below is the GS
+   screen x times Vz, so each test is against a plane through the camera.
+   pc_margin_mesh 3 (its sphere reaches the camera or the line to the player): unless all vertices
+   lie on one side of the 4:3 view, widened to take in the player (PLAYER_HALF either side of its
+   spot), or behind the near plane. Their hull then misses that view at every depth, so the part
+   neither ends in a straight edge at the 4:3 border nor crosses the line to the player.
+   pc_margin_mesh 2 (in front of the player): when a vertex lies in front of the camera inside the
+   4:3 screen; cut there, it would end in a straight edge at the 4:3 border. */
+#define PLAYER_HALF 8.0f   /* the player's collision radius (O_WRK ar) is 3.5 */
 int pc_margin_reaches_43(const VU1_STRIP_BUF* v, int n)
 {
     const float kx = fVu1AspectW * fVu1Projection;
+    if (pc_margin_mesh == 3) {
+        float x0 = NATIVE_43_X0, x1 = NATIVE_43_X1, pz = pc_margin_player[1];
+        int left = 1, right = 1, behind = 1;
+        if (pz > _fNaViwClipNear) {
+            float xp = fVu1OffsetX + kx * pc_margin_player[0] / pz, pad = kx * PLAYER_HALF / pz;
+            if (xp - pad < x0) x0 = xp - pad;
+            if (xp + pad > x1) x1 = xp + pad;
+        }
+        for (int i = 0; i < n; i++) {
+            float x = fVu1OffsetX * v[i].fVz + kx * v[i].fVx;
+            if (x > x0 * v[i].fVz) left = 0;
+            if (x < x1 * v[i].fVz) right = 0;
+            if (v[i].fVz > _fNaViwClipNear) behind = 0;
+        }
+        return !(left || right || behind);
+    }
     if (pc_margin_mesh != 2) return 0;
     for (int i = 0; i < n; i++) {
         float x = fVu1OffsetX * v[i].fVz + kx * v[i].fVx;   /* screen x times Vz */

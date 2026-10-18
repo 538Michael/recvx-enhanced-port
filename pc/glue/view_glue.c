@@ -26,9 +26,10 @@ void pc_view_changed(void)
 #include <string.h>
 
 uint32_t pc_cur_mesh, pc_cur_strip;   /* identity of what is being drawn (native_glue.c) */
-int pc_margin_mesh;   /* the mesh being drawn shows only in the hor+ margins (native_glue.c); 2: in front of the player */
+int pc_margin_mesh;   /* the mesh being drawn shows only in the hor+ margins (native_glue.c); 2, 3: checked there (pc_margin_part) */
+float pc_margin_player[2];   /* view x and z of the player, for pc_margin_mesh 3 */
 static int margin_next;
-void pc_margin_next(int front) { margin_next = front ? 2 : 1; }
+void pc_margin_next(int mode) { margin_next = mode; }
 static void take_view(void);
 static int view_taken;
 void pc_mesh_begin(const void* model)
@@ -70,11 +71,14 @@ int pc_is_room_object(const void* obj)
 
 /* hor+ widescreen with a fixed camera (ps2_NinjaCnk.c pc_show_hidden): is a room part the cut
    hides drawn anyway? With the native renderer it is, cut to the margins (pc_margin_next,
-   stream.c native_draw), unless it would cover the view: its bounding sphere reaches the
-   camera or the line from the camera to the player (a wall the cut looks through), or it lies
-   in front of the player and reaches into the 4:3 view (native_glue.c pc_margin_reaches_43: it
-   would end in a straight edge at the 4:3 border). Without it, only a part entirely outside
-   the 4:3 view. Called with the part's model matrix current. */
+   stream.c native_draw), unless it would cover the player or end in a straight edge at the 4:3
+   border; native_glue.c pc_margin_reaches_43 checks its vertices after the model's vertex chunk.
+   A part whose bounding sphere reaches the camera or the line from the camera to the player
+   (pc_margin_mesh 3: a wall the cut looks through, or one running past the camera) is drawn
+   only if it lies entirely beside the 4:3 view and the player, like the walls running from the
+   camera's corner of a courtyard (0/3, 0/10). Other parts in front of the player (2) are left
+   out when a vertex lies inside the 4:3 view. Without the native renderer, only a part
+   entirely outside the 4:3 view. Called with the part's model matrix current. */
 int pc_margin_part(const void* obj)
 {
     const NJS_CNK_MODEL* m = ((const NJS_CNK_OBJECT*)obj)->model;
@@ -82,7 +86,6 @@ int pc_margin_part(const void* obj)
     float z, r, sx, half, t, pl, dx, dy, dz;
     if (m->r <= 0) return 0;
     njCalcPoint(NULL, &ctr, &c);
-    if (c.z - m->r < _fNaViwClipNear) return 0;
     if (pc_native_3d()) {
         pw.x = plp->px; pw.y = plp->py; pw.z = plp->pz;
         njCalcPoint(cam.mtx, &pw, &p);
@@ -90,10 +93,11 @@ int pc_margin_part(const void* obj)
         t = pl > 0 ? (c.x * p.x + c.y * p.y + c.z * p.z) / pl : 0;
         t = t < 0 ? 0 : t > 1 ? 1 : t;
         dx = c.x - t * p.x; dy = c.y - t * p.y; dz = c.z - t * p.z;
-        if (dx * dx + dy * dy + dz * dz < m->r * m->r) return 0;
-        pc_margin_next(c.z < p.z);
+        pc_margin_player[0] = p.x; pc_margin_player[1] = p.z;
+        pc_margin_next(c.z - m->r < _fNaViwClipNear || dx * dx + dy * dy + dz * dz < m->r * m->r ? 3 : c.z < p.z ? 2 : 1);
         return 1;
     }
+    if (c.z - m->r < _fNaViwClipNear) return 0;
     z = fabsf(_nj_screen_.dist / c.z);
     r = m->r * z * fNaViwAspectW;
     sx = c.x * z;
