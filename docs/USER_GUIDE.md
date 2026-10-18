@@ -119,7 +119,7 @@ renderer, skipped intro and door animations (Skip door animations: Instant) and 
 | Frame rate limit | `fps_limit` | **Off (display rate)**, 30, 60, 90, 120, 144. Caps the images shown per second, in-between frames included; the game itself always runs at 30 |
 | Show frame rate | `show_fps` | **on**: counter at the top right |
 | **Picture** | | |
-| Aspect ratio | `aspect` | 4:3 (original), Stretch to window, **Widescreen (hor+)**: 3D fills the window, 2D and menus stay 4:3 in the middle (the OPTION screen's picture strips run to the window's edges; what the inventory, item box, files and map keep off-screen stays hidden) |
+| Aspect ratio | `aspect` | 4:3 (original), Stretch to window, **Widescreen (hor+)**: 3D fills the window, 2D and menus stay 4:3 in the middle; with the fixed cameras, room parts the original hides for a camera angle are drawn in the side margins (except walls the camera looks through), while the 4:3 middle stays exactly the original (the OPTION screen's picture strips run to the window's edges; what the inventory, item box, files and map keep off-screen stays hidden) |
 | Internal resolution | `scale` | **Auto** (follows the window) or 1x-8x of 640x448 |
 | Display-rate frames | `interpolate` | "Enhanced mode": in-between frames blended from the last two game frames, up to the display's refresh rate. The game logic stays at its original 30 FPS, so gameplay is unchanged. **On**; off is "vanilla" |
 | Frame blend (trail) | `frame_blend` | the PS2's motion trail (each frame mixed over the previous one). Auto, **Off**, On; Auto is on in vanilla and off with display-rate frames |
@@ -135,7 +135,7 @@ renderer, skipped intro and door animations (Skip door animations: Instant) and 
 | **Renderer** | | |
 | Native 3D renderer | `native_3d` | **on**: 3D models projected and clipped by the GPU instead of the emulated VU1/GS path |
 | Native textures | `native_tex` | **on**: textures uploaded once instead of on every switch |
-| Cull off-screen models | `model_cull` | **on** (as on the PS2); off stops models popping at the screen edges |
+| Cull off-screen models | `model_cull` | **on** (as on the PS2); off stops characters, enemies and objects popping at the screen edges. It does not affect the room itself (walls, floors, props): see Aspect ratio |
 | **HD textures** | | see [HD texture packs](#hd-texture-packs) |
 | HD textures | `hd_textures` | **on**: a PCSX2 HD texture pack in `mods/textures` replaces the textures it covers (after a restart). Without a pack nothing changes |
 | HD textures: font | `hd_textures_font` | **off**: the game's font stays; on: the pack's font too |

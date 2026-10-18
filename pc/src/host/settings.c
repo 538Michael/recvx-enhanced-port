@@ -183,7 +183,7 @@ const Setting g_settings[] = {
       .help = "Brightness, contrast and gamma back to neutral: the original picture." },
     { SP_DISPLAY, "Native 3D renderer", V(g_config.native_3d), 0, 1, 1, .help = "3D models projected and clipped by the GPU instead of the emulated VU1 and GS.", .group = "RENDERER" },
     { SP_DISPLAY, "Native textures", V(g_config.native_tex), 0, 1, 1, .help = "Textures uploaded once and bound afterwards instead of re-uploaded on every switch." },
-    { SP_DISPLAY, "Cull off-screen models", V(g_config.model_cull), 0, 1, 1, .help = "As on the PS2. Off: models no longer pop at the screen edges. Third person never culls." },
+    { SP_DISPLAY, "Cull off-screen models", V(g_config.model_cull), 0, 1, 1, .help = "As on the PS2. Off: characters, enemies and objects no longer pop at the screen edges (the room itself is not affected). Third person never culls." },
     { SP_DISPLAY, "HD textures", V(g_config.hd_textures), 0, 1, 1, .flags = SET_RESTART,
       .help = "A PCSX2 HD texture pack in mods/textures (as PCSX2 ships it) replaces the textures it covers. Off: the original textures." },
     { SP_DISPLAY, "HD textures: font", V(g_config.hd_textures_font), 0, 1, 1,

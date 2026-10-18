@@ -15,6 +15,13 @@
   questions such as "Use an ink ribbon?" and the memory card screens work with the mouse too.
   Keyboard and gamepad work as before.
 
+### Display
+
+- **Fuller rooms in widescreen**: with the fixed cameras, the side margins now show the walls,
+  floors and props the original leaves out for each camera angle, as the third-person views do.
+  The middle of the picture stays exactly as the original, and walls the camera looks through
+  stay hidden.
+
 ### Fixes
 
 - **Stuck after Alexia's flames**: after being set on fire by Alexia's first form, your character

@@ -3,10 +3,13 @@
 #include "../../decomp/include/ps2/veronica/prog/ps2_NaView.h"
 #include "../../decomp/include/ps2/veronica/prog/ps2_NaGraphics3D.h"
 #include "../../decomp/include/ps2/veronica/prog/ps2_Vu1Strip.h"
+#include "../../decomp/include/ps2/veronica/prog/ps2_NaMatrix.h"
+#include <math.h>
 
 extern float fVu1Projection;
 extern float _fNaViwClipNear, _fNaViwClipFar;
 extern sceVu0FMATRIX ClipMatrix2;
+extern NJS_SCREEN _nj_screen_;
 
 void pc_view_changed(void)
 {
@@ -23,14 +26,18 @@ void pc_view_changed(void)
 #include <string.h>
 
 uint32_t pc_cur_mesh, pc_cur_strip;   /* identity of what is being drawn (native_glue.c) */
+int pc_margin_mesh;   /* the mesh being drawn shows only in the hor+ margins (native_glue.c); 2: in front of the player */
+static int margin_next;
+void pc_margin_next(int front) { margin_next = front ? 2 : 1; }
 static void take_view(void);
 static int view_taken;
 void pc_mesh_begin(const void* model)
 {
     if (!view_taken) take_view();   /* the first mesh of a frame: the camera it is drawn with */
     pc_cur_mesh = (uint32_t)(uintptr_t)model; pc_cur_strip = 0; stream_tag(pc_cur_mesh);
+    pc_margin_mesh = margin_next; margin_next = 0;
 }
-void pc_mesh_end(void) { pc_cur_mesh = 0; stream_tag(0); }
+void pc_mesh_end(void) { pc_cur_mesh = 0; pc_margin_mesh = 0; stream_tag(0); }
 void pc_mesh_strip(const void* strip) { pc_cur_strip = (uint32_t)(uintptr_t)strip; stream_strip(pc_cur_strip); }
 
 /* effect.c draw loops: the following output is this effect (O_WRK; NULL: none). The tag is odd
@@ -59,6 +66,39 @@ int pc_is_room_object(const void* obj)
 {
     const NJS_CNK_OBJECT* o = (const NJS_CNK_OBJECT*)obj;
     return rom->mdl.objP && o >= rom->mdl.objP && o < rom->mdl.objP + rom->mdl.obj_num;
+}
+
+/* hor+ widescreen with a fixed camera (ps2_NinjaCnk.c pc_show_hidden): is a room part the cut
+   hides drawn anyway? With the native renderer it is, cut to the margins (pc_margin_next,
+   stream.c native_draw), unless it would cover the view: its bounding sphere reaches the
+   camera or the line from the camera to the player (a wall the cut looks through), or it lies
+   in front of the player and reaches into the 4:3 view (native_glue.c pc_margin_reaches_43: it
+   would end in a straight edge at the 4:3 border). Without it, only a part entirely outside
+   the 4:3 view. Called with the part's model matrix current. */
+int pc_margin_part(const void* obj)
+{
+    const NJS_CNK_MODEL* m = ((const NJS_CNK_OBJECT*)obj)->model;
+    NJS_POINT3 ctr = m->center, c, pw, p;
+    float z, r, sx, half, t, pl, dx, dy, dz;
+    if (m->r <= 0) return 0;
+    njCalcPoint(NULL, &ctr, &c);
+    if (c.z - m->r < _fNaViwClipNear) return 0;
+    if (pc_native_3d()) {
+        pw.x = plp->px; pw.y = plp->py; pw.z = plp->pz;
+        njCalcPoint(cam.mtx, &pw, &p);
+        pl = p.x * p.x + p.y * p.y + p.z * p.z;
+        t = pl > 0 ? (c.x * p.x + c.y * p.y + c.z * p.z) / pl : 0;
+        t = t < 0 ? 0 : t > 1 ? 1 : t;
+        dx = c.x - t * p.x; dy = c.y - t * p.y; dz = c.z - t * p.z;
+        if (dx * dx + dy * dy + dz * dz < m->r * m->r) return 0;
+        pc_margin_next(c.z < p.z);
+        return 1;
+    }
+    z = fabsf(_nj_screen_.dist / c.z);
+    r = m->r * z * fNaViwAspectW;
+    sx = c.x * z;
+    half = _nj_screen_.w / 2.0f;
+    return sx - r > half || sx + r < -half;
 }
 
 /* Frames of different scenes or camera cuts are never blended. Taken when the frame's first mesh

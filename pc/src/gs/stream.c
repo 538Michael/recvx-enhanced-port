@@ -202,16 +202,29 @@ static int nv_same_pos(const NativeVertex* a, const NativeVertex* b, uint32_t n)
     return 1;
 }
 
-/* clip a polygon against near_d >= 0 (plane 0) or far_d >= 0 (plane 1); returns the count */
+/* distance to plane 0 near (near_d >= 0), 1 far (far_d >= 0), 2 left of the 4:3 screen, 3 right of it */
+static float plane_d(const NativeVertex* v, int plane)
+{
+    return plane == 0 ? v->near_d : plane == 1 ? v->far_d : plane == 2 ? NATIVE_43_X0 * v->w - v->x : v->x - NATIVE_43_X1 * v->w;
+}
+
+/* clip a polygon against plane_d >= 0; returns the count */
 static int clip_plane(const NativeVertex* in, int n, NativeVertex* out, int plane)
 {
     int m = 0;
     for (int i = 0; i < n; i++) {
         const NativeVertex *a = &in[i], *b = &in[(i + 1) % n];
-        float da = plane ? a->far_d : a->near_d, db = plane ? b->far_d : b->near_d;
+        float da = plane_d(a, plane), db = plane_d(b, plane);
         if (da >= 0) out[m++] = *a;
         if ((da >= 0) != (db >= 0)) out[m++] = nv_lerp(a, b, da / (da - db));
     }
+    return m;
+}
+
+/* a convex polygon of n vertices as triangles at tri[m]; returns the new count */
+static int fan(NativeVertex* tri, int m, const NativeVertex* p, int n)
+{
+    for (int j = 2; j < n; j++) { tri[m++] = p[0]; tri[m++] = p[j - 1]; tri[m++] = p[j]; }
     return m;
 }
 
@@ -233,23 +246,26 @@ void native_strip(unsigned int prim, const NativeVertex* v, int n)
 /* render thread: strip -> triangles; triangles whose three normals face away are dropped
    (SingleMain) and the rest clipped against the near and far planes, as the VU1 SCISSOR
    routine does, so the GPU only ever gets vertices in front of the camera (w >= near > 0):
-   how drivers clip primitives reaching behind the camera differs */
+   how drivers clip primitives reaching behind the camera differs. Margin triangles (cull bit 2)
+   are also cut to the parts left and right of the 4:3 screen, so the 4:3 picture stays exact. */
 static void native_draw(unsigned int prim, const NativeVertex* v, int n, long ev)
 {
-    NativeVertex tri[64 * 9];
+    static NativeVertex tri[64 * 24];   /* render thread only; up to 8 triangles per margin triangle */
     int m = 0;
     int type = (int)(prim & 7);   /* 3 triangle list, 5 fan, otherwise strip */
     if (n > 64) n = 64;
     for (int i = 2; i < n; i += type == 3 ? 3 : 1) {
         const NativeVertex* t3[3] = { type == 5 ? &v[0] : &v[i - 2], &v[i - 1], &v[i] };
+        int margin = t3[2]->cull & 4;
         if ((t3[2]->cull & 2) || (t3[0]->cull & t3[1]->cull & t3[2]->cull & 1)) continue;
-        if (t3[0]->near_d >= 0 && t3[1]->near_d >= 0 && t3[2]->near_d >= 0 && t3[0]->far_d >= 0 && t3[1]->far_d >= 0 && t3[2]->far_d >= 0) {
+        if (!margin && t3[0]->near_d >= 0 && t3[1]->near_d >= 0 && t3[2]->near_d >= 0 && t3[0]->far_d >= 0 && t3[1]->far_d >= 0 && t3[2]->far_d >= 0) {
             tri[m++] = *t3[0]; tri[m++] = *t3[1]; tri[m++] = *t3[2];
         } else {
-            NativeVertex p0[3] = { *t3[0], *t3[1], *t3[2] }, p1[4], p2[5];
+            NativeVertex p0[3] = { *t3[0], *t3[1], *t3[2] }, p1[4], p2[5], p3[6];
             int k = clip_plane(p0, 3, p1, 0);
             k = k ? clip_plane(p1, k, p2, 1) : 0;
-            for (int j = 2; j < k; j++) { tri[m++] = p2[0]; tri[m++] = p2[j - 1]; tri[m++] = p2[j]; }
+            if (!margin) m = fan(tri, m, p2, k);
+            else for (int side = 2; side < 4; side++) m = fan(tri, m, p3, k ? clip_plane(p2, k, p3, side) : 0);   /* left, right */
         }
     }
     if (m) gs_draw_native(prim, tri, m, ev);

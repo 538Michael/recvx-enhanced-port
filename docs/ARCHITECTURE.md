@@ -135,10 +135,19 @@ Render targets get GS-pixel margins on both sides. The game's clip matrix
 while the projection is untouched, so 3D fills the margins and 2D drawn at x 0..639 stays 4:3 in
 the middle. Model culling is widened the same way (`fNaViwHalfW`, the joint window of
 `bhCheckClipModel`/`bhCheckClipPoint`). Room cameras hide room parts they cannot see (`hidobj`
-lists, authored for 4:3); in widescreen such a part is drawn anyway when its bounding sphere lies
-entirely outside the 4:3 view, while hidden parts inside it (occluders) stay hidden
-(`pc_show_hidden`). Full-width scissors, fills and render-target copies are extended into the
-margins. So 2D drawn outside x 0..639, which the PS2's display never showed, would appear there:
+lists, authored for 4:3). In widescreen such a part is drawn anyway, but only in the margins
+(`ps2_NinjaCnk.c pc_show_hidden` -> `view_glue.c pc_margin_part` -> `pc_margin_next`): its
+triangles carry `NativeVertex.cull` bit 2 and `stream.c native_draw` cuts them to the parts
+left and right of the 4:3 screen (GS x 1728..2368), so the 4:3 picture stays exactly the
+original, also for parts that reach across its edge. Parts that would cover the view are left
+out: those whose bounding sphere reaches the camera or the line from the camera to the player
+(the walls a cut looks through), and parts nearer than the player with a vertex inside the 4:3
+view (they would end in a straight edge at its border; `native_glue.c pc_margin_reaches_43`,
+checked after the model's vertex chunk). Without the native 3D renderer a hidden part is
+only drawn when its bounding sphere lies entirely outside the 4:3 view and away from the
+camera. "Cull off-screen models" (`model_cull`) is unrelated: it only skips actors and objects
+whose test points are off the (widened) screen. Full-width scissors, fills and render-target
+copies are extended into the margins. So 2D drawn outside x 0..639, which the PS2's display never showed, would appear there:
 while the Itemselect and Map tasks run (status screen, item box, files, map; `main.c
 njUserMain` -> `pc_menu_clip`), their 2D is clipped to the 4:3 screen (`native_glue.c`:
 triangles by their clip distances, sprites on the CPU), except stretched overlays and full-width
