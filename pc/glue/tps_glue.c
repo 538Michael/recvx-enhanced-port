@@ -364,26 +364,35 @@ static void atmos_fog(int cut_changed)
 
 /* the light slots as bhControlLight fills them (one directional, three point lights; the
    lights' values of this frame are in lp->w*), each light scaled by its weight. A light that
-   fades in waits for a free point-light slot, so slots never change hands mid-fade. */
+   fades in waits for a free point-light slot, so slots never change hands mid-fade.
+   The target is what the game shows: the first directional light that is on and the first three
+   point lights that are on. A light that is on behind those gets no weight: RM_1020 (palace main
+   hall) keeps the red alarm light of RM_1021 on behind the room's own directional light, and
+   blending the directional lights by weight let it through during each fade. */
 static void atmos_lights(int cut_changed)
 {
     LGT_WORK* lp = rom->lgtp;
     LPTB* lptb = sys->lg_ptb;
-    int n = rom->lgt_n < MAXL ? rom->lgt_n : MAXL, used = 0, lct = 2, i;
-    float rest = 1.0f, dv[3] = { 0, 0, 0 }, dc[3] = { 0, 0, 0 }, l;
+    int n = rom->lgt_n < MAXL ? rom->lgt_n : MAXL, used = 0, lct = 2, i, dirs = 0, pts = 0;
+    float dw = 0, dv[3] = { 0, 0, 0 }, dc[3] = { 0, 0, 0 }, l;
     int wait = 0;
+    unsigned char on[MAXL];
 
+    for (i = 0; i < n; i++) {   /* bhControlLight's choice (its on-screen test of flg 0x10 aside) */
+        on[i] = (lp[i].flg & 3) == 3;
+        if (on[i] && lp[i].lsrc == 2) on[i] = !dirs++;
+        else if (on[i] && lp[i].lsrc == 4) on[i] = pts++ < 3;
+    }
     /* a point light waits for a slot: the ones going out fade twice as fast, so the
        dip in between stays short */
     for (i = 0; i < n; i++) if (lp[i].lsrc == 4 && lw[i] > 0) used++;
-    for (i = 4; i < n; i++) if (lp[i].lsrc == 4 && (lp[i].flg & 3) == 3 && lw[i] == 0 && used >= 3) wait = 1;
+    for (i = 4; i < n; i++) if (lp[i].lsrc == 4 && on[i] && lw[i] == 0 && used >= 3) wait = 1;
     used = 0;
     for (i = 0; i < n; i++) {
-        int on = (lp[i].flg & 3) == 3;
-        if (atmos_reset || i < 4 || (on != lon[i] && !cut_changed)) lw[i] = on;   /* 0..3 are global (muzzle flash, ...) */
-        else if (on && lw[i] > 0) lw[i] = step(lw[i], 1);
-        else if (!on) lw[i] = lw[i] > (wait ? 2 : 1) * FADE ? lw[i] - (wait ? 2 : 1) * FADE : 0;
-        lon[i] = on;
+        if (atmos_reset || i < 4 || (on[i] != lon[i] && !cut_changed)) lw[i] = on[i];   /* 0..3 are global (muzzle flash, ...) */
+        else if (on[i] && lw[i] > 0) lw[i] = step(lw[i], 1);
+        else if (!on[i]) lw[i] = lw[i] > (wait ? 2 : 1) * FADE ? lw[i] - (wait ? 2 : 1) * FADE : 0;
+        lon[i] = on[i];
         if (lp[i].lsrc == 4 && lw[i] > 0) used++;
     }
     for (i = 4; i < n; i++)   /* fading in: a point light only into a free slot */
@@ -392,11 +401,10 @@ static void atmos_lights(int cut_changed)
     for (i = 0; i < n; i++, lp++) {
         float w = lw[i];
         if (w <= 0) continue;
-        if (lp->lsrc == 2) {   /* the game takes the first directional light that is on */
-            float e = w * rest;
-            rest *= 1.0f - w;
-            dv[0] += e * lp->wvx; dv[1] += e * lp->wvy; dv[2] += e * lp->wvz;
-            dc[0] += e * lp->wr; dc[1] += e * lp->wg; dc[2] += e * lp->wb;
+        if (lp->lsrc == 2) {   /* the outgoing and the incoming directional light cross-fade */
+            dw += w;
+            dv[0] += w * lp->wvx; dv[1] += w * lp->wvy; dv[2] += w * lp->wvz;
+            dc[0] += w * lp->wr; dc[1] += w * lp->wg; dc[2] += w * lp->wb;
         } else if (lp->lsrc == 4 && lct < 5) {
             njCnkSetEasyMultiLightPoint(lct, lp->wpx, lp->wpy, lp->wpz);
             njCnkSetEasyMultiLightRange(lct, lp->wnr, lp->wfr);
@@ -415,10 +423,11 @@ static void atmos_lights(int cut_changed)
     sys->lg_pnt = lct - 2;
     for (i = lct; i <= 4; i++) { njCnkSetEasyMultiLightSwitch(i, 0); njCnkSetSimpleMultiLightSwitch(i, 0); }
     l = sqrtf(dv[0] * dv[0] + dv[1] * dv[1] + dv[2] * dv[2]);
-    if (rest < 1.0f && l > 0.0001f) {
+    if (dw > 0 && l > 0.0001f) {
+        float k = dw > 1 ? 1 / dw : 1;   /* one light at full weight at most; less while one fades in from none */
         sys->st_flg |= 0x10000;
         sys->lg_vx = dv[0] / l; sys->lg_vy = dv[1] / l; sys->lg_vz = dv[2] / l;
-        sys->lg_r = dc[0]; sys->lg_g = dc[1]; sys->lg_b = dc[2];
+        sys->lg_r = dc[0] * k; sys->lg_g = dc[1] * k; sys->lg_b = dc[2] * k;
     } else {
         sys->st_flg &= ~0x10000;
         sys->lg_vx = sys->lg_vy = sys->lg_vz = sys->lg_r = sys->lg_g = sys->lg_b = 0;

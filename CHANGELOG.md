@@ -34,6 +34,10 @@
 
 ### Fixes
 
+- **Red light in the palace main hall**: in third person the hall could flash red while walking
+  between camera areas, from the alarm lighting that should only show once the alarm is on. The
+  lighting now matches the fixed cameras, and the alarm still lights the hall red when it sounds.
+  Rooms with many lamps also light up the way the fixed cameras show them.
 - **Stuck after Alexia's flames**: after being set on fire by Alexia's first form, your character
   could freeze in the next hit, aim or step and never get control back. Also with "You appear as",
   the body no longer jumps to a wrong pose for a moment when an enemy grabs or burns you.
