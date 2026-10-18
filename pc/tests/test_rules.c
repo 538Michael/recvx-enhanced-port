@@ -70,6 +70,27 @@ static void dual(void)
 }
 
 /* the 4:3 screen is GS x 1728..2368: with ox 2048 and kx 320 a vertex at x/z -1..1 */
+static void knife(void)
+{
+    float d = 65536.0f / 360.0f;
+    CHECK(pc_knife_height(-8 * d, 14, 2) == 2);     /* the camera's rest pitch at a standing enemy: straight */
+    CHECK(pc_knife_height(0, 30, 2) == 2);
+    CHECK(pc_knife_height(23 * d, 30, 2) == 4);     /* up beyond 22.5 degrees */
+    CHECK(pc_knife_height(22 * d, 30, 2) == 2);
+    CHECK(pc_knife_height(18 * d, 30, 4) == 4);     /* kept until 17.5 */
+    CHECK(pc_knife_height(17 * d, 30, 4) == 2);
+    CHECK(pc_knife_height(-23 * d, 14, 2) == 8);    /* down beyond 22.5 */
+    CHECK(pc_knife_height(-22 * d, 14, 2) == 2);
+    CHECK(pc_knife_height(-18 * d, 14, 8) == 8);
+    CHECK(pc_knife_height(-17 * d, 14, 8) == 2);
+    CHECK(pc_knife_height(-10 * d, 3, 2) == 8);     /* below knee height: a crawler, legs */
+    CHECK(pc_knife_height(30 * d, 5, 4) == 8);
+    CHECK(pc_knife_height(-10 * d, 7, 2) == 2);
+    CHECK(pc_knife_height(-10 * d, 7, 8) == 8);     /* kept until 8 units */
+    CHECK(pc_knife_height(-10 * d, 9, 8) == 2);
+    CHECK(pc_knife_height(18 * d, 30, 8) == 2);     /* down to up passes straight */
+}
+
 static void margins(void)
 {
     VU1_STRIP_BUF v[3];
@@ -168,6 +189,7 @@ int main(void)
 {
     enemies();
     dual();
+    knife();
     margins();
     clipping();
     warp_music();
