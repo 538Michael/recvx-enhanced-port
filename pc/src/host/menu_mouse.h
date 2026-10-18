@@ -9,6 +9,8 @@ extern "C" {
 typedef struct MenuMouse {
     volatile int on;        /* option (ini "menu_mouse", F1 Gameplay), default on */
     volatile int active;    /* game thread: a screen with mouse support is open */
+    volatile int play;      /* game thread, every frame: the player has control (pc_in_play), which
+                               overrides active: the cursor never outlasts a screen that ended another way */
     /* main thread -> game thread */
     volatile int x, y;      /* cursor in the game's 2D screen space (njDrawSprite2D: 640x480, 4:3 part), 1/16 px */
     volatile int held;      /* 1 left, 2 right */
@@ -22,7 +24,7 @@ extern MenuMouse g_menu_mouse;
 void menu_mouse_event(const void* sdl_event);
 void menu_mouse_update(void* window, int overlay_open);   /* once per presented frame */
 int  menu_mouse_on(void);       /* any thread: the "menu_mouse" option and the input source lets the mouse play */
-int  menu_mouse_cursor(void);   /* the OS cursor belongs to a menu (third person releases the mouse) */
+int  menu_mouse_cursor(void);   /* the OS cursor belongs to a menu, not play (third person releases the mouse) */
 /* game thread (pc/glue/lobby_glue.c): what the mouse did since this screen last looked - the pointer in
    game 2D px, moved, button presses and wheel notches (none when the mouse is off); each screen keeps its
    own MouseTake (zeroed) */

@@ -36,7 +36,10 @@ static int screen(void)
         if (!(sys->ts_flg & 0x200)) return STATUS_SCREEN;   /* bhSysCallItemselect runs StatusMain */
         if (!(sys->ts_flg & 0x400)) return MAP_SCREEN;
     }
-    if ((sys->st_flg & 0x8000) && sys->mes_seln > 0) return QUESTION;   /* a message's choices (the typewriter's "use an ink ribbon?") */
+    /* a message's choices (the typewriter's "use an ink ribbon?"), while the message shows (st_flg 0x200):
+       a script that ends it otherwise (bhMesDispEndSet, as the Gold Luger room's switch panel when
+       cancelled) leaves 0x8000 and mes_seln set until the next message */
+    if ((sys->st_flg & 0x8200) == 0x8200 && sys->mes_seln > 0) return QUESTION;
     return NONE;
 }
 

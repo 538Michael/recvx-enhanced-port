@@ -3,6 +3,7 @@
    window) is open. Main thread. */
 #include "../host/menu_mouse.h"
 #include "../host/bindings.h"
+#include "../host/tps.h"
 #include <SDL3/SDL.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -26,7 +27,7 @@ static void move_to(float px, float py)   /* window pixels */
 
 /* the option, and the mouse plays (not "Gamepad only": a stale cursor would point at items) */
 int menu_mouse_on(void) { return g_menu_mouse.on && g_input_source != INPUT_PAD; }
-int menu_mouse_cursor(void) { return menu_mouse_on() && g_menu_mouse.active; }
+int menu_mouse_cursor(void) { return menu_mouse_on() && g_menu_mouse.active && !g_menu_mouse.play; }
 
 void menu_mouse_event(const void* e)
 {
@@ -87,7 +88,7 @@ void menu_mouse_update(void* window, int overlay_open)
     static int shown = -1;
     /* unfocused (alt-tab): always show the cursor over the window */
     int focused = (SDL_GetWindowFlags((SDL_Window*)window) & SDL_WINDOW_INPUT_FOCUS) != 0;
-    int show = !focused || !menu_mouse_on() || overlay_open || g_menu_mouse.active;
+    int show = !focused || !menu_mouse_on() || overlay_open || menu_mouse_cursor();
     if (!scripted() && menu_mouse_cursor() && !overlay_open) {
         float x, y, d = SDL_GetWindowPixelDensity((SDL_Window*)window);
         SDL_MouseButtonFlags b = SDL_GetMouseState(&x, &y);
@@ -97,5 +98,14 @@ void menu_mouse_update(void* window, int overlay_open)
     if (show != shown) {
         shown = show;
         if (show) SDL_ShowCursor(); else SDL_HideCursor();
+    }
+    {   /* RECVX_MOUSE_TRACE=1: who has the mouse, on each change (tps_update_mouse_mode ran just before) */
+        static int trace = -1, last = -1;
+        int now = show | tps_mouse_captured() << 1 | g_menu_mouse.active << 2 | g_menu_mouse.play << 3 | overlay_open << 4 | focused << 5;
+        if (trace < 0) trace = SDL_getenv("RECVX_MOUSE_TRACE") != NULL;
+        if (trace && now != last)
+            SDL_Log("mouse: frame %u captured %d cursor %d (menu %d play %d overlay %d focus %d)", (unsigned)gs_frame_count(), now >> 1 & 1, now & 1,
+                    now >> 2 & 1, now >> 3 & 1, now >> 4 & 1, now >> 5 & 1);
+        last = now;
     }
 }

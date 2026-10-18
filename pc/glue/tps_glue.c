@@ -14,6 +14,7 @@
 #include "../src/host/tps.h"
 #include "../src/host/modern.h"
 #include "../src/host/bindings.h"
+#include "../src/host/menu_mouse.h"
 
 TpsConfig g_tps = { .fov = 75, .aim_fov = 65, .dist = 140, .aim_dist = 100, .height = 165, .shoulder = 35,
                     .sens_x = 100, .sens_y = 100, .aim_sens = 70, .crosshair = 1, .atmos = 1, .key = 62 /* F5 */,
@@ -28,6 +29,9 @@ int actor_aim_hand(const BH_PWORK* p, float* hand);
 float actor_cam_scale(void);
 uint64_t gs_frame_count(void); /* the presented frame (RECVX_INPUT, frame dumps) */
 int reload_at_rest(void);      /* reload_glue.c */
+int pc_in_play(const BH_PWORK* p, int scope);
+int pc_in_game(void);           /* options_glue.c */
+int pc_trade_screen(void);      /* trade_glue.c */
 
 static float yaw, pitch;          /* camera, game angle units (65536 = 360 deg); pitch > 0 looks up */
 static float mouse_dx, mouse_dy;  /* this frame's mouse motion, pixels */
@@ -1023,4 +1027,7 @@ void tps_frame(void)
        messages, pick-ups, their fades), through hits, grabs and weapon loads (a held trigger or
        quick knife stays held) */
     g_tps.pad_play = on && g_tps.pad_modern && tps_cam_active && sys && (sys->sp_flg & 0x40) && !(sys->ss_flg & 0x400000);
+    /* with or without third person: the player has control, so no menu has the mouse (menu_mouse.c);
+       the co-op trade screen is open in play */
+    g_menu_mouse.play = pc_in_game() && plp && pc_in_play(plp, 0) && !pc_trade_screen();
 }

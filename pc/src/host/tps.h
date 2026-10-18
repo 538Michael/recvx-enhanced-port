@@ -49,6 +49,7 @@ int tps_kbm_touched(void);                   /* any key or mouse button down (th
 /* main thread */
 void tps_input_event(const void* sdl_event);
 void tps_update_mouse_mode(void* window, int overlay_open);
+int  tps_mouse_captured(void);                /* relative mode as tps_update_mouse_mode last set it */
 void tps_frame(void);                         /* game thread, frame hand-off */
 
 #ifdef __cplusplus

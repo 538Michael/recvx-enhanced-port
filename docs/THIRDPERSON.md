@@ -9,7 +9,8 @@ thread), `pc/src/host/tps.h`, `pc/src/input/tps_input.c` and the F1 overlay (set
 
 Toggle with **F5**, the `--third-person` command-line flag, or `tps = 1` in
 `<save dir>/recvx.ini`. It can be switched at any time; it only takes over in normal play.
-While it is on the mouse is captured (F1/F2/F3 free it).
+While it is on the mouse is captured whenever you have control (F1/F2/F3, a menu, a question or
+a puzzle with mouse support free it until you are back in control).
 
 | Key | Action |
 |---|---|
@@ -227,8 +228,16 @@ unit (the character is about 17 units tall).
   2 units (walking: 1).
 * Camera collision never feeds back into the aim: the crosshair ray starts at the wall-free
   shoulder point, and the camera position depends only on the player's position.
-* Mouse: SDL relative mode while third person is on and no overlay window is open; deltas are
-  consumed once per game frame.
+* Mouse: SDL relative mode while third person is on, the window has focus and no overlay window
+  is open, unless a screen with mouse support has it ("Mouse in menus", `menu_mouse.c`
+  `menu_mouse_cursor`). That screen flag never outlasts play: the game thread publishes each frame
+  whether the player has control (`g_menu_mouse.play`: `pc_in_play`, not the co-op trade screen),
+  and in play the mouse is the camera's whatever a screen left behind. A message's choices count
+  as a screen only while the message shows (`st_flg` 0x200): puzzles that end their choice with
+  `bhMesDispEndSet` on cancel (the Gold Luger room's switch panel, the office dial, the bio-lab
+  keypad) leave `st_flg` 0x8000 and `mes_seln` set until the next message. Deltas are consumed
+  once per game frame. `RECVX_MOUSE_TRACE=1` logs each change (captured, cursor, menu, play,
+  overlay, focus).
 
 ## Light and fog
 
