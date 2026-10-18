@@ -91,6 +91,15 @@ title menu, as after a game over. Anything not saved is lost; changed options ar
 right click answers NO. It works in the Battle Game too. In co-op, leaving ends the session: the
 partner plays on alone. The OPTION screen of the title menu does not have it.
 
+### Skipping the ending
+
+The ending movie and the credits can be skipped, which the PS2 version does not allow: any key,
+mouse button or gamepad button fades the ending movie out, and another press does the same for the
+credits. Only a press made while the movie is on screen counts, so a button still held from the last
+fight skips nothing. The results screen, what it unlocks (Battle Game, the rocket launcher for an A
+rank), the save of the system data and the return to the title come as after watching to the end.
+The total time still counts the skipped part, so the rank is the same either way.
+
 ## Settings
 
 All PC settings are available in two places that edit the same values:
