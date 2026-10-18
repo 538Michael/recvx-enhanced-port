@@ -11,6 +11,7 @@
 #include "../../decomp/include/ps2/veronica/prog/light.h"
 #include "../../decomp/include/ps2/veronica/prog/ps2_NinjaCnk.h"
 #include "../../decomp/include/ps2/veronica/prog/ps2_NaFog.h"
+#include "../../decomp/include/ps2/veronica/prog/playpch.h"
 #include "../src/host/tps.h"
 #include "../src/host/modern.h"
 #include "../src/host/bindings.h"
@@ -39,6 +40,7 @@ static int mouse_moved;           /* the mouse moved this frame (pc_input_active
 static float clip_near, clip_far; /* the game's clip range while we draw with ours */
 static int trace;                 /* RECVX_TPS_TRACE=1: log the free aim */
 static NJS_POINT3 aim_t;          /* free aim: the crosshair target (tps_calc_model) */
+static int aim_e;                 /* free aim: the enemy under the crosshair, -1: a wall or nothing */
 static int aim_h;                 /* free aim: the aim height bit given to the game (at_flg 4 up, 8 down), 0: none */
 static float bend_a;   /* the last free-aim bend (radians per node), 0: none */
 static float aim_corr;            /* free aim with a model: the drawn weapon's pitch minus the hand's (radians), eased */
@@ -709,12 +711,13 @@ static void aim_at_crosshair(void)
     if (bhCheckL2Wall(&line, 0x400, &len)) dist = len;
     sys->apos = apos; sys->ahtp = ahtp;
     wall = dist;
+    aim_e = -1;
     for (int i = 0; i < sys->ewk_n; i++) {
         BH_PWORK* e = &ene[i];
         float d;
         if (!aimable(e)) continue;
         d = ray_capsule(&sh, &dir, &e->watr);
-        if (d > 0 && d < dist) dist = d;   /* in front of the shoulder */
+        if (d > 0 && d < dist) dist = d, aim_e = i;   /* in front of the shoulder */
     }
     if (dist == wall && dist < AIM_MIN) dist = AIM_MIN;
     t.x = sh.x + dir.x * dist; t.y = sh.y + dir.y * dist; t.z = sh.z + dir.z * dist;
@@ -762,6 +765,107 @@ static void aim_at_crosshair(void)
                plp->wax * (360.0f / 65536.0f), dist, plp->at_flg & 0xE,
                sqrtf((o.x + w.x - t.x) * (o.x + w.x - t.x) + (o.y + w.y - t.y) * (o.y + w.y - t.y) + (o.z + w.z - t.z) * (o.z + w.z - t.z)), hp, eye.x, eye.y, eye.z);
     }
+}
+
+/* Dual weapons (WpnTab flg 0x800: the Gold Lugers, the sub machine guns; playpch.c): each arm fires along
+   ay plus a yaw of its own, the right (hand 9, CheckGunHit at the shot) by arm_dr, the left (hand 13, two
+   ticks later) by arm_dl, and PlyPchMain turns each arm by arm_ar / arm_al eased towards them. The game sets
+   them only at its lock-on (SetLockOnDirection: raising the weapon, L1), relative to the facing it turns to
+   then (between two enemies in front of it, each arm on one). Free aim turns the character to the crosshair
+   instead, so the arms stayed turned by those offsets: held outwards, firing past the crosshair at where the
+   enemies had been. Free aim sets them every tick: one arm at the crosshair target, the other at the nearest
+   other enemy within DUAL_YAW / DUAL_PITCH of the crosshair direction and in range, on the side of that arm
+   (as the game, which gives the left arm the enemy further left), else at the crosshair target too; each
+   yaw from its own muzzle (the shot's origin), within DUAL_YAW. The pitch (wax, the bend) and the aim height
+   stay the crosshair target's, so the other enemy must take the same aim height. */
+#define DUAL_YAW DEG(28.0f)
+#define DUAL_PITCH DEG(15.0f)
+static int dual_e = -1;   /* the other arm's enemy, -1: none (trace) */
+
+/* the muzzle of the weapon in hand `node` as drawn last tick, turned about the player with its facing since (ay0) */
+static void muzzle(int node, int ay0, float* m)
+{
+    const float* h = plp->mlwP->owP[node].mtx;
+    float z = WpnTab[plp->wpnr_no].wp_fps1.z, x = h[8] * z + h[12] - plp->px, y = h[10] * z + h[14] - plp->pz;
+    float tr = RAD((short)(plp->ay - ay0)), c = cosf(tr), s = sinf(tr);
+    m[0] = plp->px + x * c + y * s; m[1] = h[9] * z + h[13]; m[2] = plp->pz - x * s + y * c;
+}
+
+/* an arm's yaw from its muzzle m to t, relative to the facing, within DUAL_YAW */
+static int arm_yaw(const float* m, const float* t)
+{
+    float a = wrap(atan2f(-(t[0] - m[0]), -(t[2] - m[2])) * (32768.0f / 3.14159265f) - (short)plp->ay);
+    return (int)(a > DUAL_YAW ? DUAL_YAW : a < -DUAL_YAW ? -DUAL_YAW : a);
+}
+
+static void dual_aim(int ay0)
+{
+    PP_WORK* pp = (PP_WORK*)plp->exp2;
+    float r[3], l[3], t[3], best = 0;
+    int cls = plp->at_flg & 0xE, left = 0, prev = dual_e, keep = 0;
+    muzzle(9, ay0, r);
+    muzzle(13, ay0, l);
+    dual_e = -1;
+    for (int i = 0; i < sys->ewk_n; i++) {
+        BH_PWORK* e = &ene[i];
+        const NJS_CAPSULE* c = &e->watr;
+        float x = (c->c1.x + c->c2.x) / 2 - plp->px, y = (c->c1.y + c->c2.y) / 2 - plp->py, z = (c->c1.z + c->c2.z) / 2 - plp->pz;
+        float h = sqrtf(x * x + z * z), d = sqrtf(h * h + y * y), dy, p, w = i == prev ? 1.15f : 1.0f;
+        int k;
+        NJS_CAPSULE cap;
+        NJS_POINT3 apos;
+        ATR_WORK* ahtp;
+        /* what the game's own search takes (playpch.c bhSearchEnemy) */
+        if (i == aim_e || !aimable(e) || (e->flg2 & 0x10) || (e->stflg & 0x40000000) ||
+            ((e->flg & 0x80) && (((O_WRK*)e->lkwkp)->stflg & 0x1000000)) || h < 1.0f || d > WpnTab[plp->wpnr_no].l || (i != prev && (keep || (best > 0 && d >= best))))
+            continue;   /* (the last tick's enemy is kept while it stays in a slightly wider cone: else two at the
+                           cone's edge or at the same distance took turns, and the arms swung between them) */
+        dy = wrap(atan2f(-x, -z) * (32768.0f / 3.14159265f) - (short)plp->ay);   /* > 0: left of the crosshair */
+        p = atan2f(y - 11.0f, h) * (32768.0f / 3.14159265f);
+        k = p > 4096 ? 4 : p < -4096 || y < 6.0f ? 8 : 2;   /* its aim height, as aim_at_crosshair */
+        if (fabsf(dy) > DUAL_YAW * w || fabsf(p - plp->wax) > DUAL_PITCH * w || (cls && k != cls)) continue;
+        {   /* in sight of the arm's muzzle (the game's test from the player's head) */
+            const float* m = dy > 0 ? l : r;
+            cap.c1.x = m[0]; cap.c1.y = m[1]; cap.c1.z = m[2];
+            cap.c2.x = plp->px + x; cap.c2.y = plp->py + y; cap.c2.z = plp->pz + z;
+            cap.r = 0.1f;
+            apos = sys->apos; ahtp = sys->ahtp;
+            k = bhCheckC2WallN(&cap, 0x40000400);
+            sys->apos = apos; sys->ahtp = ahtp;
+            if (k) continue;
+        }
+        best = d; dual_e = i; left = dy > 0; keep = i == prev;
+        t[0] = plp->px + x; t[1] = plp->py + y; t[2] = plp->pz + z;
+    }
+    if (dual_e < 0) t[0] = aim_t.x, t[1] = aim_t.y, t[2] = aim_t.z;
+    pp->arm_dr = arm_yaw(r, left ? &aim_t.x : t);
+    pp->arm_dl = arm_yaw(l, left ? t : &aim_t.x);
+    pp->count = 3;                         /* PlyPchMain: the arms a third of the way there per tick */
+    pp->hed_rate = left || dual_e < 0 ? 65536 : 0;   /* the head follows the arm at the crosshair (PlyPchMain: 65536 the right) */
+}
+
+/* RECVX_TPS_TRACE, dual weapons: each arm's shot (the right one when gun_delay is set, the left two ticks
+   later) with its yaw, its enemy and the enemies' health */
+static void trace_dual(void)
+{
+    static int last = -1;
+    const PP_WORK* pp = (const PP_WORK*)plp->exp2;
+    int arm = pp->gun_delay == 1 && last != 1 ? 'R' : pp->gun_delay == -1 && last == 0 ? 'L' : 0;
+    char hp[256];
+    int n = 0;
+    last = pp->gun_delay;
+    if (!arm) return;
+    for (int i = 0; i < sys->ewk_n && n < (int)sizeof(hp) - 24; i++)
+        if ((ene[i].flg & 1) && (ene[i].flg & 0x20)) {   /* health, degrees off the facing (> 0 left), distance */
+            const NJS_CAPSULE* c = &ene[i].watr;
+            float x = (c->c1.x + c->c2.x) / 2 - plp->px, z = (c->c1.z + c->c2.z) / 2 - plp->pz;
+            n += snprintf(hp + n, sizeof(hp) - n, " %d:%d@%.0f/%.0f", i, ene[i].hp,
+                          wrap(atan2f(-x, -z) * (32768.0f / 3.14159265f) - (short)plp->ay) * (360.0f / 65536.0f), sqrtf(x * x + z * z));
+        }
+    printf("tps: DUAL %c shot wpn %d ay %.1f wax %.1f arm_dr %.1f arm_dl %.1f (shown %.1f %.1f) crosshair enemy %d (%s arm) other %d, aim height %d, hp%s\n",
+           arm, plp->wpnr_no, (short)plp->ay * (360.0f / 65536.0f), plp->wax * (360.0f / 65536.0f), pp->arm_dr * (360.0f / 65536.0f),
+           pp->arm_dl * (360.0f / 65536.0f), pp->arm_ar * (360.0f / 65536.0f), pp->arm_al * (360.0f / 65536.0f), aim_e,
+           pp->hed_rate ? "right" : "left", dual_e, plp->at_flg & 0xE, hp);
 }
 
 /* how far the barrel of the weapon in hand matrix h (along the hand's x axis from the muzzle
@@ -902,8 +1006,9 @@ void tps_player(void)
         mouse_dx = stick_yaw = 0;
         look(g_tps.aim_sens / 100.0f, 1.0f);
         static int lock = -1;   /* test aid (RECVX_TPS_TRACE=2): follow the enemy the game locked on to */
-        if (plp->flg & 0x100000) lock = plp->src_no;
-        if (trace > 1 && lock >= 0 && (ene[lock].flg & 3) == 1) {   /* at RECVX_TPS_AIM_AT along its hit capsule (0 c1 .. 1 c2) */
+        if (plp->flg & 0x100000)   /* (dual weapons: the nearest enemy of their lock-on, playpch.c SetLockOnDirection) */
+            lock = (WpnTab[plp->wpnr_no].flg & 0x800) && plp->exp2 ? (int)(((PP_WORK*)plp->exp2)->LckTbl[0] - ene) : plp->src_no;
+        if (trace > 1 && lock >= 0 && lock < sys->ewk_n && (ene[lock].flg & 3) == 1) {   /* at RECVX_TPS_AIM_AT along its hit capsule (0 c1 .. 1 c2) */
             NJS_CAPSULE* c = &ene[lock].watr;
             NJS_POINT3 eye, dir, sh;
             float dx, dy, dz, f = getenv("RECVX_TPS_AIM_AT") ? (float)atof(getenv("RECVX_TPS_AIM_AT")) : 0.5f;
@@ -917,7 +1022,14 @@ void tps_player(void)
             plp->flg &= ~0x100000;
             plp->stflg &= ~0x800;
         }
-        aim_at_crosshair();
+        {
+            int ay0 = plp->ay;
+            aim_at_crosshair();
+            if ((WpnTab[plp->wpnr_no].flg & 0x800) && plp->exp2) {   /* dual weapons; lowering them: the game's */
+                if (plp->mode2 != 68) dual_aim(ay0);
+                if (trace) trace_dual();
+            }
+        }
         return;
     }
     if (pad_cam && plp->mode1 == 0) {   /* gamepad: towards the left stick's direction from the camera */
