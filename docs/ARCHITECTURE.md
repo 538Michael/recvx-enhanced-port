@@ -403,6 +403,13 @@ village, collision. The render thread (GS emulation, replays: `r_exec`, `r_inter
     `PlayStartMovieEx` stops the BGM and voice streams, and room scripts that want the background
     SE (MIDI) gone stop it themselves before the movie (`BGSeOff`); the graveyard's rain plays on
     under its movie, as on the PS2.
+  - **Ending skip**: room 9/36's last event plays the ending (`MV_021`) and the credits (`MV_015`,
+    a 4:3 movie), then `RankingCall`; both have no cancel bit in `MovieTypeDef`. `sdfunc.c
+    PlayStartMovieEx` gives them cancel with a fade (the intro's), and a press counted by
+    `pc_intro_pressed` since the movie began (not the pad's edge) is their cancel button. The fade
+    starts from the picture (the room's black screen fade behind it is cleared first), and the play
+    time, which counts on through these movies, gets the vblanks the movie had left
+    (`pc_movie_vblanks_left`), so the results are those of the movie watched to its end.
   - The game's sprite (`vbrank_draw`, as on the PS2) draws the frame, so size, position and
     the screen fades drawn over it are the game's. Before it, `stream_movie` puts the frame
     number into the GS stream; the **render thread** (`gs_gl.c gs_movie_bind`) uploads the

@@ -84,7 +84,8 @@ void  pc_native_strip(const unsigned short* idx_uv, int n, const struct VU1_STRI
 int   pc_screen_filter_mode(void);
 int   pc_skip_door_demo(void);       /* "Skip door animations" Instant: the load screen, no demo */
 int   pc_door_skip_pressed(int start);   /* Skippable: a press since the demo began (start: it begins now) */
-int   pc_intro_pressed(int start);       /* boot logos, intro movie: a press since the screen began (start: it begins now) */
+int   pc_intro_pressed(int start);       /* boot logos, intro movie, ending and credits: a press since the screen began (start: it begins now) */
+int   pc_movie_vblanks_left(int frames); /* the playing movie of that many pictures: vblanks until it would end by itself */
 int   pc_fast_loading(void);         /* "Fast loading": room sound packs and texture lists at once */
 /* mods folder (pc/src/audio/adx.c, docs/modding/README.md "The mods folder"): size of <mods>/name or -1; ADXF handle or NULL */
 int   pc_mod_file_size(const char* name);

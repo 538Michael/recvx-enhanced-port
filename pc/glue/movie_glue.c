@@ -147,6 +147,17 @@ void termAll(void)
     rmi.iMovieState = 0;
 }
 
+/* vblanks until the playing movie of `frames` pictures would end by itself (readMpeg's end test),
+   all of it before it plays; a skipped ending adds them to the play time (sdfunc.c) */
+int pc_movie_vblanks_left(int frames)
+{
+    int64_t left;
+    if (rmi.iMovieState != MOVIE_STAT_PLAYING) return 2 * (skip_movies ? 30 : frames);
+    if (skip_movies) return 2 * (30 - skip_frames);   /* RECVX_SKIP_MOVIES: 30 game frames */
+    left = 2 * (int64_t)(frames - clock_ofs) - (int64_t)(ps2_vblank_count() - start_vblank - paused_total);
+    return left > 0 ? (int)left : 0;
+}
+
 /* the SPU2's sound data input volume, 0..0x7FFF (full); the game's ps2mwPlySetOutVol gives 0x7FFF at 0 dB */
 void changeInputVolume(u_int val) { audio_movie_volume((val & 0xFFFF) / 32767.0f); }
 int sendToIOP(int dst, u_char* src, int size) { (void)dst; (void)src; (void)size; return 0; }

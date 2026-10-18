@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Gameplay
+
+- **Skippable ending and credits**: press any key, mouse button or gamepad button to skip the
+  ending movie, and press again to skip the credits. The results screen, your unlocks and the
+  save after the ending still come as usual, and the next movies keep their sound.
+
 ### Enemies
 
 - **Custom enemies and Mutated Steve**: the enemy spawner now lists custom enemies at the end,
