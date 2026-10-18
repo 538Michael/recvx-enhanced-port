@@ -442,7 +442,7 @@ The F2 window (also the EXTRAS page of ENHANCED SETTINGS) is meant for testing a
 - add any item to the inventory, and view the inventory;
 - spawn an enemy of any type in front of you ([ENEMIES.md](ENEMIES.md)); custom enemies follow the
   game's types at the end of the list, marked "[C] ": Mutated Steve (Steve's monster form that can
-  be killed: the Tyrant's moves and death, tougher than the Tyrant) and those of `mods/enemies.ini`;
+  be killed: his own moves, the Tyrant's death) and those of `mods/enemies.ini`;
 - teleport to any room through the game's door transition: choose a **location** (an area of the
   game; Claire's and Chris's halves are listed separately, Chris's are the last three), a
   **room** and an **entry** (where you arrive). Rooms carry the save menu's name where the game

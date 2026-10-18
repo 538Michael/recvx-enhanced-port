@@ -10,13 +10,20 @@
  *    one per model in the room), with sub-models on its nodes (attach), and the drawn size (scale);
  *  - sdfunc.c RequestEnemySeBasic (pc_variant_sound): sound programs of the base played from another
  *    room's enemy sound bank;
- *  - its motion set: a copy of the base's with motions swapped (motions), set at the spawn.
+ *  - its motion set: a copy of the base's with motions swapped (motions), set at the spawn;
+ *  - motions of another enemy (the donor: its model's skeleton and motion set, read from its room file
+ *    as the spawner reads enemies, no textures): while the base plays a mapped motion, and when it dies
+ *    (death: the donor's motions in turn, the last held), the donor's skeleton is posed in that motion at
+ *    the enemy's place and the base's own model (or `model`) is drawn retargeted from it.
  * Its parts and children (linked to it) count as the variant. Everything is keyed by the variant id,
  * which co-op spawn notes carry, so a guest makes the same enemy.
  */
 #include "../../decomp/include/ps2/veronica/prog/types.h"
 #include "../../decomp/include/ps2/veronica/prog/main.h"
 #include "../../decomp/include/ps2/veronica/prog/MdlPut.h"
+#include "../../decomp/include/ps2/veronica/prog/Motion.h"
+#include "../../decomp/include/ps2/veronica/prog/binfunc.h"
+#include "../../decomp/include/ps2/veronica/prog/dread.h"
 #include "../src/host/actors.h"
 #include "../src/host/enemies.h"
 #include "../src/host/variants.h"
@@ -35,6 +42,7 @@ extern int enemy_room_gen;              /* enemyopt_glue.c */
 int pc_variant_n;                       /* variant enemies in this room */
 static unsigned short slot_var[128];    /* slot -> variant id (the variant's body) */
 static float steps[128], dam_left[128];
+static int death_t[128];                /* ticks since it died (flg & 2), -1 alive */
 static short vmodel[VSLOTS] = { -1, -1 };   /* catalogue model shown in variant display slot k */
 static struct { unsigned short id; MN_WORK set[512]; } mset[VSETS];
 static struct { unsigned short id; signed char bank; } vbank[VARIANT_MAX];
@@ -71,6 +79,114 @@ static int model_slot(int model)
     return at;
 }
 
+/* the "You appear as" catalogue entry of v's base (its own look, drawn posed from a donor), -1 */
+static int self_model(const EnemyVariant* v)
+{
+    int i;
+    for (i = 0; i < ACTOR_MODELS; i++)
+        if (actor_models[i].id == v->type && actor_models[i].mdlver == v->mdlver) return i;
+    return -1;
+}
+
+/* the model v is drawn as when it is not drawn as its base: `model`, else its own for the donor's motions */
+static int drawn_model(const EnemyVariant* v) { return v->model >= 0 ? v->model : v->donor_type ? self_model(v) : -1; }
+
+/* ---------------------------------------------------------------- the donor
+   Another enemy's skeleton (its first sub-model's nodes) and motion set, from the room file the spawner reads it
+   from (actor_find), realized in a buffer of our own; no textures (it is never drawn). One donor at a time,
+   kept until another is needed. */
+#define DONOR_SIZE (2 << 20)
+static unsigned char dbuf[DONOR_SIZE] __attribute__((aligned(64)));
+static int donor_key = -1;
+static O_WORK dow[64] __attribute__((aligned(16)));
+static MN_WORK dmth[512];
+static BH_PWORK dw;
+
+const ActorModel* spawn_entry(int i);
+int spawn_base_count(void);
+static const ActorModel* entry_of(int type, int ver)
+{
+    int i;
+    for (i = 0; i < spawn_base_count(); i++)
+        if (spawn_entry(i)->id == type && spawn_entry(i)->mdlver == ver) return spawn_entry(i);
+    return NULL;
+}
+
+static int donor_load(int type, int ver)
+{
+    const ActorModel* am = entry_of(type, ver);
+    ActorData a;
+    unsigned char *p, *mtn;
+    int key = type << 8 | ver, mofs, nofs, dt, i;
+    if (key == donor_key) return 1;
+    donor_key = -1;
+    if (!am || !actor_find(am, &a) || !a.mtn) return 0;
+    mofs = (int)((unsigned int)a.mdl & 63);   /* (the data's alignment kept) */
+    nofs = ((mofs + a.mlen + 63) & ~63) + (int)((unsigned int)a.mtn & 63);
+    if (nofs + a.nlen > DONOR_SIZE) return 0;
+    memcpy(dbuf + mofs, a.mdl, a.mlen);
+    memcpy(dbuf + nofs, a.mtn, a.nlen);
+    memset(&dw, 0, sizeof(dw));
+    memset(dmth, 0, sizeof(dmth));
+    for (p = dbuf + mofs; (dt = *(int*)p) != -1; p += 4 + (dt > 0 ? dt : 0))   /* its first model (not a face mask, not skin) */
+        if (dt > 0 && *(int*)(p + 4) != 0x4B53414D && *(int*)(p + 4) != SKIN_MAGIC) { bhMlbBinRealize(p + 4, &dw.mdl[0]); break; }
+    if (!dw.mdl[0].objP || dw.mdl[0].obj_num > 64) return 0;
+    dw.mdl[0].owP = dow;
+    dw.mlwP = &dw.mdl[0];
+    dw.mdl_n = 1;
+    dw.mtx = (float(*)[16])dw.mtxbuf;
+    dw.flg = 0x1 | 0x1000;   /* bhCalcModel: the base matrix as set (the enemy's) */
+    for (i = 0, mtn = dbuf + nofs; (dt = *(int*)mtn) != -1 && i < 512; i++, mtn += 4 + dt)
+        if (dt) bhMnbBinRealize(mtn + 4, &dmth[i]);
+    dw.mnwP = dw.mnwPb = dmth;
+    donor_key = key;
+    host_log("variant: donor %s (type %d model %d) loaded: %d nodes, %d KB of motions\n", am->name, type, ver, (int)dw.mdl[0].obj_num, a.nlen >> 10);
+    return 1;
+}
+
+/* the donor posed in its motion m at frame frm (16.16, clamped to the motion) at enemy r's place; NULL: none */
+static BH_PWORK* donor_pose(const BH_PWORK* r, int m, int frm)
+{
+    int last;
+    if (m < 0 || m >= 512 || !dmth[m].datP || dmth[m].obj_num > dw.mdl[0].obj_num) return NULL;
+    last = ((int)dmth[m].frm_num - 1) << 16;
+    dw.mtn_no = (unsigned int)m;
+    dw.frm_no = frm < 0 ? 0 : frm > last ? last : frm;
+    dw.hokan_count = 0;
+    dw.mtn_md = 0;
+    bhSetMotion(&dw, 0, 0, NULL);
+    dw.px = r->px; dw.py = r->py; dw.pz = r->pz;
+    dw.ax = r->ax; dw.ay = r->ay; dw.az = r->az;
+    dw.draw_tp = r->draw_tp;
+    memcpy(dw.mtxbuf, r->mtx, sizeof(float) * 16);
+    bhCalcModel(&dw);
+    return &dw;
+}
+
+/* what enemy r's body shows from the donor now: its death (in turn, the last one's end held), or a mapped motion at
+   the base's phase; NULL: its own */
+static BH_PWORK* donor_now(const EnemyVariant* v, BH_PWORK* r)
+{
+    int s = (int)(r - ene), i;
+    if (!v->donor_type || donor_key != (v->donor_type << 8 | v->donor_mdlver)) return NULL;
+    if (v->death_n && (r->flg & 0x2)) {
+        int t = death_t[s] < 0 ? 0 : death_t[s];
+        for (i = 0; i < v->death_n; i++) {
+            int m = v->death[i], len = m >= 0 && m < 512 && dmth[m].datP ? (int)dmth[m].frm_num - 1 : 0;
+            if (t < len || i == v->death_n - 1) return donor_pose(r, m, t << 16);
+            t -= len;
+        }
+    }
+    if (r->mnwP == r->mnwPb && r->mnwP)
+        for (i = 0; i < v->dmotion_n; i++)
+            if (r->mtn_no == (unsigned int)v->dmotion[i][0]) {
+                int m = v->dmotion[i][1], own = (int)r->mnwP[r->mtn_no].frm_num;
+                long f = own > 0 && m < 512 ? (long)r->frm_no * dmth[m].frm_num / own : r->frm_no;   /* (long: 64 bits, pc_prelude.h) */
+                return donor_pose(r, m, (int)f);
+            }
+    return NULL;
+}
+
 /* room load (enemyopt_glue.c enemy_room_finished, before the randomizer) */
 void variant_room(void)
 {
@@ -94,21 +210,25 @@ void variant_spawned(int slot, int id)
     const EnemyVariant* v = variant_by_id(id);
     BH_PWORK* ep = &ene[slot];
     const char* look = "its base's model";
-    int k, i;
+    int k, i, dm = v ? drawn_model(v) : -1;
     if (!v || ep->id != v->type) {
         host_log("variant: slot %d: %s %d, it plays as its base type %d\n", slot, v ? "not the base type of variant" : "unknown variant", id, ep->id);
         return;
     }
     slot_var[slot] = (unsigned short)id;
     steps[slot] = dam_left[slot] = 0;
+    death_t[slot] = -1;
     pc_variant_n++;
-    if (v->model >= 0) {
-        if ((k = model_slot(v->model)) < 0)
+    if (v->donor_type && !donor_load(v->donor_type, v->donor_mdlver))
+        host_log("variant: %s: donor type %d model %d not loaded: its own motions only\n", v->name, v->donor_type, v->donor_mdlver);
+    if (dm >= 0) {
+        if ((k = model_slot(dm)) < 0)
             for (k = 0; k < VSLOTS && vmodel[k] >= 0; k++);
         if (k == VSLOTS) look = "no display slot left: its base's model";
-        else if (vmodel[k] == v->model) look = actor_models[v->model].name;
-        else if (actor_set(ACTOR_VARIANT + k, v->model) && actor_rigged(ACTOR_VARIANT + k)) { vmodel[k] = v->model; look = actor_models[v->model].name; }
+        else if (vmodel[k] == dm) look = actor_models[dm].name;
+        else if (actor_set(ACTOR_VARIANT + k, dm) && actor_rigged(ACTOR_VARIANT + k)) { vmodel[k] = (short)dm; look = actor_models[dm].name; }
         else { actor_set(ACTOR_VARIANT + k, -1); look = "its model could not be loaded or mapped: its base's"; }
+        if (v->model < 0 && k < VSLOTS && vmodel[k] == dm) look = "its own (posed from the donor for the donor's motions)";
     }
     if (v->motion_n && ep->mnwPb) {   /* its own copy of the set, motions swapped */
         for (k = 0; k < VSETS && mset[k].id && mset[k].id != id; k++);
@@ -167,17 +287,22 @@ int pc_variant_pre(BH_PWORK* ep, int slot)
     return runs;
 }
 
+/* after its step (a co-op puppet's too: its death plays from the dead flag the host sends) */
 void pc_variant_post(BH_PWORK* ep, int slot)
 {
-    const EnemyVariant* v;
-    (void)slot;
-    if (!pre_pl || pre_pl != plp || plp->hp >= pre_hp || !(v = of(ep))) return;
-    {
-        int hp = pre_hp - (int)lroundf((pre_hp - plp->hp) * v->damage);
-        if (plp->hp >= 0) plp->hp = hp < 0 ? -1 : hp;   /* (a blow the game made fatal stays fatal) */
-    }
+    const EnemyVariant* v = of(ep);
+    BH_PWORK* pl = pre_pl;
     pre_pl = NULL;
+    if (!v) return;
+    if (v->death_n && ep == root(ep)) death_t[slot] = (ep->flg & 0x2) ? death_t[slot] + 1 : -1;   /* the ticks of its death */
+    if (pl && pl == plp && plp->hp < pre_hp && plp->hp >= 0) {   /* (a blow the game made fatal stays fatal) */
+        int hp = pre_hp - (int)lroundf((pre_hp - plp->hp) * v->damage);
+        plp->hp = hp < 0 ? -1 : hp;
+    }
 }
+
+/* the decomp asks: ep (or the enemy it belongs to) is an enemy variant (en17.c: Monster Steve's killable ways) */
+int pc_variant_is(BH_PWORK* ep) { return of(ep) != NULL; }
 
 /* ---------------------------------------------------------------- drawing */
 /* its node matrices scaled by s about (x, y, z), or back (1 / s) */
@@ -211,14 +336,17 @@ static void attach_draw(BH_PWORK* w, int sub, int node)
 int pc_variant_draw(BH_PWORK* ep)
 {
     const EnemyVariant* v = of(ep);
-    BH_PWORK* r;
-    int k, i;
+    BH_PWORK *r, *src;
+    int k, i, dm;
     if (!v) return 0;
     r = root(ep);
-    if (v->model >= 0 && (k = model_slot(v->model)) >= 0) {
+    src = donor_now(v, r);
+    dm = src ? drawn_model(v) : v->model;
+    if (!src) src = r;
+    if (dm >= 0 && (k = model_slot(dm)) >= 0) {
         BH_PWORK* w;
         if (ep != r) return (ep->flg & 0x80) != 0;   /* its body's parts: the model stands in for all of them */
-        actor_pose(ACTOR_VARIANT + k, ep);
+        actor_pose(ACTOR_VARIANT + k, src);
         if (!(w = actor_work(ACTOR_VARIANT + k))) return 0;
         w->draw_tp = ep->draw_tp;
         if (v->scale != 1.0f) scale_nodes(w->mlwP, v->scale, ep->px, ep->py, ep->pz);

@@ -321,37 +321,40 @@ game).
 
 ### Built in: Mutated Steve
 
-Monster Steve's model on Tyrant 1's AI (id 1, F2 "[C] Mutated Steve").
+Monster Steve himself, killable (id 1, F2 "[C] Mutated Steve"): his own code (`en17.c`), model,
+arms, motions, attacks and sounds, spawned as an ordinary enemy, with the Tyrant's death.
 
-* **Why the Tyrant's AI**: Monster Steve's own code (`en17.c`) is written for the Antarctic
-  chase: its Die mode is empty and nothing ever moves him to it (HP 250, damage only staggers
-  him), his swing kills outright and his other blows kill below 120 hit points, and it drives room
-  light 2 (`bhEne17_SetLight`) and the camera. The Tyrant (`en19.c`, form 0, the randomizer's
-  Tyrant) walks, swings, staggers, kneels, falls and dies in any room.
-* **The look**: Monster Steve (catalogue model "Monster Steve", RM_9280 record 0) posed every time
-  it is drawn from the Tyrant's skeleton by the appearance system's humanoid retargeting
-  ([ACTORS.md](ACTORS.md) "Retargeting": the Tyrant's 26 nodes mapped as the source, Steve's 24 as
-  the model), plus his two arm pieces (sub-models 3 and 4: his claw and the axe arm, which his own
-  code links to nodes 9 and 13 as enemies 31/32) on his hands. The Tyrant itself is not drawn; it
-  stays what the game moves, hits and collides with.
-* **Death**: the Tyrant's own (damage 17, fall 18, lying 2; `flg & 2` set, the body stays down for
-  the visit), played by the Tyrant's skeleton and mapped onto Steve like every other motion: he
-  falls forward and stays face down. A record the randomizer turned into him keeps its kill bit,
-  so `DieCk` counts the kill; a spawned one has none (as every spawned enemy).
-* **Numbers** (Tyrant 1: 500 HP normal, 300 easy): hp x1.3 (650 / 390), damage x1.25 (the
-  Tyrant's blows 30/40/40/50 become 38/50/50/63; the player has 200), speed and size the Tyrant's.
-  Measured in the lift hall (3/0) from 4 m with auto-aim: 40 handgun hits, 9 grenade rounds (25
-  hits); the shotgun took him from 650 to 70 in 24 shells (about 28 in all). The Tyrant there: 30
-  handgun hits, 7 grenade rounds, 21 shells.
-* **Sounds** from his room's bank (RM_9280 bank 3, an extra bank): his steps, roar and axe striking
-  for the Tyrant's steps (program 0), swing (8, motion 9) and fall (5, motion 18); his hurt cry
-  (program 2, as `en17.c bhEne17_DamageAdd`) on every hit, which the Tyrant makes no sound for. The
-  Tyrant's other sound (6, a heavy stagger) stays the Tyrant's.
-* **Hits on the player** are the Tyrant's (the player plays the Tyrant's damage motions 30..45 from
-  its set with the busy flag set, released at the end); checked with Claire, Chris played, and
-  "You appear as" Chris's file and Monster Steve: each hit 70 steps in mode 5, then back in
-  control.
-* Randomizer: weight 1 in Wild, never in Mild, heavy (below).
+* **Outside his chase**: his code is written for the Antarctic chase (RM_9280): no hit takes his
+  hit points (250), his Die mode is empty and nothing moves him there, his axe swing (motion 2)
+  kills outright and his other heavy blows (motions 15, 16) kill below 120 hit points and take 120
+  otherwise, and he drives room light 2 (`bhEne17_SetLight`) and shakes the camera
+  (`bhEne17_CameraControl`). For this variant only (`en17.c PC_VARIANT`: `pc_variant_is`, the enemy
+  is a variant, which a chase's room record never is):
+  * every hit takes his hit points (`bhEne17_DmgChk`); below 0 he goes to `bhEne17_Die`, which sets
+    `flg & 2` (dead, as every enemy: a record the randomizer turned into him keeps its kill bit and
+    `DieCk` counts it; a spawned one has none), stops his motion and his attacks, and leaves him
+    where he fell for the visit;
+  * his killing blows are heavy ones (`pc_steve_blow`): 50, as the Tyrant's heaviest, knocking the
+    player down as his 120-point blow does, times the variant's damage (1.25: **63**; the player
+    has 160 on normal, 320 on easy, so a player at full health always survives a blow); his close
+    swipe (motion 11, the player played from his set's motions 20..23) stays 30, x1.25: **38**;
+  * no room light and no camera shake.
+
+  The chase runs his code as on the PS2 (checked: RM_9280 with his record running, frame-identical
+  to the previous build).
+* **Death**: he has no death motion. The Tyrant's (donor 19.0: its fall 18, then lying 2, held at
+  its end; `en19.c` TY_BR0_DIE) is played by the Tyrant's skeleton at his place and retargeted onto
+  his own model ("Monster Steve", RM_9280 record 0, in a display slot of the appearance system) with
+  his claw and axe arm on its hands (sub-models 3 and 4 on nodes 9 and 13, as his code links them):
+  he falls forward and lies face down. His own body and arm enemies stay in their slots, not drawn.
+* **Numbers**: hp x3.4 (his 250 hit points: 850 of damage; the same on every difficulty, his code
+  has no HP table). Measured in the lift hall (3/0) from 4 m with auto-aim: about 42 handgun hits
+  (30 took 600), 15 shotgun shells, 5 grenade rounds (10 hits); Tyrant 1 there: 30, 21, 7. He walks,
+  charges and swings as in the chase; with no shots he hits a standing player about every 4 s.
+* **Hits on the player** are his own (busy flag set, released at the end): checked with Claire, Chris
+  played, and "You appear as" Chris's file and Monster Steve: each heavy blow 19 steps knocked
+  down, each close swipe 70 steps in his grab, then back in control.
+* Randomizer: weight 1 in Wild, never in Mild, heavy (below). Slots: 3 (him and his two arms).
 
 ### What is applied where
 
@@ -364,6 +367,7 @@ Monster Steve's model on Tyrant 1's AI (id 1, F2 "[C] Mutated Steve").
 | speed | steps per frame (0.5..2: AI, motions and movement together; below 1 a step is skipped, never one with a hit) | `pc_variant_pre` |
 | scale | drawn size (node matrices scaled about its position); hits and collision stay the base's | `pc_variant_draw` |
 | motions | its own copy of the base's motion set with entries swapped (`a:b`: it plays b where the base asks for a); 4 such sets per room | `variant_spawned` |
+| motions `a:T:b`, death | another enemy's motions (the donor T, one per variant): its first sub-model's skeleton and its motion set read from its room file as the spawner reads enemies (`actor_find`, no textures, 2 MB buffer, one donor at a time); while the base plays `a`, and once it is dead (`flg & 2`: the death motions in turn, timed by the steps since, the last one's end held), the donor is posed in that motion at the enemy's place and the base's own catalogue model (or `model`) is drawn retargeted from it, the base's linked parts hidden | `pc_variant_post` (the death's steps, a co-op puppet's too), `pc_variant_draw` |
 | sounds, sound_map, hurt_sound | that room's bank 3 as an extra bank ("Sounds of added types"); a request of a mapped base program plays the other program from it; the hurt sound is requested on a hit, on the voice channel (whose bank is kept apart from the other channel's, `sdfunc.c`) | `sdfunc.c RequestEnemySeBasic` -> `pc_variant_sound` |
 
 Its parts and children (linked to it) count as the variant. With no variant in the room
@@ -386,7 +390,9 @@ armour = 1               ; damage taken: weapon damage x armour / hp
 damage = 1.5             ; damage dealt to the player
 speed = 1.5              ; 0.5..2
 scale = 1.4              ; drawn size, 0.25..4
-motions = 4:2            ; up to 8 pairs: plays motion 2 of its set where the base asks for 4
+motions = 4:2, 6:19:16   ; up to 8 of each: plays motion 2 of its own set where the base asks for 4,
+                         ;   and shows motion 16 of enemy 19 (the Tyrant; type[.model version]) for 6
+death = 19.0: 18, 2      ; when it dies: the Tyrant's motions 18, then 2, the last one's end held
 sounds = 9280            ; room file whose enemy sound bank sound_map and hurt_sound use
 sound_map = 0:0, 8:9     ; up to 16 pairs of sound programs: the base's -> that bank's
 hurt_sound = 2           ; that bank's program played when a hit lands
@@ -409,13 +415,14 @@ every sound a variant requests with its motion and frame.
   not where the script uses `rm_flg` bits 29..31), plus `big`, `heavy` (one per room) and `stages`;
   its slot cost is the larger of `slots` and the base's. It replaces free and script-shown records
   only (event-driven records keep their type), never in boss rooms (the whole room is kept). The
-  log says `-> Mutated Steve (variant 1: type 19 model 0)`. In tours of 81 rooms with enemies (6
-  seeds, Wild) he took one record in 0..1 rooms per seed (3060, 3170, 7130), none in the 16 boss
+  log says `-> Mutated Steve (variant 1: type 17 model 0)`. In tours of 72 rooms with enemies (6
+  seeds, Wild) he took one record in 0..1 rooms per seed (3060, 3170, 7130), none in the 12 boss
   rooms reached. Extra enemies copy a randomized
   record's variant too. Its grab family is its base type's (the hold rule keys on the type).
 * **Co-op**: the spawn note's `variant` field (formerly padding; the protocol is unchanged) carries
   the id; the guest realizes the base into the same slot and applies the same variant (model,
-  motions, sounds), after which the enemy is an ordinary puppet; its hits on the guest come from
+  motions, donor, sounds), after which the enemy is an ordinary puppet (its death plays from the
+  dead flag the host sends); its hits on the guest come from
   the host's step (damage already scaled). The randomizer draws the same variants on both sides
   **only if both have the same variants**: partners need the same `mods/enemies.ini`. An unknown
   id plays as its base type (logged).
@@ -425,8 +432,10 @@ every sound a variant requests with its motion and frame.
 
 * The model is only drawn: hits, collision, the shadow and the camera follow the base's skeleton
   (a model much larger than its base is hit where the base is).
-* Motions map within the base's set. A model gets the base's motions through the retargeting, so
-  another type's death plays by choosing that type as the base.
+* One donor per variant; one donor loaded at a time (another variant's donor in the same room: its
+  donor motions are not shown). The model only takes the donor's rotations (retargeting, humanoid
+  skeletons): a donor motion snaps in without blending, and its hits, collision and shadow stay the
+  base's (a dead body's where it stood).
 * Two different models per room (a third: its base is drawn); 4 swapped motion sets per room.
 * Sound programs are per type: `sound_map` must name programs of the bank it uses; nothing checks
   that they fit.
