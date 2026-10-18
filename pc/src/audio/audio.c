@@ -93,6 +93,7 @@ void audio_movie_volume(float gain)
     if (movie_stream) SDL_SetAudioStreamGain(movie_stream, movie_gain * g_config.music_volume / 100.0f);
     SDL_UnlockMutex(lock);
 }
+float audio_movie_gain(void) { return movie_gain * g_config.music_volume / 100.0f; }
 void audio_movie_close(void)
 {
     SDL_AudioStream* s;
