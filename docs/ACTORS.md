@@ -355,27 +355,32 @@ co-op (the partner sees it too) and in cutscenes to the event double of the char
 
 ### The list
 
-The menus list one entry per distinct look: "As played", the five player files and 50 catalogue
-models (56 entries instead of 68). They share `actors.c` `appear_count`, `appear_at`,
-`appear_pos`, `appear_step`, `appear_name`, `appear_canon`; the list is filtered for display only,
-so catalogue indices, `g_coop.chr`, `Pose.chr` and the cutscene doubles are unaffected. A hidden
-value in `recvx.ini` is mapped to its listed twin when the file is read. Test: ctest `appear`
-(`pc/tests/test_appear.c`).
+The menus list one entry per distinct look: "As played", the five player files, 50 catalogue
+models and, last, the player characters' four cutscene models (60 entries instead of 68). They share
+`actors.c` `appear_count`, `appear_at`, `appear_pos`, `appear_step`, `appear_name`, `appear_canon`;
+the list is filtered and ordered for display only, so catalogue indices, `g_coop.chr`, `Pose.chr`
+and the cutscene doubles are unaffected (no protocol change). A hidden value in `recvx.ini` is
+mapped to its listed twin when the file is read. Test: ctest `appear` (`pc/tests/test_appear.c`).
 
 Left out of the menus (`twins[]`):
 
 | Hidden (catalogue index) | Shown instead | Why |
 |---|---|---|
-| Claire (cutscene model) 0 | Claire (player file) | same look |
-| Chris (cutscene model) 1, (event model) 2 | Chris | same look |
-| Steve (cutscene model) 3, (event model) 4 | Steve | same look |
-| Wesker (cutscene model) 5, (event models) 6, 7 | Wesker | same look; the doubles wear the sunglasses as a separate prop |
+| Chris (event model) 2 | Chris | same look |
+| Steve (event model) 4 | Steve | same look |
+| Wesker (event models) 6, 7 | Wesker | same look; the doubles wear the sunglasses as a separate prop |
 | Alfred Ashford 2 (9), (event model) 11 | Alfred Ashford (8) | same uniform |
 | Tyrant 2 (18) | Tyrant (17) | one extra blood stain |
 | Bandersnatch 2 (23) | Bandersnatch (22) | only its long arm (event piece) |
 
 Kept although related: "Alfred Ashford (wounded)", "Hunter (Sweeper)" and every zombie variant.
-Order: As played, the player files, the cast, the creatures, the zombies.
+Order: As played, the player files, the cast, the creatures, the zombies, then the cutscene models
+of Claire (0), Chris (1), Steve (3) and Wesker (5) (`tail[]`): listed next to the player files,
+each would follow the same character's file. They are the event doubles' meshes: no hands (the
+unarmed pieces are drawn, as for the rest of the cast), and no head part of their own (Claire's
+cutscene model has no ponytail and Wesker's no sunglasses: in cutscenes the scripts link the
+player's `sys->obwp[2]` to the double). Earlier versions hid them as twins of the player files;
+their stored values stayed valid.
 
 Models not in the catalogue:
 
@@ -564,6 +569,9 @@ weapon of a hand the model lacks floated at the invisible source's hand.
   skeleton. The model is loaded at the hand-off while the room has such a double (player files
   too: `ACTOR_PART + n` loads part file `10 + n` as a display model). Creatures without a humanoid
   node map do not replace doubles.
+* The played character's own cutscene model chosen (Claire's while Claire is played) replaces no
+  double (`actor_doubles`): the double is that model already, with its face, hand pieces and the
+  linked head part.
 * **Hands are objects**: the cast's cutscene models have no hands; the room script links hand
   pieces (fist, open hand, holding poses) and props to the double's hand nodes and swaps them per
   gesture. `actor_double_tick` (from `coop_control_remote`, after `bhControlEnemy`, before

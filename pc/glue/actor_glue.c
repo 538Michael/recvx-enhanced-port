@@ -1471,6 +1471,7 @@ void actor_doubles(int idx)
     static const signed char twin[5] = { 0, 1, 3, 5, -1 };   /* the player files' cutscene models (a face mask): Claire, Chris, Steve, Wesker */
     if (!g_appear_cutscene) idx = -1;
     if (g_appear_face && idx >= ACTOR_PART && idx < ACTOR_PART + 5 && twin[idx - ACTOR_PART] >= 0) idx = twin[idx - ACTOR_PART];
+    if (idx >= 0 && idx < ACTOR_MODELS && actor_models[idx].id == doubles[pid][0]) idx = -1;   /* the played character's own cutscene model: the game's double (its face, its hands) */
     if (idx >= 0)
         for (i = 0; i < (int)sys->ewk_n && i < 128 && !any; i++)
             for (j = 0; j < 3; j++) any |= (ene[i].flg & 0x1) && doubles[pid][j] && ene[i].id == doubles[pid][j];

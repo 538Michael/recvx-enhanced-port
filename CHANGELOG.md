@@ -39,6 +39,14 @@
 - **No hitch when a game starts**: the short freeze when going from the title into the game is
   gone.
 
+### Appearance
+
+- **Cutscene models are back in "You appear as"**: Claire, Chris, Steve and Wesker as they look
+  in the cutscenes can be chosen again, in F1, F3, ENHANCED SETTINGS and the lobby. They are at the
+  end of the list, so each character no longer shows up twice in a row. Claire's cutscene model has
+  no ponytail and Wesker's no sunglasses (the game's cutscenes add them separately). Choosing the
+  cutscene model of the character you play keeps the game's own cutscenes, with faces and lip sync.
+
 ### Fixes
 
 - **Mouse stuck after a puzzle**: backing out of a puzzle that asks you to pick a button or a
