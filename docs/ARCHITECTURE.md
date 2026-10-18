@@ -450,8 +450,10 @@ village, collision. The render thread (GS emulation, replays: `r_exec`, `r_inter
   while its key is held the Combat Knife is equipped through the inventory's own `WeaponSet` and
   raised (ready bit 0x10), so ammo, hit checks, aiming and the co-op partner's view are the game's
   own. It waits until the player is back to a neutral state (not aiming, reloading, grabbed, in a
-  menu, event or door), and on release restores the previous weapon (or the same item in another
-  slot) once the knife is lowered. Nothing is restored if the weapon was changed meanwhile.
+  menu, event or door; the idle animation after ten seconds of standing counts, as the game's own
+  aim breaks it), and on release restores the previous weapon (or the same item in another slot)
+  once the knife is lowered. Nothing is restored if the weapon was changed meanwhile, or if the
+  game ended (`bhExitGame` -> `knife_game_exit`).
 - **Reload** (`pc/glue/reload_glue.c`, hooked in `bhControlPlayer` after the mode handler, where
   the game's own trigger-pull reload switches to it): on a press of a reload row (`pad_reload`: the
   game row, or in third person `tps_reload`) with the magazine not full, the game's

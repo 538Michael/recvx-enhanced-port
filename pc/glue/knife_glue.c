@@ -8,7 +8,6 @@
 #include "../../decomp/include/ps2/veronica/prog/main.h"
 #include "../../decomp/include/ps2/veronica/prog/sub1.h"
 #include "../src/host/cheat.h"
-#include <stdio.h>
 #include <stdlib.h>
 
 int pad_quick_knife(void);
@@ -28,8 +27,12 @@ static unsigned int* inv(void) { return &sys->itm[sys->ply_id * 16]; }
 static int in_play(void) { return pc_in_play(plp, 0); }
 
 /* weapon down and standing, turning, walking, running or stepping back (not the quick turn,
-   not the idle animation, stairs, pushing, ...) */
-static int at_rest(void) { return in_play() && plp->mode1 == 0 && plp->mode2 <= 11 && !(plp->flg & 0x10000); }
+   stairs, pushing, ...), or in the idle animation (mode2 13, after 10 s standing: flg 0x10000 is
+   its pad lock, which the aim button breaks as from standing, bhCPM0_action) */
+static int at_rest(void)
+{
+    return in_play() && plp->mode1 == 0 && ((plp->mode2 <= 11 && !(plp->flg & 0x10000)) || plp->mode2 == 13);
+}
 
 static void equip(int slot)
 {
@@ -45,8 +48,8 @@ static void give_back(void)
     else if (ID(iv[prev_slot]) == prev_id) to = prev_slot;
     else
         for (i = 1; i <= n && !to; i++) if (ID(iv[i]) == prev_id) to = i;   /* moved */
-    printf("knife: back to %s (slot %d, item %d, count %d)\n", !prev_id ? "no weapon" : to ? "the weapon before" : "nothing (it is gone), the knife stays",
-           to, to && prev_id ? ID(iv[to]) : 0, to && prev_id ? iv[to] & 0xFFFF : 0);
+    host_log("knife: back to %s (slot %d, item %d, count %d)\n", !prev_id ? "no weapon" : to ? "the weapon before" : "nothing (it is gone), the knife stays",
+             to, to && prev_id ? ID(iv[to]) : 0, to && prev_id ? iv[to] & 0xFFFF : 0);
     if (to) equip(to);
     state = 0;
 }
@@ -69,9 +72,11 @@ static void trace(void)
     if (on < 0) on = getenv("RECVX_KNIFE_TRACE") != NULL;
     if (!on || n++ % 15) return;
     for (int i = 0; i < sys->ewk_n; i++) if (ene[i].flg & 1) hp += ene[i].hp;
-    printf("knife: trace state %d play %d rest %d mode %d/%d/%d/%d weapon %d inv %x %x %x %x enemy hp %.0f\n", state, in_play(), at_rest(), plp->mode0,
-           plp->mode1, plp->mode2, plp->mode3, plp->wpnr_no, iv[0], iv[1], iv[2], iv[3], hp);
+    host_log("knife: trace state %d play %d rest %d mode %d/%d/%d/%d weapon %d inv %x %x %x %x enemy hp %.0f\n", state, in_play(), at_rest(), plp->mode0,
+             plp->mode1, plp->mode2, plp->mode3, plp->wpnr_no, iv[0], iv[1], iv[2], iv[3], hp);
 }
+
+void knife_game_exit(void) { state = 0; }
 
 /* pad.c bhSetPad, before pad_ps is derived (virtual bits) */
 unsigned int knife_pad(unsigned int pad)
@@ -81,7 +86,7 @@ unsigned int knife_pad(unsigned int pad)
     if (!sys || !plp) return pad;
     iv = inv();
     if (state && (plp->mode0 == 3 || plp->hp <= 0 ||iv[0] != (unsigned int)knife_slot || ID(iv[knife_slot]) != KNIFE)) {
-        printf("knife: weapon changed elsewhere, nothing to give back\n");   /* inventory, script, game over */
+        host_log("knife: weapon changed elsewhere, nothing to give back\n");   /* inventory, script, game over */
         state = 0;
     }
     held = pc_quick_knife_on() && g_cheat.noclip != 2 && pad_quick_knife();
@@ -95,14 +100,14 @@ unsigned int knife_pad(unsigned int pad)
             own = iv[0] != (unsigned int)knife_slot;
             prev_slot = iv[0];
             prev_id = prev_slot ? ID(iv[prev_slot]) : 0;
-            printf("knife: drawn from slot %d (before: slot %d, item %d, count %d)\n", knife_slot, prev_slot, prev_id, prev_id ? iv[prev_slot] & 0xFFFF : 0);
+            host_log("knife: drawn from slot %d (before: slot %d, item %d, count %d)\n", knife_slot, prev_slot, prev_id, prev_id ? iv[prev_slot] & 0xFFFF : 0);
             if (own) equip(knife_slot);
             if (own && prev_id && knife_drop()) iv[prev_slot] = 0;
         }
     }
     if (state == 1 && !held) {
         state = own ? 2 : 0;
-        printf("knife: released in mode %d/%d%s\n", plp->mode1, plp->mode2, own ? "" : " (it was equipped before: it stays)");
+        host_log("knife: released in mode %d/%d%s\n", plp->mode1, plp->mode2, own ? "" : " (it was equipped before: it stays)");
     }
     if (state == 2 && at_rest()) give_back();   /* after the swing: the game lowers the knife first */
     if (state == 1 && in_play()) pad |= 0x10;   /* readied: fire slashes */
