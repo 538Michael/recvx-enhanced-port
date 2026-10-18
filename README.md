@@ -38,6 +38,8 @@ native paths replace the expensive parts. The game reads your own disc image in 
 - **Enhanced settings** in the game's own OPTION menu and an F1 overlay; full rebinding of keyboard,
   mouse and gamepad; per-window input source for local co-op on one PC.
 - **Cheats and debug tools** (F2), co-op window (F3).
+- **HD texture packs**: PCSX2 HD texture packs for the game load as they come, from
+  `mods/textures/` (see [HD texture packs](#hd-texture-packs)).
 - **Mods**: replacement room files and archive entries from a `mods/` folder, plus tools to build
   new rooms.
 - **Tooling** for determinism checks, rendering comparisons and profiling.
@@ -56,6 +58,28 @@ Prebuilt Linux and Windows builds and the co-op server are on the
 [Releases](https://github.com/aikatore/recvx-enhanced-port/releases) page (no game data
 included). Unpack and run `recvx.exe` (Windows) or `./recvx` (Linux); see
 [docs/USER_GUIDE.md](docs/USER_GUIDE.md).
+
+## HD texture packs
+
+HD texture packs made for the PCSX2 emulator (for SLUS-20184, the US release) work without
+conversion. None are included; use a pack you have.
+
+1. Create a `textures` folder inside the `mods` folder, which sits next to the game (beside
+   `recvx.exe` / `recvx` and the `save` folder): `mods/textures/`.
+2. Put the pack in there as it comes. Any of these layouts works:
+   - `mods/textures/SLUS-20184/replacements/...` (the folder from PCSX2's `textures` directory)
+   - `mods/textures/replacements/...`
+   - `mods/textures/<pack name>/...`, or the `.dds` files themselves
+3. Start the game. The log says `hd textures: N replacements in <folder>`.
+
+**Several packs and load order:** put each pack in its own folder and number the folders, for
+example `mods/textures/1_addon/` and `mods/textures/2_base/`. When two packs replace the same
+texture, the one in the folder that comes first by name wins, so `1_...` overrides `2_...`.
+
+Settings (F1 or ENHANCED SETTINGS, DISPLAY): **HD textures** turns packs on or off, **HD
+textures: UI** also uses redesigned menus, title and inventory (on), **HD textures: font** uses
+the pack's font (off). A pack in another folder: `hd_textures_dir = <path>` in `recvx.ini` or
+`--hd-textures <path>`. Details: [docs/USER_GUIDE.md](docs/USER_GUIDE.md#hd-texture-packs).
 
 ## Building from source
 
