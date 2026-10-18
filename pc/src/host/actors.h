@@ -79,6 +79,7 @@ int  actor_head(int who, float* out);   /* world position of its head node (else
 void actor_doubles(int idx);            /* at the hand-off: the appearance for the cutscene doubles */
 void actor_double_tick(void);           /* every tick before the objects follow their links: the double's pose, hands, face */
 int  actor_double_acting(void);         /* a cutscene double of the character played is shown (a cutscene) */
+int  actor_double_kept(void);           /* the doubles stay the game's for the chosen model: the played character's own cutscene model */
 /* before actor_pose(who, src) (slots 0, 1): src shows the mesh of player character `mesh` (0..3, a
    part-file mesh on the real skeleton; -1: a catalogue model is shown) and plays the motions of
    character `motion`. Gender-matched animations need it; without it src's own motions are used. */

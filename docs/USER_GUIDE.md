@@ -207,7 +207,7 @@ Your model, in single player and co-op (see [ACTORS.md](ACTORS.md)):
 
 | Setting | ini key | Effect |
 |---|---|---|
-| You appear as | `coop_char` | **As played**, or another player file, story cast member, creature or zombie; at the end of the list the cutscene models of Claire, Chris, Steve and Wesker (Claire without her ponytail, Wesker without his sunglasses); in co-op your partner sees it too (also in F3 and the lobby's MODEL row) |
+| You appear as | `coop_char` | **As played**, or another player file, story cast member, creature or zombie; at the end of the list the cutscene models of Claire, Chris, Steve and Wesker (Claire with her swinging ponytail, Wesker with his sunglasses); in co-op your partner sees it too (also in F3 and the lobby's MODEL row) |
 | Use gender-matched animations | `appear_gender_anim` | **on**: a man shown while you play Claire moves with Chris's motions, a woman shown while you play a man with Claire's |
 | Swapped model in cutscenes | `appear_in_cutscenes` | **on**; off keeps the real Claire or Chris in cutscenes, with their own hands, faces and voice, and shows the swapped model only while you play. In co-op each player chooses for their own screen |
 | Talking faces in cutscenes (experimental) | `appear_cutscene_face` | **off**; on: the swapped model moves its mouth with the lines in cutscenes |
