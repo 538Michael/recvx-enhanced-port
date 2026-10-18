@@ -377,10 +377,41 @@ Kept although related: "Alfred Ashford (wounded)", "Hunter (Sweeper)" and every 
 Order: As played, the player files, the cast, the creatures, the zombies, then the cutscene models
 of Claire (0), Chris (1), Steve (3) and Wesker (5) (`tail[]`): listed next to the player files,
 each would follow the same character's file. They are the event doubles' meshes: no hands (the
-unarmed pieces are drawn, as for the rest of the cast), and no head part of their own (Claire's
-cutscene model has no ponytail and Wesker's no sunglasses: in cutscenes the scripts link the
-player's `sys->obwp[2]` to the double). Earlier versions hid them as twins of the player files;
-their stored values stayed valid.
+unarmed pieces are drawn, as for the rest of the cast), and no head part of their own (in
+cutscenes the scripts link the player's `sys->obwp[2]` to the double); the display actor brings
+Claire's ponytail and Wesker's sunglasses itself ("Head parts" below). Earlier versions hid them as
+twins of the player files; their stored values stayed valid.
+
+### Head parts
+
+Claire's cutscene model is shown with her ponytail, Wesker's (and his hidden event models) with his
+sunglasses, wherever a display actor shows them: our player, the co-op partner, the
+cutscene double ("Swapped model in cutscenes" on) and the lobby previews (`actor_glue.c load_head`,
+`head_pose`, `head_draw`).
+
+* **Source**: sub-model 4 of the character's part file (`lkmtab`: 1211 the ponytail, 1212 the
+  sunglasses; Claire's costume 0, file 10, and Wesker's, file 13), read when the model is loaded,
+  whatever character is played: only its skin and model chunks are kept (Claire 1.4 KB, Wesker
+  2.3 KB, into the display slot's own buffer) and only its texture block is uploaded (Claire 128 KB,
+  Wesker 5 KB, one texture entry; refused like a model under the margins of "Loading"). The
+  player's own model and `sys->obwp` are not touched; the part file goes through the loader's
+  `pack` buffer.
+* **Set up** as `bhSetPlayer` does (`player_hair`: offsets on head node 5, Claire's skin), in an
+  `O_WRK` of the display slot, linked to the display actor's work (all four cast models have their
+  head at node 5, which `bhObjClpn` reads). Per pose its position follows the model's head; the
+  ponytail runs the game's own simulation (`bhObjClpn`, `bhCalcHair`: the same joints, from the
+  display actor's retargeted angles) once per tick (our player and the partner: the pose after
+  control; the double: `actor_double_tick`), in work of its own (`exp0`/`exp3`, 20 KB per slot,
+  flag `0x100000`), so it never takes `bhGetFreeMemory` (the earlier crash: memory under a pending
+  weapon read). Drawn right after the display actor.
+* **Memory**: per display slot (3) 34 KB of static buffers (103 KB in all, not the game's arena); per shown head part one texture
+  entry and the texture above; one part-file read (about 1.2 MB, the existing buffer) per model
+  change. Released with the model (`unload`, `njReleaseTextureAll`: game over, the title).
+* **The played character's own cutscene model** (Claire's while Claire is played): the doubles
+  stay the game's (see "Cutscene doubles"), and while one acts `sys->obwp[2]` is the character's
+  own head part linked by the script (`self_cine_hair`, as with "Swapped model in cutscenes" off,
+  `actor_double_kept`); in gameplay the display actor's copy is shown.
+* Not covered: a script's InitPony (`flg2 & 0x2`) does not reset the copy; a teleport swings it once.
 
 Models not in the catalogue:
 

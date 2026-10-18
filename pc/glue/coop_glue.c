@@ -359,15 +359,15 @@ static void self_actor(int idx)
     else if (was) { setup_hair(sys->obwp, plp, self_mesh >= 0 ? self_mesh & 3 : sys->ply_id); self_cine = 0; }
 }
 
-/* "Swapped model in cutscenes" off (g_appear_cutscene): while a cutscene double of the character played
-   acts, sys->obwp[2] is the character's own head part (Claire's ponytail: the scripts link it to the
+/* "Swapped model in cutscenes" off (g_appear_cutscene), or the doubles kept for the played character's
+   own cutscene model (actor_double_kept): while a cutscene double of the character played acts, sys->obwp[2] is the character's own head part (Claire's ponytail: the scripts link it to the
    double, ObjLinkSet), from its own model; when the double is gone, ours again. Where the script
    linked it (work, node, x offset) is kept. Every tick before the objects follow their links. */
 extern ETTY_WORK lkmtab[2];             /* player.c: the head parts (both sub-model 4) */
 static void self_cine_hair(void)
 {
     O_WRK* op = &sys->obwp[2];
-    int mesh = self_mesh >= 0 && self_ours(), want = !g_appear_cutscene && (actor_shown(0) || mesh) && actor_double_acting();
+    int mesh = self_mesh >= 0 && self_ours(), want = (!g_appear_cutscene || actor_double_kept()) && (actor_shown(0) || mesh) && actor_double_acting();
     int v = lkmtab[0].mdlver, n = plp->mdl_n, ono = op->lkono, *s = plp->skp[v];
     unsigned char* lk = op->lkwkp;
     float lox = op->lox;

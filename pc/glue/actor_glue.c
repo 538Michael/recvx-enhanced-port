@@ -78,6 +78,15 @@ typedef struct Disguise {
     NJS_TEXLIST* tex[16];               /* texlists we uploaded */
     int tex_n;
     Rig rig;                            /* rig.ok: posed from the source's skeleton */
+    struct {   /* the player characters' cutscene models: the head part the scripts link to them (Claire's
+                  ponytail, Wesker's sunglasses), from the character's part file (load_head) */
+        O_WORK ow[16] __attribute__((aligned(16)));
+        unsigned char keep[8192] __attribute__((aligned(64)));   /* its skin and model chunks */
+        unsigned char exp0[0x4000] __attribute__((aligned(32))), exp3[0x1000] __attribute__((aligned(32)));   /* the ponytail's work (bhObjClpn) */
+        BH_PWORK w;                     /* sub-model 4 as bhReadPlayerData has it (player_hair reads it there) */
+        O_WRK obj[3];                   /* [2]: the head part, linked to node 5 of the display actor */
+        int on;
+    } hp;
 } Disguise;
 static Disguise dg[ACTOR_SLOTS] __attribute__((aligned(64)));
 static unsigned char pack[6 << 20] __attribute__((aligned(64)));
@@ -550,7 +559,7 @@ static void unload(Disguise* d)
         for (i = 0; i < d->tex_n; i++) njReleaseTexture(d->tex[i]);
         bhGarbageTexture(NULL, 0);
     }
-    d->tex_n = d->tex_gone = d->posed = d->face = d->lip = d->lip_max = 0;
+    d->tex_n = d->tex_gone = d->posed = d->face = d->lip = d->lip_max = d->hp.on = 0;
     if (d == &dg[ACTOR_DOUBLE]) dbl_posed = NULL;
     d->model = -1;
     memset(&d->w, 0, sizeof(d->w));
@@ -846,6 +855,77 @@ static int load_part_model(Disguise* d, int file)
     return 1;
 }
 
+/* The head part of player character chr (0 Claire's ponytail, 3 Wesker's sunglasses) for a cutscene model
+   of that character, which has none of its own (the scripts link the player's sys->obwp[2] to the
+   double): sub-model 4 of part file 10 + chr, its skin and its texture only (Claire 1.4 KB + 128 KB
+   texture, Wesker 2.3 KB + 5 KB), set up as bhSetPlayer does and linked to node 5 of the display actor.
+   The ponytail simulates in work of its own (no game memory, docs/ACTORS.md "Head parts"). */
+static void load_head(Disguise* d, int chr)
+{
+    unsigned char *p, *end, *skin = NULL, *c = NULL;
+    int dt, i = 0, tex = 0, size, slen = 0, clen = 0;
+    unsigned int n = 0;
+    O_WRK* op = &d->hp.obj[2];
+    ML_WORK* m = &d->hp.w.mdl[4];
+    if (!read_file(sys->sys_partid, 10 + chr) || (size = (int)rd32(pack)) <= 0 || size > (int)sizeof(pack) - 4) return;
+    end = pack + 4 + size;
+    for (p = pack + 4; p + 4 <= end && (dt = (int)rd32(p)) != -1 && i <= 4; p += dt) {   /* (as bhReadPlayerData) */
+        p += 4;
+        if (!dt) continue;
+        if (rd32(p) == SKIN_MAGIC) { skin = p; slen = dt; continue; }   /* for the next sub-model */
+        if (i == 4) { c = p; clen = dt; break; }
+        tex += mlb_textured(p);   /* texture blocks before ours */
+        skin = NULL;
+        slen = 0;
+        i++;
+    }
+    if (!c || !mlb_textured(c) || slen > 2048 || 2048 + 64 + clen > (int)sizeof(d->hp.keep)) { host_log("actor: head part of part file %d: no sub-model 4 (%d bytes)\n", 10 + chr, clen); return; }
+    memset(&d->hp.w, 0, sizeof(d->hp.w));
+    if (skin) d->hp.w.skp[4] = (int*)((unsigned char*)memcpy(d->hp.keep + ((skin - pack) & 63), skin, slen) + 4);   /* (the data's alignment kept) */
+    p = memcpy(d->hp.keep + 2048 + ((c - pack) & 63), c, clen);
+    bhMlbBinRealize(p, m);
+    if (!m->objP || m->obj_num > 16 || !m->texP || !tex_room("head part", 1)) { host_log("actor: head part of part file %d not loaded (%d nodes)\n", 10 + chr, m->objP ? (int)m->obj_num : -1); return; }
+    if (d->hp.w.skp[4]) npSkinConvert(m->objP, d->hp.w.skp[4]);
+    m->owP = d->hp.ow;
+    memset(d->hp.ow, 0, sizeof(d->hp.ow));
+    for (p = end, i = 0; i < 2; i++) {   /* motions, z translation */
+        if (p + 4 > pack + sizeof(pack) || rd32(p) > (unsigned)(pack + sizeof(pack) - p - 4)) return;
+        p += 4 + rd32(p);
+    }
+    for (i = 0; i <= tex; i++) {   /* the texture blocks of the textured sub-models, ours last */
+        if (p + 4 > pack + sizeof(pack)) return;
+        n = rd32(p);
+        p += 4;
+        if (n & 0x80000000) { p = pack + ((p - pack + 31) & ~31); n &= ~0x80000000; }
+        if (n > (unsigned)(pack + sizeof(pack) - p)) return;
+        if (i < tex) p += n;
+    }
+    bhSetMemPvpTexture(m->texP, p, 0);
+    m->flg |= 0x200;
+    d->tex[d->tex_n++] = m->texP;
+    d->hp.w.mdl_n = 5;
+    player_hair(d->hp.obj, &d->hp.w, chr, d->hp.exp0, d->hp.exp3);
+    op->lkwkp = (unsigned char*)&d->w;
+    d->hp.on = op->flg & 0x1;
+    host_log("actor: head part of part file %d: %d nodes, %d bytes, texture %d bytes\n", 10 + chr, (int)m->obj_num, clen + slen, (int)n);
+}
+
+/* the head part a pose has put at the display actor's head: the ponytail swings once per tick (step) */
+static void head_pose(Disguise* d, int step)
+{
+    O_WRK* op = &d->hp.obj[2];
+    if (!d->hp.on || !d->mapped) return;
+    njCalcPoint(&d->w.mlwP->owP[5].mtx, (NJS_POINT3*)&op->lox, (NJS_POINT3*)&op->px);
+    if (step && op->id == 1211) bhObjClpn(op);
+    bhCalcModel((BH_PWORK*)op);
+}
+
+static void head_draw(Disguise* d)
+{
+    O_WRK* op = &d->hp.obj[2];
+    if (d->hp.on && d->mapped && (op->flg & 0x1) && !(op->mdflg & 0x1)) bhPutModel((BH_PWORK*)op);
+}
+
 static int load(Disguise* d, int idx)
 {
     int heap = heap_free(), anim;
@@ -868,6 +948,12 @@ static int load(Disguise* d, int idx)
              d->w.mdl[0].obj_num, (heap - heap_free()) >> 10, d->rig.ok ? "player animations" : "own idle motion");
     if (d->rig.ok) { int k; for (k = 0; k < 22; k++) host_log(" %d", d->rig.map[k]); }
     host_log("\n");
+    if (idx < ACTOR_MODELS && d->rig.ok && d->rig.map[5] == 5) {   /* (bhObjClpn reads node 5) */
+        int k;
+        for (k = 0; k < 3; k++)
+            if (doubles[0][k] == actor_models[idx].id) load_head(d, 0);
+            else if (doubles[3][k] == actor_models[idx].id) load_head(d, 3);
+    }
     if (getenv("RECVX_RIG_DUMP")) {   /* test aid: the rest skeleton (node, parent, model-space position, bind angles) */
         Rig r;
         const NJS_CNK_OBJECT* o = d->w.mdl[0].objP;
@@ -1290,6 +1376,7 @@ void actor_pose(int who, BH_PWORK* src)
                 for (k = 9; k <= 13; k += 4)
                     if (d->rig.map[k] >= 0 && sr.map[k] >= 0) memcpy(&src->mlwP->owP[(int)sr.map[k]].mtx[12], &m->owP[(int)d->rig.map[k]].mtx[12], 12);
             }
+            head_pose(d, who == ACTOR_DOUBLE ? dbl_tick : !redraw);
             return;
         }
     }
@@ -1303,7 +1390,7 @@ void actor_pose(int who, BH_PWORK* src)
 
 void actor_draw(int who)
 {
-    if (dg[who].model >= 0 && dg[who].posed) bhPutModel(&dg[who].w);
+    if (dg[who].model >= 0 && dg[who].posed) { bhPutModel(&dg[who].w); head_draw(&dg[who]); }
 }
 
 /* game.c bhAllDrawModel, in place of bhPutModel(plp): 1 = drawn */
@@ -1317,6 +1404,7 @@ int actor_put_player(void)
         redraw = 0;
     }
     bhPutModel(&dg[0].w);
+    head_draw(&dg[0]);
     return 1;
 }
 
@@ -1334,6 +1422,7 @@ int actor_put_enemy(BH_PWORK* ep)
     }
     if (!dg[ACTOR_DOUBLE].mapped) return 0;   /* only a skeleton-driven model stands in for a cutscene double */
     bhPutModel(&dg[ACTOR_DOUBLE].w);
+    head_draw(&dg[ACTOR_DOUBLE]);
     return 1;
 }
 
@@ -1465,13 +1554,17 @@ void actor_double_tick(void)
 /* at the hand-off: the model for the cutscene doubles of the character played (appearance: a
    catalogue index, ACTOR_PART + part file - 10, or -1); loaded only while the room has one.
    "Swapped model in cutscenes" off: none, the game draws its doubles (hands, face, all their own) */
+static int dbl_kept;
+int actor_double_kept(void) { return dbl_kept; }
+
 void actor_doubles(int idx)
 {
     int i, j, pid = sys->ply_id & 3, any = 0;
     static const signed char twin[5] = { 0, 1, 3, 5, -1 };   /* the player files' cutscene models (a face mask): Claire, Chris, Steve, Wesker */
     if (!g_appear_cutscene) idx = -1;
     if (g_appear_face && idx >= ACTOR_PART && idx < ACTOR_PART + 5 && twin[idx - ACTOR_PART] >= 0) idx = twin[idx - ACTOR_PART];
-    if (idx >= 0 && idx < ACTOR_MODELS && actor_models[idx].id == doubles[pid][0]) idx = -1;   /* the played character's own cutscene model: the game's double (its face, its hands) */
+    dbl_kept = idx >= 0 && idx < ACTOR_MODELS && actor_models[idx].id == doubles[pid][0];
+    if (dbl_kept) idx = -1;   /* the played character's own cutscene model: the game's double (its face, its hands, its head part) */
     if (idx >= 0)
         for (i = 0; i < (int)sys->ewk_n && i < 128 && !any; i++)
             for (j = 0; j < 3; j++) any |= (ene[i].flg & 0x1) && doubles[pid][j] && ene[i].id == doubles[pid][j];
