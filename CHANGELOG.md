@@ -53,6 +53,9 @@
 
 ### Fixes
 
+- **Scope with a gamepad in third person**: with the Modern gamepad controls, the sniper rifle's
+  and linear launcher's scope closed again as soon as it opened. Holding LT now keeps it up: aim
+  with the right stick, click the right stick to zoom, RT fires and RB reloads.
 - **Room parts popping at the screen edges**: in third person and with the fixed cameras in
   widescreen, walls, floors and props near the left and right edges could vanish and pop back
   while the camera turned, most visibly on ultrawide screens (in the prison courtyard the

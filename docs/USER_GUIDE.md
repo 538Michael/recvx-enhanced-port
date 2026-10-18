@@ -258,7 +258,7 @@ behind). As in the Resident Evil 2 and 4 remakes:
 | Gamepad (Xbox / PlayStation) | Action | ini |
 |---|---|---|
 | Left stick | walk where it points seen from the camera; pushed far it runs | |
-| Right stick | turn the camera; while aiming, aim (the crosshair) | |
+| Right stick | turn the camera; while aiming, aim (the crosshair; the sniper rifle's and linear launcher's scope too, slower while zoomed in) | |
 | LT / L2 (hold) | aim: the character faces the camera's direction, the camera moves to the shoulder | `pad_tps_aim` |
 | RT / R2 | fire while aiming; otherwise action | `pad_tps_fire` |
 | A / Cross | action: doors, items, examine, confirm | `pad_tps_action` |
@@ -269,9 +269,13 @@ behind). As in the Resident Evil 2 and 4 remakes:
 | LB / L1 (hold) | quick knife: knife drawn and raised, RT slashes, the weapon before on release | `pad_tps_knife` |
 | RB / R1 | reload ([Reload](#reload)) | `pad_tps_reload` |
 | D-pad down | quick turn (the camera swings round with the character) | `pad_tps_quickturn` |
-| Right stick click | camera behind the character | `pad_tps_recenter` |
+| Right stick click | camera behind the character; in the scope: zoom in / out | `pad_tps_recenter` |
 | Left stick pulled back + run | quick turn | |
 | D-pad up / left / right, Start | as before (d-pad: tank turn and walk; Start: options) | |
+
+The sniper rifle and the linear launcher aim through their scope: hold LT, aim with the right stick
+(the left stick and d-pad turn it as in the original), click the right stick to zoom in or out, RT
+fires, RB reloads, let go of LT to leave it.
 
 Reload sits on RB as in Resident Evil 4 and the RE4 remake's type C (the remakes' other types use
 X / Square, which runs here as in the game's type A); the quick turn, which the stick gesture also
