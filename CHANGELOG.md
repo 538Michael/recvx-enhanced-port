@@ -14,8 +14,6 @@
   through a wall. It no longer does.
 - **Music after an interrupted co-op follow**: if the game ended (game over, quitting) while you
   were being moved to the host's room, the next door you used could get its music wrong.
-- **Swapped cutscene models**: Claire's ponytail no longer swings twice as fast when two of her
-  cutscene doubles are on screen.
 - **Silent movies after skipping the intro**: skipping the intro movie at start-up left every
   later movie without its sound, such as the one in the graveyard. Movies now always play their
   sound, and the intro no longer gets louder for a moment when you skip it.
