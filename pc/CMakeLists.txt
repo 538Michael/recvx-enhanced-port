@@ -172,7 +172,11 @@ if(RECVX_LAYOUT_PAD)
     set(LAYOUT_PAD_SRC tests/layout_pad.c)
     set_source_files_properties(tests/layout_pad.c PROPERTIES COMPILE_DEFINITIONS RECVX_LAYOUT_PAD=${RECVX_LAYOUT_PAD})
 endif()
-add_executable(recvx ${LAYOUT_PAD_SRC} $<TARGET_OBJECTS:recvx_game> $<TARGET_OBJECTS:recvx_platform>
+if(WIN32)
+    enable_language(RC)
+    set(RECVX_RES res/recvx.rc)   # the program icon
+endif()
+add_executable(recvx ${LAYOUT_PAD_SRC} ${RECVX_RES} $<TARGET_OBJECTS:recvx_game> $<TARGET_OBJECTS:recvx_platform>
                $<$<TARGET_EXISTS:glibc_compat>:$<TARGET_OBJECTS:glibc_compat>>)
 target_link_libraries(recvx PRIVATE imgui SDL3::SDL3 miniupnpc::miniupnpc natpmp monocypher m)
 if(WIN32)
