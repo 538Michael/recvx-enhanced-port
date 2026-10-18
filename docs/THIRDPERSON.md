@@ -184,7 +184,7 @@ unit (the character is about 17 units tall).
 |---|---|
 | `RECVX_TPS_MOUSE="frame:dx:dy,..."` | moves the mouse dx/dy counts per game frame from that presented frame on |
 | `RECVX_VPAD="frame:input+input,..."` | a virtual gamepad ([ARCHITECTURE.md](ARCHITECTURE.md)): sticks as `leftx=0.5+lefty=-1` (up is negative), triggers `+lefttrigger`; a trigger after another input needs its own `+` (`+lefttrigger++righttrigger`) |
-| `RECVX_TPS_TRACE=1` | logs the gamepad per frame ("tps: pad": the sticks past their dead zones, the walk direction, facing, camera, quick turn, the enemy nearest the crosshair) and its aim assist ("tps: assist"), the free aim per frame, each shot's direction and wall hit against the crosshair target ("SHOT"), the drawn weapon's barrel with "You appear as", the camera ("tps: cam A\|B": yaw, pitch, the player's position, the model's root, the point followed and the eye), the aim height given to the game, the scope per frame ("tps: scope": `ay`, `wax`, the field of view, the turn of the mouse and right stick in game units, the enemy nearest the centre in degrees, the enemies' health); `=2` also keeps the camera on the enemy the game locked on to (the middle of its hit capsule, or `RECVX_TPS_AIM_AT=f` along it: 0 = `c1`, for a zombie the head, 1 = `c2`, its legs) |
+| `RECVX_TPS_TRACE=1` | logs the gamepad per frame ("tps: pad": the sticks past their dead zones, the walk direction, facing, camera, quick turn, the enemy nearest the crosshair) and its aim assist ("tps: assist"), the free aim per frame, each shot's direction and wall hit against the crosshair target ("SHOT"), the drawn weapon's barrel with "You appear as", the camera ("tps: cam A\|B": yaw, pitch, the player's position, the model's root, the point followed and the eye), the aim height given to the game, the scope per frame ("tps: scope": `ay`, `wax`, the field of view, the turn of the mouse and right stick in game units, the enemy nearest the centre in degrees, the enemies' health), each shot of a dual weapon ("tps: DUAL R\|L": the arms' yaws aimed and shown, the enemy under the crosshair and the other arm's, the aim height, each enemy's health, degrees off the facing and distance); `=2` also keeps the camera on the enemy the game locked on to (dual weapons: the nearest of their lock-on; the middle of its hit capsule, or `RECVX_TPS_AIM_AT=f` along it: 0 = `c1`, for a zombie the head, 1 = `c2`, its legs) |
 | `RECVX_TPS_ORBIT=degrees` | turns only the view about the player (side views; aim unchanged, camera ignores walls) |
 | `RECVX_ATMOS_TRACE=1` | logs each game frame's cut, the game's fog, lights and filter and what "smooth" shows |
 | `RECVX_EFF_TRACE=1` | logs effects spawned and queued |
@@ -397,6 +397,36 @@ zombies were thrown away.
   meanwhile (grabs) is left alone.
 * With "Game auto-aim" the game's own aim height plays: W / S press the up/down bits as the
   d-pad does (`0x21` / `0x42`).
+
+### Dual weapons
+
+The Gold Lugers and the sub machine guns (`WpnTab flg 0x800`, `playpch.c`) fire one shot per arm:
+the right (hand 9) along `ay + arm_dr`, the left (hand 13) two ticks later along `ay + arm_dl`,
+each from its own muzzle (`CheckGunHit`), and `PlyPchMain` turns each arm by `arm_ar` / `arm_al`,
+eased towards those. The game sets the two offsets only at its lock-on (`SetLockOnDirection`:
+raising the weapon, L1): with two enemies in front it turns the character between them and gives
+each arm one. Free aim then turned the character to the crosshair and the offsets stayed, so the
+arms were held outwards (20 and 27 degrees with a second zombie 45 degrees to the left) and both
+shots went past the zombie under the crosshair, which took no damage.
+
+Free aim now sets them every tick (`dual_aim`, after `aim_at_crosshair`; not while lowering, mode2 68):
+
+* One arm aims at the crosshair target. The other aims at the nearest other enemy within 28 degrees
+  of the crosshair direction and 15 degrees of its pitch, in the weapon's range, that the game's own
+  search would take (alive, targetable, not hidden or behind a wall from that arm's muzzle,
+  `bhSearchEnemy`'s tests) and that takes the same aim height as the crosshair target (one pitch,
+  `wax`, and one aim height, `at_flg`, serve both arms). The arm on that enemy's side takes it, as
+  the game gives the left arm the enemy further left; the head follows the other one (`hed_rate`).
+  The enemy of the last tick is kept while it stays within 1.15 times those limits, so two enemies
+  at the same distance or at the edge do not take turns.
+* Without such an enemy both arms aim at the crosshair target, so the guns converge to the front.
+* Each arm's yaw is taken from its own muzzle (last tick's hand, turned with the character since)
+  and kept within 28 degrees; the arms ease there a third of the way per tick (`count` 3).
+* Shots therefore go where each arm points; the pitch, bend and aim height are the crosshair
+  target's as for single weapons, so lying zombies are hit the same way. The fixed cameras and
+  "Game auto-aim" with the mouse keep the game's own dual targeting.
+* Co-op: each arm's hits reach the partner as any hit (`EV_ENE_HIT` per enemy hit, with the aim
+  height). The partner draws our motions only, without the arms' turn, as it shows no aim pitch.
 
 ## Limits
 
