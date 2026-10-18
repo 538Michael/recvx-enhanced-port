@@ -348,8 +348,8 @@ Room ambient and lights 0..3 (muzzle flash, lighter, ...) do not change per cut.
   model's x axis, marks both `O_WORK flg 1` and runs `bhCalcModel` again, so arms, head, hair and
   weapons follow. Node angles are untouched (no feedback into the motion blend). The bend eases in
   and out (0.35 per frame).
-* The pitch is measured from the weapon hand (node 9) of the unbent pose to the target (the knife:
-  the camera's pitch, [Knife](#knife)). Muzzle
+* The pitch is measured from the weapon hand (node 9) of the unbent pose to the target (the knife: capped and
+  held, [Knife](#knife)). Muzzle
   flash, knife hits and attachments use the bent matrices; the shot ray is the game's (`wax`).
 * **Shots on walls** (`aim_at_crosshair`): enemies are aimed from the enemy-test origin (11 units
   up); when the crosshair target is a wall, the aim starts at the muzzle, so wall hits land on the
@@ -403,27 +403,30 @@ zombies were thrown away.
 
 The knife (`WpnTab flg 0x40000000`, also the quick knife) plays the straight slash; its hit test
 (`weapon.c bhCheckKnifeAtari`, `player.c` after `tps_calc_model`) is a capsule from the hand
-(node 8) to the blade tip on the bent matrices, so the bend is where the slash goes. Its pitch is
-the camera's (`pitch`), not the angle to the point under the crosshair:
+(node 8) to the blade tip on the bent matrices, so the bend is where the slash goes.
 
 * With the camera at its rest pitch (-8 degrees) an enemy 5 to 10 units in front puts the crosshair
-  on its head, 3 to 6 units above the hand: the hand-to-target angle was +25 to +30 degrees (`wax`,
-  from the shot origin 11 units up, +32 to +46, aim height up). The upper body jumped up by that
-  in one tick when the enemy stepped into the crosshair. The hand also swings during the slash,
-  and at a close target that moved the angle by up to 17 degrees per tick (a crawler: -54 to +12
-  degrees and aim height down, straight, up within one slash). 0.3.1 clamped the knife's upward
-  pitch to 0, so it could not aim up at all.
-* `aim_at_crosshair`: `wax` is the camera pitch; the aim height is `pc_knife_height`
-  (`pc_rules.h`): up above 22.5 degrees, down below -22.5 degrees or at a point under the
-  crosshair less than 6 units above the floor (crawlers, legs), else straight. A height is kept
-  until the pitch is 5 degrees back inside (the point 8 units up), so the slash does not switch
-  at an edge.
-* `tps_calc_model` bends by the camera pitch (within 60 degrees, eased in and out as for the
-  guns): no jumps and no feedback from the swinging hand.
-* The camera sits about 5 units above the hand, so looking at an enemy's body at knife range is a
-  steep look down (its middle: -35 degrees at 10 units, -48 at 6) and gives a low, down slash;
-  the slash goes where you look. A standing zombie still takes the hit (only lying ones refuse a
-  straight one).
+  on its head, 3 to 6 units above the hand: the hand-to-target angle, which the knife used as the
+  guns do, was +25 to +30 degrees (`wax`, from the shot origin 11 units up, +32 to +46, aim height
+  up). The upper body jumped up by that in one tick when the enemy stepped into the crosshair. The
+  hand also swings during the slash, and at a close target that moved the angle by up to 17 degrees
+  per tick (a crawler: -54 to +12 degrees and aim height down, straight, up within one slash).
+  0.3.1 clamped the knife's upward pitch to 0, so it could not aim up at all.
+* The camera's pitch alone is no better: the camera sits about 5 units above the hand, so keeping
+  the crosshair on the middle of a standing zombie is a steep look down (-35 degrees at 10 units,
+  -48 at 6, -54 at 5) while the hand-to-target angle stays within -8..0.
+* `knife_aim` (`tps_calc_model`) takes the hand-to-target angle of the straight pose, capped by
+  `pc_knife_pitch` (`pc_rules.h`): no higher than the camera looks up, and level while it looks
+  down; at a point below knee height (6 units, kept until 8: crawlers, legs, the floor) as steep as
+  the camera looks down, since the slash reaches it from a hand swung forward and down (the angle
+  from the raised hand, about -37 degrees at a crawler 6 to 12 units away, fell short of it).
+  Within 60 degrees.
+* Between slashes the pitch eases towards that (0.35 per tick), so the bend shows where the next
+  slash goes; through a slash (`mode2` 69) it and the aim height are held. `wax` is that pitch.
+* The aim height is `pc_knife_height` of that pitch: up above 22.5 degrees, down below -22.5 or at a
+  point below knee height, else straight; a height is kept until the pitch is 5 degrees back
+  inside, so the slash does not switch at an edge. It is set there instead of in
+  `aim_at_crosshair`, still before the knife's hit test, and put back by `tps_player_mode`.
 
 ### Dual weapons
 

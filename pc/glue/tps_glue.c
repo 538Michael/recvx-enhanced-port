@@ -740,20 +740,14 @@ static void aim_at_crosshair(void)
     h = sqrtf((t.x - o.x) * (t.x - o.x) + (t.z - o.z) * (t.z - o.z));
     plp->ay += (short)(ay - plp->ay);
     plp->wax = plp->waxp = (short)(int)(atan2f(t.y - o.y, h) * (32768.0f / 3.14159265f));
-    /* the knife: the camera's pitch, where the player looks. The angle to the point under the crosshair
-       raised it by tens of degrees at an enemy right in front with the camera level (its head is far
-       above the hand at that range). */
-    if (knife) plp->wax = plp->waxp = (short)(int)pitch;
     aim_t = t;
     /* the game's aim height for what the shot goes at, read by the enemies until the next mode
        handler (tps_player_mode): zombies and the anatomist on the ground, a knocked-down Hunter,
        Cerberus and Bandersnatch in one of their states take no damage from a straight shot; a
        shotgun blows a zombie's head only aimed up. Up/down beyond 22.5 degrees (half the original
-       aim's 45), and down at anything below knee height; the knife's with a margin (pc_knife_height). */
-    if (plp->at_flg & 0xE) {
-        static int knife_h = 2;
-        aim_h = knife ? (knife_h = pc_knife_height(pitch, t.y - plp->py, knife_h))
-                      : plp->wax > 4096 ? 4 : plp->wax < -4096 || t.y - plp->py < 6.0f ? 8 : 2;
+       aim's 45), and down at anything below knee height. The knife's: tps_calc_model (knife_aim). */
+    if ((plp->at_flg & 0xE) && !knife) {
+        aim_h = plp->wax > 4096 ? 4 : plp->wax < -4096 || t.y - plp->py < 6.0f ? 8 : 2;
         plp->at_flg = (plp->at_flg & ~0xE) | aim_h;
         if (aim_h == 2) aim_h = 0;
     }
@@ -1107,9 +1101,35 @@ static void bend(BH_PWORK* p, float a)
     ow[2].flg &= ~1; ow[3].flg &= ~1;
 }
 
+/* the knife (docs/THIRDPERSON.md "Knife"): its pitch (radians) from a, the hand of the straight pose to
+   the crosshair target, capped by the camera (pc_knife_pitch). Eased between slashes and held through a
+   slash: the hand swings, and at a close target that moved the angle by up to 17 degrees a tick. wax
+   and the aim height (pc_knife_height, held too) follow it. */
+static float knife_aim(float a, int on, int fresh)
+{
+    static float kp;
+    static int h = 2, low;
+    int slash = plp->mode2 == 69;
+    float want;
+    low = aim_t.y - plp->py < (low ? 8.0f : 6.0f);   /* (pc_knife_height's knee height and margin) */
+    want = pc_knife_pitch(a, RAD(pitch), low);
+    if (fresh) kp = want;
+    else if (!slash) kp += (want - kp) * 0.35f;
+    if (on) {
+        if (!slash) h = pc_knife_height(kp * (32768.0f / 3.14159265f), aim_t.y - plp->py, h);
+        plp->wax = plp->waxp = (short)(int)(kp * (32768.0f / 3.14159265f));
+        if (plp->at_flg & 0xE) {   /* (an enemy that cleared it is left alone, as aim_at_crosshair) */
+            plp->at_flg = (plp->at_flg & ~0xE) | h;
+            aim_h = h == 2 ? 0 : h;
+        }
+    }
+    return kp;
+}
+
 void tps_calc_model(void)
 {
     static float w;   /* eased in/out when the weapon is raised/lowered */
+    static int live;  /* the last tick bent (else the knife's pitch starts afresh) */
     O_WORK* ow = plp->mlwP->owP;
     float a, dx, dz, ofs[3];
     int on = tps_cam_active && !lock_aim() && plp->mode0 == 1 && plp->mode1 == 1 && plp->mode2 != 68 && !reload_at_rest();
@@ -1117,7 +1137,7 @@ void tps_calc_model(void)
     bhCalcModel(plp);
     bend_a = 0;
     w += (on - w) * 0.35f;
-    if (w < 0.01f || plp->mlwP->obj_num <= 9) { aim_corr = 0; return; }
+    if (w < 0.01f || plp->mlwP->obj_num <= 9) { aim_corr = 0; live = 0; return; }
     /* pitch from the weapon hand of the straight pose to the target (not wax: the shot starts
        lower, at 11 units, and needs a steeper angle for close targets); with "You appear as" the
        hand where the model holds the weapon (a Tyrant's is higher: its weapon pointed over the
@@ -1125,11 +1145,15 @@ void tps_calc_model(void)
     actor_aim_offset(plp, ofs);
     dx = aim_t.x - ow[9].mtx[12] - ofs[0]; dz = aim_t.z - ow[9].mtx[14] - ofs[2];
     a = atan2f(aim_t.y - ow[9].mtx[13] - ofs[1], sqrtf(dx * dx + dz * dz));
-    if (trace && (WpnTab[plp->wpnr_no].flg & 0x40000000))
-        printf("tps: knife frame %u mode %d/%d motion %d frame %d camera pitch %.1f hand to target %.1f (%.1f away, %.1f up) wax %.1f aim height %d\n",
-               (unsigned)gs_frame_count(), plp->mode2, plp->mode3, plp->mtn_no, plp->frm_no >> 16, pitch * (360.0f / 65536.0f), a * 57.29578f,
-               sqrtf(dx * dx + dz * dz), aim_t.y - ow[9].mtx[13], plp->wax * (360.0f / 65536.0f), plp->at_flg & 0xE);
-    if (WpnTab[plp->wpnr_no].flg & 0x40000000) a = RAD(pitch);   /* the knife: the camera's pitch (aim_at_crosshair) */
+    if (WpnTab[plp->wpnr_no].flg & 0x40000000) {
+        float ht = a;
+        a = knife_aim(a, on, !live);
+        if (trace)
+            printf("tps: knife frame %u mode %d/%d motion %d frame %d camera pitch %.1f hand to target %.1f (%.1f away, %.1f up) knife pitch %.1f wax %.1f aim height %d\n",
+                   (unsigned)gs_frame_count(), plp->mode2, plp->mode3, plp->mtn_no, plp->frm_no >> 16, pitch * (360.0f / 65536.0f), ht * 57.29578f,
+                   sqrtf(dx * dx + dz * dz), aim_t.y - ow[9].mtx[13], a * 57.29578f, plp->wax * (360.0f / 65536.0f), plp->at_flg & 0xE);
+    }
+    live = 1;
     bend_a = a = w * (a > 1.047f ? 1.047f : a < -1.047f ? -1.047f : a) / 2;   /* at most 60 degrees */
     bend(plp, a);
     {   /* "You appear as" another model (the retargeting): the weapon is drawn in the model's hand, which

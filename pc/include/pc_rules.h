@@ -48,6 +48,19 @@ static inline int pc_dual_arm(int i, int aim_e, int prev, float dy, float dp)
 }
 
 /* ---------------------------------------------------------------- free knife aim (tps_glue.c) */
+/* the knife's pitch (radians, > 0 up) from the angle a of the hand to the point under the crosshair and
+   the camera's pitch cam: a, but no higher than the camera looks up and level while it looks down (an
+   enemy right in front puts its head under a level crosshair, far above the hand); at a point below knee
+   height (low: a crawler, the floor) as steep as the camera looks down (the slash reaches it from a hand
+   swung forward and down: the angle from the raised hand fell short). Within 60 degrees. */
+static inline float pc_knife_pitch(float a, float cam, int low)
+{
+    float cap = cam > 0 ? cam : 0;
+    a = a < cap ? a : cap;
+    if (low && cam < a) a = cam;
+    return a < -1.047f ? -1.047f : a > 1.047f ? 1.047f : a;
+}
+
 #define PC_KNIFE_UP (22.5f * (65536.0f / 360.0f))   /* half the original's 45 degrees, as the guns' aim height */
 #define PC_KNIFE_HYST (5.0f * (65536.0f / 360.0f))
 

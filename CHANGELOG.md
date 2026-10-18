@@ -10,10 +10,10 @@
 
 ### Third person
 
-- **Free knife aim**: the knife follows where you look again. Look up to slash up at tall enemies
-  or enemies above you, and down for low slashes at crawling zombies. An enemy right in front of
-  you no longer makes the knife fly up at its head, and the knife no longer twitches during a
-  slash.
+- **Free knife aim**: you can aim the knife again. Look up to slash up at tall enemies or enemies
+  above you, and aim at a crawling zombie or the floor for a low slash. Aiming at an enemy right in
+  front of you slashes level instead of flying up at its head, and the knife no longer twitches
+  during a slash.
 
 ### Fixes
 
