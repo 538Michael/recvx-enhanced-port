@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.6.3 (2026-10-19)
 
 > [!NOTE]
 > Hey, this is still a small patch from issues from yesterday. Just a heads up: Until the weekend patches will be a bit slower due to work, sorry!
