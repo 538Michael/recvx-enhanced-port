@@ -220,7 +220,8 @@ headless.
 - **HD texture packs** (`gs/hdpack.c`, [HD_PACK.md](HD_PACK.md)): every texture decode computes
   PCSX2's replacement key (XXH3 of the texture's GS memory and palette); a file of that name in
   `mods/textures` is checked against the original once and then bound in its place, in the same
-  UV space.
+  UV space. Three loader threads read and check the files; the render thread uploads a few ms of
+  them per frame, and waits for them only under a screen fade (`Frame.fade`, a room's fade-in).
 - Still emulated: the GS register/state model, GS memory (render-to-texture, CLUTs, non-native
   textures), render targets, VIF/DMA for the remaining packets.
 

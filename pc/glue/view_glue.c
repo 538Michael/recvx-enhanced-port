@@ -194,6 +194,11 @@ static void take_view(void)
     }
     view_taken = 1;
 }
+/* stream submit: 1 if the screen fade covers the frame but lets it through (a room's fade-in): HD
+   texture packs wait for replacements first drawn then, else they are loaded in the background
+   (hdpack.c) */
+int pc_frame_fade(void) { return sys->fade_an > 0.0f && sys->fade_an < 255.0f; }
+
 /* stream_submit: the scene and view (eye, direction) of the frame being submitted */
 uint64_t pc_frame_view(float view[6])
 {

@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- **Stutter at camera changes with an HD texture pack**: the first time a camera angle showed
+  textures not seen before, the game froze for a moment while it loaded their HD versions. They
+  now load in the background: the game keeps running, and those textures switch to HD a moment
+  later. Rooms still appear with their HD textures from the start.
+
 ## 0.6.3 (2026-10-19)
 
 ### Gameplay
