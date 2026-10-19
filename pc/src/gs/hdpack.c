@@ -22,7 +22,8 @@
  * 0..255). Verdicts are kept in <save>/hd_textures.txt, so a file is checked once.
  *
  * The pack folder is indexed once by file name; files are loaded when first drawn and kept up to a
- * memory budget (least recently used ones are dropped and reloaded when needed again).
+ * memory budget (least recently used ones are dropped and reloaded when needed again). Loader
+ * threads read and check them; a draw waits for that only under a screen fade (see "loading").
  */
 #include "gs.h"
 #include "hdpack.h"
@@ -42,13 +43,19 @@
 enum { V_UNKNOWN, V_OK, V_REJECTED, V_BROKEN };   /* shows the original / does not / is (nearly) all transparent there */
 enum { A_RAW, A_SCALED, A_CONST };   /* replacement alpha: GS units, 0..255, the original's constant */
 typedef struct { uint64_t tex, clut; uint32_t bits; } Key;
+enum { J_NONE, J_QUEUED, J_RUNNING, J_DONE };   /* Entry.job (under qm) */
 typedef struct {
     Key k; uint32_t name;
-    int st;                 /* 0 not loaded, 1 being read, 2 uploaded (gl), 3 not usable (the font / UI setting may allow it), 4 cannot be loaded */
+    int st;                 /* (render thread) 0 not loaded, 1 being read, 2 uploaded (gl), 3 not usable (the font / UI setting may allow it), 4 cannot be loaded */
     GLuint gl; uint32_t bytes; uint64_t last;
     uint8_t verdict, amode, aconst;
     uint32_t* orig; int ow, oh;   /* the original's texels, until it is checked */
     char why[64];           /* a rejection, for the log */
+    uint8_t job, inq;       /* the loader threads' work on it; in their queue */
+    uint8_t flags;          /* the lookup's NTEX_* tags as it was loaded */
+    int8_t r;               /* read_check: the check's result, -1 none */
+    void* data; size_t n;   /* the file read (DDS bytes, or a PNG as an RGBA surface), until uploaded */
+    uint64_t rns, cns;      /* time it took to read and check */
 } Entry;
 static Entry* ents; static int nents, cents;
 static char* names; static size_t nnames, cnames;
@@ -153,6 +160,7 @@ static void cache_load(void)
     host_log("hd textures: %d checked replacements from %s\n", n, cache_path);
 }
 
+static void loader_start(void);
 static void setup(void)
 {
     char dir[1100];
@@ -181,6 +189,7 @@ static void setup(void)
     }
     SDL_snprintf(cache_path, sizeof(cache_path), "%s/hd_textures.txt", g_config.save_dir);
     cache_load();
+    loader_start();
 }
 
 int hdpack_active(void)
@@ -479,9 +488,24 @@ static int content_check(Entry* e, const void* data, size_t n)
 
 /* ---------------- loading ---------------- */
 
-/* A replacement is read, checked (the first time) and uploaded when its texture is first drawn,
-   on the render thread: a room's textures are first drawn under its fade-in, so it is shown
-   with them from its first visible frame (a few ms per file from the page cache). */
+/* A replacement is loaded when its texture is first drawn. Reading and checking it (a few ms per
+   file from the page cache, 100+ ms for a burst from a cold disk) is done by loader threads
+   while the draws keep the original texture; the render thread only uploads what is ready, a
+   few ms of it per frame. Under a screen fade that lets the picture through (the fade-in of a
+   room) a draw waits for its file instead, so a room shows its replacements from its first
+   visible frame; under a black screen the files are read in the meantime. Textures first drawn
+   later (another camera cut, an enemy, an effect) show the original until their file is in. */
+#define UPLOAD_BUDGET_NS 3000000   /* render-thread time for finishing loads per executed frame */
+#define READY_MAX (128u << 20)     /* files read but not uploaded yet (a 32-bit process) */
+#define LOADERS 3                  /* loader threads: reads overlap, checks run in parallel */
+static SDL_Mutex* qm;
+static SDL_Condition* qc;          /* a job done, queued, or ready bytes freed */
+static int* queue_; static int qh, qn;
+static uint64_t ready;             /* bytes read, not uploaded */
+static int fade;                   /* hdpack_frame: 1 the picture shows through a fade */
+static uint64_t spent;             /* this frame's time in finish */
+static int nloading;               /* entries in st 1 */
+
 /* may this lookup use the file? Ones that differ from the original only with hd_textures_font
    (font pages) or hd_textures_ui (anything else but the textures the port cuts its own menu
    entries from) */
@@ -492,40 +516,80 @@ static int usable(const Entry* e, uint32_t flags)
     return flags & NTEX_FONT ? g_config.hd_textures_font : g_config.hd_textures_ui && !(flags & NTEX_KEEP);
 }
 
-static void load(Entry* e, uint32_t flags)
+/* read the file and check it the first time (a loader thread, or the render thread when it
+   waits); touches only the entry */
+static void read_check(Entry* e)
 {
     const char* path = names + e->name;
-    int png = !SDL_strcasecmp(strrchr(path, '.'), ".png");
-    uint64_t t0 = SDL_GetTicksNS(), t1, t2;
-    size_t n = 0;
-    void* data;
-    if (png) {
+    uint64_t t0 = SDL_GetTicksNS(), t1;
+    e->n = 0; e->r = -1;
+    if (!SDL_strcasecmp(strrchr(path, '.'), ".png")) {
         SDL_Surface* s = SDL_LoadPNG(path);
-        data = s ? SDL_ConvertSurface(s, SDL_PIXELFORMAT_ABGR8888) : NULL;   /* RGBA bytes */
+        e->data = s ? SDL_ConvertSurface(s, SDL_PIXELFORMAT_ABGR8888) : NULL;   /* RGBA bytes */
         SDL_DestroySurface(s);
-    } else data = SDL_LoadFile(path, &n);
+        if (e->data) e->n = (size_t)((SDL_Surface*)e->data)->pitch * ((SDL_Surface*)e->data)->h;
+    } else e->data = SDL_LoadFile(path, &e->n);
     t1 = SDL_GetTicksNS();
-    if (data && e->verdict == V_UNKNOWN && e->orig) {
-        int r = content_check(e, data, n);
-        if (r >= 0) {
-            SDL_PathInfo info;
-            FILE* f;
-            e->verdict = r == 1 ? V_OK : r ? V_BROKEN : V_REJECTED;
-            if (SDL_GetPathInfo(path, &info) && (f = pc_fopen(cache_path, "a"))) {
-                char line[1200];   /* (SDL's printf: the 64-bit size also with msvcrt) */
-                SDL_snprintf(line, sizeof(line), "%s %u %u %llu %s\n", r == 1 ? "ok" : r ? "broken" : "rejected", e->amode, e->aconst, (unsigned long long)info.size, rel(e));
-                fputs(line, f);
-                fclose(f);
-            }
-            if (r != 1) { host_log("hd textures: %s does not show the original (%s)%s\n", rel(e), e->why, usable(e, flags) ? "" : ", not used"); rejected++; }
+    if (e->data && e->verdict == V_UNKNOWN && e->orig) e->r = (int8_t)content_check(e, e->data, e->n);
+    e->rns = t1 - t0; e->cns = SDL_GetTicksNS() - t1;
+}
+
+static int SDLCALL loader(void* unused)
+{
+    (void)unused;
+    SDL_LockMutex(qm);
+    for (;;) {
+        Entry* e;
+        while (!qn || ready > READY_MAX) SDL_WaitCondition(qc, qm);
+        e = &ents[queue_[qh]]; qh = (qh + 1) % nents; qn--;
+        e->inq = 0;
+        if (e->job != J_QUEUED) continue;   /* the render thread took it over */
+        e->job = J_RUNNING;
+        SDL_UnlockMutex(qm);
+        read_check(e);
+        SDL_LockMutex(qm);
+        e->job = J_DONE;
+        ready += e->n;
+        SDL_BroadcastCondition(qc);
+    }
+    return 0;
+}
+
+static void loader_start(void)
+{
+    int n = 0;
+    if ((queue_ = malloc((size_t)nents * sizeof(int))) && (qm = SDL_CreateMutex()) && (qc = SDL_CreateCondition()))
+        for (int i = 0; i < LOADERS; i++) {
+            SDL_Thread* th = SDL_CreateThread(loader, "hdpack", NULL);
+            if (th) { SDL_DetachThread(th); n++; }
         }
+    if (!n) qm = NULL;   /* loaded on the render thread */
+}
+
+/* the render thread's part: the verdict, the upload, the memory budget */
+static void finish(Entry* e)
+{
+    uint32_t flags = e->flags;
+    const char* path = names + e->name;
+    int png = !SDL_strcasecmp(strrchr(path, '.'), ".png");
+    uint64_t t0 = SDL_GetTicksNS();
+    if (e->r >= 0) {
+        SDL_PathInfo info;
+        FILE* f;
+        e->verdict = e->r == 1 ? V_OK : e->r ? V_BROKEN : V_REJECTED;
+        if (SDL_GetPathInfo(path, &info) && (f = pc_fopen(cache_path, "a"))) {
+            char line[1200];   /* (SDL's printf: the 64-bit size also with msvcrt) */
+            SDL_snprintf(line, sizeof(line), "%s %u %u %llu %s\n", e->r == 1 ? "ok" : e->r ? "broken" : "rejected", e->amode, e->aconst, (unsigned long long)info.size, rel(e));
+            fputs(line, f);
+            fclose(f);
+        }
+        if (e->r != 1) { host_log("hd textures: %s does not show the original (%s)%s\n", rel(e), e->why, usable(e, flags) ? "" : ", not used"); rejected++; }
     }
     free(e->orig); e->orig = NULL;
-    t2 = SDL_GetTicksNS();
-    e->gl = !data || !usable(e, flags) ? 0 : png ? upload_rgba(data, &e->bytes) : upload_dds(data, n, &e->bytes);
-    if (png) SDL_DestroySurface(data); else SDL_free(data);
+    e->gl = !e->data || !usable(e, flags) ? 0 : png ? upload_rgba(e->data, &e->bytes) : upload_dds(e->data, e->n, &e->bytes);
+    if (png) SDL_DestroySurface(e->data); else SDL_free(e->data);
     if (!e->gl) {   /* unreadable or not uploadable: never tried again (bind would on every draw) */
-        e->st = data && e->verdict != V_UNKNOWN && !usable(e, flags) ? 3 : 4;
+        e->st = e->data && e->verdict != V_UNKNOWN && !usable(e, flags) ? 3 : 4;
         if (e->st == 4) host_log("hd textures: cannot load %s\n", rel(e));
     } else {
         if (e->amode == A_CONST) glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_A, GL_ONE);
@@ -533,6 +597,7 @@ static void load(Entry* e, uint32_t flags)
         loads++;
         bytes += e->bytes;
     }
+    e->data = NULL;
     while (bytes > cap_bytes) {   /* least recently used */
         Entry* o = NULL;
         for (int i = 0; i < nents; i++) if (ents[i].st == 2 && &ents[i] != e && (!o || ents[i].last < o->last)) o = &ents[i];
@@ -541,8 +606,48 @@ static void load(Entry* e, uint32_t flags)
         bytes -= o->bytes;
         o->gl = 0; o->st = 0;
     }
-    read_ns += t1 - t0; check_ns += t2 - t1; upload_ns += SDL_GetTicksNS() - t2;
+    read_ns += e->rns; check_ns += e->cns; upload_ns += SDL_GetTicksNS() - t0;
+    spent += SDL_GetTicksNS() - t0;
+    nloading--;
     stats();
+}
+
+/* st 0 -> 1: to the loader threads (without them, at once) */
+static void start(Entry* e, uint32_t flags)
+{
+    e->st = 1; e->flags = (uint8_t)flags;
+    nloading++;
+    if (!qm) { read_check(e); finish(e); return; }
+    SDL_LockMutex(qm);
+    e->job = J_QUEUED;
+    if (!e->inq) { e->inq = 1; queue_[(qh + qn++) % nents] = (int)(e - ents); }
+    SDL_BroadcastCondition(qc);
+    SDL_UnlockMutex(qm);
+}
+
+/* st 1: finished if read; wait: read now if no loader thread has begun it, else wait for it */
+static void poll(Entry* e, int wait)
+{
+    int job;
+    SDL_LockMutex(qm);
+    if (wait) {
+        if (e->job == J_QUEUED) e->job = J_NONE;
+        while (e->job == J_RUNNING) SDL_WaitCondition(qc, qm);
+    }
+    job = e->job;
+    if (job == J_DONE) { ready -= e->n; e->job = J_NONE; SDL_BroadcastCondition(qc); }
+    SDL_UnlockMutex(qm);
+    if (job == J_NONE) read_check(e);
+    if (job == J_NONE || job == J_DONE) finish(e);
+}
+
+/* a game frame is executed: what the loader threads have read is uploaded, a few ms of it */
+void hdpack_frame(int faded)
+{
+    fade = faded;
+    spent = 0;
+    for (int i = 0; qm && nloading && i < nents && spent < UPLOAD_BUDGET_NS; i++)
+        if (ents[i].st == 1) poll(&ents[i], 0);
 }
 
 unsigned int hdpack_bind(unsigned int t, float* ascale)
@@ -553,7 +658,8 @@ unsigned int hdpack_bind(unsigned int t, float* ascale)
     if (t >= cmap || !map[t]) return t;
     e = &ents[(map[t] & 0x0FFFFFFF) - 1];
     if (e->st == 3 && usable(e, map[t] >> 28)) e->st = 0;   /* not used so far, now asked for (font / UI setting) */
-    if (e->st == 0) load(e, map[t] >> 28);
+    if (e->st == 0) start(e, map[t] >> 28);
+    if (e->st == 1 && fade) poll(e, 1);
     if (e->st != 2 || !usable(e, map[t] >> 28)) return t;
     e->last = ++clock_;
     /* GS alpha (0x80 = 1.0) as the original: the replacement's 0..255 scaled, or the original's constant */

@@ -87,13 +87,38 @@ several files have the same name (the same key, e.g. two packs in `1_...` and `2
 one whose path in the pack folder comes first wins (byte order, `\` read as `/`, so the same on
 Windows and Linux; logged as `hd textures: N names in several folders, the first folder in name
 order wins`); the others are never loaded. A file
-is read, checked (the first time) and uploaded on the render thread when its texture is first
-drawn (DDS: BC1/BC2/BC3/BC7 compressed as they are, uncompressed RGBA/BGRA; PNG through SDL). A
-room's textures are first drawn under its fade-in, so the room shows its replacements from its
-first visible frame; the cost is a pause of the frames that first draw them (tens of ms per room
-from the page cache, about 1-2.5 ms of it per file for the check on the first visit). Loaded
-replacements stay in a budget of 1024 MB (`RECVX_HD_CACHE_MB`); the least recently used are
-dropped and read again when needed. One log line sums it up 2 s after lookups and loads stop:
+is loaded when its texture is first drawn (DDS: BC1/BC2/BC3/BC7 compressed as they are,
+uncompressed RGBA/BGRA; PNG through SDL):
+
+- Three **loader threads** read it and check it (the first time); the draws keep the original
+  texture meanwhile. At the start of each executed frame the render thread uploads what is read,
+  up to 3 ms of it per frame (at least one file). Files read but not uploaded are capped at
+  128 MB.
+- **Under a screen fade that lets the picture through** (`pc_frame_fade`: the game's fade alpha
+  between 0 and 255, as in a room's fade-in) a draw waits for its file instead: read on the
+  render thread if no loader thread has begun it, else waited for. A room's textures are first
+  drawn under its fade, so it shows its replacements from its first visible frame. The room is
+  first drawn one frame earlier under the black screen; that frame already hands its files to the
+  loader threads.
+- **Textures first drawn later** (another camera cut, an enemy, an effect, a menu without a
+  fade) show the original until their file is in, usually one to a few frames later. Loading them
+  where they were drawn (up to 0.6.3) paused the render thread at the cut: measured in nine
+  rooms, up to 53 ms per cut with the files in the page cache and up to 147 ms from a cold disk
+  on the first visit (NVMe; slower disks pause longer). Now a cut costs the decoding of its new
+  original textures and their keys: up to 23 ms where a cut shows 35 new ones (11 ms without a
+  pack), whatever the disk.
+- A room's first visible frame waits for its files: in the same nine rooms up to 33 ms with the
+  files in the page cache, up to 90 ms from a cold disk on the first visit (46 files, 195 MB);
+  read on the render thread alone they took up to 72 and 303 ms.
+
+Which replacements a room needs is known only when it is drawn: native texture definitions are
+recorded at a TIM2's first upload, which the ordering-table walker makes when it first draws
+that texture, and the key needs the draw's TEX0 (size, format, CLUT bank) and palette. So
+nothing is loaded ahead of the first draw.
+
+Loaded replacements stay in a budget of 1024 MB (`RECVX_HD_CACHE_MB`); the least recently used
+are dropped and read again when needed. One log line sums it up 2 s after lookups and loads stop
+(read and check times on either thread, upload on the render thread):
 
 ```
 hd textures: 95 hits (4 rejected, 1 font kept), 0 misses; 80 loaded, 295 MB kept (read 40 ms, checks 136 ms, upload 29 ms, keys 4 ms)

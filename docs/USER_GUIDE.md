@@ -485,7 +485,9 @@ the pack comes:
 
 Rooms show the replacements from their first visible frame; the first time a room is entered its
 replacements are also checked against the original pictures, which can make that room take a
-moment longer to appear. Settings (Display): **HD textures** (on), **HD textures: font** (off)
+moment longer to appear. Textures that first show up later (another camera angle, an enemy, an
+effect) are loaded in the background without stopping the game, and switch to HD a moment after
+they appear. Settings (Display): **HD textures** (on), **HD textures: font** (off)
 and **HD textures: UI** (on).
 
 - Packs made on another disc version (for example a translation) or with redesigned menus

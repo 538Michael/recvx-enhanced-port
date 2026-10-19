@@ -22,6 +22,7 @@
 #include "stream.h"
 #include "native.h"
 #include "textures.h"
+#include "hdpack.h"
 #include "../host/prof.h"
 #include "../ps2_platform.h"
 #include <SDL3/SDL.h>
@@ -43,6 +44,7 @@ struct Frame {
     uint64_t scene;                          /* pc_frame_view: stage, room, cut */
     float view[6];                           /* ... and the camera's eye and view direction */
     float pt[3]; int pt_flags;               /* stream_point */
+    int fade;                                /* pc_frame_fade: the picture shows through a screen fade */
     /* filled by the render thread when executed */
     Group* g; size_t ng, cg;
     Inst* in; size_t nin, cin;
@@ -295,8 +297,10 @@ void stream_disp(uint32_t fbp, uint32_t fbw, uint32_t psm) { push_ev(EV_DISP, 0,
 
 static void submit(int partial)
 {
+    extern int pc_frame_fade(void);
     Frame* f = recording();
     f->partial = partial;
+    f->fade = pc_frame_fade();
     rec = NULL;
     prof_push(PROF_QUEUE);
     SDL_LockMutex(mtx);
@@ -399,6 +403,7 @@ void stream_exec(Frame* f)
     gs_clut_state_save(f->clut_start);
     ntex_state_save(f->ntex_start);
     gs_tex_epoch = 0;
+    hdpack_frame(f->fade);
     for (size_t i = 0; i < f->nev; i++) {
         const Ev* e = &f->ev[i];
         if (tex_event(e)) gs_tex_epoch = (uint32_t)i + 1;
