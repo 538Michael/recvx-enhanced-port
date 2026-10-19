@@ -3,6 +3,9 @@
 > The underlying decompilation ([AshfordFamily/recvx-decomp](https://github.com/AshfordFamily/recvx-decomp)) is a separate, human-led project. Our changes to it live in a fork and are disclosed as AI-assisted, as that project asks.
 > No game data is included. You need your own legally obtained copy of *Resident Evil Code: Veronica X* (PS2, NTSC-U, SLUS-20184).
 
+Community Discordserver, thanks cristinathegamer056 for setting it up!
+https://discord.gg/ZpDn46yv2
+
 # recvx-enhanced-port
 
 [![build](https://github.com/aikatore/recvx-enhanced-port/actions/workflows/build.yml/badge.svg)](https://github.com/aikatore/recvx-enhanced-port/actions/workflows/build.yml)
