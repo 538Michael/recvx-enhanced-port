@@ -549,6 +549,18 @@ static void scripted(unsigned int* inv)
             ef = NULL;
         }
     }
+    {   /* RECVX_EFF_MODE1="f:id:type:mode1,...": at game frame f, mode1 of every live effect of that id and type
+           (e.g. "200:263:0:1": the fires laid out in Alexia's hall burn, as in her fight) */
+        static const char* em = (const char*)-1;
+        if (em == (const char*)-1) em = getenv("RECVX_EFF_MODE1");
+        while (em && sscanf(em, "%d:%d:%d:%d%n", &f, &a, &b, &c, &n) == 4 && clock >= f) {
+            int hit = 0;
+            for (int i = 0; i < 512; i++)
+                if ((eff[i].flg & 1) && eff[i].id == a && eff[i].type == b) { eff[i].mode1 = (unsigned char)c; hit++; }
+            printf("test: effect %d type %d: mode1 %d on %d at game frame %d\n", a, b, c, hit, clock);
+            em = em[n] == ',' ? em + n + 1 : NULL;
+        }
+    }
     {   /* RECVX_RETRY="frame,...": a retry point here (as the scripts' ReTryPointSet): the game over's continue resumes in this room */
         static const char* rt = (const char*)-1;
         if (rt == (const char*)-1) rt = getenv("RECVX_RETRY");

@@ -788,10 +788,12 @@ int gs_batch_two_pass(void) { return batch_valid && vcount && two_pass(batch_sta
 
 /* the batch: vbuf's vertices from vbo_first on, with the static runs in their places (one draw
    call each part, in order: the same primitives in the same order as one call) */
+static uint32_t gt_cnt[4];   /* RECVX_GPU_TIME: GL draws (at most), GS-path sprites, other GS-path primitives, native triangles */
 static void draw_batch(int afail_pass)
 {
     int at = 0;
     uni1i(u_afail_pass, afail_pass);
+    gt_cnt[0] += 1 + 2 * (uint32_t)nsruns;
     if (!nsruns) { glDrawArrays(batch_mode, vbo_first, vcount); return; }
     for (int r = 0; r <= nsruns; r++) {
         int end = r < nsruns ? sruns[r].start : vcount;
@@ -824,6 +826,7 @@ static struct {
     uint64_t cpu_exec0, cpu_exec, cpu_pres0;
     double sum_cpu[3], sum_gpu[3];   /* exec, in-between, frame image */
     double part[4];                  /* in-between: start copy, replay draws, display + overlay, restore */
+    double cnt[2][4];                /* gt_cnt summed: executed frames, in-between images */
     int n_cpu[3], n_gpu[3];
     uint64_t last_log;
 } gt;
@@ -866,12 +869,14 @@ static void gt_exec_begin(void)
     if (gt.kind[gt.slot] == 4) gt.kind[gt.slot] = 0;   /* executed, never presented (skipped): no GPU time */
     gt_collect(gt.slot, 1);
     gt_mark(GT_EXEC0);
+    memset(gt_cnt, 0, sizeof(gt_cnt));
     gt.cpu_exec0 = SDL_GetTicksNS();
 }
 static void gt_exec_end(void)
 {
     if (!gt.on) return;
     gt_mark(GT_EXEC1);
+    for (int i = 0; i < 4; i++) gt.cnt[0][i] += gt_cnt[i];
     gt.kind[gt.slot] = 4;
     gt.sum_cpu[0] += (SDL_GetTicksNS() - gt.cpu_exec0) / 1e6; gt.n_cpu[0]++;
 }
@@ -881,6 +886,7 @@ static void gt_present_begin(void)
     if (!gt.on) return;
     if (!(gt.kind[gt.slot] & 4)) gt_collect(gt.slot, 1);
     gt_mark(GT_PRES0);
+    memset(gt_cnt, 0, sizeof(gt_cnt));
     gt.cpu_pres0 = SDL_GetTicksNS();
 }
 static void gt_present_end(int inbetween)
@@ -891,6 +897,7 @@ static void gt_present_end(int inbetween)
     gt_mark(GT_PRES1);
     gt.kind[gt.slot] = (gt.kind[gt.slot] & 4) | (inbetween ? 1 : 2);
     gt.sum_cpu[inbetween ? 1 : 2] += (now - gt.cpu_pres0) / 1e6; gt.n_cpu[inbetween ? 1 : 2]++;
+    if (inbetween) for (int i = 0; i < 4; i++) gt.cnt[1][i] += gt_cnt[i];
     gt.slot = (gt.slot + 1) % GT_RING;
     for (int i = 1; i < GT_RING / 2; i++) gt_collect((gt.slot + i) % GT_RING, 0);
     if (!gt.last_log) gt.last_log = now;
@@ -902,9 +909,13 @@ static void gt_present_end(int inbetween)
                  gt.n_cpu[1] / s, A(gt.sum_cpu[1], gt.n_cpu[1]), A(gt.sum_gpu[1], gt.n_gpu[1]),
                  A(gt.part[0], gt.n_gpu[1]), A(gt.part[1], gt.n_gpu[1]), A(gt.part[2], gt.n_gpu[1]), A(gt.part[3], gt.n_gpu[1]),
                  gt.n_cpu[2] / s, A(gt.sum_cpu[2], gt.n_cpu[2]), A(gt.sum_gpu[2], gt.n_gpu[2]));
+        for (int k = 0; k < 2; k++)
+            host_log("gputime: %s draws %.0f, GS-path sprites %.0f, other GS-path primitives %.0f, native triangles %.0f\n", k ? "per in-between" : "per frame",
+                     A(gt.cnt[k][0], gt.n_cpu[k]), A(gt.cnt[k][1], gt.n_cpu[k]), A(gt.cnt[k][2], gt.n_cpu[k]), A(gt.cnt[k][3], gt.n_cpu[k]));
 #undef A
         memset(gt.sum_cpu, 0, sizeof(gt.sum_cpu)); memset(gt.sum_gpu, 0, sizeof(gt.sum_gpu));
         memset(gt.n_cpu, 0, sizeof(gt.n_cpu)); memset(gt.n_gpu, 0, sizeof(gt.n_gpu)); memset(gt.part, 0, sizeof(gt.part));
+        memset(gt.cnt, 0, sizeof(gt.cnt));
         gt.last_log = now;
     }
 }
@@ -1361,6 +1372,7 @@ static void batch_for(int type, const GsVertex* v, int count, const GsContext* c
 void gs_draw_primitive(int type, const GsVertex* v, int count, const GsContext* c, uint64_t prim)
 {
     int fst = (prim >> 8) & 1;
+    gt_cnt[type == 6 ? 1 : 2]++;
     batch_for(type, v, count, c, prim);
     if (type == 6) { /* sprite: two corners, attributes from the 2nd vertex */
         const GsVertex *a = &v[0], *b = &v[1];
@@ -1451,6 +1463,7 @@ static void gl_triangles(unsigned int prim, const GlVertex* g, int n, int sfirst
         vcount += k;
         i += k;
     }
+    gt_cnt[3] += (uint32_t)n / 3;
 }
 
 /* The GL vertices of each native strip as the executed frame drew them, by event: a replay
