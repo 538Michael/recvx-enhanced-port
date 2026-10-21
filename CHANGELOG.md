@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Gameplay
+
+- **Auto-climb stairs**: a new GAMEPLAY option. With it on, walking or running into a staircase
+  takes you up or down it without pressing the action button, with any controls, in third person
+  and in co-op. Standing in front of stairs or walking past them does nothing, and doors, items
+  and steps onto or off a ledge still need the button, so you never drop off a ledge by accident.
+  Off by default.
+
 ## 0.6.5 (2026-10-21)
 
 ### Co-op
