@@ -2711,6 +2711,11 @@ void coop_item_late(int bit)
     host_log("coop: took item %d of flag %d, but the partner had taken it first: ours goes back\n", item, bit);
 }
 
+static void gate_hold(int w, unsigned int* set, unsigned int* clr);
+static void gate_ours(int w, unsigned int bits);
+static void gate_release(void);
+static void gate_drop(void);
+
 static void diff_flags(void)
 {
     unsigned int* f = flag_block();
@@ -2727,6 +2732,7 @@ static void diff_flags(void)
         unsigned int set = f[w] & ~last[w], clr = last[w] & ~f[w];
         if (!(set | clr)) continue;
         last[w] = f[w];
+        gate_ours(w, set | clr);
         if (w >= IT_FLG && w < IT_FLG + 16 && set) { flag_at = tick; it_new[w - IT_FLG] |= set; }
         if (!item_word(w)) prog_at = tick;
         if (trace && w >= 64 && w < 96) fprintf(stderr, "coop: ed_flg word %d set %08x clr %08x (ours, room %d/%d)\n", w - 64, set, clr, sys->stg_no, sys->rom_no);
@@ -2873,6 +2879,7 @@ static int apply_session_event(const Event* e)
                     host_log("coop: the host took item %d of flag word %d as we did: ours goes back\n", item, w);
                 }
             }
+            gate_hold(w, &c.u.fl.set[j], &c.u.fl.clr[j]);   /* a gate of the scene we are in: when it ends */
             f[w] = (f[w] | c.u.fl.set[j]) & ~c.u.fl.clr[j];
             last[w] = (last[w] | c.u.fl.set[j]) & ~c.u.fl.clr[j];
         }
@@ -2988,6 +2995,7 @@ static void session(void)
         memset(mine, 0, sizeof(mine));
         back_n = 0;
         lost_at = prog_at = 0;
+        gate_drop();   /* the flag block is replaced too */
     }
     if (is_host) {
         if (game) regroup_check();
@@ -3006,7 +3014,7 @@ static void session(void)
         if (need_blob || pop_pending || popping) return;
         follow();
     }
-    if (tx_in_game && game) diff_flags();
+    if (tx_in_game && game) { gate_release(); diff_flags(); }
 }
 
 /* ---------------------------------------------------------------- world events (M8) */
@@ -3066,13 +3074,14 @@ static unsigned char evdoor[256];          /* the event goes through a door (Set
 static unsigned short trace_buf[4096];
 static int ntrace;
 static unsigned int pre_flags[NFLAG];
-static struct { int on, n; unsigned int id; Event ev; unsigned short ops[TRIG_OPS]; } trig;   /* the partner's block, to replay */
+static struct { int on, n, held; unsigned int id, at; Event ev; unsigned short ops[TRIG_OPS]; } trig;   /* the partner's block, to replay (at: arrived) */
 static unsigned short trig_ops[TRIG_OPS];
 static unsigned int trig_done;
 
 static unsigned int scd_sig(void) { return (unsigned int)(size_t)rom->evtp->scd1 ^ ((unsigned int)(size_t)rom->evtp->evd << 11) ^ ((unsigned int)sys->rcase << 28); }
 
-static void world_reset(void) { trig.on = 0; trig_done = 0; }
+static void gate_drop(void);
+static void world_reset(void) { trig.on = 0; trig_done = 0; gate_drop(); }
 
 typedef struct Blk { unsigned int ifel, then0, then1, end; int nc; unsigned char cset[8], cval[8]; unsigned short cbit[8]; } Blk;
 
@@ -3205,6 +3214,64 @@ static Region* region_at(unsigned int start)
     for (i = 0; i < nreg; i++)
         if (reg[i].start == start) return &reg[i];
     return NULL;
+}
+
+/* ---- a gate stays as our own scene left it until the scene ends
+   A world event often takes the player through two steps of the room script: one step enters a scene
+   (cinema mode, CineSet 3) and sets a room flag, and a later block, gated by the same world flag, ends it
+   (its events, or the "No" branch's CineSet 4) - the turntable (7/11): the key's event asks "Move the
+   turntable?" and the block that moves it, or not, tests ev_flg 350 clear; the guillotine gate (0/8):
+   the Eagle Plate used in the item screen enters the scene, the block that opens the gate when the screen
+   has closed tests ev_flg 11 clear; the lift corridor (7/8): the Halberd sets ev_flg 339 and enters the
+   scene, the block that takes the lift once the screen has closed tests it set and clears it. In single
+   player nothing changes that flag in between. In co-op the partner did: its EV_FLAGS (it moved the
+   turntable while our question was open), or our replay of its block (its game ran the lift's block on our
+   flag and sent it back: the replay cleared ev_flg 339 here, without the door), and the closing block no
+   longer ran: our player stayed in cinema mode for good (frozen). So while our player is in a scene, the
+   partner's changes to this room's world event gates wait (held) and are applied when the scene ends or
+   the room changes (our own change of a held bit is newer and drops it), and so does the replay of its
+   blocks (coop_scd1; the stream waits behind it as for any replay, SCENE_WAIT at most). */
+#define SCENE_WAIT 300                  /* frames: a replay waits for our scene at most 10 s (the stream waits with it) */
+static unsigned int held_set[NFLAG], held_clr[NFLAG];
+static int held_key = -1;               /* the room they were held in */
+static int in_scene(void) { return (sys->cb_flg & 0x4) != 0; }   /* cinema: bhCineSet */
+/* the gate bits of this room's world event blocks in flag word w (none before the room's script was swept) */
+static unsigned int gate_bits(int w)
+{
+    unsigned int m = 0;
+    int i;
+    if (rom->evtp != reg_evtp || scd_sig() != reg_sig) return 0;
+    for (i = 0; i < nreg; i++)
+        if (world_off(reg[i].set) + (reg[i].bit >> 5) == w) m |= 0x80000000u >> (reg[i].bit & 31);
+    return m;
+}
+/* EV_FLAGS: keep the partner's gate changes out of *set / *clr while our scene runs */
+static void gate_hold(int w, unsigned int* set, unsigned int* clr)
+{
+    unsigned int g;
+    if (!in_scene() || !(g = gate_bits(w) & (*set | *clr))) return;
+    held_set[w] = (held_set[w] | (*set & g)) & ~(*clr & g);
+    held_clr[w] = (held_clr[w] | (*clr & g)) & ~(*set & g);
+    *set &= ~g; *clr &= ~g;
+    held_key = coop_room_key();
+    host_log("coop: the partner changed world flag word %d (%08x) while our scene runs in %d/%d: held until it ends\n", w, g, sys->stg_no, sys->rom_no);
+}
+static void gate_drop(void) { memset(held_set, 0, sizeof(held_set)); memset(held_clr, 0, sizeof(held_clr)); held_key = -1; }
+static void gate_ours(int w, unsigned int bits) { held_set[w] &= ~bits; held_clr[w] &= ~bits; }   /* diff_flags: we changed them */
+/* every frame in game: the held changes once our scene has ended (or we left the room) */
+static void gate_release(void)
+{
+    unsigned int* f = flag_block();
+    int w, n = 0;
+    if (held_key < 0 || (in_scene() && held_key == coop_room_key())) return;
+    for (w = 0; w < NFLAG; w++) {
+        if (!(held_set[w] | held_clr[w])) continue;
+        f[w] = (f[w] | held_set[w]) & ~held_clr[w];
+        last[w] = (last[w] | held_set[w]) & ~held_clr[w];
+        n++;
+    }
+    if (n) host_log("coop: our scene ended: the partner's held world flags (%d words) applied\n", n);
+    gate_drop();
 }
 
 static void count_keys(unsigned char* keys);
@@ -3478,7 +3545,10 @@ void coop_scd1(void)
         host_log("coop: the partner's world event block %04x: we left the room, its flags only\n", trig.ev.u.tr.start);
         trig_done = trig.id;
     }
-    if (trig.on && trig.id != trig_done && plp && plp->mode0 != 4 && plp->mode0 != 6 && plp->hp >= 0 && !(sys->cb_flg & 0x1)) {
+    if (trig.on && trig.id != trig_done && in_scene() && frame_no - trig.at < SCENE_WAIT) {   /* (see gate_hold) */
+        if (!trig.held) host_log("coop: the partner's world event block %04x waits until our scene in %d/%d ends\n", trig.ev.u.tr.start, sys->stg_no, sys->rom_no);
+        trig.held = 1;
+    } else if (trig.on && trig.id != trig_done && plp && plp->mode0 != 4 && plp->mode0 != 6 && plp->hp >= 0 && !(sys->cb_flg & 0x1)) {
         Region* r = region_at(trig.ev.u.tr.start);
         int door = 0, k2;
         for (k2 = 0; k2 < trig.n; k2++)
@@ -3528,7 +3598,9 @@ static int apply_trig(const Event* e)
     }
     if (!trig.on || trig.id != e->id) {
         trig.on = 1;
+        trig.held = 0;
         trig.id = e->id;
+        trig.at = frame_no;
         trig.ev = *e;
         trig.n = e->u.tr.n;
         memcpy(trig.ops, trig_ops, sizeof(trig.ops));
@@ -5642,6 +5714,13 @@ static void world_trace(void)
             was[k][i] = on;
         }
     room = r;
+    if (frame_no % 300 == 0) {   /* the world flags (ev ed ky mp: not the item words), to compare both sides */
+        const unsigned int* f = flag_block();
+        unsigned int h = 0;
+        for (i = 0; i < NFLAG; i++)
+            if (!item_word(i)) h = h * 31 + f[i];
+        fprintf(stderr, "coop: world flags %08x at frame %u in %d/%d\n", h, frame_no, sys->stg_no, sys->rom_no);
+    }
 }
 
 static int drop_now(int events)

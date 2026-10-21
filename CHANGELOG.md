@@ -15,6 +15,13 @@
   camera shows it: you and your surroundings get the same haze or darkness, and it still fades
   smoothly between camera angles. Too much? The Fog intensity setting lowers it as before.
 
+### Fixes
+
+- **Co-op: frozen at the turntable, the guillotine gate or the lift**: when one player used the
+  turntable, the Eagle Plate or the Halberd while the other was in the middle of the same thing
+  (answering "Move the turntable?", or the item screen still closing), one of them could stay stuck
+  in the scene for good. Each player's scene now finishes as it does in single player.
+
 ## 0.6.4 (2026-10-20)
 
 ### Fixes
