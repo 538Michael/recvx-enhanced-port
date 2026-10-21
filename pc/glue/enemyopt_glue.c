@@ -496,12 +496,40 @@ static void kill_test(void)
     }
 }
 
+/* Test aid RECVX_HEADSHOT=n: n game frames into each room, every living zombie in its AI (records and added ones) takes
+   one head hit as from the magnum (weapon 6, item 32; en01.c bhEne01_CheckExpHead: joint 11), the hit that blows the head off;
+   then its head state (exp0 + 0x78, -1: blown off), hp and modes are logged every 15 frames for 90 frames. */
+static void headshot_test(void)
+{
+    static int n = -2, gen = -1, t;
+    int k;
+    if (n == -2) n = getenv("RECVX_HEADSHOT") ? atoi(getenv("RECVX_HEADSHOT")) : -1;
+    if (n < 0 || !sys || !plp || (sys->gm_flg & 0x9) || (sys->cb_flg & 0x1)) return;
+    if (gen != enemy_room_gen) { gen = enemy_room_gen; t = 0; }
+    if (++t < n || t > n + 90) return;
+    for (k = 0; k < (int)sys->ewk_n && k < 128; k++) {
+        BH_PWORK* ep = &ene[k];
+        if (!(ep->flg & 0x1) || ep->id != 1 || (ep->flg & 0x80) || !ep->exp0) continue;
+        if (t == n && !(ep->flg & 0x2) && !(ep->stflg & 0x1000000) && ep->mode0 == 1) {
+            ep->flg |= 0x4;
+            ep->dpx = ep->px; ep->dpy = ep->py + 16.0f; ep->dpz = ep->pz;
+            ep->wpnr_no = 6;
+            ep->djnt_no = 11;
+            ep->dam[11] += 30;
+        }
+        if ((t - n) % 15 == 0)
+            printf("test: headshot room %04d slot %d model %d type %d: head %d hp %d mode %d/%d/%d flg %#x\n", room_file_now(), k, ep->mdlver, ep->type,
+                   *(int*)(ep->exp0 + 0x78), ep->hp, ep->mode0, ep->mode1, ep->mode2, ep->flg);
+    }
+}
+
 void enemy_extras_frame(void)
 {
     static int done_gen = -1;
     const EnemyOpts* o;
     int cand[128], nc = 0, k, made = 0;
     kill_test();
+    headshot_test();
     if (done_gen == enemy_room_gen || !sys || !plp || !rom) return;
     o = enemy_opts();
     if (!o->extra || coop_is_guest()) { done_gen = enemy_room_gen; return; }

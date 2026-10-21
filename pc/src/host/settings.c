@@ -382,6 +382,8 @@ const Setting g_settings[] = {
     { SP_GAMEPLAY, "Randomize event enemies", V(g_enemy_opts.events), 0, 1, 1,
       .help = "Enemies that rooms show later or that events drive change too: the ones events animate get another look of their own kind, so the scenes still play. Next room." },
     { SP_GAMEPLAY, "Enemy seed", V(g_enemy_opts.seed), 0, 99999, 1, .fmt = "%d", .help = "Placements and randomizer: the same seed gives the same rooms. In co-op both use the host's." },
+    { SP_GAMEPLAY, "Head blow-offs", V(g_config.head_blowoff), 0, 1, 1,
+      .help = "A zombie's head that the magnum or the shotgun aimed up close bursts is gone from its body, on every zombie look. Off: as the original, which only shows the burst and the blood." },
 
     { SP_CONTROLS, "Input source", V(g_input_source), 0, 2, 1, sources, .apply = bind_apply_source,
       .help = "Which devices play in this window. Auto: keyboard/mouse and gamepad, while the window has focus. Keyboard/mouse "

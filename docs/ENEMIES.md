@@ -204,6 +204,41 @@ Details in [COOP.md](COOP.md); what matters for enemies:
 * **Kills while the guest runs the room** (`EV_GONE`): at the take-over the guest names its dead
   enemies; the host hides its matching copies for that visit.
 
+## Head blow-offs
+
+**The game**: `en01.c bhEne01_DmgCheckType00` bursts a walking zombie's head (`bhEne01_CheckExpHead`)
+when a weapon whose `En01_WpnDamageTbl` entry has flag `0x10` hits it and one of: the head joint
+(11) took damage (`exp0 + 0x78 > 0`, any of these weapons: magnum, shotgun, sniper rifle, grenade
+launcher); the shotgun or grenade launcher (weapons 11, 14) aimed up within 10 units on the same
+floor; the magnum (weapon 6) on joint 1 or 8..11; weapon 19 on joint 1 or 8..17. Handguns never do. It
+sets hp -1 and `exp0 + 0x78 = -1`, spawns effect 356 at the neck (`bhEne01_ExpHeadEffect2`: chunks,
+then the neck's blood fountain) and the zombie falls (damage mode 4) and dies as from any kill.
+`bhEne01_CutHead` (a scripted kill, the grab's counter) sets the same flag. Model versions 31 and 42
+(prisoner 3, base staff 3) are left out by the game: their heads never burst.
+
+**Nothing hid the head**, on any zombie look, original or swapped: every zombie model (all 24 looks)
+is one skinned mesh on node 1 of the 18-node zombie skeleton, the head is part of it, and the PS2's
+skin cutter `njplus.c npCutSkin` is an empty function. The head stayed on the falling body behind the
+blood (checked: each look spawned in the lift hall and given the head hit, `RECVX_HEADSHOT`;
+frame-identical between the room's own zombies and other looks).
+
+**On the PC** ("Head blow-offs", GAMEPLAY, `head_blowoff`, on by default): a zombie whose
+`exp0 + 0x78` is -1 is drawn without its head (`MdlPut.c bhPutModel` -> `variant_glue.c
+pc_zombie_head`): while it is drawn, the rotation part of the matrices of head node 11 and the nodes
+below it is zeroed, so the skin's vertices the head bone carries meet at the head joint and the
+blended neck vertices close into a stump; the matrices are put back after the draw, so the game's
+state, hits, collision and effects are untouched. One rule for every look: they share the skeleton.
+A linked upper half (`flg & 0x80`) follows its body's flag. While the head part flies off
+(`en01b.c`, head part `exp0 + 0x10` in mode 3) it is not hidden. An enemy variant with a zombie
+base drawn as another model ("Enemy variants") hides that model's head role (`actor_head_node`,
+the rig's head and the nodes below it). Off: as the original (frames identical to the previous
+build). Caps the game links to the head (lab coat, base staff, civilian looks) fly off as before.
+
+**Co-op**: the host decides the burst; a zombie's `exp0` is not in the snapshots, but effect 356 goes
+to the guest as an `EV_FX` linked to the zombie's slot, and `coop_glue.c apply_fx` sets the
+guest's flag from it, so the partner sees the head go too. A guest that enters the room later sees
+the body with its head.
+
 ## Requirements for randomizers and difficulty options
 
 1. **Record count and order** stay (scripts, `wrk_no`, model/motion/texture tables, co-op slots).
@@ -361,7 +396,7 @@ arms, motions, attacks and sounds, spawned as an ordinary enemy, with the Tyrant
 | Field | Applied | Where |
 |---|---|---|
 | base | the spawner entry of that type and model version is realized (`spawn_at`), the variant remembered by its slot | `spawn_glue.c` -> `variant_spawned` |
-| model, attach | drawn instead of the base (and of its linked parts), posed from the base's skeleton every time it is drawn; a display slot of the appearance system per model in the room (`ACTOR_VARIANT`, 2 slots), released with the room's textures; a model with no humanoid node map, or one that does not load: the base is drawn | `eneset.c bhDrawEnemy` -> `pc_variant_draw` |
+| model, attach | drawn instead of the base (and of its linked parts), posed from the base's skeleton every time it is drawn (also while a zombie base plays a chewing or walking motion with its mouth morph, `mdflg & 2`: before, the base was drawn then); a display slot of the appearance system per model in the room (`ACTOR_VARIANT`, 2 slots), released with the room's textures; a model with no humanoid node map, or one that does not load: the base is drawn | `eneset.c bhDrawEnemy` -> `pc_variant_draw` |
 | hp, armour | the damage a hit is about to deal (`ep->dam[]`, which `bhEne_CalcDamage` sums) x armour / hp, before its step; its own HP number, thresholds and HP tables stay the base's (so each difficulty keeps its ratio) | `eneset.c bhControlEnemy` -> `pc_variant_pre` |
 | damage | the player's hit points its step took, x damage (a blow the game made fatal stays fatal) | `pc_variant_post` |
 | speed | steps per frame (0.5..2: AI, motions and movement together; below 1 a step is skipped, never one with a hit) | `pc_variant_pre` |
@@ -693,5 +728,6 @@ Test aids:
 | `RECVX_SPAWN_SURVEY="stg:rom,..."` | tries every spawner entry in each room and logs the result; `RECVX_SPAWN_SURVEY_ALL=1` keeps the spawns |
 | `RECVX_ENEMY_EXTRA`, `_PLACE`, `_RANDOM`, `_SEED`, `_VARIETY`, `_EVENTS` | override the enemy options |
 | `RECVX_ENEMY_KILL=n` | from n game frames into each room, every 20 frames each living, shown enemy of the room's records (ids 1..30, in its AI) takes a heavy hit as from the player's weapon; logs each death (`flg & 2`, what `DieCk` turns into the kill bit) and per room how many died (Black Widows take damage through their body parts and do not die from it) |
+| `RECVX_HEADSHOT=n` | n game frames into each room, every living zombie in its AI (records and added ones) takes one head hit as from the magnum (weapon 6 on joint 11, the game's burst path); its head state (`exp0 + 0x78`), hp and modes are logged every 15 frames for 90 frames |
 | `RECVX_ENEMY_TRACE=dist` | traces enemy steps (co-op targets) |
 | `RECVX_TRACE_SND=1` | logs sound requests and extra banks |
