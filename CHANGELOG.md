@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Third person
+
+- **Fog like the fixed cameras**: over the shoulder, fog and darkness were much weaker than with
+  the fixed cameras, because the camera is so much closer to you. Fog now looks as the fixed
+  camera shows it: you and your surroundings get the same haze or darkness, and it still fades
+  smoothly between camera angles. Too much? The Fog intensity setting lowers it as before.
+
 ## 0.6.4 (2026-10-20)
 
 ### Fixes

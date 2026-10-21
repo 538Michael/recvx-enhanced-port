@@ -186,7 +186,7 @@ unit (the character is about 17 units tall).
 | `RECVX_VPAD="frame:input+input,..."` | a virtual gamepad ([ARCHITECTURE.md](ARCHITECTURE.md)): sticks as `leftx=0.5+lefty=-1` (up is negative), triggers `+lefttrigger`; a trigger after another input needs its own `+` (`+lefttrigger++righttrigger`) |
 | `RECVX_TPS_TRACE=1` | logs the gamepad per frame ("tps: pad": the sticks past their dead zones, the walk direction, facing, camera, quick turn, the enemy nearest the crosshair) and its aim assist ("tps: assist"), the free aim per frame, each shot's direction and wall hit against the crosshair target ("SHOT"), the drawn weapon's barrel with "You appear as", the camera ("tps: cam A\|B": yaw, pitch, the player's position, the model's root, the point followed and the eye), the aim height given to the game, the scope per frame ("tps: scope": `ay`, `wax`, the field of view, the turn of the mouse and right stick in game units, the enemy nearest the centre in degrees, the enemies' health), each shot of a dual weapon ("tps: DUAL R\|L": the arms' yaws aimed and shown, the enemy under the crosshair and the other arm's, the aim height, each enemy's health, degrees off the facing and distance); `=2` also keeps the camera on the enemy the game locked on to (dual weapons: the nearest of their lock-on; the middle of its hit capsule, or `RECVX_TPS_AIM_AT=f` along it: 0 = `c1`, for a zombie the head, 1 = `c2`, its legs) |
 | `RECVX_TPS_ORBIT=degrees` | turns only the view about the player (side views; aim unchanged, camera ignores walls) |
-| `RECVX_ATMOS_TRACE=1` | logs each game frame's cut, the game's fog, lights and filter and what "smooth" shows |
+| `RECVX_ATMOS_TRACE=1` | logs each game frame's cut, the game's fog, lights and filter, the player's view depth from the view drawn and from the cut camera, and the fog shown with our camera (range in view depth) and what "smooth" shows |
 | `RECVX_EFF_TRACE=1` | logs effects spawned and queued |
 
 ## How the original camera works
@@ -251,7 +251,11 @@ unit (the character is about 17 units tall).
 * **The cut camera underneath**: `bhCheckCut` leaves the cut's camera in `cam`, and the next
   frame's game logic reads it (gore sprites towards `-cam.v*`, `bhEff305/306` towards `cam.wp*`,
   3D sound). `tps_after_cut` (after `bhCheckCut`) puts our view back and clears `gm_flg 0x20`
-  (the cut change that wipes lens blood).
+  (the cut change that wipes lens blood). The cut camera keeps its own state (`cut_cam`):
+  `tps_after_draw` puts it into `cam` before `bhCheckCut`, so a tracking cut eases on from where
+  it was rather than from our view, as with the fixed cameras, and `tps_after_cut` keeps it with
+  its view vector and eye. It is where the fixed camera would be (fog, below; the
+  camera-relative fog of `flg & 0x40/0x80` measures its eye).
 * Enhanced-mode interpolation: `pc_scene_id` ignores cut changes while our camera is active.
 * Hooks: `bhSetPad` (third-person keys and mouse buttons as virtual bits); `bhControlPlayer` after
   the mode handler (mouse yaw into `plp->ay`; while aiming `ay`/`wax` towards the crosshair target,
@@ -323,12 +327,40 @@ Room ambient and lights 0..3 (muzzle flash, lighter, ...) do not change per cut.
   The outgoing and incoming directional light cross-fade. A point light fading in waits for a
   free slot (at most three in use); meanwhile the outgoing ones fade twice as fast (a short dip).
   The on-screen test of `flg & 0x10` is not applied.
-* Fog: density fades for on/off; range and colour ease (8% per game frame); the colour follows the
-  denser fog faster. The range is measured from our camera (the camera-relative shift otherwise
-  made fog come and go as the camera turned).
+* Fog: density fades for on/off; colour eases (8% per game frame) and follows the denser fog
+  faster; at a cut change the range eases from the one shown (the difference shrinks 8% per game
+  frame), otherwise it follows "Fog like the fixed cameras" (below) every frame.
 * Screen filter: alpha fades over 0.8 s. Not faded: the per-cut background colour of
   `ts_flg & 0x200` rooms.
 * When our camera stops, lights are recomputed and the fog is re-applied (`gm_flg 0x10`).
+
+**Fog like the fixed cameras** (both settings; per cut the range changes at once). The game's fog
+is linear in view depth (`ps2_NaFog.c`: `njGenerateFogTable3` fills `fNaFogTbl` from the cut's
+`fog_nr`/`fog_fr`, `njCalcFogPower` looks it up by density / depth; 883 of the 1000 cuts with fog
+start it at the camera, a near value behind it). It was authored for the fixed cameras, which
+stand far off; ours is close behind the player. Measured (`RECVX_ATMOS_TRACE`, the player's depth
+from both cameras; same spot, our view along the fixed camera's): the player at 35 to 115 units
+from the fixed camera, at 15 from ours, so the player had a quarter to a tenth of the fog (graveyard
+0/2: 0.61 fixed, 0.17 ours; Antarctic exterior 6/0: 0.62, 0.07) and the scenery around them as
+little. Not the cause: smooth's range was the cut's own (no averaging), its table was made every
+frame, and the field of view does not enter (the depth is the view's z).
+
+`tps_atmos` therefore moves the range towards our camera by the player's depth from the cut
+camera (`cut_cam`, above; the camera-relative shift of `flg & 0x40/0x80` included, `cam.fog_*`)
+less their depth from ours: the player gets the fog the fixed camera gives them, what is near
+them about the same, what is farther more, as the fixed camera would show the same surfaces
+from a view along ours. The shift is divided by `pc_fog_scale()` (Fog intensity stretches all
+depths), so the option scales it as before and the player's fog matches at any setting. A near
+value that ends up behind our camera means fog from the camera on, which `njGenerateFogTable3`
+cannot express (it starts the fog at the camera then); `fog_table` fills the table itself. The
+fixed camera, events and first person keep the game's fog.
+
+Result (`scratch/tpsfog`, not in the repository): the fog fraction of the whole picture, from two
+renders of the same frame with white and black fog, averaged 0.50 fixed, 0.24 before and 0.56
+after over ten matched views in 0/2, 0/5, 0/6, 4/5 and 6/0; at Fog intensity 50 (graveyard) 0.28
+fixed, 0.12 before, 0.31 after. Our view shows more of what lies beyond the player, so a picture
+can come out a little foggier than the fixed camera's. Rooms that use black fog as darkness (the
+barracks 0/6) get as dark around the player as with the fixed camera, and farther away darker.
 
 **Under-water views** (both settings). Cut flag `0x400` marks a cut whose camera looks in from
 under the water: only the submarine dock (RM_4030 and RM_8050, cuts 0, 2 and 5 of 6, whose
