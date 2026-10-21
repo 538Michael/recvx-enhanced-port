@@ -22,8 +22,6 @@
   had. The head is now gone and the zombie falls headless, on every zombie look, the randomizer's
   and the enemy spawner's included, and your co-op partner sees it too. The GAMEPLAY option "Head
   blow-offs" turns it off for the original look.
-- **Custom enemies built on a zombie**: one drawn as another model showed the plain zombie instead
-  while it walked or chewed. It keeps its own model now.
 - **Co-op: frozen at the turntable, the guillotine gate or the lift**: when one player used the
   turntable, the Eagle Plate or the Halberd while the other was in the middle of the same thing
   (answering "Move the turntable?", or the item screen still closing), one of them could stay stuck
