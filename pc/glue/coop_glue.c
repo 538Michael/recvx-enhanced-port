@@ -1701,6 +1701,8 @@ static int apply_fx(const Event* e)
     if (e->u.fx.mlw >= 0) op->mlwP = (ML_WORK*)&own->mdl[e->u.fx.mlw];
     op->exp0 = (unsigned char*)ex;
     fx_mirror[k] = 1;
+    if (op->id == 356 && lk && lk->id == 1 && lk->exp0 && !(lk->flg & 0x80))   /* en01.c's head burst: the zombie's head is gone here too */
+        *(int*)(lk->exp0 + 0x78) = -1;                                          /* (its exp0 is not in the snapshots; "Head blow-offs") */
     if (e->u.fx.owner < 128) {   /* its sounds from the bank of the enemy type that made it (effect.c, eneset.c) */
         extern short pc_eff_owner[512][2];
         int pc_enemy_sound_type(int slot);

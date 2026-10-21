@@ -177,6 +177,7 @@ visible, and Contrast until the right square on the white strip is barely visibl
 | Rearranged enemies, Enemy randomizer, Enemy seed | `enemy_place`, `enemy_random`, `enemy_seed` | optional enemy changes; bosses stay as they are ([ENEMIES.md](ENEMIES.md#enemy-options)) |
 | Randomizer variety | `enemy_variety` | **Wild** (1): any enemy kind that fits the spot, a different one for each enemy of a room where possible, Tyrants, Giant Black Widows and bats included; Mild (0): two common kinds per room |
 | Randomize event enemies | `enemy_random_events` | **on**: enemies a room shows later become other kinds too, and the ones a scene animates get another look of their own kind (the scene still plays); off: only free-roaming enemies change |
+| Head blow-offs | `head_blowoff` | **on**: a zombie whose head the game bursts (the magnum, or the shotgun aimed up close) falls without it, on every zombie look and for the co-op partner too; off: as the original, which shows the burst and the blood but leaves the head on ([ENEMIES.md](ENEMIES.md#head-blow-offs)) |
 
 ### Controls
 

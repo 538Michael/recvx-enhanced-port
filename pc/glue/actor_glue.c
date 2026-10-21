@@ -1625,6 +1625,8 @@ int actor_hand_free(int who, int node)
     return n >= 0 && !node_has_mesh(&d->w, n);
 }
 
+int actor_head_node(int who) { return dg[who].model >= 0 && dg[who].rig.ok ? dg[who].rig.map[5] : -1; }
+
 int actor_head(int who, float* out)
 {
     Disguise* d = &dg[who];
