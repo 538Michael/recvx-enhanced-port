@@ -40,6 +40,7 @@ static const struct { const char* key; int* val; int lo, hi; } keys[] = {
     { "skip_doors", &g_config.skip_doors, 0, 2 },     /* 0 off, 1 instant, 2 skippable */
     { "fast_loading", &g_config.fast_loading, 0, 1 },
     { "quick_knife", &g_config.quick_knife, 0, 1 },
+    { "auto_stairs", &g_config.auto_stairs, 0, 1 },
     { "head_blowoff", &g_config.head_blowoff, 0, 1 },
     { "model_cull", &g_config.model_cull, 0, 1 },
     { "skip_intro", &g_config.skip_intro, 0, 1 },

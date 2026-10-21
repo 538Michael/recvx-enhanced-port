@@ -102,6 +102,7 @@ extern int pc_plp_frm, pc_plp_hokan;
 extern unsigned int pc_plp_mtn;
 extern void* pc_plp_set;
 int   pc_inf_ammo(void);      /* F2 cheat (pc/glue/cheat_glue.c): bhCheckBullet/bhCountBullet as for an unlimited weapon */
+int   pc_auto_stairs(void);   /* option (pc/glue/stairs_glue.c): bhControlPlayer without an action press: 1 = examine as for one (walked into stairs) */
 /* F2 cheat "Unlock all" (pc/glue/cheat_glue.c): bhPlItemCheck passes for a key at its lock; bhControlPlayer's examine
    press in a key's use spot (1: taken) and bhControlEvent around scd1 (0 before, 1 after) use the key there;
    bhUseItemCheck / bhCmpB found the key used tested; bhInitEvent: a room's entry script is about to run */
