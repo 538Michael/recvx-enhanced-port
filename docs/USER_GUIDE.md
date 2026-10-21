@@ -205,6 +205,14 @@ side, mouse sensitivity, invert Y, crosshair, the game's auto-aim and the gamepa
   room's camera cut changes).
 - **Gamepad controls** (`tps_pad_controls`): **Modern (twin-stick)** (default) or Classic (tank
   controls through the game's buttons, the camera behind).
+- **Precise hits** (`tps_precise_hits`, on by default): with free aim a shot hits an enemy only where
+  the crosshair meets its body (head, torso, arms, legs as it moves, crawls or lies); a shot beside it
+  misses. A head hit does half again the damage (zombies, Cerberus, Bandersnatch, Tyrant, Alexia's
+  first form, Steve), and a zombie's head bursts (magnum, shotgun, sniper rifle) only from a hit on
+  the head. The shotgun keeps a narrow spread; grenades, the bow gun, the
+  rocket and linear launchers and the knife hit as in the game. Off: the game's wide hit test, which
+  also hits an enemy the crosshair is beside. Not with "Game auto-aim" on the mouse (the lock-on
+  needs the game's test) or with the fixed cameras.
 
 Details and limits: [THIRDPERSON.md](THIRDPERSON.md).
 

@@ -47,6 +47,44 @@ static inline int pc_dual_arm(int i, int aim_e, int prev, float dy, float dp)
     return dy > 0 ? 2 : 1;
 }
 
+/* ---------------------------------------------------------------- precise hits (tps_glue.c) */
+/* the ray p + t * d (|d| = 1, t >= 0) against the capsule a-b of radius r (a == b: a sphere): the t where
+   it enters (0 when p is inside), -1 if it misses; *mid the t on the ray nearest the capsule's axis (a
+   point inside it when it hits). Exact: the capsule is a cylinder and two end spheres, entered at the
+   first of the three. */
+static inline float pc_ray_sphere(const float* p, const float* d, const float* c, float r)
+{
+    float o[3] = { p[0] - c[0], p[1] - c[1], p[2] - c[2] };
+    float b = o[0] * d[0] + o[1] * d[1] + o[2] * d[2], q = o[0] * o[0] + o[1] * o[1] + o[2] * o[2] - r * r, h = b * b - q;
+    if (q <= 0) return 0;
+    return h < 0 || b > 0 ? -1 : -b - sqrtf(h);
+}
+static inline float pc_ray_capsule(const float* p, const float* d, const float* a, const float* b, float r, float* mid)
+{
+    float ba[3] = { b[0] - a[0], b[1] - a[1], b[2] - a[2] }, oa[3] = { p[0] - a[0], p[1] - a[1], p[2] - a[2] };
+    float bb = ba[0] * ba[0] + ba[1] * ba[1] + ba[2] * ba[2], bd = ba[0] * d[0] + ba[1] * d[1] + ba[2] * d[2];
+    float bo = ba[0] * oa[0] + ba[1] * oa[1] + ba[2] * oa[2], od = oa[0] * d[0] + oa[1] * d[1] + oa[2] * d[2];
+    float k = bb - bd * bd, u, t, ta, tb;   /* k: |ba|^2 sin^2 of the angle between ray and axis (0: a sphere or parallel) */
+    /* the point a + u ba nearest the ray's line (u clamped to the segment; the distance is convex in u),
+       then the ray's point nearest that */
+    u = k > 1e-6f * bb ? (bo - bd * od) / k : 0;
+    u = u < 0 ? 0 : u > 1 ? 1 : u;
+    t = u * bd - od;
+    *mid = t < 0 ? 0 : t;
+    ta = pc_ray_sphere(p, d, a, r);
+    tb = pc_ray_sphere(p, d, b, r);
+    t = ta < 0 || (tb >= 0 && tb < ta) ? tb : ta;
+    if (k > 1e-6f * bb) {   /* the cylinder: |oa + t d|^2 - ((oa + t d) . ba)^2 / bb = r^2 */
+        float B = bb * od - bo * bd, C = bb * (oa[0] * oa[0] + oa[1] * oa[1] + oa[2] * oa[2]) - bo * bo - r * r * bb, h = B * B - k * C;
+        if (C <= 0 && bo >= 0 && bo <= bb) return 0;   /* inside it */
+        if (h >= 0) {
+            float tc = (-B - sqrtf(h)) / k, y = bo + tc * bd;
+            if (tc >= 0 && y > 0 && y < bb && (t < 0 || tc < t)) t = tc;
+        }
+    }
+    return t;
+}
+
 /* ---------------------------------------------------------------- music on a warp (cheat_glue.c) */
 /* after the entry script of a room reached without a door, with the music that played before it
    (was, was_vol) stopped as a door does: the new music request. The same music asked for again plays

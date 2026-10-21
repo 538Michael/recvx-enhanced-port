@@ -10,6 +10,17 @@
   and steps onto or off a ledge still need the button, so you never drop off a ledge by accident.
   Off by default.
 
+### Third person
+
+- **Precise hits**: a new THIRD PERSON option, on by default. Over the shoulder, enemies were still
+  hit by the game's very wide hit test, so a shot that went past an enemy often hit it anyway. Now a
+  shot hits only where the crosshair is actually on the enemy's body, as it walks, crawls or lies, and
+  big enemies are hit on their big bodies. Head hits do more damage, and a zombie's head bursts with
+  the magnum, shotgun or sniper rifle only when you really hit the head. The shotgun keeps a narrow
+  spread; explosives, the bow gun, the linear launcher and the knife work as before, and bosses keep
+  their weak spots. Off gives the old behaviour; the fixed cameras are unchanged. Co-op partners need
+  this version.
+
 ## 0.6.5 (2026-10-21)
 
 ### Co-op

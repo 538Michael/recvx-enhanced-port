@@ -19,7 +19,7 @@
 #include "pc_rules.h"
 
 TpsConfig g_tps = { .fov = 75, .aim_fov = 65, .dist = 140, .aim_dist = 100, .height = 165, .shoulder = 35,
-                    .sens_x = 100, .sens_y = 100, .aim_sens = 70, .crosshair = 1, .atmos = 1, .key = 62 /* F5 */,
+                    .sens_x = 100, .sens_y = 100, .aim_sens = 70, .crosshair = 1, .precise = 1, .atmos = 1, .key = 62 /* F5 */,
                     .pad_modern = 1, .pad_sens_x = 100, .pad_sens_y = 100, .pad_aim_sens = 50, .pad_dead_move = 20, .pad_dead_look = 15 };
 int tps_on;            /* hooks active (changes only at the frame hand-off) */
 int tps_cam_active;    /* our camera is the view of the current frame */
@@ -750,6 +750,144 @@ static float ray_capsule(const NJS_POINT3* p, const NJS_POINT3* d, const NJS_CAP
 
 static int aimable(const BH_PWORK* e) { return (e->flg & 0x1) && (e->flg & 0x20) && !(e->flg & 0x2) && !(e->stflg & 0x1000000); }
 
+/* ---------------------------------------------------------------- "Precise hits" (docs/THIRDPERSON.md)
+   The game hits an enemy when a capsule along the shot, 2 units wide plus 0.2..0.4 per unit of distance
+   (the shotgun 0.3, up to 40), touches the enemy's one hit capsule (watr, the whole body and more):
+   a shot beside the enemy hits it. With this option the player's hitscan shots in third person (and
+   in its scope) hit an enemy only where the ray meets its body: the joints' capsules and spheres of the
+   enemy's table (cpcl: head, torso, arms, legs on its bones as posed this frame; the game's own, used
+   for the sniper rifle and the bow gun), else its hit capsule as a ray. The hit's joint is the volume's,
+   so the game's damage per body part (a zombie's head, arms, legs) follows the shot. */
+#define HEAD_DAMAGE 150       /* a hit on the head joint does this percent of its damage (head_joint) */
+#define SHOTGUN_R0 0.3f       /* the shotgun's cone: this wider at the muzzle, */
+#define SHOTGUN_K 0.06f       /* plus this per unit of distance (3.4 degrees either side), */
+#define SHOTGUN_MAX 3.0f      /* at most this */
+unsigned char tps_hit_precise[128];   /* per enemy slot: its last gun hit was precise, as weapon + 1 (0: not; coop_glue.c) */
+static float xr[7];                   /* the crosshair's ray (aim_at_crosshair): from, direction, length to its wall */
+static int ticks, xr_tick = -1;       /* tps_player calls; the one in which it was cast (a shot in the mode handler before the next: the same) */
+
+int pc_precise_hits(void)
+{
+    return tps_on && g_tps.precise && plp && (tps_cam_active ? !lock_aim() : in_scope());
+}
+
+/* the head's joint of enemy type id, -1: none or one that keeps its own rules: Nosferatu (its weak spot),
+   Alexia 2 and 3, the Gulp Worm (its own +30% on the head), the Hunter (head and chest are one volume) */
+static int head_joint(int id)
+{
+    switch (id) {
+    case 1: return 11;    /* zombie */
+    case 26: return 13;   /* anatomist */
+    case 4: return 5;     /* Cerberus */
+    case 9: return 4;     /* Bandersnatch */
+    case 12: return 5;    /* Alexia 1 */
+    case 17: return 5;    /* Steve */
+    case 19: return 5;    /* Tyrant */
+    }
+    return -1;
+}
+
+/* volume *c of enemy e's table (advanced past it): capsule a-b of radius r (a sphere: a == b) on the bones
+   (bhCheckCapCol2Capsule's reading), its joint */
+static int volume(const BH_PWORK* e, const CPCL** c, float* a, float* b, float* r)
+{
+    const CPCL* v = (*c)++;
+    const float* m = e->mlwP->owP[v->jnt_a].mtx;
+    int k;
+    *r = 0.1f * v->cap_r;
+    if (v->jnt_a == v->jnt_b) {   /* a sphere: the next row is its offset in the joint's frame */
+        const CPCL* o = (*c)++;
+        for (k = 0; k < 3; k++) a[k] = b[k] = 0.1f * (o->jnt_a * m[k] + o->jnt_b * m[4 + k] + o->cap_r * m[8 + k]) + m[12 + k];
+    } else
+        for (k = 0; k < 3; k++) a[k] = m[12 + k], b[k] = e->mlwP->owP[v->jnt_b].mtx[12 + k];
+    return v->jnt_a;
+}
+
+/* the ray p + t d (|d| = 1) against enemy e's body, each volume wider by the shotgun's cone at its distance
+   (cone): the t where it enters (-1: a miss), *jnt its joint (the hit capsule: the joint nearest the point,
+   as the game picks it), *no its entry in the table (-1: the hit capsule) */
+static float body_ray(const BH_PWORK* e, const float* p, const float* d, int cone, int* jnt, int* no)
+{
+    const CPCL* c = e->cpcl;
+    float best = -1, a[3], b[3], r, t, m;
+    int j, n;
+    *no = -1;
+    if (!e->mlwP) return -1;
+    for (n = 0; c && c->cap_r; n++) {
+        j = volume(e, &c, a, b, &r);
+        if (cone) {
+            float x = (a[0] + b[0]) / 2 - p[0], y = (a[1] + b[1]) / 2 - p[1], z = (a[2] + b[2]) / 2 - p[2], w = SHOTGUN_R0 + SHOTGUN_K * sqrtf(x * x + y * y + z * z);
+            r += w < SHOTGUN_MAX ? w : SHOTGUN_MAX;
+        }
+        t = pc_ray_capsule(p, d, a, b, r, &m);
+        if (t >= 0 && (best < 0 || t < best)) best = t, *jnt = j, *no = n;
+    }
+    if (!e->cpcl) {
+        const NJS_CAPSULE* w = &e->watr;
+        r = w->r;
+        if (cone) {
+            float x = (w->c1.x + w->c2.x) / 2 - p[0], y = (w->c1.y + w->c2.y) / 2 - p[1], z = (w->c1.z + w->c2.z) / 2 - p[2], s = SHOTGUN_R0 + SHOTGUN_K * sqrtf(x * x + y * y + z * z);
+            r += s < SHOTGUN_MAX ? s : SHOTGUN_MAX;
+        }
+        if ((best = pc_ray_capsule(p, d, &w->c1.x, &w->c2.x, r, &m)) >= 0) {
+            float q = 0, h[3] = { p[0] + d[0] * best, p[1] + d[1] * best, p[2] + d[2] * best };
+            *jnt = 0;
+            for (j = 1; j < (int)e->mlwP->obj_num; j++) {
+                const float* o = e->mlwP->owP[j].mtx;
+                float l = (h[0] - o[12]) * (h[0] - o[12]) + (h[1] - o[13]) * (h[1] - o[13]) + (h[2] - o[14]) * (h[2] - o[14]);
+                if (!*jnt || l < q) *jnt = j, q = l;
+            }
+        }
+    }
+    return best;
+}
+
+/* weapon.c bhCheckGunAtari: the shot against enemy pp: the joint hit, -1 a miss; hp where the ray enters.
+   With our camera the ray is the crosshair's (from the shoulder point to its wall, aim_at_crosshair the tick
+   before: the game's ay / wax were turned to it), as seen; the game's ray (c1 -> c2, its cone ignored) starts
+   lower and beside it, at the character's chest, and crossed the crosshair's only at its target: aimed just
+   beside an enemy in front of a far wall, it went through the enemy. In the scope the game's ray is the
+   view's. The volume's entry goes to cpcl_no as the game's test sets it (Nosferatu's core). */
+int pc_precise_hit(BH_PWORK* pp, int wpn, const float* c1, const float* c2, float* hp)
+{
+    float p[3], d[3], l, t;
+    int j = -1, no, k, x = tps_cam_active && xr_tick == ticks;   /* x: the crosshair's ray */
+    if (x)
+        for (k = 0, l = xr[6]; k < 3; k++) p[k] = xr[k], d[k] = xr[3 + k];
+    else {
+        for (k = 0; k < 3; k++) p[k] = c1[k], d[k] = c2[k] - c1[k];
+        if ((l = sqrtf(d[0] * d[0] + d[1] * d[1] + d[2] * d[2])) <= 0) return -1;
+        for (k = 0; k < 3; k++) d[k] /= l;
+    }
+    t = body_ray(pp, p, d, 0, &j, &no);
+    if (t < 0 && wpn == 11) t = body_ray(pp, p, d, 1, &j, &no);   /* the shotgun: the part under the crosshair, else in its cone */
+    if (t < 0 || t > l) return -1;
+    if (no >= 0) pp->cpcl_no = no;
+    for (k = 0; k < 3; k++) hp[k] = p[k] + d[k] * t;
+    if (trace) printf("tps: PRECISE wpn %d hits enemy %d (type %d) joint %d volume %d %.1f away along the %s ray, %.2f above its feet\n", wpn, (int)(pp - ene), pp->id, j, no, t,
+                      x ? "crosshair's" : "game's", hp[1] - pp->py);
+    return j;
+}
+
+/* bhCheckGunAtari after a gun hit added to enemy pp's damage on joint jnt (d0 before): whether it was a
+   precise hit (with the weapon), and a precise hit on the head does HEAD_DAMAGE percent */
+void pc_precise_dam(BH_PWORK* pp, int jnt, int d0, int precise, int wpn)
+{
+    int i = (int)(pp - ene);
+    if (i >= 0 && i < 128) tps_hit_precise[i] = precise ? wpn + 1 : 0;
+    if (precise && jnt == head_joint(pp->id)) pp->dam[jnt] = d0 + (pp->dam[jnt] - d0) * HEAD_DAMAGE / 100;
+    if (trace) printf("tps: HIT wpn %d enemy %d (type %d, hp %d) joint %d damage %d%s, its state %d modes %d/%d, %.1f above its feet\n", wpn, i, pp->id,
+                      pp->hp, jnt, pp->dam[jnt] - d0, !precise ? " (game's test)" : jnt == head_joint(pp->id) ? " (precise, head)" : " (precise)",
+                      pp->type, pp->mode0, pp->mode2, pp->dpy - pp->py);
+}
+
+/* en01.c bhEne01_CheckExpHead: the zombie's hit being judged was precise (a head burst only on the head) */
+int pc_precise_head(BH_PWORK* pp)
+{
+    int i = (int)(pp - ene);
+    return i >= 0 && i < 128 && tps_hit_precise[i] && tps_hit_precise[i] == pp->wpnr_no + 1;
+}
+
 /* the enemy whose middle is nearest the crosshair by angle: its offset (target minus crosshair,
    game units) and whether a wall is in between; 0 = none */
 static int nearest_enemy(float* oy, float* op, int* walled)
@@ -800,7 +938,7 @@ static void aim_at_crosshair(void)
     NJS_LINE line;
     ATR_WORK* ahtp;
     float dist = 1000.0f, wall, len, h, r = WpnTab[plp->wpnr_no].r;
-    int ay;
+    int ay, prec = pc_precise_hits();
 
     view(&eye, &dir, &sh);
     line.px = sh.x; line.py = sh.y; line.pz = sh.z;
@@ -809,12 +947,15 @@ static void aim_at_crosshair(void)
     if (bhCheckL2Wall(&line, 0x400, &len)) dist = len;
     sys->apos = apos; sys->ahtp = ahtp;
     wall = dist;
+    xr[0] = sh.x; xr[1] = sh.y; xr[2] = sh.z; xr[3] = dir.x; xr[4] = dir.y; xr[5] = dir.z; xr[6] = wall;
+    xr_tick = ticks;
     aim_e = -1;
     for (int i = 0; i < sys->ewk_n; i++) {
         BH_PWORK* e = &ene[i];
         float d;
+        int j, n;
         if (!aimable(e)) continue;
-        d = ray_capsule(&sh, &dir, &e->watr);
+        d = prec ? body_ray(e, &sh.x, &dir.x, 0, &j, &n) : ray_capsule(&sh, &dir, &e->watr);
         if (d > 0 && d < dist) dist = d, aim_e = i;   /* in front of the shoulder */
     }
     if (dist == wall && dist < AIM_MIN) dist = AIM_MIN;
@@ -900,10 +1041,10 @@ static void dual_aim(int ay0, int prev)
 {
     PP_WORK* pp = (PP_WORK*)plp->exp2;
     float r[3], l[3], t[3], best = 0;
-    int cls = plp->at_flg & 0xE, left = 0, keep = 0;
+    int cls = plp->at_flg & 0xE, left = 0, keep = 0, prec = pc_precise_hits();
     muzzle(9, ay0, r);
     muzzle(13, ay0, l);
-    for (int i = 0; i < sys->ewk_n; i++) {
+    for (int i = 0; !prec && i < sys->ewk_n; i++) {   /* (precise hits: no other enemy, both at the crosshair) */
         BH_PWORK* e = &ene[i];
         const NJS_CAPSULE* c = &e->watr;
         float x = (c->c1.x + c->c2.x) / 2 - plp->px, y = (c->c1.y + c->c2.y) / 2 - plp->py, z = (c->c1.z + c->c2.z) / 2 - plp->pz;
@@ -998,6 +1139,7 @@ void tps_trace_hands(const float* drawn, const float* real)
    from o = (px, py + 11, pz) + forward * (3 + r), the wall test from the muzzle at the hand
    (owP[9], still the matrices the fire code read), both along Rx(wax) Ry(ay); where the wall ray
    ends against the crosshair target */
+static int lock = -1;   /* RECVX_TPS_TRACE=2: the enemy the game locked on to (tps_player) */
 static void trace_shot(void)
 {
     static unsigned last = 0xFFFFFFFF;
@@ -1005,6 +1147,26 @@ static void trace_shot(void)
     int shot = ammo < last && last != 0xFFFFFFFF;
     last = ammo;
     if (!shot) return;
+    if (lock >= 0 && lock < sys->ewk_n && ene[lock].cpcl && ene[lock].mlwP && (ene[lock].flg & 3) == 1) {
+        /* how far the crosshair's ray (the one this shot was aimed by) passed from that enemy's body: its volume nearest
+           the ray, the gap between them (< 0: through it) */
+        const BH_PWORK* e = &ene[lock];
+        const CPCL* c = e->cpcl;
+        float a[3], b[3], r, m, best = 1e9f, q[3], ab[3], u, gap;
+        int n, k, bn = -1;
+        for (n = 0; c->cap_r; n++) {
+            volume(e, &c, a, b, &r);
+            pc_ray_capsule(xr, xr + 3, a, b, 0, &m);
+            for (k = 0, u = 0, gap = 0; k < 3; k++) q[k] = xr[k] + xr[3 + k] * m - a[k], ab[k] = b[k] - a[k], u += q[k] * ab[k], gap += ab[k] * ab[k];
+            u = gap > 0 ? u / gap : 0;
+            u = u < 0 ? 0 : u > 1 ? 1 : u;
+            for (k = 0, gap = 0; k < 3; k++) gap += (q[k] - ab[k] * u) * (q[k] - ab[k] * u);
+            gap = sqrtf(gap) - r;
+            if (gap < best) best = gap, bn = n;
+        }
+        printf("tps: SHOT at enemy %d %.1f away: the crosshair passes %.2f from its body (volume %d)\n", lock,
+               sqrtf((e->px - plp->px) * (e->px - plp->px) + (e->pz - plp->pz) * (e->pz - plp->pz)), best, bn);
+    }
     {
         const float* h = plp->mlwP->owP[9].mtx;
         float z = WpnTab[plp->wpnr_no].wp_fps1.z, l = WpnTab[plp->wpnr_no].l, r = WpnTab[plp->wpnr_no].r, len, g[3], o[3], w[3], miss = 0, de = 0, ang;
@@ -1044,6 +1206,33 @@ static void trace_shot(void)
    game's +-45 degrees. During a shot's recoil (mode3 3) the game sets wax to ct3 plus the kick each
    frame: the mouse moves ct3. */
 #define SCOPE_PITCH 8192   /* bhCPM2_act_scp's clamp */
+
+/* test aid (RECVX_TPS_TRACE=2): the point of the locked enemy RECVX_TPS_AIM_AT names, seen from s: "f" along its hit
+   capsule (0 c1 .. 1 c2, default 0.5), "cN" the middle of volume N of its table; ":side:up" that many units beside it
+   (right of the view from s) and above */
+static int aim_aid_on(void) { return trace > 1 && lock >= 0 && lock < sys->ewk_n && (ene[lock].flg & 3) == 1; }
+static void aim_aid(const float* s, float* p)
+{
+    const NJS_CAPSULE* c = &ene[lock].watr;
+    const char* at = getenv("RECVX_TPS_AIM_AT");
+    float f = at && *at != 'c' ? (float)atof(at) : 0.5f, a[3], b[3], r, side = 0, up = 0, dx, dz, h;
+    for (int k = 0; k < 3; k++) p[k] = (&c->c1.x)[k] + ((&c->c2.x)[k] - (&c->c1.x)[k]) * f;
+    if (at && *at == 'c' && ene[lock].cpcl && ene[lock].mlwP) {
+        const CPCL* v = ene[lock].cpcl;
+        for (int n = atoi(at + 1); v->cap_r && n >= 0; n--) {
+            volume(&ene[lock], &v, a, b, &r);
+            for (int k = 0; k < 3; k++) p[k] = (a[k] + b[k]) / 2;
+        }
+    }
+    if (at && (at = strchr(at, ':'))) {
+        side = (float)atof(at + 1);
+        if ((at = strchr(at + 1, ':'))) up = (float)atof(at + 1);
+    }
+    dx = p[0] - s[0]; dz = p[2] - s[2]; h = sqrtf(dx * dx + dz * dz);
+    if (h > 0) p[0] -= dz / h * side, p[2] += dx / h * side;
+    p[1] += up;
+}
+
 static void scope_look(void)
 {
     static float fy, fp;   /* the turn below one game unit, kept for the next frame */
@@ -1062,6 +1251,16 @@ static void scope_look(void)
     p = p > SCOPE_PITCH ? SCOPE_PITCH : p < -SCOPE_PITCH ? -SCOPE_PITCH : p;
     if (plp->mode3 == 3) plp->ct3 = p;
     else plp->wax = plp->waxp = p;
+    if (aim_aid_on()) {   /* test aid: the scope's centre (the shot from the head, playpch2.c) on RECVX_TPS_AIM_AT */
+        const float* m = plp->mlwP->owP[5].mtx;
+        float o[3], t[3];
+        for (int k = 0; k < 3; k++) o[k] = 1.5f * m[4 + k] - m[8 + k] + m[12 + k];
+        aim_aid(o, t);
+        plp->ay = (int)(atan2f(-(t[0] - o[0]), -(t[2] - o[2])) * (32768.0f / 3.14159265f));
+        p = (int)(atan2f(t[1] - o[1], sqrtf((t[0] - o[0]) * (t[0] - o[0]) + (t[2] - o[2]) * (t[2] - o[2]))) * (32768.0f / 3.14159265f));
+        if (plp->mode3 == 3) plp->ct3 = p;
+        else plp->wax = plp->waxp = p;
+    }
     if (trace) {   /* and the live enemy nearest the scope's centre: its hit capsule's middle seen from the eye
                       (cam.p*: the scope's camera last drawn), degrees off the centre */
         float best = -1, oy = 0, op = 0, hp = 0;
@@ -1091,7 +1290,16 @@ void tps_player(void)
     int n, dual_prev = dual_gen == enemy_room_gen ? dual_e : -1;
     dual_e = -1;   /* kept only from one tick of dual_aim to the next in a room: not across a gap or another weapon */
     dual_gen = enemy_room_gen;
+    ticks++;   /* (pc_precise_hit: the crosshair's ray is this tick's only if aim_at_crosshair casts it below) */
     if (trace && tps_cam_active && plp->mode1 == 1) trace_shot();
+    if (trace) {   /* a zombie's head burst (en01.c: exp0 + 0x78 set to -1) */
+        static int head[128];
+        for (int i = 0; i < sys->ewk_n && i < 128; i++) {
+            int h = ene[i].id == 1 && (ene[i].flg & 1) && ene[i].exp0 ? *(int*)(ene[i].exp0 + 0x78) : 0;
+            if (h == -1 && head[i] != -1) printf("tps: HEAD BURST enemy %d (last hit joint %d, weapon %d)\n", i, ene[i].djnt_no, ene[i].wpnr_no);
+            head[i] = h;
+        }
+    }
     /* (the scope's first tick still has our camera: the free aim below points the scope at the crosshair's target) */
     if (!tps_cam_active && plp->mode0 == 1 && plp->mode1 == 1 && plp->mode2 == 71) { scope_look(); return; }
     if (!tps_cam_active || plp->mode0 != 1 || (plp->mode1 == 0 && plp->mode2 > 13) || reload_at_rest()) { frac = 0; return; }
@@ -1105,15 +1313,15 @@ void tps_player(void)
         yaw = wrap(yaw - mouse_dx * TURN_PER_PIXEL * g_tps.sens_x / 100.0f * g_tps.aim_sens / 100.0f + dy);
         mouse_dx = stick_yaw = 0;
         look(g_tps.aim_sens / 100.0f, 1.0f);
-        static int lock = -1;   /* test aid (RECVX_TPS_TRACE=2): follow the enemy the game locked on to */
+        /* test aid (RECVX_TPS_TRACE=2): follow the enemy the game locked on to (lock, file scope: trace_shot) */
         if (plp->flg & 0x100000)   /* (dual weapons: the nearest enemy of their lock-on, playpch.c SetLockOnDirection) */
             lock = (WpnTab[plp->wpnr_no].flg & 0x800) && plp->exp2 ? (int)(((PP_WORK*)plp->exp2)->LckTbl[0] - ene) : plp->src_no;
-        if (trace > 1 && lock >= 0 && lock < sys->ewk_n && (ene[lock].flg & 3) == 1) {   /* at RECVX_TPS_AIM_AT along its hit capsule (0 c1 .. 1 c2) */
-            NJS_CAPSULE* c = &ene[lock].watr;
+        if (aim_aid_on()) {   /* at RECVX_TPS_AIM_AT */
             NJS_POINT3 eye, dir, sh;
-            float dx, dy, dz, f = getenv("RECVX_TPS_AIM_AT") ? (float)atof(getenv("RECVX_TPS_AIM_AT")) : 0.5f;
+            float dx, dy, dz, p[3];
             view(&eye, &dir, &sh);
-            dx = c->c1.x + (c->c2.x - c->c1.x) * f - sh.x; dy = c->c1.y + (c->c2.y - c->c1.y) * f - sh.y; dz = c->c1.z + (c->c2.z - c->c1.z) * f - sh.z;
+            aim_aid(&sh.x, p);
+            dx = p[0] - sh.x; dy = p[1] - sh.y; dz = p[2] - sh.z;
             yaw = atan2f(-dx, -dz) * (32768.0f / 3.14159265f);
             pitch = atan2f(dy, sqrtf(dx * dx + dz * dz)) * (32768.0f / 3.14159265f);
             look(0, 0);   /* within the mouse's pitch range */

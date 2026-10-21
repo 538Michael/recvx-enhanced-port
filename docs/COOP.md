@@ -5,7 +5,7 @@ over the internet or a LAN (UDP). Co-op is an optional addon: with it off the ga
 as without it (every hook is `#ifdef TARGET_PC` and `if (coop_on)`).
 
 Part 1 is for players: how to host, join and play. Part 2 is the reference: architecture,
-protocol 20, security and limits. Related: [SERVER.md](SERVER.md) (the optional co-op server),
+protocol 21, security and limits. Related: [SERVER.md](SERVER.md) (the optional co-op server),
 [USER_GUIDE.md](USER_GUIDE.md) (settings, controls), [ACTORS.md](ACTORS.md) (models and voices),
 [ENEMIES.md](ENEMIES.md) (enemy options), [ARCHITECTURE.md](ARCHITECTURE.md),
 [BUILDING.md](BUILDING.md).
@@ -853,10 +853,10 @@ send time minus the echoed datagram's arrival. Sample = arrival - our clock - th
 smoothed (EWMA 0.1). The name tag's point goes with the recorded frame (`stream_point`) and is
 interpolated with the in-between frames; it snaps on camera cuts and in vanilla mode.
 
-## Protocol 20
+## Protocol 21
 
-`COOP_VERSION` is **20**; both players need builds with the same version (a mismatch is reported,
-e.g. "the host runs co-op protocol 19, we 20: both need the same build"). The co-op server does not
+`COOP_VERSION` is **21**; both players need builds with the same version (a mismatch is reported,
+e.g. "the host runs co-op protocol 20, we 21: both need the same build"). The co-op server does not
 look at the game protocol. Version history in short: 11 join code, 1200-byte datagrams, checked
 events, `EV_ATR`; 12 `EV_FX`; 13 `EV_GRANT`; 14 `EV_TSCREEN`; 15 `EV_GONE`; 16 player id and rejoin
 tag, `EV_OWN`; 17 trade requests; 18 voices; 19 the game rules `OPT_IMPORTANT`, `OPT_NO_RIBBON`,
@@ -864,7 +864,8 @@ tag, `EV_OWN`; 17 trade requests; 18 voices; 19 the game rules `OPT_IMPORTANT`, 
 shared loot as one pool (`EV_PICKUP` gives the partner only items for both; `undo`), the shooter's
 aim height in `EV_ENE_HIT`, unknown flag and option bits refused; 20 `EV_EOPTS` carries the
 randomizer's variety and event-enemy setting (the randomizer's choices changed, so builds of 19 would
-make other enemies from the same seed). `Pose.pflg` and `Pose.flr` were added inside protocol 18
+make other enemies from the same seed); 21 `COOP_HIT_PRECISE` in `EV_ENE_HIT` (third person
+"Precise hits", [THIRDPERSON.md](THIRDPERSON.md#precise-hits)). `Pose.pflg` and `Pose.flr` were added inside protocol 18
 (0 means "not sent", and receivers fall back).
 
 All structures are little-endian, packed as the compiler lays them out on x86 (pinned by
@@ -931,7 +932,7 @@ Slot, `mode[4]`, model index (`mlwP` as index into the enemy's `mdl[]`, -1..15),
 
 | Type | Id | Direction | Payload |
 |---|---|---|---|
-| `EV_ENE_HIT` | 1 | either | Our shot hit a puppet: joints, damage, hit bits, hit point/direction, weapon; `flg` also carries the shooter's aim height (`at_flg & 0xE` << 8, with `COOP_HIT_AIM`) |
+| `EV_ENE_HIT` | 1 | either | Our shot hit a puppet: joints, damage, hit bits, hit point/direction, weapon; `flg` also carries the shooter's aim height (`at_flg & 0xE` << 8, with `COOP_HIT_AIM`) and `COOP_HIT_PRECISE` when the shooter's "Precise hits" judged it (a zombie's head then bursts only from a head hit) |
 | `EV_PLY_HIT` | 2 | host | A host enemy hit the partner's stand-in: hp delta, flag bits, modes, direction |
 | `EV_BLOB` | 3 | host | Game state chunk (save region; `pad` 1: its items are the joiner's saved ones) |
 | `EV_FLAGS` | 4 | either | 1..6 changed flag words: set and cleared bits, base event id |
