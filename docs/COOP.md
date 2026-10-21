@@ -703,6 +703,18 @@ floor or trigger, "Yes" chosen, an item used) hold only where the player did it.
   parameters only as one of its own script's `WalAtariSet2` / `EtcAtariSet2` / `FlrAtariSet2` writes
   them for that record; never id or floor. Records are synced only after a shared world event.
 * A partner in another room gets the flags only; `scd0` builds the room from them when it enters.
+* **A scene of our own is not cut short** (`gate_hold`, `coop_scd1`): many world events take two steps
+  of the script. One enters a scene (cinema mode) and sets a room flag; a later block, gated by the same
+  world flag, ends it (its events, or a "No" branch). The turntable (7/11): the key's event asks "Move the
+  turntable?" and the block that moves it tests `ev_flg` 350 clear; the guillotine gate (0/8) and the
+  lift corridor (7/8): the item used in the item screen enters the scene, the block that acts once the
+  screen has closed tests the gate. When the partner's change of that flag arrived in between (it moved
+  the turntable while our question was open, or its game ran the lift's block on our flag and our replay
+  of it cleared the flag), the closing block never ran and the player stayed in the scene (frozen). While
+  our player is in cinema mode, the partner's changes to this room's world event gates are held and
+  applied when the scene ends or the room changes (a change of our own to a held bit is newer and wins),
+  and the replay of its blocks waits too (the stream with it, 10 s at most). Each game then ends its own
+  scene as in single player (a "Yes" to the turntable's question takes that player down too).
 
 ### Flags, pickups, game state
 
