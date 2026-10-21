@@ -1899,6 +1899,25 @@ void gs_frame_begin(void)
     fin_fresh = 0;
 }
 
+/* fences after the GPU work last handed over (executed frames, presented images), newest last */
+static GLsync gpu_fence[2];
+static void gpu_fence_set(void)
+{
+    if (gpu_fence[0]) glDeleteSync(gpu_fence[0]);
+    gpu_fence[0] = gpu_fence[1];
+    gpu_fence[1] = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+}
+
+/* the GPU has at most the last executed frame or image left to do (waiting up to wait_ns): one
+   more in-between image keeps it busy without queueing replays behind each other */
+int gs_gpu_ready(uint64_t wait_ns)
+{
+    if (gpu_fence[0] && glClientWaitSync(gpu_fence[0], GL_SYNC_FLUSH_COMMANDS_BIT, wait_ns) == GL_TIMEOUT_EXPIRED) return 0;
+    if (gpu_fence[0]) glDeleteSync(gpu_fence[0]);
+    gpu_fence[0] = NULL;
+    return 1;
+}
+
 /* a game frame was executed: keep its image; with interpolation, snapshot the render
    targets so in-between replays can be undone */
 void gs_frame_executed(int interpolate)
@@ -1930,6 +1949,7 @@ void gs_frame_executed(int interpolate)
         final_vw = 0;
     }
     stat_prims = stat_flushes = 0;
+    gpu_fence_set();
     gt_exec_end();
 }
 
@@ -1995,6 +2015,7 @@ uint64_t gs_present(const struct Frame* cur, float t)
         dump_window();
     }
     gt_present_end(inbetween);
+    gpu_fence_set();   /* before the swap: the image's own work, not the presentation queue */
     swap = SDL_GetTicksNS();
     SDL_GL_SwapWindow(g_window);
     swap = SDL_GetTicksNS() - swap;

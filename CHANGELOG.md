@@ -8,6 +8,14 @@
   without pressing the action button. Some stairs with an event, such as one in the Palace, need
   the button the first time.
 
+### Performance
+
+- **Steady game speed in heavy effect scenes**: with in-between frames on, a scene full of fire
+  and effects, such as Alexia's burning hall, could slow the game itself down and make it feel
+  sluggish when the graphics card could not keep up, even though the frame rate looked fine. The
+  game now keeps its normal speed, and only shows fewer in-between frames while the graphics card
+  is busy.
+
 ## 0.6.5 (2026-10-21)
 
 ### Co-op

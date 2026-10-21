@@ -92,6 +92,7 @@ void render_loop(void)
                refreshes: t = 1/n, 2/n, ... 1, evenly spaced however the game thread's frame
                delivery jitters against vsync. Otherwise by time since arrival. */
             double n = period * 1e-9 * present_hz();
+            uint64_t tick = (uint64_t)(1e9 / present_hz());
             float t;
             uint64_t swap;
             if (!interp) t = 1.0f;
@@ -101,6 +102,15 @@ void render_loop(void)
             /* the next game frame is already waiting (the game runs below its rate): an
                in-between image of this one would only delay it (a whole replay of the scene) */
             if (t < 1.0f && fixed_t <= 0.0f && stream_queued()) continue;
+            /* the GPU is still two frames or images behind most of a refresh later (a heavy
+               scene at a high resolution and rate): this refresh gets no in-between image.
+               Replays queued up behind each other would hold up the next game frame's execution,
+               and with it the game thread (one frame in flight): the game would slow down. */
+            if (t < 1.0f && fixed_t <= 0.0f && !gs_gpu_ready(tick / 8 * 7)) {
+                shown++;
+                pace_until = pace_until && pace_until + tick > now ? pace_until + tick : now + tick;
+                continue;
+            }
             {   /* the name tag moves with the 3D */
                 float x, y;
                 int fl = stream_point_at(interp ? prev : NULL, cur, t, &x, &y);
@@ -117,7 +127,6 @@ void render_loop(void)
                (the wait is the stream_pop above), so every image, in-between or not, is shown
                for one refresh. */
             {   /* on a fixed grid (a late present does not shift the following ones) */
-                uint64_t tick = (uint64_t)(1e9 / present_hz());
                 swap_avg += ((double)swap - swap_avg) / 8;
                 if (g_config.vsync && swap_avg >= tick / 8 && present_hz() == display_hz()) pace_until = 0;   /* limited: always paced */
                 else pace_until = pace_until && pace_until + tick > now ? pace_until + tick : now + tick;

@@ -96,4 +96,5 @@ struct Frame;
 void gs_frame_begin(void);
 void gs_frame_executed(int interpolate);
 uint64_t gs_present(const struct Frame* cur, float t);   /* returns the swap's blocking time (ns) */
+int gs_gpu_ready(uint64_t wait_ns);   /* at most the last executed frame or image still on the GPU (waits up to wait_ns) */
 void gs_replay_check(const struct Frame* cur);   /* RECVX_REPLAY_CHECK */
