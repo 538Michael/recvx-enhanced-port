@@ -59,6 +59,9 @@ PFN_glPixelStorei gl_PixelStorei;
 PFN_glGetError gl_GetError;
 PFN_glGetString gl_GetString;
 PFN_glFinish gl_Finish;
+PFN_glFenceSync gl_FenceSync;
+PFN_glClientWaitSync gl_ClientWaitSync;
+PFN_glDeleteSync gl_DeleteSync;
 
 int gl_load(void* (*getproc)(const char*))
 {
@@ -122,5 +125,8 @@ int gl_load(void* (*getproc)(const char*))
     if (!(gl_GetError = (PFN_glGetError)getproc("glGetError"))) ok = 0;
     if (!(gl_GetString = (PFN_glGetString)getproc("glGetString"))) ok = 0;
     if (!(gl_Finish = (PFN_glFinish)getproc("glFinish"))) ok = 0;
+    if (!(gl_FenceSync = (PFN_glFenceSync)getproc("glFenceSync"))) ok = 0;
+    if (!(gl_ClientWaitSync = (PFN_glClientWaitSync)getproc("glClientWaitSync"))) ok = 0;
+    if (!(gl_DeleteSync = (PFN_glDeleteSync)getproc("glDeleteSync"))) ok = 0;
     return ok;
 }

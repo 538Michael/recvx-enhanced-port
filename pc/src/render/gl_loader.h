@@ -267,4 +267,18 @@ extern PFN_glGetString gl_GetString;
 typedef void (GLAPIENTRY *PFN_glFinish)(void);
 extern PFN_glFinish gl_Finish;
 #define glFinish gl_Finish
+typedef struct __GLsync* GLsync; typedef uint64_t GLuint64;
+#define GL_SYNC_GPU_COMMANDS_COMPLETE 0x9117
+#define GL_SYNC_FLUSH_COMMANDS_BIT 0x1
+#define GL_TIMEOUT_EXPIRED 0x911B
+#define GL_WAIT_FAILED 0x911D
+typedef GLsync (GLAPIENTRY *PFN_glFenceSync)(GLenum condition, GLbitfield flags);
+extern PFN_glFenceSync gl_FenceSync;
+#define glFenceSync gl_FenceSync
+typedef GLenum (GLAPIENTRY *PFN_glClientWaitSync)(GLsync sync, GLbitfield flags, GLuint64 timeout);
+extern PFN_glClientWaitSync gl_ClientWaitSync;
+#define glClientWaitSync gl_ClientWaitSync
+typedef void (GLAPIENTRY *PFN_glDeleteSync)(GLsync sync);
+extern PFN_glDeleteSync gl_DeleteSync;
+#define glDeleteSync gl_DeleteSync
 int gl_load(void* (*getproc)(const char*));
