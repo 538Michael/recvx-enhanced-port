@@ -239,6 +239,10 @@ to the guest as an `EV_FX` linked to the zombie's slot, and `coop_glue.c apply_f
 guest's flag from it, so the partner sees the head go too. A guest that enters the room later sees
 the body with its head.
 
+**Third person, "Precise hits"** ([THIRDPERSON.md](THIRDPERSON.md#precise-hits)): a shot tested
+against the zombie's body bursts the head only when that hit is on the head (joint 11); earlier head
+damage, the magnum's near hit on joints 1 and 8..10 and the shotgun aimed up no longer do.
+
 ## Requirements for randomizers and difficulty options
 
 1. **Record count and order** stay (scripts, `wrk_no`, model/motion/texture tables, co-op slots).

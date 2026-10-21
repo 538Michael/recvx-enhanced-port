@@ -69,6 +69,56 @@ static void dual(void)
     CHECK(pc_dual_arm(4, 4, 4, 10, 0) == 0);
 }
 
+#define NEAR(a, b) (fabsf((a) - (b)) < 1e-3f)
+static void precise(void)
+{
+    const float o[3] = { 0, 0, 0 }, fx[3] = { 0, 0, -1 }, a[3] = { 0, -2, -10 }, b[3] = { 0, 2, -10 };
+    float m, d[3];
+    /* a vertical capsule of radius 1 ten units ahead */
+    CHECK(NEAR(pc_ray_capsule(o, fx, a, b, 1, &m), 9) && NEAR(m, 10));
+    {   /* beside it: 0.5 inside the radius hits, 1.5 misses */
+        const float p1[3] = { 0.5f, 0, 0 }, p2[3] = { 1.5f, 0, 0 }, p3[3] = { -1.01f, 0, 0 };
+        CHECK(NEAR(pc_ray_capsule(p1, fx, a, b, 1, &m), 10 - sqrtf(0.75f)));
+        CHECK(pc_ray_capsule(p2, fx, a, b, 1, &m) < 0);
+        CHECK(pc_ray_capsule(p3, fx, a, b, 1, &m) < 0);
+    }
+    {   /* over the top: the end sphere is round (2.5 up hits at x 0, not at x 0.9) */
+        const float p1[3] = { 0, 2.5f, 0 }, p2[3] = { 0.9f, 2.5f, 0 }, p3[3] = { 0, 3.01f, 0 };
+        CHECK(NEAR(pc_ray_capsule(p1, fx, a, b, 1, &m), 10 - sqrtf(0.75f)) && NEAR(m, 10));
+        CHECK(pc_ray_capsule(p2, fx, a, b, 1, &m) < 0);
+        CHECK(pc_ray_capsule(p3, fx, a, b, 1, &m) < 0);
+    }
+    /* behind the ray: a miss; from inside: 0 */
+    {
+        const float bk[3] = { 0, 0, 1 }, in[3] = { 0.2f, 1.5f, -10 }, cap[3] = { 0, 2.5f, -10 };
+        CHECK(pc_ray_capsule(o, bk, a, b, 1, &m) < 0);
+        CHECK(pc_ray_capsule(in, fx, a, b, 1, &m) == 0);
+        CHECK(pc_ray_capsule(cap, fx, a, b, 1, &m) == 0);   /* in the end sphere */
+    }
+    /* along the axis: enters through the end sphere */
+    {
+        const float up[3] = { 0, 1, 0 }, below[3] = { 0, -20, -10 };
+        CHECK(NEAR(pc_ray_capsule(below, up, a, b, 1, &m), 17));
+    }
+    /* a sphere (a == b) */
+    {
+        const float c[3] = { 0, 0, -10 };
+        CHECK(NEAR(pc_ray_capsule(o, fx, c, c, 1, &m), 9) && NEAR(m, 10));
+        CHECK(pc_ray_capsule(o, fx, a, a, 1, &m) < 0);   /* 2 below the ray */
+    }
+    /* slanted: the point nearest the axis lies inside the capsule */
+    d[0] = 0.1f; d[1] = 0.05f; d[2] = -1;
+    {
+        float l = sqrtf(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]), t, q[3], u;
+        d[0] /= l; d[1] /= l; d[2] /= l;
+        t = pc_ray_capsule(o, d, a, b, 1, &m);
+        CHECK(t > 0 && m >= t);
+        q[0] = d[0] * m; q[1] = d[1] * m; q[2] = d[2] * m + 10;   /* relative to the axis at y 0 */
+        u = q[1] < -2 ? -2 : q[1] > 2 ? 2 : q[1];
+        CHECK(q[0] * q[0] + (q[1] - u) * (q[1] - u) + q[2] * q[2] < 1);
+    }
+}
+
 /* the 4:3 screen is GS x 1728..2368: with ox 2048 and kx 320 a vertex at x/z -1..1 */
 static void margins(void)
 {
@@ -179,6 +229,7 @@ int main(void)
 {
     enemies();
     dual();
+    precise();
     margins();
     clipping();
     warp_music();

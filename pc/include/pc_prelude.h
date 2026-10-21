@@ -103,6 +103,14 @@ extern unsigned int pc_plp_mtn;
 extern void* pc_plp_set;
 int   pc_inf_ammo(void);      /* F2 cheat (pc/glue/cheat_glue.c): bhCheckBullet/bhCountBullet as for an unlimited weapon */
 int   pc_auto_stairs(void);   /* option (pc/glue/stairs_glue.c): bhControlPlayer without an action press: 1 = examine as for one (walked into stairs) */
+/* third-person option "Precise hits" (pc/glue/tps_glue.c): weapon.c bhCheckGunAtari tests the player's hitscan shot (on: 1)
+   against the enemies' bodies (shot c1 -> c2: the joint hit or -1, hp the point), each gun hit tells the enemy's damage
+   (d0 before it) whether it was precise; en01.c bhEne01_CheckExpHead: 1 = the zombie's hit was precise */
+struct BH_PWORK;
+int   pc_precise_hits(void);
+int   pc_precise_hit(struct BH_PWORK* pp, int wpn, const float* c1, const float* c2, float* hp);
+void  pc_precise_dam(struct BH_PWORK* pp, int jnt, int d0, int precise, int wpn);
+int   pc_precise_head(struct BH_PWORK* pp);
 /* F2 cheat "Unlock all" (pc/glue/cheat_glue.c): bhPlItemCheck passes for a key at its lock; bhControlPlayer's examine
    press in a key's use spot (1: taken) and bhControlEvent around scd1 (0 before, 1 after) use the key there;
    bhUseItemCheck / bhCmpB found the key used tested; bhInitEvent: a room's entry script is about to run */

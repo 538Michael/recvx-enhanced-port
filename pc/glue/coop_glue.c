@@ -44,6 +44,7 @@ extern char* rdx_files[205];             /* ps2_dvd_image.c: the room files */
 extern int rdx_image_data_max;
 extern int enemy_room_gen;              /* enemyopt_glue.c: room loads so far */
 extern int pose_trace_mark;             /* pose_trace.c (test aid RECVX_POSE_TRACE) */
+extern unsigned char tps_hit_precise[128];   /* tps_glue.c: an enemy's last gun hit was a precise one (weapon + 1) */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1858,6 +1859,7 @@ static void capture_hits(void)
         e.type = EV_ENE_HIT;
         e.idx = i;
         e.u.eh.flg = (ep->flg & 0x4) | (plp->at_flg & 0xE) << 8 | COOP_HIT_AIM;   /* with the shooter's aim height */
+        if (pc_precise_head(ep)) e.u.eh.flg |= COOP_HIT_PRECISE;   /* and whether its "Precise hits" judged it (tps_glue.c) */
         e.u.eh.flg2 = ep->flg2 & 0x4; e.u.eh.comb_flg = ep->comb_flg & 0x70;
         e.u.eh.djnt_no = ep->djnt_no; e.u.eh.wpnr_no = ep->wpnr_no;
         e.u.eh.dp[0] = ep->dpx; e.u.eh.dp[1] = ep->dpy; e.u.eh.dp[2] = ep->dpz;
@@ -5124,6 +5126,7 @@ static int apply_event(const Event* e)
         ep->flg |= e->u.eh.flg & 0x4; ep->flg2 |= e->u.eh.flg2; ep->comb_flg |= e->u.eh.comb_flg;
         if (e->u.eh.flg & COOP_HIT_AIM) hit_aim[e->idx] = 0x80 | ((e->u.eh.flg >> 8) & 0xE);
         ep->djnt_no = e->u.eh.djnt_no; ep->wpnr_no = e->u.eh.wpnr_no;
+        tps_hit_precise[e->idx] = e->u.eh.flg & COOP_HIT_PRECISE ? e->u.eh.wpnr_no + 1 : 0;
         ep->dpx = e->u.eh.dp[0]; ep->dpy = e->u.eh.dp[1]; ep->dpz = e->u.eh.dp[2];
         ep->dvx = e->u.eh.dv[0]; ep->dvy = e->u.eh.dv[1]; ep->dvz = e->u.eh.dv[2];
         ep->dax = e->u.eh.dax; ep->day = e->u.eh.day;

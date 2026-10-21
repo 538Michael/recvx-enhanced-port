@@ -95,6 +95,9 @@ from the same point along the same angles, so it goes where the scope's centre i
   the reticle stays round in the middle, where the shots go.
 * With the fixed cameras the scope keeps the original controls: the mouse is captured only in
   third person, and the fixed cameras have no mouse aim or fire.
+* [Precise hits](#precise-hits): the sniper rifle's shot is tested along the scope's centre against
+  the enemies' joint volumes (the game's own test was nearly that, 0.1 units wide); the linear
+  launcher's beam is a projectile and unchanged.
 
 ### Gamepad
 
@@ -169,6 +172,7 @@ unit (the character is about 17 units tall).
 | Invert Y | `tps_invert_y` | 0 |
 | Crosshair | `tps_crosshair` | 1 |
 | Game auto-aim (0 = free aim) | `tps_auto_aim` | 0 |
+| Precise hits ([Precise hits](#precise-hits)) | `tps_precise_hits` | 1 |
 | Mouse/keyboard camera (0 = B, 1 = A) | `tps_free_camera` | 0 |
 | Gamepad controls (0 = Classic, 1 = Modern) | `tps_pad_controls` | 1 |
 | Stick camera speed X / Y (percent; 100 = 180 / 120 degrees a second) | `tps_pad_sens_x`, `tps_pad_sens_y` | 100 |
@@ -184,7 +188,8 @@ unit (the character is about 17 units tall).
 |---|---|
 | `RECVX_TPS_MOUSE="frame:dx:dy,..."` | moves the mouse dx/dy counts per game frame from that presented frame on |
 | `RECVX_VPAD="frame:input+input,..."` | a virtual gamepad ([ARCHITECTURE.md](ARCHITECTURE.md)): sticks as `leftx=0.5+lefty=-1` (up is negative), triggers `+lefttrigger`; a trigger after another input needs its own `+` (`+lefttrigger++righttrigger`) |
-| `RECVX_TPS_TRACE=1` | logs the gamepad per frame ("tps: pad": the sticks past their dead zones, the walk direction, facing, camera, quick turn, the enemy nearest the crosshair) and its aim assist ("tps: assist"), the free aim per frame, each shot's direction and wall hit against the crosshair target ("SHOT"), the drawn weapon's barrel with "You appear as", the camera ("tps: cam A\|B": yaw, pitch, the player's position, the model's root, the point followed and the eye), the aim height given to the game, the scope per frame ("tps: scope": `ay`, `wax`, the field of view, the turn of the mouse and right stick in game units, the enemy nearest the centre in degrees, the enemies' health), each shot of a dual weapon ("tps: DUAL R\|L": the arms' yaws aimed and shown, the enemy under the crosshair and the other arm's, the aim height, each enemy's health, degrees off the facing and distance); `=2` also keeps the camera on the enemy the game locked on to (dual weapons: the nearest of their lock-on; the middle of its hit capsule, or `RECVX_TPS_AIM_AT=f` along it: 0 = `c1`, for a zombie the head, 1 = `c2`, its legs) |
+| `RECVX_TPS_TRACE=1` | logs the gamepad per frame ("tps: pad": the sticks past their dead zones, the walk direction, facing, camera, quick turn, the enemy nearest the crosshair) and its aim assist ("tps: assist"), the free aim per frame, each shot's direction and wall hit against the crosshair target ("SHOT"), the drawn weapon's barrel with "You appear as", the camera ("tps: cam A\|B": yaw, pitch, the player's position, the model's root, the point followed and the eye), the aim height given to the game, the scope per frame ("tps: scope": `ay`, `wax`, the field of view, the turn of the mouse and right stick in game units, the enemy nearest the centre in degrees, the enemies' health), each shot of a dual weapon ("tps: DUAL R\|L": the arms' yaws aimed and shown, the enemy under the crosshair and the other arm's, the aim height, each enemy's health, degrees off the facing and distance), each gun hit ("tps: HIT": weapon, enemy, joint, damage, precise or the game's test, the enemy's state), each precise test that met a body ("tps: PRECISE": joint, volume, along which ray), a zombie's head burst ("tps: HEAD BURST"); `=2` also keeps the camera on the enemy the game locked on to (dual weapons: the nearest of their lock-on), also in the scope, and logs per shot how far the crosshair passed from that enemy's body ("tps: SHOT at enemy") |
+| `RECVX_TPS_AIM_AT=f`, `=cN`, `...:side:up` | with `RECVX_TPS_TRACE=2`, where on that enemy: `f` along its hit capsule (0 = `c1`, for a zombie the head, 1 = `c2`, its legs; default 0.5), `cN` the middle of volume N of its joint table ([Precise hits](#precise-hits); a zombie: `c0` hips to chest, `c4` the head); `:side:up` adds that many units beside it (right of the view, negative left) and above |
 | `RECVX_TPS_ORBIT=degrees` | turns only the view about the player (side views; aim unchanged, camera ignores walls) |
 | `RECVX_ATMOS_TRACE=1` | logs each game frame's cut, the game's fog, lights and filter, the player's view depth from the view drawn and from the cut camera, and the fog shown with our camera (range in view depth) and what "smooth" shows |
 | `RECVX_EFF_TRACE=1` | logs effects spawned and queued |
@@ -472,8 +477,80 @@ Free aim now sets them every tick (`dual_aim`, after `aim_at_crosshair`; not whi
 * Shots therefore go where each arm points; the pitch, bend and aim height are the crosshair
   target's as for single weapons, so lying zombies are hit the same way. The fixed cameras and
   "Game auto-aim" with the mouse keep the game's own dual targeting.
+* With [Precise hits](#precise-hits) neither arm takes another enemy (that would be a lock-on):
+  both aim at the crosshair target, and each shot is tested on its own along the crosshair's ray.
 * Co-op: each arm's hits reach the partner as any hit (`EV_ENE_HIT` per enemy hit, with the aim
   height). The partner draws our motions only, without the arms' turn, as it shows no aim pitch.
+
+## Precise hits
+
+Setting "Precise hits" (THIRD PERSON page, ini `tps_precise_hits`, on by default). Off, and with the
+fixed cameras, the game's test as before (frames identical to the build without it).
+
+**How the game hits** (`weapon.c bhCheckGunAtari`, measured with `RECVX_TPS_TRACE=2` at a zombie
+spawned in the lift hall 3/0, 10 to 40 units away): the shot is a capsule from the player's chest
+(`py + 11`, 3 + `r` ahead), `r` = 2 units plus `rn` per unit of distance, at most `rmax` (handguns
+and sub machine guns 0.4 / 4, the magnum 0.2 / 1, the shotgun 0.3 / 40), tested against the enemy's
+one hit capsule (`watr`: for a zombie the whole body, 2.5 units thick). The joint damaged is the
+bone nearest the point where they touch, so the game does know head, arms and legs, but from where
+the cone touched the big capsule, not where the shot went. There is no lock-on in free aim, but the
+cone does the same: with the crosshair beside a zombie's body (the gap between the crosshair's ray
+and the nearest part of the body, the volumes below), the handgun hit 64 of 66 shots within 0.5
+units, 60 of 69 at 0.5 to 1, 57 of 68 at 1 to 2 and 15 of 23 at 2 or more. Only the
+sniper rifle and the bow gun (`WpnTab flg 0x8`) test the enemy's joint capsules with a thin ray.
+
+**On** (`tps_glue.c pc_precise_hits`, `pc_precise_hit`, `pc_ray_capsule` in `pc_rules.h`), for the
+player's hitscan shots (`WpnTab flg 0x10000000`, not the projectiles `0x20000000`) with our camera
+and free aim (not "Game auto-aim" with the mouse: its lock-on needs the wide test), and in the scope:
+
+* **The ray**: the crosshair's (from the shoulder point along the view, to the first wall; cast by
+  `aim_at_crosshair` the tick before, which turned `ay` / `wax` to it), as seen. The game's ray starts
+  at the chest, lower and beside it, and crossed the crosshair's only at its target: aimed just past
+  an enemy at a far wall it went through the enemy. In the scope the game's ray, which is the view's.
+* **The volumes**: the enemy's joint table (`pp->cpcl`, the game's own for the sniper rifle and bow
+  gun: capsules between two bones and spheres on a bone, on the bones as posed this frame, so they
+  follow walking, crawling, lying and attacks). A zombie: hips to chest (radius 1.6), two chest
+  spheres (1.8), neck (0.6), head (1.1), upper and lower arms (0.6, 0.5), thighs and shins (0.9, 0.8);
+  the Tyrant 1 to 2.5, the Gulp Worm 5.5. Chosen over shrinking `watr`: the game already sized them to
+  the models and they carry the joint. Enemies without a table (fish, ants, the Spotter, Alexia's
+  second form, Alfred, the knights, the ceiling trap) keep their hit capsule, tested with the thin
+  ray, the joint the game's nearest bone. The hit is the first volume the ray enters (exact
+  ray-capsule test); its joint takes the damage, its entry goes to `cpcl_no` as in the game's test.
+  The game's later checks stay: a wall between the gun and the point hit stops the shot.
+* **Measured** as above with it on: 0 of 674 shots with the crosshair beside the body hit (0 to 0.5
+  units: 0 of 131, 0.5 to 1: 0 of 223, 1 to 2: 0 of 244, 2 and more: 0 of 76); 70 of 75 on the body
+  hit (the other 5: a wall between the gun hand and the arm hit). Lying zombies (0/6) and crawlers
+  (legs shot off with the shotgun) are hit where aimed; the Tyrant, Bandersnatch and Cerberus on their
+  bodies and heads, 6 units beside them not.
+* **Shotgun** (weapon 11; the game tests one cone per enemy, with no pellets): the volume under the
+  crosshair if the ray meets one, else the volumes 0.3 units wider plus 0.06 per unit of distance (3.4
+  degrees either side), at most 3. Every enemy in it is hit, each with its own hit point, joint and
+  distance (the game gave all of them the nearest one's).
+* **Dual weapons**: both arms at the crosshair ([Dual weapons](#dual-weapons)), each shot tested.
+* **Not changed**: the knife (`bhCheckKnifeAtari`), the bow gun's arrows, the grenade, rocket and
+  linear launchers (projectiles and blasts: `bhCheckFlyAtari`, `bhCheckBombAtari`).
+
+**Heads.** A hit whose joint is the head does 150 % of its damage (`HEAD_DAMAGE`, `pc_precise_dam`) on
+zombies and the anatomist (joint 11 / 13), Cerberus (5), the Bandersnatch (4), the Tyrant (5),
+Alexia's first form (5) and Steve (5). Not: Nosferatu (its weak spot, below), Alexia's second and
+third form, the Gulp Worm (its table already gives its head +30 %), the Hunter (head and chest are one
+volume), types without a table. A zombie's head burst (`en01.c bhEne01_CheckExpHead`,
+[ENEMIES.md](ENEMIES.md#head-blow-offs)) is the game's for weapons with flag `0x10` (magnum, shotgun,
+sniper rifle, the Gold Lugers), but for a precise hit (`pc_precise_head`: the zombie's last gun hit was
+precise, with this weapon) only that hit on the head counts: not head damage from earlier shots, the
+magnum's near hit on the hips or chest or the shotgun aimed up within 10 units. Measured: the magnum
+at the hips 14 units away burst the head with the game's test and does not with this; on the head
+it bursts at 14 and at 27 units, the shotgun too. The grenade launcher and bow gun keep the game's rule.
+
+**Bosses.** Nosferatu (Battle Game 5/80): the sniper rifle on its core (volume 0) still does five
+times the damage (`en15.c`, `cpcl_no` 0) and kills it as with the game's test. The final Alexia
+(5/81) still falls to the linear launcher (a projectile, unchanged). The Gulp Worm (5/83) is hit
+where it shows.
+
+**Co-op**: the shooter decides as now and sends its damage per joint with `EV_ENE_HIT`; the flag
+`COOP_HIT_PRECISE` (protocol 21) says its hit was precise, so the side running the zombie bursts its
+head by the same rule (checked: the guest's magnum on the head bursts it on both sides, on the hips
+it does not, with the guest's option off it does as before).
 
 ## Limits
 
@@ -483,7 +560,7 @@ Free aim now sets them every tick (`dual_aim`, after `aim_at_crosshair`; not whi
 * Aim poses: free aim bends the straight pose up to 60 degrees of pitch. No laser sight.
 * The crosshair goes down to 60 degrees: from the shoulder (16.5 units up) it meets the floor
   about 9.5 units ahead, so a crawling zombie nearer than that cannot be put under it (the shot
-  goes at the floor behind it; the game's wide hit test may still reach it).
+  goes at the floor behind it; with "Precise hits" off the game's wide hit test may still reach it).
 * Co-op: enemies judge a hit with the aim height of the player they are after; the partner's
   stand-in carries none, so every hit counts on an enemy after the partner.
 * Near walls: a wall closer than 40 units on the crosshair ray counts as 40 units away for the
