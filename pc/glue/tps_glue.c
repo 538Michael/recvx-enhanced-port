@@ -56,6 +56,30 @@ static int pad_move;              /* the left stick walks this frame: tps_player
 static float pad_target;
 static int recenter;              /* game frames left of the camera easing behind the character */
 
+/* a camera in `cam`: position, angles, view vector, eye */
+typedef struct { float px, py, pz, vx, vy, vz, wpx, wpy, wpz; int ax, ay, az; float ln; int pers; } View;
+static View view_now;   /* ours as bhControlCamera derived it */
+static View cut_cam;    /* the cut's own camera, running underneath ours (cut_cam_ok) */
+static int cut_cam_ok;
+
+static void view_get(View* v)
+{
+    v->px = cam.px; v->py = cam.py; v->pz = cam.pz;
+    v->vx = cam.vx; v->vy = cam.vy; v->vz = cam.vz;
+    v->wpx = cam.wpx; v->wpy = cam.wpy; v->wpz = cam.wpz;
+    v->ax = cam.ax; v->ay = cam.ay; v->az = cam.az;
+    v->ln = cam.ln; v->pers = cam.pers;
+}
+
+static void view_put(const View* v)
+{
+    cam.px = v->px; cam.py = v->py; cam.pz = v->pz;
+    cam.vx = v->vx; cam.vy = v->vy; cam.vz = v->vz;
+    cam.wpx = v->wpx; cam.wpy = v->wpy; cam.wpz = v->wpz;
+    cam.ax = v->ax; cam.ay = v->ay; cam.az = v->az;
+    cam.ln = v->ln; cam.pers = v->pers;
+}
+
 #define DEG(a) ((a) * (65536.0f / 360.0f))
 #define TURN_PER_PIXEL DEG(0.12f)   /* mouse at 100% sensitivity */
 #define RAD(a) ((a) * (3.14159265f / 32768.0f))
@@ -107,7 +131,7 @@ static void deactivate(void)
     atmos_off();
     tps_player_mode();
     if (!tps_cam_active) return;
-    tps_cam_active = g_tps.cam_active = g_tps.aiming = 0;
+    tps_cam_active = g_tps.cam_active = g_tps.aiming = cut_cam_ok = 0;
     g_tps.pad_play = g_tps.pad_play && in_scope();   /* (a held aim trigger stays held into the scope) */
     /* the room camera resumes: the game's own re-initialisation of the current cut */
     if (sys && !(sys->st_flg & 0x1)) sys->gm_flg |= 0x800;
@@ -210,7 +234,7 @@ void tps_camera(void)
     int aim;
 
     if (!camera_allowed()) { deactivate(); return; }
-    if (!tps_cam_active) { yaw = plp->ay; pitch = DEG(-8.0f); cur_dist = g_tps.dist / 10.0f; cur_fov = (float)g_tps.fov; fol_move = 0; fol = *(NJS_POINT3*)&plp->px; }
+    if (!tps_cam_active) { view_get(&cut_cam); cut_cam_ok = 1; yaw = plp->ay; pitch = DEG(-8.0f); cur_dist = g_tps.dist / 10.0f; cur_fov = (float)g_tps.fov; fol_move = 0; fol = *(NJS_POINT3*)&plp->px; }
     follow();
     tps_cam_active = g_tps.cam_active = 1;
 
@@ -257,37 +281,55 @@ void tps_camera(void)
     if (clip_near != -1.0f || clip_far != -20000.0f) njClipZ(-1.0f, -20000.0f);
 }
 
-/* our view as bhControlCamera derived it: position, angles, view vector, eye */
-static struct { float px, py, pz, vx, vy, vz, wpx, wpy, wpz; int ax, ay, az; float ln; int pers; } view_now;
+/* view depth of (x, y, z) (the fog's view z) for a camera, its view matrix as bhControlCamera
+   builds it: T(0,0,-ln) Rz Rx Ry T(-(p + of)) */
+static float view_depth(const View* v, float x, float y, float z)
+{
+    NJS_MATRIX m;
+    NJS_POINT3 p = { x, y, z }, q;
+    njUnitMatrix(&m);
+    njTranslate(&m, 0, 0, -v->ln);
+    njRotateZ(&m, v->az); njRotateX(&m, v->ax); njRotateY(&m, v->ay);
+    njTranslate(&m, -(v->px + cam.ofx), -(v->py + cam.ofy), -(v->pz + cam.ofz));
+    njCalcPoint(&m, &p, &q);
+    return -q.z;
+}
 
 /* game.c bhMainSequence, after the frame is drawn */
 void tps_after_draw(void)
 {
     if (!tps_cam_active) return;
     if (clip_near != fNaViwClipNear || clip_far != fNaViwClipFar) njClipZ(clip_near, clip_far);
-    view_now.px = cam.px; view_now.py = cam.py; view_now.pz = cam.pz;
-    view_now.vx = cam.vx; view_now.vy = cam.vy; view_now.vz = cam.vz;
-    view_now.wpx = cam.wpx; view_now.wpy = cam.wpy; view_now.wpz = cam.wpz;
-    view_now.ax = cam.ax; view_now.ay = cam.ay; view_now.az = cam.az;
-    view_now.ln = cam.ln; view_now.pers = cam.pers;
+    view_get(&view_now);
+    if (cut_cam_ok) view_put(&cut_cam);   /* bhCheckCut moves the cut camera on from its own state */
 }
 
-/* game.c bhMainSequence, after bhCheckCut: the cut system (still running underneath) leaves
+/* game.c bhMainSequence, after bhCheckCut: the cut system (still running underneath) moves
    its own camera in `cam` - position and angles of a tracking cut every frame, the view
    vector on a cut change (bhSetCut), the eye for cuts with distance fog
-   (bhControlActiveCamera). The next frame's game logic runs before tps_camera and reads
-   them: effects offset towards the camera (gore sprites, explosions, splashes: cam.v*,
-   cam.wp*), 3D sound (cam.ay). Put ours back while our camera stays (not when this frame
-   switched to an event or fixed camera). */
+   (bhControlActiveCamera). It runs on from its own state (tps_after_draw), as with the fixed
+   cameras; kept in cut_cam, it is where the fixed camera would be (fog, "Light and fog").
+   The next frame's game logic runs before tps_camera and reads `cam`: effects offset towards
+   the camera (gore sprites, explosions, splashes: cam.v*, cam.wp*), 3D sound (cam.ay). Put
+   ours back while our camera stays (not when this frame switched to an event or fixed camera). */
 void tps_after_cut(void)
 {
     if (!tps_cam_active || !camera_allowed()) return;
+    view_get(&cut_cam);
+    {   /* its view vector and eye for the new position and angles, as bhControlCamera */
+        NJS_MATRIX m;
+        NJS_VECTOR f = { 0, 0, -1.0f };
+        NJS_POINT3 e = { 0, 0, -cut_cam.ln };
+        njUnitMatrix(&m);
+        njTranslate(&m, cut_cam.px + cam.ofx, cut_cam.py + cam.ofy, cut_cam.pz + cam.ofz);
+        njRotateY(&m, cut_cam.ay); njRotateX(&m, cut_cam.ax); njRotateZ(&m, cut_cam.az);
+        njCalcPoint(&m, &e, (NJS_POINT3*)&cut_cam.wpx);
+        njCalcVector(&m, &f, (NJS_VECTOR*)&cut_cam.vx);
+        cut_cam.vx = -cut_cam.vx; cut_cam.vy = -cut_cam.vy;
+    }
+    cut_cam_ok = 1;
     sys->gm_flg &= ~0x20;   /* "the view cut" (bhSetCut): ours did not; it wipes blood off the lens (effect 301) */
-    cam.px = view_now.px; cam.py = view_now.py; cam.pz = view_now.pz;
-    cam.vx = view_now.vx; cam.vy = view_now.vy; cam.vz = view_now.vz;
-    cam.wpx = view_now.wpx; cam.wpy = view_now.wpy; cam.wpz = view_now.wpz;
-    cam.ax = view_now.ax; cam.ay = view_now.ay; cam.az = view_now.az;
-    cam.ln = view_now.ln; cam.pers = view_now.pers;
+    view_put(&view_now);
 }
 
 /* ---- Light and fog (docs/THIRDPERSON.md "Light and fog") ----
@@ -305,7 +347,7 @@ extern float fNaFogTbl[128];   /* ps2_NaFog.c */
 static int atmos_reset = 1, atmos_trace = -1, last_cut = -1;
 static float lw[MAXL];                      /* weight of each room light */
 static unsigned char lon[MAXL];             /* on (flg & 3 == 3) in the previous frame */
-static struct { float a, nr, fr, c[3]; int on; unsigned col; float tnr, tfr; } fog;   /* shown; on..tfr: last target */
+static struct { float a, n, f, dn, df, c[3]; int on; unsigned col; } fog;   /* shown: density, range (view depth), easing left, colour; on, col: last target */
 static float filw[4], fila[4];              /* screen filters (effects 90..92): weight, alpha */
 
 static float step(float w, int on) { w += on ? FADE : -FADE; return w < 0 ? 0 : w > 1 ? 1 : w; }
@@ -313,12 +355,14 @@ static float step(float w, int on) { w += on ? FADE : -FADE; return w < 0 ? 0 : 
 /* RECVX_ATMOS_TRACE=1: one line per game frame - the cut, the game's fog (on, colour, range as
    set, the cut's own range, camera-relative bits), the filter, the cut's under-water
    distortion (cam.flg 0x20) and whether it is drawn (gm_flg 0x100), the lights on, the light slots
-   as drawn; with "smooth" also the fog and filters shown */
+   as drawn, the player's view depth in the view drawn and from the cut camera underneath ours;
+   with our fog also the fog shown (density, colour, range in view depth), with "smooth" the filters */
 static void atmos_log(int smooth_on)
 {
     char buf[640];
     int len = 0;
     CAM_WRK* ci = &rom->cutp[cam.ncut].cam[cam.camver];
+    View now;
     for (int i = 4; i < rom->lgt_n && i < MAXL && len < 200; i++)
         if ((rom->lgtp[i].flg & 3) == 3) len += snprintf(buf + len, sizeof buf - len, " %d", i);
     len += snprintf(buf + len, sizeof buf - len, " | dir %.2f %.2f %.2f pts", (sys->st_flg & 0x10000) ? sys->lg_r : 0,
@@ -326,23 +370,57 @@ static void atmos_log(int smooth_on)
     for (int i = 0; i < sys->lg_pnt && i < 3; i++)
         len += snprintf(buf + len, sizeof buf - len, " (%.0f %.0f %.0f: %.2f %.2f %.2f)", sys->lg_ptb[i].ps.x, sys->lg_ptb[i].ps.y,
                         sys->lg_ptb[i].ps.z, sys->lg_ptb[i].cr, sys->lg_ptb[i].cg, sys->lg_ptb[i].cb);
+    view_get(&now);
     printf("atmos: frame %u room %d/%d cut %d.%d pos %.1f %.1f tps %d smooth %d | game fog %d %06x %.1f %.1f cut %.1f %.1f rel %x"
-           " | fil %d %d %02x | eff110 %d drawn %d | lights%s",
+           " | fil %d %d %02x | eff110 %d drawn %d | lights%s | depth %.1f cut camera %.1f",
            (unsigned)gs_frame_count(), sys->stg_no, sys->rom_no, cam.ncut, cam.camver, plp->px, plp->pz, tps_cam_active, smooth_on,
            (ci->flg & 8) != 0, cam.fog_col & 0xFFFFFF, cam.fog_nr, cam.fog_fr, ci->fog_nr, ci->fog_fr, ci->flg & 0xC0,
-           (cam.flg & 8) != 0, sys->fil_no, sys->fil_rt & 0xFF, (cam.flg & 0x20) != 0, (sys->gm_flg & 0x100) != 0, buf);
-    if (smooth_on)
-        printf(" | shown fog %.2f %02x%02x%02x %.1f %.1f fil %.2f %.2f %.2f", fog.a, (int)(fog.c[0] + 0.5f), (int)(fog.c[1] + 0.5f),
-               (int)(fog.c[2] + 0.5f), fog.nr, fog.fr, filw[0], filw[1], filw[2]);
+           (cam.flg & 8) != 0, sys->fil_no, sys->fil_rt & 0xFF, (cam.flg & 0x20) != 0, (sys->gm_flg & 0x100) != 0, buf,
+           view_depth(&now, plp->px, plp->py + 10.0f, plp->pz), view_depth(cut_cam_ok ? &cut_cam : &now, plp->px, plp->py + 10.0f, plp->pz));
+    if (last_cut >= 0)
+        printf(" | shown fog %.2f %02x%02x%02x %.1f %.1f", fog.a, (int)(fog.c[0] + 0.5f), (int)(fog.c[1] + 0.5f), (int)(fog.c[2] + 0.5f), fog.n, fog.f);
+    if (smooth_on) printf(" fil %.2f %.2f %.2f", filw[0], filw[1], filw[2]);
     printf("\n");
 }
 
-/* fog amount 0..1 of the range (near, far) (njGenerateFogTable3: linear from -n to -f) at 50
-   units, a typical distance in view */
+/* fog amount 0..1 at 50 units, a typical distance in view, for fog linear in view depth from n to f */
 static float fog_amount(float n, float f)
 {
-    float a = (50.0f + n) / fmaxf(n - f, 1.0f);
+    float a = (50.0f - n) / fmaxf(f - n, 1.0f);
     return a < 0 ? 0 : a > 1 ? 1 : a;
+}
+
+/* The fog as the fixed camera shows it. Fog grows with view depth, and the cut's fixed camera
+   stands far off (30 to 115 units from the player in the rooms measured), ours close behind the player
+   (about 14): the same fog left the player and the scenery around them far clearer. The range
+   is moved towards our camera by the player's depth from the cut camera (cut_cam, running
+   underneath) less the depth from ours, so the player and what is around them get the fog the
+   fixed camera shows, what is farther more. Divided by the Fog intensity scale, which
+   stretches all depths (njCalcFogPower): with the option the player's fog matches too.
+   In view depth: n near, f far (the cut's fog_nr/fog_fr negated; njGenerateFogTable3 starts
+   the fog at the camera when the near value is not in front of it). */
+static void fog_range(float nr, float fr, float* n, float* f)
+{
+    float x = plp->px, y = plp->py + 10.0f, z = plp->pz, d;   /* about the body's middle */
+    View ours;
+    view_get(&ours);   /* this frame's (bhControlCamera) */
+    d = (fmaxf(view_depth(&cut_cam, x, y, z), 0) - view_depth(&ours, x, y, z)) / pc_fog_scale();
+    *n = (fr / 256.0f > nr ? -nr : 0) - d;
+    *f = -fr - d;
+    if (*f < 1) *f = 1;
+    if (*n > *f - 1) *n = *f - 1;
+}
+
+/* the fog table for fog linear in view depth from n to f (n < 0: fog already at the camera),
+   weighted by a; njGenerateFogTable3 sets the density for f. Entry i is the depth f / m,
+   m = 2^(i/16) * (16 + i%16) / 16 (njCalcFogPower: index from density / depth) */
+static void fog_table(float n, float f, float a)
+{
+    njGenerateFogTable3(rom->fog, -n, -f);
+    for (int i = 0; i < 128; i++) {
+        float m = (float)(1 << (i >> 4)) * (16 + (i & 15)) / 16.0f, k = (f / m - n) / (f - n);
+        fNaFogTbl[i] = 255.0f - a * 255.0f * (k < 0 ? 0 : k > 1 ? 1 : k);   /* 255 = no fog */
+    }
 }
 
 static void atmos_fog(int cut_changed)
@@ -350,31 +428,32 @@ static void atmos_fog(int cut_changed)
     CAM_WRK* ci = &rom->cutp[cam.ncut].cam[cam.camver];
     int on = (ci->flg & 0x8) && !(sys->gm_flg & 0x200000), snap;
     unsigned col = ((sys->st_flg & 0x100000) ? sys->fog_col : cam.fog_col) & 0xFFFFFF;
-    float c[3] = { (float)(col >> 16 & 0xFF), (float)(col >> 8 & 0xFF), (float)(col & 0xFF) };
-    /* the cut's own range, measured from our camera: not the camera-relative shift of
-       bhControlActiveCamera, which measures our eye against the cut camera's base position
-       along our view, so the fog came and went as the camera turned */
-    float nr = ci->fog_nr, fr = ci->fog_fr;
+    float c[3] = { (float)(col >> 16 & 0xFF), (float)(col >> 8 & 0xFF), (float)(col & 0xFF) }, n, f;
 
-    snap = atmos_reset || (!cut_changed && (on != fog.on || col != fog.col || nr != fog.tnr || fr != fog.tfr));
+    /* the range the game set for the cut camera (cam.fog_*: the cut's, for flg 0x40/0x80 shifted
+       by the cut camera's eye, bhControlActiveCamera), seen from ours */
+    fog_range(cam.fog_nr, cam.fog_fr, &n, &f);
+    snap = atmos_reset || (!cut_changed && (on != fog.on || col != fog.col));
     fog.a = snap ? on : step(fog.a, on);
     if (snap || (on && fog.a <= FADE)) {   /* at once, or fading in from no fog */
-        fog.nr = nr; fog.fr = fr;
+        fog.dn = fog.df = 0;
         for (int i = 0; i < 3; i++) fog.c[i] = c[i];
     } else if (on) {
+        /* a new cut: the range eases from the one shown (the difference fades out) */
+        if (cut_changed) { fog.dn = fog.n - n; fog.df = fog.f - f; }
         /* the colour follows the denser fog: towards a denser one it changes faster, towards a
            thinner one slower (else a thin bright fog and a dense dark one mix to a grey haze) */
-        float k = EASE * fog_amount(nr, fr) / fmaxf(fog_amount(fog.nr, fog.fr), 0.01f);
+        float k = EASE * fog_amount(n, f) / fmaxf(fog_amount(fog.n, fog.f), 0.01f);
         k = k < EASE / 4 ? EASE / 4 : k > EASE * 4 ? EASE * 4 : k;
-        fog.nr += (nr - fog.nr) * EASE; fog.fr += (fr - fog.fr) * EASE;
+        fog.dn -= fog.dn * EASE; fog.df -= fog.df * EASE;
         for (int i = 0; i < 3; i++) fog.c[i] += (c[i] - fog.c[i]) * k;
     }
-    fog.on = on; fog.col = col; fog.tnr = nr; fog.tfr = fr;
+    if (on || snap) { fog.n = n + fog.dn; fog.f = f + fog.df; }   /* fading out: the last range */
+    fog.on = on; fog.col = col;
 
     if (fog.a <= 0) { njFogDisable(); return; }
     njSetFogColor((unsigned)(fog.c[0] + 0.5f) << 16 | (unsigned)(fog.c[1] + 0.5f) << 8 | (unsigned)(fog.c[2] + 0.5f));
-    njGenerateFogTable3(rom->fog, fog.nr, fog.fr);
-    for (int i = 0; i < 128; i++) fNaFogTbl[i] = 255.0f - fog.a * (255.0f - fNaFogTbl[i]);   /* 255 = no fog */
+    fog_table(fog.n, fog.f, fog.a);
     njSetFogTable(rom->fog);
     njFogEnable();
 }
@@ -457,17 +536,21 @@ static void atmos_lights(int cut_changed)
 /* game.c bhMainSequence, after bhControlLight (before drawing) */
 void tps_atmos(void)
 {
-    int cut, smooth_on;
+    int cut, own, smooth_on;
     if (atmos_trace < 0) atmos_trace = getenv("RECVX_ATMOS_TRACE") != NULL;
     if (!sys || !rom || !plp) return;
     /* our camera with the room's lights (not an event's, not the inventory's) */
-    smooth_on = g_tps.atmos && tps_cam_active && !(sys->gm_flg & 0x80) && !(sys->st_flg & 0x1000000) && !(cam.flg & 0x2);
-    if (smooth_on) {
+    own = tps_cam_active && !(sys->gm_flg & 0x80) && !(sys->st_flg & 0x1000000) && !(cam.flg & 0x2);
+    smooth_on = g_tps.atmos && own;
+    if (own) {
         cut = cam.ncut | cam.camver << 8;
+        if (!smooth_on) atmos_reset = 1;   /* per cut: the fog at once; lights and filters the game's */
         atmos_fog(cut != last_cut);
-        atmos_lights(cut != last_cut);
+        if (smooth_on) {
+            atmos_lights(cut != last_cut);
+            atmos_reset = 0;
+        }
         last_cut = cut;
-        atmos_reset = 0;
     } else {
         atmos_off();
     }
@@ -477,7 +560,7 @@ void tps_atmos(void)
 /* back to the game's own light and fog (the lights are set from scratch every frame) */
 static void atmos_off(void)
 {
-    if (atmos_reset) return;
+    if (last_cut < 0) return;
     atmos_reset = 1;
     last_cut = -1;
     if (sys) sys->gm_flg |= 0x10;   /* the game sets its fog again (sync.c bhControlEOR) */

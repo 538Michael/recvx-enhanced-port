@@ -8,6 +8,13 @@
   With it on, the lobby and the co-op window never show your or your partner's IP address, and
   the address fields show stars. Copying the join address and joining still work as before.
 
+### Third person
+
+- **Fog like the fixed cameras**: over the shoulder, fog and darkness were much weaker than with
+  the fixed cameras, because the camera is so much closer to you. Fog now looks as the fixed
+  camera shows it: you and your surroundings get the same haze or darkness, and it still fades
+  smoothly between camera angles. Too much? The Fog intensity setting lowers it as before.
+
 ## 0.6.4 (2026-10-20)
 
 ### Fixes
