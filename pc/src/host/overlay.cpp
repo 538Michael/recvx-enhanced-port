@@ -488,8 +488,12 @@ static void coop_window(void)
                           "a direct path first (hole punching), the server's relay when that fails. An address (ip:port#CODE) is\n"
                           "always joined directly. Without a server: exactly as Direct.\n"
                           "Direct (P2P): addresses only, no server contact. Via server: always through the relay.");
+    /* Hide IP addresses: the address fields as passwords, "Show" reveals them until the window closes */
+    static bool show_addr;
+    if (!coop_visible || !c->hide_ip) show_addr = false;
+    ImGuiInputTextFlags addr_flags = c->hide_ip && !show_addr ? ImGuiInputTextFlags_Password : 0;
     if (c->conn != COOP_CONN_DIRECT) {   /* first how to connect, then only what it needs (as the lobby) */
-        if (ImGui::InputText("Co-op server", c->server, sizeof(c->server))) changed = true;
+        if (ImGui::InputText("Co-op server", c->server, sizeof(c->server), addr_flags)) changed = true;
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
             ImGui::SetTooltip("The rendezvous/relay server (recvx-server, docs/SERVER.md): host name or IP, port 7141 implied\n"
                               "(host:port for another). Both players use the same server. Empty: no server.");
@@ -499,7 +503,7 @@ static void coop_window(void)
     }
     if (ImGui::InputInt("Host port", &c->port)) { c->port = c->port < 1 ? 1 : c->port > 65535 ? 65535 : c->port; changed = true; }
     bool by_code = coop_join_by_code(c);   /* Via server, or Automatic with a server: a room code (as the lobby's CODE row) */
-    if (ImGui::InputText(by_code ? "Room code###join" : "Join address###join", c->join, sizeof(c->join))) changed = true;
+    if (ImGui::InputText(by_code ? "Room code###join" : "Join address###join", c->join, sizeof(c->join), addr_flags)) changed = true;
     if (ImGui::IsItemHovered())
         ImGui::SetTooltip(c->conn == COOP_CONN_SERVER ? "The room code the host's lobby or F3 shows (XXXX-XXXX; case and dash do not matter),\n"
                                                         "joined through the co-op server above."
@@ -507,6 +511,12 @@ static void coop_window(void)
                                       "An address (ip:port#CODE, the host's \"Copy join address\") still joins directly."
                                     : "The host's address and join code, as its \"Copy join address\" gives them: ip:port#CODE.\n"
                                       "For a room code (XXXX-XXXX) choose Automatic or Via server and set the co-op server.");
+    if (c->hide_ip) {   /* also during a session */
+        ImGui::EndDisabled();
+        ImGui::Checkbox("Show the address fields", &show_addr);
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Hide IP addresses is on (F1 / ENHANCED SETTINGS CO-OP): the fields show stars until this is ticked.");
+        ImGui::BeginDisabled(!off);
+    }
     if (ImGui::Combo("Loot (host)", &c->loot, loots, IM_ARRAYSIZE(loots))) changed = true;
     if (ImGui::IsItemHovered())
         ImGui::SetTooltip("Shared: each item lies there once - whoever takes it has it, so you split the supplies.\n"
@@ -604,7 +614,7 @@ static void coop_window(void)
                                   "co-op server: the same join address or room code works again at once.");
         }
     }
-    ImGui::TextWrapped("%s", cs.status[0] ? cs.status : "not connected");
+    ImGui::TextWrapped("%s", cs.status[0] ? coop_shown(cs.status) : "not connected");
     if (cs.state != COOP_OFF && cs.host && cs.code[0]) ImGui::Text("Join code: %.4s-%.4s", cs.code, cs.code + 4);
     if (cs.state != COOP_OFF && cs.host && cs.room[0]) {
         char room[16];
@@ -619,16 +629,16 @@ static void coop_window(void)
     if (pm.local_ip[0] || pm.msg[0]) {   /* hosting */
         char addr[80];
         ImGui::SeparatorText("Internet");
-        ImGui::Text("This PC (LAN): %s", pm.local_ip[0] ? pm.local_ip : "?");
-        ImGui::Text("Public address: %s", pm.public_ip[0] ? pm.public_ip : pm.state == PM_BUSY ? "looking..." : "unknown");
+        ImGui::Text("This PC (LAN): %s", pm.local_ip[0] ? coop_shown(pm.local_ip) : "?");
+        ImGui::Text("Public address: %s", pm.public_ip[0] ? coop_shown(pm.public_ip) : pm.state == PM_BUSY ? "looking..." : "unknown");
         if (pm.state == PM_FAILED) ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.8f, 0.3f, 1.0f));
-        if (pm.msg[0]) ImGui::TextWrapped("%s", pm.msg);
+        if (pm.msg[0]) ImGui::TextWrapped("%s", coop_shown(pm.msg));
         if (pm.state == PM_FAILED) ImGui::PopStyleColor();
         if (pm.public_ip[0]) snprintf(addr, sizeof(addr), "%s:%d#%s", pm.public_ip, pm.public_port, cs.code);
         else snprintf(addr, sizeof(addr), "%s:%d#%s", pm.local_ip, c->port, cs.code);
         if (ImGui::Button(pm.public_ip[0] ? "Copy join address" : "Copy LAN address")) SDL_SetClipboardText(addr);
         ImGui::SameLine();
-        ImGui::TextDisabled("%s", addr);
+        ImGui::TextDisabled("%s", coop_shown(addr));
     }
     if (cs.at_title)
         ImGui::TextDisabled("Host: choose New Game or Load Game in the title menu; the partner joins your game.\n"

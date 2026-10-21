@@ -295,6 +295,39 @@ const char* net_addr_str(const NetAddr* a)
     return s;
 }
 
+/* the length of an IPv4 address (a.b.c.d, 1-3 digits each) at s, 0 if none */
+static int ipv4_at(const char* s)
+{
+    int n = 0, part, d;
+    for (part = 0; part < 4; part++) {
+        if (part && s[n++] != '.') return 0;
+        for (d = 0; d < 3 && s[n] >= '0' && s[n] <= '9'; d++) n++;
+        if (!d) return 0;
+    }
+    return s[n] >= '0' && s[n] <= '9' ? 0 : n;
+}
+
+const char* net_mask_addrs(const char* text, const char* const* hosts, char* out, int cap)
+{
+    static const char mask[] = "xxx.xxx.xxx.xxx";   /* the game font draws * as a spade */
+    const char* name[4];
+    int len[4], nn = 0, o = 0, i, k;
+    for (; hosts && *hosts && nn < 4; hosts++) {   /* the host part, if it is a name or address with a dot */
+        k = (int)strcspn(*hosts, ":# ");
+        if (k > 2 && memchr(*hosts, '.', k)) { name[nn] = *hosts; len[nn++] = k; }
+    }
+    while (*text && o < cap - 1) {
+        k = 0;
+        for (i = 0; i < nn && !k; i++)
+            if (!strncmp(text, name[i], len[i])) k = len[i];
+        if (!k && (o == 0 || !(out[o - 1] == '.' || (out[o - 1] >= '0' && out[o - 1] <= '9')))) k = ipv4_at(text);
+        if (k) { o += snprintf(out + o, cap - o, "%s", mask); if (o > cap - 1) o = cap - 1; text += k; }
+        else out[o++] = *text++;
+    }
+    out[o] = 0;
+    return out;
+}
+
 #ifndef RECVX_NET_NO_SDL
 uint32_t net_ms(void) { return (uint32_t)SDL_GetTicks(); }
 uint64_t net_us(void) { return SDL_GetTicksNS() / 1000; }

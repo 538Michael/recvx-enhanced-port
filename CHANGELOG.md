@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Co-op
+
+- **Hide IP addresses**: a new option on the CO-OP settings page for streaming and screenshots.
+  With it on, the lobby and the co-op window never show your or your partner's IP address, and
+  the address fields show stars. Copying the join address and joining still work as before.
+
 ## 0.6.4 (2026-10-20)
 
 ### Fixes

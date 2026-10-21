@@ -72,6 +72,17 @@ int main(void)
         portmap_status(&st);
         CHECK(!st.msg[0]);
     }
+    {   /* Hide IP addresses: addresses and the given host names masked, ports, codes and versions kept */
+        const char* hosts[] = { "my.host.example:7140#ABCD-EFGH", "K7QM-3XRA", "localhost:1", NULL };
+        char o[200], t[8];
+        CHECK(!strcmp(net_mask_addrs("connected to 192.168.1.20:7140, ping 5 ms", NULL, o, sizeof(o)), "connected to xxx.xxx.xxx.xxx:7140, ping 5 ms"));
+        CHECK(!strcmp(net_mask_addrs("LAN 10.0.0.2:7140   PUBLIC 84.1.2.3:7140   CODE K7QM-3XRA", hosts, o, sizeof(o)),
+                      "LAN xxx.xxx.xxx.xxx:7140   PUBLIC xxx.xxx.xxx.xxx:7140   CODE K7QM-3XRA"));
+        CHECK(!strcmp(net_mask_addrs("looking up the host my.host.example", hosts, o, sizeof(o)), "looking up the host xxx.xxx.xxx.xxx"));
+        CHECK(!strcmp(net_mask_addrs("my.host.example:7140#ABCD-EFGH", hosts, o, sizeof(o)), "xxx.xxx.xxx.xxx:7140#ABCD-EFGH"));
+        CHECK(!strcmp(net_mask_addrs("localhost:1 version 0.6.4 room 1234.5", hosts, o, sizeof(o)), "localhost:1 version 0.6.4 room 1234.5"));
+        CHECK(!strcmp(net_mask_addrs("1.2.3.4", NULL, t, sizeof(t)), "xxx.xxx"));   /* cut to the buffer */
+    }
     printf("net: ok\n");
     return 0;
 }
