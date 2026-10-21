@@ -1004,8 +1004,8 @@ static void row_text(int r, char* label, char* val, int n)
     case R_KICK: strcpy(label, "REMOVE STUCK PLAYER"); break;
     case R_COPY: strcpy(label, "COPY JOIN ADDRESS"); break;
     case R_RCOPY: strcpy(label, g_coop.room[0] ? "COPY ROOM CODE" : "ROOM CODE: WAITING FOR THE SERVER"); break;
-    case R_ADDR: strcpy(label, lb.mode ? "CODE" : "ADDRESS"); snprintf(val, n, "%.*s", n - 1, lb.edit == F_ADDR ? lb.buf : g_coop.join); break;
-    case R_SERVER: strcpy(label, "SERVER"); snprintf(val, n, "%.*s", n - 1, lb.edit == F_SERVER ? lb.buf : g_coop.server[0] ? g_coop.server : "-"); break;
+    case R_ADDR: strcpy(label, lb.mode ? "CODE" : "ADDRESS"); snprintf(val, n, "%.*s", n - 1, lb.edit == F_ADDR ? lb.buf : coop_shown(g_coop.join)); break;
+    case R_SERVER: strcpy(label, "SERVER"); snprintf(val, n, "%.*s", n - 1, lb.edit == F_SERVER ? lb.buf : g_coop.server[0] ? coop_shown(g_coop.server) : "-"); break;
     case R_PW: {   /* shown as stars, also while typing */
         int k, len = (int)strlen(lb.edit == F_PW ? lb.buf : g_coop.password);
         strcpy(label, "PASSWORD");
@@ -1117,6 +1117,9 @@ static int lobby_input(void)
     return 0;
 }
 
+/* the field being typed shows stars: a password, or an address with Hide IP addresses (coop_shown) */
+static int edit_hidden(void) { return lb.edit == F_PW || (g_coop.hide_ip && (lb.edit == F_ADDR || lb.edit == F_SERVER)); }
+
 static void draw_rows(void)
 {
     int r;
@@ -1128,6 +1131,7 @@ static void draw_rows(void)
         unsigned int col = locked ? 0xFF707070 : sel ? 0xFFFFFFFF : 0xFFB0B0B0;
         if (!row_visible(r)) continue;
         row_text(r, label, val, sizeof(val));
+        if (sel && edit_hidden()) memset(val, '*', strlen(val));
         if (sel) rect(ROW_X - 8, y - 2, 634, y + row_h() - 4, lb.edit ? 0x60406080 : 0x50FFFFFF, Z_FRONT);
         {   /* a long label next to a value: narrower (EXTRA ENEMIES); a long one alone: to the panel's edge */
             float lw = text_w(label, ROW_SC), room = (has_value(r) || val[0]) ? VAL_X - ROW_X - 8 : 634 - ROW_X - 4,
@@ -1145,7 +1149,7 @@ static void draw_rows(void)
             if (sel && lb.edit && (lb.spin & 16)) {   /* caret */
                 char pre[128];
                 snprintf(pre, sizeof(pre), "%.*s", lb.caret, lb.buf);
-                if (lb.edit == F_PW) memset(pre, '*', strlen(pre));
+                if (edit_hidden()) memset(pre, '*', strlen(pre));
                 rect(VAL_X + text_w(pre, sc), y, VAL_X + text_w(pre, sc) + 2, y + 18, 0xFFFFFFFF, Z_FRONT + 0.01f);
             }
         }
@@ -1163,7 +1167,7 @@ static void draw_info(void)
     if (lb.msg_t > 0) { lb.msg_t--; text(24, y, lb.msg, 0.55f, 0xFFFFE080); y += 17; }
     else y += 15 * text_wrap(24, y, 584, row_help(lb.row), 0.5f, 0xFFA0D0FF, 2);
     /* without a session a status is why (busy port, the host left): highlighted */
-    y += 16 * text_wrap(24, y, 592, g_coop.status[0] ? g_coop.status : "Not connected", 0.52f, !session_on() && g_coop.status[0] ? 0xFFFFC060 : col, 2);
+    y += 16 * text_wrap(24, y, 592, g_coop.status[0] ? coop_shown(g_coop.status) : "Not connected", 0.52f, !session_on() && g_coop.status[0] ? 0xFFFFC060 : col, 2);
     if (!hosting()) return;
     if (g_coop.room[0]) {
         snprintf(line, sizeof(line), "ROOM CODE %.4s-%.4s (through the co-op server)", g_coop.room, g_coop.room + 4);
@@ -1175,8 +1179,8 @@ static void draw_info(void)
              pm.public_ip[0] ? pm.public_ip : pm.state == 1 ? "looking..." : "unknown");
     if (pm.public_ip[0]) snprintf(line + strlen(line), sizeof(line) - strlen(line), ":%d", pm.public_port);
     if (g_coop.code[0]) snprintf(line + strlen(line), sizeof(line) - strlen(line), "   CODE %.4s-%.4s", g_coop.code, g_coop.code + 4);
-    text(24, y, line, 0.52f, col); y += 16;
-    if (pm.msg[0] && y < 470) text_wrap(24, y, 592, pm.msg, 0.48f, pm.state == 3 ? 0xFFFFC060 : 0xFFA0A0A0, y < 455 ? 2 : 1);   /* UPnP */
+    text(24, y, coop_shown(line), 0.52f, col); y += 16;
+    if (pm.msg[0] && y < 470) text_wrap(24, y, 592, coop_shown(pm.msg), 0.48f, pm.state == 3 ? 0xFFFFC060 : 0xFFA0A0A0, y < 455 ? 2 : 1);   /* UPnP */
 }
 
 /* our model and, at the title with us, the partner's, with their names */

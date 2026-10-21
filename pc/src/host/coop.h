@@ -72,7 +72,12 @@ typedef struct CoopState {
     /* game rules of protocol 19 (host; the guest follows the host's, Pose.opts). No ink ribbons is g_config.no_ink_ribbon. */
     int important;                  /* shared loot: weapons and ink ribbons stay each player's own to take (ini coop_important) */
     int skip_sync;                  /* a cutscene both play is skipped when both pressed skip (ini coop_skip_sync) */
+    int hide_ip;                    /* Hide IP addresses (ini hide_ip): on screen masked, coop_shown */
 } CoopState;
+/* Hide IP addresses: every address shown on screen goes through here. With hide_ip on, the
+   text with its IPv4 addresses and the join and co-op server host names masked (net_mask_addrs),
+   else text itself. A ring of 4 buffers per thread (lobby_io.c). Input fields mask as passwords. */
+const char* coop_shown(const char* text);
 /* joining: where our inventory comes from (g_coop.items; 0..14 is a save slot) */
 enum { COOP_ITEMS_CURRENT = -3,     /* our game in progress (F3 in game); at the title the new-game items */
        COOP_ITEMS_HOST = -2,        /* saved with the host (its record of our player id); none: the new-game items */

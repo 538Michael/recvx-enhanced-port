@@ -283,6 +283,25 @@ on). The tag scales with the window height and follows the head in enhanced (int
 next to the frame-rate counter (alone when the counter is off). F3 and the lobby status line show
 it too. The ping is the real network round trip (receive timestamps), not rounded to game frames.
 
+### Hiding IP addresses (streaming)
+
+**Hide IP addresses** (F1 / ENHANCED SETTINGS CO-OP; ini `hide_ip`, default off) is for streams and
+screenshots. With it on, no IP address shows on screen, yours or the partner's:
+
+* The lobby's status and info lines and F3 (status, "This PC (LAN)", "Public address", the UPnP
+  message, the join address next to **Copy join address**) show each address as
+  `xxx.xxx.xxx.xxx`. Ports, the join code and the room code stay visible, e.g.
+  `xxx.xxx.xxx.xxx:7140#ABCDEFGH`. A host name typed as the join address or co-op server is
+  masked the same way.
+* The address fields (lobby ADDRESS / CODE and SERVER, F3 Join address / Room code and Co-op server)
+  show stars, also while you type or paste. In F3, **Show the address fields** reveals them until
+  the window closes; in the lobby turn the option off to see them.
+* Only the display changes: **COPY JOIN ADDRESS** / **Copy join address** put the real address on the
+  clipboard, and joining uses what you typed.
+
+`recvx.log` (and the console) still contain the addresses, for troubleshooting: do not show the
+console window on stream or post the log publicly.
+
 ### Sounds
 
 You hear the partner's footsteps, its gun's own shot sound, its effects (muzzle flash, hit sparks,
@@ -529,6 +548,7 @@ only on the host; "locked" ones cannot change during a session.
 | You appear as (APPEARANCE page) | `coop_char` | model index (0: as played) |
 | Partner's name tag | `coop_nametag` | 0/1 (1) |
 | Show ping | `show_ping` | 0/1 (1) |
+| Hide IP addresses | `hide_ip` | 0/1 (0); see "Hiding IP addresses" |
 | Follow host (joining player) | `coop_follow` | 0/1 (1) |
 | Loot (host), locked | `coop_loot` | 0 Shared, 1 Individual (0) |
 | Important items for both (host), locked | `coop_important` | 0/1 (1); shared loot only |

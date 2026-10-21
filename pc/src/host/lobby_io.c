@@ -5,6 +5,8 @@
 #include "lobby.h"
 #include "settings.h"
 #include "savestore.h"
+#include "coop.h"
+#include "net/net.h"
 #include <SDL3/SDL.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -198,3 +200,17 @@ int lobby_write_partners(int slot, const void* buf, int n)
 }
 
 void lobby_settings_changed(void) { settings_save_later(); }   /* the main thread writes recvx.ini */
+
+const char* coop_shown(const char* text)
+{
+    static __thread char ring[4][512];
+    static __thread int k;
+    char join[sizeof(g_coop.join)], srv[sizeof(g_coop.server)];
+    const char* hosts[] = { join, srv, NULL };
+    if (!g_coop.hide_ip || !text) return text;
+    memcpy(join, (const void*)g_coop.join, sizeof(join));   /* another thread may be editing them: bounded copies */
+    memcpy(srv, (const void*)g_coop.server, sizeof(srv));
+    join[sizeof(join) - 1] = srv[sizeof(srv) - 1] = 0;
+    k = (k + 1) & 3;
+    return net_mask_addrs(text, hosts, ring[k], sizeof(ring[k]));
+}

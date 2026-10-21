@@ -27,6 +27,10 @@ int  net_recv(NetAddr* from, void* buf, int cap);       /* bytes, or -1 when not
    empty read (net.c); otherwise when it was read */
 uint64_t net_rx_us(void);
 const char* net_addr_str(const NetAddr* a);             /* "a.b.c.d:port", static buffer */
+/* text with every IPv4 address in it, and the host part of each of hosts[] (NULL-ended,
+   "host[:port][#code]"; only one with a dot, so a room code stays), as "xxx.xxx.xxx.xxx", ports
+   and codes kept; into out (cap bytes), returned. Hide IP addresses: coop.h coop_shown. */
+const char* net_mask_addrs(const char* text, const char* const* hosts, char* out, int cap);
 uint32_t net_ms(void);                                  /* monotonic milliseconds */
 uint64_t net_us(void);                                  /* monotonic microseconds */
 int  net_local_ip(char* out, int cap);                  /* this PC's LAN address (route to the internet), no traffic */

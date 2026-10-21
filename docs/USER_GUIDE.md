@@ -223,7 +223,9 @@ Your model, in single player and co-op (see [ACTORS.md](ACTORS.md)):
 
 ### Co-op
 
-The CO-OP page (also in F3) holds your own choices: name tags, the ping display, follow host; the host's game rules: loot
+The CO-OP page (also in F3) holds your own choices: name tags, the ping display, Hide IP addresses (for
+streams and screenshots: addresses on screen as `xxx.xxx.xxx.xxx`, address fields as stars;
+[COOP.md](COOP.md#hiding-ip-addresses-streaming)), follow host; the host's game rules: loot
 mode (Shared: each item lies there once and whoever takes it has it, so you split the supplies; key
 items go to both. Individual: each player takes their own copy), "Important items for both" (with
 shared loot, on by default: weapons and ink ribbons lie there for each player), "Synchronized cutscene skip" (a cutscene both watch is skipped once both pressed skip),
