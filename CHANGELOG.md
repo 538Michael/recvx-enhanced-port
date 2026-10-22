@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- **Co-op: items from missed events**: a weapon or key item that an event gave your partner while you
+  were elsewhere, such as the handgun in the prison courtyard, could be missing from the floor when
+  you came in, if you had got that item from the same event in an earlier co-op game since starting
+  the program. It now lies there, and it glints like other items on the floor so it is easy to spot.
+
 ## 0.6.7 (2026-10-22)
 
 ### Gameplay

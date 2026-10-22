@@ -438,10 +438,10 @@ gets too follows the loot mode:
 
 An item that goes to both: a partner who watched the event in the same room gets it from the event
 itself, as the triggering player. A partner who missed it gets the item **on the floor** of that
-room, where the other player stood, as a normal pickup ("Take the Handgun? Yes / No"). Only that
-partner sees it. It is kept with the partner's game (saved with it, kept across disconnects) until
-taken. Nothing is given twice: a partner who was in the event, or already holds the item (not for
-stackable items), gets nothing.
+room, where the other player stood, as a normal pickup ("Take the Handgun? Yes / No") that glints
+like other items on the floor. Only that partner sees it. It is kept with the partner's game (saved
+with it, kept across disconnects) until taken. Nothing is given twice: a partner who was in the event,
+or already holds the item (not for stackable items), gets nothing.
 
 An item that is the triggering player's alone: nothing goes on the partner's floor; with shared
 loot a partner who watched the event and got one too gives it back at once ("... from the partner's

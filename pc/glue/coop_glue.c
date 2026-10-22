@@ -2093,6 +2093,7 @@ static int rule(int opt);
 static void world_reset(void);
 static void trade_reset(void);
 static void ts_reset(void);
+static void grant_forget(void);
 
 /* a new partner session (or ours restarted): both event streams start again from id 1 */
 static void session_reset(void)
@@ -3063,6 +3064,7 @@ static void session(void)
         back_n = 0;
         lost_at = prog_at = 0;
         gate_drop();   /* the flag block is replaced too */
+        grant_forget();
     }
     if (is_host) {
         if (game) regroup_check();
@@ -4772,7 +4774,7 @@ static void ts_frame(void)
    item: the room's own item record of that id (its model; the event used it as its prop), put where we
    stood, with a pickup trigger of the game's own kind (sys->metcp, the movable objects' extra
    triggers), so taking it is the game's pickup (crouch, "Will you take it?", full inventory: it stays).
-   Nothing is kept when the partner got that item from the same event in that room itself (it watched
+   Nothing is kept when the partner got that item from the same event in that room in this game (it watched
    it), or has it already (unless it stacks). Which items go to the partner (grant_for_partner): individual loot
    weapons (with the lighter) and key items (the partner cannot run the event); shared loot (one pool) key items and
    the lighter, weapons and ink ribbons only with "important items for both". The others stay the triggering
@@ -4780,6 +4782,7 @@ static void ts_frame(void)
 #define GRANT0 320                      /* GRANT_N entries of 5 words: flr << 24 | item << 16 | count, room, x y z */
 #define GRANT_N 8
 #define GRANT_NOWHERE 63                /* floor of a grant whose spot is unknown (the giver was hidden in its scene) */
+#define GRANT_GLINT 100                 /* the glint of floor loot (item record aspd: its light 0.1 * aspd; most pickups have 100) */
 static struct { int item, count, room, flr; float p[3]; } gout[4];   /* ours, to send when we are in control */
 static int gout_n;
 static struct { int room, flr; float p[3]; } gseen_spot = { -1 };   /* where we last stood in control (an event may hide us) */
@@ -4818,6 +4821,14 @@ static void grant_drop(int i, const char* why)
              gw(i)[1] >> 8, gw(i)[1] & 0xFF, why);
     memset(gw(i), 0, 5 * sizeof(unsigned int));
     if (i == gk) gk = -1;
+}
+
+/* our event items and the ones still to send are this game's: an earlier game's (a session before, a game over
+   that went back before the event) made a later gift of the same item there count as one we got ourselves */
+static void grant_forget(void)
+{
+    memset(gseen, 0, sizeof(gseen));
+    gout_n = 0;
 }
 
 static int watched(int item, int room)
@@ -5078,6 +5089,7 @@ static void grant_frame(void)
     op->flg = (op->flg & ~0x40000000) | 0x1;   /* in every camera cut */
     op->stflg &= ~0x1000000;
     op->lkwkp = NULL;                          /* not in a cutscene actor's hand */
+    if (!op->aspd) op->aspd = GRANT_GLINT;     /* it glints as floor loot does (objitm.c; an event's prop has none) */
     t = &sys->metcp[getc_ix];
     memset(t, 0, sizeof(*t));
     t->flg = 0x1;
