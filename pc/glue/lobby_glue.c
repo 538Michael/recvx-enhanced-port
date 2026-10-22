@@ -584,10 +584,10 @@ enum { R_MODE, R_HOSTSTEP, R_JOINSTEP,
        R_NAME, R_CHAR,
        R_START, R_ITEMS, R_FOLLOW, R_RULES,
        R_LOOT, R_IMP, R_TFREEZE, R_SKIPS, R_RIBBON, R_GOVER, R_ENEMYPG, R_EVENTPG,
-       R_EXTRA, R_PLACE, R_RAND, R_VARIETY, R_EVENTS, R_SEED, R_RSEED, R_DETECTOR,
+       R_RAND, R_VARIETY, R_EVENTS, R_SEED, R_RSEED, R_EXTRA, R_PLACE, R_DETECTOR,
        R_HOST, R_GO, R_COPY, R_RCOPY, R_KICK, R_STOP, R_JOIN,
        R_BACK, R_N };
-static const unsigned char row_group[R_N] = { 0, 1, 1, 0, 0, 0, 0, 0, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 7, 7, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 6 };
+static const unsigned char row_group[R_N] = { 0, 1, 1, 0, 0, 0, 0, 0, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 7, 7, 4, 4, 4, 4, 4, 8, 8, 4, 5, 5, 5, 5, 5, 5, 5, 6 };
 enum { F_NONE, F_NAME, F_ADDR, F_PORT, F_SEED, F_SERVER, F_PW };
 
 static struct {
@@ -619,7 +619,7 @@ static int row_visible(int r)
     if (r == R_VARIETY || r == R_EVENTS) return lb.step == 4 && shown_eo()->rand;   /* only the randomizer has them */
     if (lb.step == 3) return r == R_GOVER || r == R_ENEMYPG || r == R_EVENTPG || ((r == R_LOOT || r == R_TFREEZE || r == R_SKIPS || r == R_RIBBON) && host) ||
                              (r == R_IMP && host && !g_coop.loot);   /* only shared loot has it */
-    if (lb.step == 4) return (r >= R_EXTRA && r <= R_SEED) || (r == R_RSEED && host);
+    if (lb.step == 4) return r >= R_RAND && r <= R_PLACE && (r != R_RSEED || host);
     if (lb.step == 5) return r == R_DETECTOR;
     switch (r) {
     case R_PORT: return host && !srv;
