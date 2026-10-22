@@ -69,13 +69,17 @@ drawn in the game's own style; your model turns in a 3D preview on the left. It 
 **Step 3: GAME RULES** (host): **LOOT** (Shared (one pickup) / Individual (each their own)),
 **IMPORTANT ITEMS** (For both / Shared; only with shared loot, see "Loot modes"), **FREEZE ON TRADE**, **CUTSCENE SKIP** (Together /
 Each alone, see "Cutscenes"), **INK RIBBONS** (Needed / Not needed, see "Saving without ink
-ribbons"), **GAME OVER** (Each player / Both, see "Game over"), **METAL DETECTOR** (Skipped /
-As original, see "Metal detector"), and the enemy options **EXTRA ENEMIES**, **REARRANGED**, **RANDOMIZER**, **VARIETY**
-(Wild / Mild) and **EVENT ENEMIES** (both shown only with the randomizer on), **SEED**, **NEW
-RANDOM SEED**. The joiner
-sees the host's GAME OVER and METAL DETECTOR rules and enemy options read-only (THE HOST'S RULES)
-once connected. The GAME RULES page fills the screen with the randomizer's two rows shown; more rules
-need a page of their own.
+ribbons"), **GAME OVER** (Each player / Both, see "Game over"), and two entries that open a page
+of their own (an arrow after what is on, e.g. "ENEMIES Randomizer"):
+
+| Entry | Its page |
+|---|---|
+| **ENEMIES** | The enemy options: **EXTRA ENEMIES**, **REARRANGED**, **RANDOMIZER**, **VARIETY** (Wild / Mild) and **EVENT ENEMIES** (both shown only with the randomizer on), **SEED**, **NEW RANDOM SEED**. |
+| **EXTRA EVENTS** | Rules for single events: **METAL DETECTOR** (Skipped / As original, see "Metal detector"). |
+
+Confirm or a click opens a page; BACK (or cancel, or a right click) returns to GAME RULES on its
+entry. The joiner sees the host's GAME OVER rule and both pages read-only (THE HOST'S RULES) once
+connected; they follow the host's changes as it makes them.
 
 Both players then see each other in the lobby, with model, name and what the other chose. The
 host picks **START THE GAME**; the partner enters the host's game in the host's room once the host
@@ -446,7 +450,7 @@ event is the partner's").
 ### Metal detector
 
 The prison's metal detector room (where you have to put metal items in a security box before
-walking through) is the host's rule **METAL DETECTOR** (lobby GAME RULES, F1 / ENHANCED SETTINGS
+walking through) is the host's rule **METAL DETECTOR** (lobby GAME RULES, EXTRA EVENTS; F1 / ENHANCED SETTINGS
 CO-OP "Metal detector (host)"; ini `coop_skip_detector`, 1 *Skipped* (default), 0 *As original*). It
 can change during a session; the joiner sees it under THE HOST'S RULES.
 
@@ -579,7 +583,7 @@ grabbed by is released on the host, an unanswered trade item returns to its owne
 ## Enemy options in co-op
 
 The host's enemy options (EXTRA ENEMIES, REARRANGED, RANDOMIZER, VARIETY, EVENT ENEMIES, SEED; F1 /
-ENHANCED SETTINGS GAMEPLAY, lobby GAME RULES) count for both. The joiner's lobby shows them (read-only) before the game
+ENHANCED SETTINGS GAMEPLAY, lobby GAME RULES, ENEMIES) count for both. The joiner's lobby shows them (read-only) before the game
 starts; changes in game take effect at the next room load on both sides. Enemies the host adds
 appear in the joiner's game in the same slots. Details: [ENEMIES.md](ENEMIES.md).
 

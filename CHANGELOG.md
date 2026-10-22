@@ -12,8 +12,9 @@
 
 - **Game over for both** (lobby GAME RULES): when one player dies, both get the game over and
   continue together from the last continue point.
-- **Metal detector skipped** (lobby GAME RULES, on by default): in co-op the prison's metal
+- **Metal detector skipped** (lobby GAME RULES, EXTRA EVENTS; on by default): in co-op the prison's metal
   detector and its security boxes are skipped.
+- **Tidier lobby game rules**: the enemy and randomizer options and the extra events have their own pages.
 
 ### Fixes
 
