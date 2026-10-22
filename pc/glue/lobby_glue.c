@@ -982,7 +982,7 @@ static const char* heading(void)
     static char h[64];
     if (lb.step == 1) return "HOW DO YOU WANT TO PLAY?";
     if (lb.step == 3) return lb.role ? "THE HOST'S GAME RULES" : "GAME RULES";
-    if (lb.step > 3) return lb.step == 4 ? (lb.role ? "THE HOST'S RULES - ENEMIES" : "GAME RULES - ENEMIES")
+    if (lb.step > 3) return lb.step == 4 ? (lb.role ? "THE HOST'S RULES - RANDOMIZER" : "GAME RULES - RANDOMIZER")
                                          : (lb.role ? "THE HOST'S RULES - EXTRA EVENTS" : "GAME RULES - EXTRA EVENTS");
     snprintf(h, sizeof(h), "%s - %s", lb.role ? "JOIN A GAME" : "HOST A GAME", lb.mode ? "VIA SERVER" : "DIRECT (P2P)");
     return h;
@@ -1010,18 +1010,8 @@ static void row_text(int r, char* label, char* val, int n)
     case R_RIBBON: strcpy(label, "INK RIBBONS"); snprintf(val, n, "%s", settings_get(lset("No ink ribbons needed")) ? "Not needed" : "Needed"); break;
     case R_START: strcpy(label, "START"); start_label(val, n, g_coop.start); break;
     case R_RULES: strcpy(label, lb.role ? "THE HOST'S RULES" : "GAME RULES"); break;
-    case R_ENEMYPG: {   /* a page: what is on (draw_rows adds its arrow) */
-        const char* on[3] = { eo->extra ? "Extra" : NULL, eo->place ? "Rearranged" : NULL, eo->rand ? "Randomizer" : NULL };
-        int k, m = 0;
-        strcpy(label, "ENEMIES");
-        for (k = 0; k < 3; k++) if (on[k]) m += snprintf(val + m, n - m, "%s%s", m ? ", " : "", on[k]);
-        if (!m) snprintf(val, n, "As original");
-        break;
-    }
-    case R_EVENTPG:
-        strcpy(label, "EXTRA EVENTS");
-        snprintf(val, n, "%s", (lb.role ? coop_skip_detector() : g_coop.skip_detector) ? "Detector skipped" : "As original");
-        break;
+    case R_ENEMYPG: strcpy(label, "RANDOMIZER"); snprintf(val, n, "%s", eo->rand ? "On" : "Off"); break;   /* a page (draw_rows adds its arrow) */
+    case R_EVENTPG: strcpy(label, "EXTRA EVENTS"); break;   /* a page of many rules: no summary */
     case R_HOST: strcpy(label, "OPEN THE LOBBY"); break;
     case R_GO: strcpy(label, "START THE GAME"); break;
     case R_STOP: strcpy(label, "CLOSE THE LOBBY"); break;
@@ -1166,6 +1156,7 @@ static void draw_rows(void)
             float lw = text_w(label, ROW_SC), room = (has_value(r) || val[0]) ? VAL_X - ROW_X - 8 : 634 - ROW_X - 4,
                   ls = lw > room ? ROW_SC * room / lw : ROW_SC;
             text(ROW_X, y + (ROW_SC - ls) * 14, label, ls, col);
+            if (!val[0] && (r == R_ENEMYPG || r == R_EVENTPG)) arrow(ROW_X + lw * ls / ROW_SC + 16, y + 9, 1, col);   /* a page, no summary: the arrow after its name */
         }
         if (has_value(r)) {
             float w = text_w(val, ROW_SC), sc = w > 190 ? ROW_SC * 190 / w : ROW_SC;   /* long model names: narrower */

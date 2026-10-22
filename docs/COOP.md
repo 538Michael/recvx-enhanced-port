@@ -70,11 +70,11 @@ drawn in the game's own style; your model turns in a 3D preview on the left. It 
 **IMPORTANT ITEMS** (For both / Shared; only with shared loot, see "Loot modes"), **FREEZE ON TRADE**, **CUTSCENE SKIP** (Together /
 Each alone, see "Cutscenes"), **INK RIBBONS** (Needed / Not needed, see "Saving without ink
 ribbons"), **GAME OVER** (Each player / Both, see "Game over"), and two entries that open a page
-of their own (an arrow after what is on, e.g. "ENEMIES Randomizer"):
+of their own (an arrow after them; RANDOMIZER also shows On or Off):
 
 | Entry | Its page |
 |---|---|
-| **ENEMIES** | The enemy options: **EXTRA ENEMIES**, **REARRANGED**, **RANDOMIZER**, **VARIETY** (Wild / Mild) and **EVENT ENEMIES** (both shown only with the randomizer on), **SEED**, **NEW RANDOM SEED**. |
+| **RANDOMIZER** | The enemy options: **EXTRA ENEMIES**, **REARRANGED**, **RANDOMIZER**, **VARIETY** (Wild / Mild) and **EVENT ENEMIES** (both shown only with the randomizer on), **SEED**, **NEW RANDOM SEED**. |
 | **EXTRA EVENTS** | Rules for single events: **METAL DETECTOR** (Skipped / As original, see "Metal detector"). |
 
 Confirm or a click opens a page; BACK (or cancel, or a right click) returns to GAME RULES on its
@@ -583,7 +583,7 @@ grabbed by is released on the host, an unanswered trade item returns to its owne
 ## Enemy options in co-op
 
 The host's enemy options (EXTRA ENEMIES, REARRANGED, RANDOMIZER, VARIETY, EVENT ENEMIES, SEED; F1 /
-ENHANCED SETTINGS GAMEPLAY, lobby GAME RULES, ENEMIES) count for both. The joiner's lobby shows them (read-only) before the game
+ENHANCED SETTINGS GAMEPLAY, lobby GAME RULES, RANDOMIZER) count for both. The joiner's lobby shows them (read-only) before the game
 starts; changes in game take effect at the next room load on both sides. Enemies the host adds
 appear in the joiner's game in the same slots. Details: [ENEMIES.md](ENEMIES.md).
 
