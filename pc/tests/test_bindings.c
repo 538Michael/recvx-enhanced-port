@@ -101,9 +101,12 @@ int main(void)
     CHECK(bind_ini_line("key_noclip_up", "R") && !bind_get(B_NOCLIP_UP, BIND_KB, 0) && !bind_conflict(B_TPS_RELOAD, BIND_KB));
     CHECK(bind_ini_line("pad_tps_quickturn", "rightshoulder") && bind_get(B_TPS_QUICKTURN, BIND_PAD, 0) == 1 + SDL_GAMEPAD_BUTTON_DPAD_DOWN);
     CHECK(bind_ini_line("key_noclip_up", "PageUp") && held(B_NOCLIP_UP, SDL_SCANCODE_PAGEUP));
-    /* third person takes W/A/S/Q from the DS2 rows, nothing else */
-    g_tps.on = 1;
+    /* third person takes W/A/S/Q from the DS2 rows in a game, nothing else (tps_glue.c kb_play) */
+    g_tps.on = g_tps.kb_play = 1;
     CHECK(!held(B_SQUARE, SDL_SCANCODE_A) && !held(B_R1, SDL_SCANCODE_W) && held(B_CROSS, SDL_SCANCODE_Z) && held(B_TPS_FWD, SDL_SCANCODE_W));
+    /* the title menus and OPTION (ENHANCED SETTINGS' L1/R1 pages) read the DS2 buttons: Q/W are L1/R1 there */
+    g_tps.kb_play = 0;
+    CHECK(held(B_L1, SDL_SCANCODE_Q) && held(B_R1, SDL_SCANCODE_W) && held(B_SQUARE, SDL_SCANCODE_A) && held(B_TPS_FWD, SDL_SCANCODE_W));
     g_tps.on = 0;
     /* rebinding: the new key drives the row, the old one no longer does */
     bind_set(B_CROSS, BIND_KB, 0, SDL_SCANCODE_C);
@@ -217,6 +220,12 @@ int main(void)
         SDL_UpdateGamepads();
         CHECK(bind_held(B_TPS_FIRE, BIND_PAD, keys, 0) && !bind_held(B_QUICKKNIFE, BIND_PAD, keys, 0));
         CHECK(bind_held(B_TPS_RUN, BIND_PAD, keys, 0) && !bind_held(B_SQUARE, BIND_PAD, keys, 0));
+        /* Start opens the options there (Select is the map, L2 of type D the aim) */
+        SDL_SetJoystickVirtualButton(j, SDL_GAMEPAD_BUTTON_START, true);
+        SDL_UpdateGamepads();
+        CHECK(bind_held(B_TPS_OPTIONS, BIND_PAD, keys, 0) && !bind_held(B_START, BIND_PAD, keys, 0));
+        SDL_SetJoystickVirtualButton(j, SDL_GAMEPAD_BUTTON_START, false);
+        SDL_UpdateGamepads();
         g_tps.pad_play = 0;   /* a menu: the game rows again, once let go */
         CHECK(!bind_held(B_QUICKKNIFE, BIND_PAD, keys, 0) && !bind_held(B_TPS_FIRE, BIND_PAD, keys, 0) && !bind_held(B_SQUARE, BIND_PAD, keys, 0));
         SDL_SetJoystickVirtualAxis(j, SDL_GAMEPAD_AXIS_RIGHT_TRIGGER, -32768);

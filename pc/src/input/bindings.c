@@ -37,6 +37,7 @@ const BindRow bind_rows[B_COUNT] = {
     [B_TPS_FIRE] = { "tps_fire", "Fire", BG_TPS, 1 },        [B_TPS_RELOAD] = { "tps_reload", "Reload", BG_TPS, 1 },
     [B_TPS_QUICKTURN] = { "tps_quickturn", "Quick turn", BG_TPS, 1 },
     [B_TPS_KNIFE] = { "tps_knife", "Quick knife (hold)", BG_TPS, 2 },
+    [B_TPS_OPTIONS] = { "tps_options", "Options", BG_TPS, 2 },
     [B_TPS_RECENTER] = { "tps_recenter", "Camera behind character", BG_TPS, 2 },
     [B_TPS_TOGGLE] = { "tps_toggle", "Third-person camera on/off", BG_HOTKEY, 0 },
     [B_SETTINGS] = { "settings", "Settings overlay", BG_HOTKEY, 0 },
@@ -51,7 +52,7 @@ const int bind_order[B_COUNT] = {
     B_UP, B_DOWN, B_LEFT, B_RIGHT, B_CROSS, B_SQUARE, B_CIRCLE, B_TRIANGLE, B_R1, B_L1, B_R2, B_L2,
     B_START, B_SELECT, B_R3, B_L3, B_QUICKTURN, B_QUICKKNIFE, B_TRADE, B_RELOAD,
     B_TPS_FWD, B_TPS_BACK, B_TPS_LEFT, B_TPS_RIGHT, B_TPS_RUN, B_TPS_ACTION, B_TPS_CANCEL, B_TPS_STATUS,
-    B_TPS_MAP, B_TPS_AIM, B_TPS_FIRE, B_TPS_RELOAD, B_TPS_QUICKTURN, B_TPS_KNIFE, B_TPS_RECENTER,
+    B_TPS_MAP, B_TPS_AIM, B_TPS_FIRE, B_TPS_RELOAD, B_TPS_QUICKTURN, B_TPS_KNIFE, B_TPS_OPTIONS, B_TPS_RECENTER,
     B_TPS_TOGGLE, B_SETTINGS, B_CHEATS, B_COOP, B_FULLSCREEN, B_NOCLIP_UP, B_NOCLIP_DOWN,
 };
 
@@ -85,6 +86,9 @@ static const int defaults[2][B_COUNT][BIND_SLOTS] = {
         [B_TPS_AIM] = { GA(LEFT_TRIGGER, 0) }, [B_TPS_FIRE] = { GA(RIGHT_TRIGGER, 0) }, [B_TPS_ACTION] = { GB(SOUTH) },
         [B_TPS_CANCEL] = { GB(EAST) }, [B_TPS_RUN] = { GB(WEST) }, [B_TPS_STATUS] = { GB(NORTH) }, [B_TPS_MAP] = { GB(BACK) },
         [B_TPS_RELOAD] = { GB(RIGHT_SHOULDER) }, [B_TPS_QUICKTURN] = { GB(DPAD_DOWN) }, [B_TPS_KNIFE] = { GB(LEFT_SHOULDER) }, [B_TPS_RECENTER] = { GB(RIGHT_STICK) },
+        /* the options: Select (type A-C) is the map here and L2 (type D) aim, so OPTION was out of reach; Start, the
+           game's second inventory button (Y has it), opens them */
+        [B_TPS_OPTIONS] = { GB(START) },
     },
 };
 
@@ -522,8 +526,8 @@ static int code_down(int row, int dev, int c, const bool* keys, int mouse)
 {
     if (dev == BIND_KB) {
         if (!input_accept(g_input_source, 0, BIND_KB, 0)) return 0;   /* Gamepad only */
-        /* third person takes the keys it uses over (W/A/S/Q by default) */
-        if (bind_rows[row].group == BG_GAME && g_tps.on && tps_uses(BIND_KB, c)) return 0;
+        /* third person takes the keys it uses over (W/A/S/Q by default), in a game outside OPTION (kb_play) */
+        if (bind_rows[row].group == BG_GAME && g_tps.kb_play && tps_uses(BIND_KB, c)) return 0;
         return c >= BIND_MOUSE ? (mouse & SDL_BUTTON_MASK(c - BIND_MOUSE)) != 0 : c < SDL_SCANCODE_COUNT && keys[c];
     }
     return gamepad && pad_row_reads(row, c) && pad_down(c);
@@ -608,6 +612,15 @@ int bind_held(int row, int dev, const bool* keys, int mouse)
         if (!c) continue;
         if (is_reload(row) ? bind_combo(row, dev, s) && combo_mode[row == B_TPS_RELOAD][dev][s] != 2 : combo_taken(dev, c)) continue;
         if (code_down(row, dev, c, keys, mouse)) return 1;
+    }
+    return 0;
+}
+
+int bind_pad_raw(int row)
+{
+    for (int s = 0; s < BIND_SLOTS; s++) {
+        int c = bind_get(row, BIND_PAD, s);
+        if (c && gamepad && pad_down(c)) return 1;
     }
     return 0;
 }

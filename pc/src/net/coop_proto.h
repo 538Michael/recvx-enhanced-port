@@ -20,7 +20,8 @@ extern "C" {
                                                EV_SKIP (synchronized cutscene skip); unknown flag and option bits refused;
                                            20: EV_EOPTS variety and event enemies (the randomizer's choices changed);
                                            21: COOP_HIT_PRECISE (third person "Precise hits");
-                                           22: game rule OPT_SKIP_DETECTOR */
+                                           22: OPT_GAMEOVER_BOTH, PF_GAME_OVER, EV_BLOB pad 2 (a shared game over's continue),
+                                               EV_OWN tid (the last game state the guest loaded); OPT_SKIP_DETECTOR */
 #define COOP_DGRAM_MAX 1200             /* bytes per datagram (below every internet path MTU) */
 #define COOP_EV_FRAME 16                /* events per frame (over the frame's datagrams) */
 #define COOP_SNAP_FRAME 48              /* enemy snapshots per frame */
@@ -32,13 +33,15 @@ enum { PKT_POSE = 1, PKT_BYE = 2, PKT_REJECT = 3 };
 enum { PF_IN_GAME = 1, PF_VISIBLE = 2, PF_ROOM_MTN = 4, PF_WANT_BLOB = 8, PF_EXT = 16,
        PF_CINE = 32,                    /* in a cutscene its skip button could skip now */
        PF_SKIP = 64,                    /* ... and we pressed it: we wait for the partner (synchronized skip) */
-       PF_ALL = 127 };
+       PF_GAME_OVER = 128,              /* our game over runs (its screen, before CONTINUE / NO is answered) */
+       PF_ALL = 255 };
 enum { OPT_INDIVIDUAL = 1, OPT_TRADE_FREEZE = 2,   /* Pose.opts: the host's session options (its game rules) */
        OPT_IMPORTANT = 4,               /* shared loot: important items (weapons, ink ribbons) are each player's own to take */
        OPT_NO_RIBBON = 8,               /* typewriters save without an ink ribbon */
        OPT_SKIP_SYNC = 16,              /* a cutscene both play is skipped once both pressed skip */
-       OPT_SKIP_DETECTOR = 32,          /* the prison's metal detector (0/9) never goes off, its security boxes rest */
-       OPT_ALL = 63 };
+       OPT_GAMEOVER_BOTH = 32,          /* one player's game over is both players'; the host's CONTINUE / NO decides */
+       OPT_SKIP_DETECTOR = 64,          /* the prison's metal detector (0/9) never goes off, its security boxes rest */
+       OPT_ALL = 127 };
 enum { BUSY_NONE, BUSY_EVENT, BUSY_MENU, BUSY_BOX, BUSY_TRADE };
 enum { MSET_OWN = -1, MSET_ROOM = -2, MSET_NONE = -3 };
 #define MNW_ROOM 0x7FFE

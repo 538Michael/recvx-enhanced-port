@@ -157,6 +157,7 @@ int   coop_fx_step(int i, int after);          /* effect.c bhControlEffect, arou
 void  coop_item_granted(int item);            /* sub1.c GetItem: an event gave us this item without asking */
 void  coop_item_taken(int bit, int etc);      /* event.c bhItmCk: we took the item of trigger etc, its it_flg bit */
 void  coop_item_late(int bit);                /* event.c bhItmCk: we took an item whose it_flg bit was set already (the partner was first) */
+void  coop_retry_point(void);                 /* room.c bhPushGameData: our continue point moved (the host keeps the guest's items with it) */
 int   pc_no_ink_ribbon(void);                 /* typewriters save without an ink ribbon (setting; in co-op the host's rule) */
 int   pc_detector_skipped(void);              /* co-op rule "Metal detector: Skipped" (pc/glue/detector_glue.c): event.c bhPlItemCheck in 0/9 finds no metal */
 void  pc_detector_scd1(void);                 /* ... event.c bhControlEvent before scd1: the empty security boxes rest */
@@ -262,6 +263,7 @@ void  trade_textures_released(void);        /* njReleaseTextureAll */
 /* quick knife (pc/glue/knife_glue.c) */
 unsigned int knife_pad(unsigned int pad);
 void knife_game_exit(void);   /* cheat_game_exit (bhExitGame): the knife's state of that game goes */
+void tps_game_exit(void);     /* cheat_game_exit (bhExitGame): the third-person camera of that game goes (tps_glue.c) */
 /* modern controls for the fixed cameras (pc/glue/modern_glue.c): nothing while they are off */
 unsigned int modern_pad(unsigned int pad);   /* pad.c bhSetPad, before knife_pad */
 void  modern_player(void);                    /* player.c bhControlPlayer, after the mode handler */

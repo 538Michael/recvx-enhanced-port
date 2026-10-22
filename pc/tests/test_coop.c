@@ -136,16 +136,19 @@ static void test_events(void)
     BAD(EV_TRADE, 0, e->u.td.entry = 0);
     BAD(EV_TRADE, 0, e->u.td.entry = 156 << 16 | 1);
     BAD(EV_TRADE, 0, e->u.td.entry = 12 << 16 | 1000);
-    /* EV_OWN (protocol 16): chunks of the guest's COOP_OWN_SIZE items, pad 0/1; EV_BLOB's pad 0/1, EV_ESTATE's 0 */
+    /* EV_OWN (protocol 16): chunks of the guest's COOP_OWN_SIZE items, pad 0/1; EV_BLOB's pad 0..2 (protocol 22: 2 a shared
+       game over's continue), EV_ESTATE's 0 */
     BAD(EV_OWN, 0, e->u.blob.total = COOP_OWN_SIZE + 64);
     BAD(EV_OWN, 0, e->u.blob.total = 2100);
     BAD(EV_OWN, 0, e->u.blob.pad = 2);
     BAD(EV_OWN, 0, e->u.blob.off = 1600);
     BAD(EV_OWN, 0, e->u.blob.off = 1500);
     BAD(EV_OWN, 0, (e->u.blob.off = 64, e->u.blob.len = 28));   /* short, not the last chunk */
-    BAD(EV_BLOB, 1, e->u.blob.pad = 2);
+    BAD(EV_BLOB, 1, e->u.blob.pad = 3);
     BAD(EV_ESTATE, 1, e->u.blob.pad = 1);
     { Event e = ev(EV_BLOB); e.u.blob.pad = 1; CHECK(coop_check_event(&e, 1) == COOP_OK); }
+    { Event e = ev(EV_BLOB); e.u.blob.pad = 2; CHECK(coop_check_event(&e, 1) == COOP_OK); }
+    { Event e = ev(EV_OWN); e.u.blob.tid = 40000; CHECK(coop_check_event(&e, 0) == COOP_OK); }   /* protocol 22: the guest's last loaded state */
     /* EV_SKIP (protocol 19): the host's "skip now", SKIP_GO only, in a room of the save format */
     BAD(EV_SKIP, 1, e->u.sk.op = 0);
     BAD(EV_SKIP, 1, e->u.sk.op = SKIP_GO + 1);
@@ -340,8 +343,9 @@ static void test_dgrams(void)
     BADP(q.flr = 32, COOP_OK);                    /* floors -2..29, 0 = not sent */
     BADP(q.flr = 1, COOP_OK);
     BADP(q.flags |= PF_CINE | PF_SKIP, COOP_OK);   /* protocol 19: in a cutscene, wants to skip it */
-    BADP(q.flags |= 128, COOP_BAD_FIELD);         /* a flag this protocol does not have */
+    BADP(q.flags |= PF_GAME_OVER, COOP_OK);       /* protocol 22: our game over runs (every flag bit is in use) */
     BADP(q.opts = OPT_ALL, COOP_OK);              /* every game rule */
+    BADP(q.opts = OPT_GAMEOVER_BOTH, COOP_OK);    /* protocol 22: "Game over: Both" */
     BADP(q.opts = OPT_SKIP_DETECTOR, COOP_OK);    /* protocol 22: the metal detector rule */
     BADP(q.opts = OPT_ALL + 1, COOP_BAD_FIELD);
     BADP(q.opts = 0x80, COOP_BAD_FIELD);
@@ -546,7 +550,7 @@ static int sane(const Event* e)
     if (e->type == EV_ENE_HIT) for (k = 0; k < 6; k++) if (e->u.eh.jnt[k] < -1 || e->u.eh.jnt[k] > 63) return 0;
     if (e->type == EV_PICKUP && (e->u.pk.undo > 1 || e->u.pk.bit < -1 || e->u.pk.bit >= 512)) return 0;
     if (e->type == EV_FLAGS) { if (e->u.fl.n > 6) return 0; for (k = 0; k < e->u.fl.n; k++) if (e->u.fl.word[k] >= 120) return 0; }
-    if (e->type == EV_BLOB || e->type == EV_ESTATE || e->type == EV_OWN) if (e->u.blob.len > 64 || e->u.blob.off + e->u.blob.len > e->u.blob.total || e->u.blob.pad > 1) return 0;
+    if (e->type == EV_BLOB || e->type == EV_ESTATE || e->type == EV_OWN) if (e->u.blob.len > 64 || e->u.blob.off + e->u.blob.len > e->u.blob.total || e->u.blob.pad > (e->type == EV_BLOB ? 2 : 1)) return 0;
     if (e->type == EV_OWN && e->u.blob.total != COOP_OWN_SIZE) return 0;
     if (e->type == EV_TRIG && (e->u.tr.n > COOP_TRIG_OPS || e->u.tr.bit >= 1024)) return 0;
     if (e->type == EV_BOX && e->u.bx.nrm + e->u.bx.nadd > 16) return 0;

@@ -34,6 +34,7 @@ int reload_at_rest(void);      /* reload_glue.c */
 int pc_in_play(const BH_PWORK* p, int scope);
 int pc_in_game(void);           /* options_glue.c */
 int pc_trade_screen(void);      /* trade_glue.c */
+int pc_options_up(void);        /* options_glue.c */
 
 static float yaw, pitch;          /* camera, game angle units (65536 = 360 deg); pitch > 0 looks up */
 static float mouse_dx, mouse_dy;  /* this frame's mouse motion, pixels */
@@ -135,6 +136,18 @@ static void deactivate(void)
     g_tps.pad_play = g_tps.pad_play && in_scope();   /* (a held aim trigger stays held into the scope) */
     /* the room camera resumes: the game's own re-initialisation of the current cut */
     if (sys && !(sys->st_flg & 0x1)) sys->gm_flg |= 0x800;
+}
+
+/* system.c bhExitGame (cheat_game_exit): the game ends (the title, a game over, a load). tps_camera, which
+   switches our camera off, only runs in a game, so the ended game's camera stayed "active": the gamepad's
+   third-person rows kept the buttons they use (Cross, d-pad down, the shoulders, ...) in the title menu, and
+   the next game started with the old camera instead of behind the character */
+void tps_game_exit(void)
+{
+    dual_e = -1;
+    aim_h = 0;
+    recenter = 0;
+    tps_cam_active = g_tps.cam_active = g_tps.aiming = g_tps.pad_play = cut_cam_ok = 0;
 }
 
 /* the weapon raised; not the reload of a lowered weapon (reload_glue.c), which keeps the walking camera */
@@ -643,10 +656,28 @@ static int pad_sticks(unsigned int* pad)
     if (!g_tps.pad_modern) pad_cam = 0;
     stick_yaw = stick_pitch = 0;
     stick_moved = pad_move = 0;
+    {   /* the right stick turns the camera (Modern) and aims. Classic keeps the game's buttons, whose turn while aiming
+           cannot move free aim's crosshair (the shot follows the crosshair), so there the right stick (free in every key
+           type: the game reads only the left one) aims too. In both, while aiming freely, the left stick and the d-pad
+           also move the crosshair, as they turn and tilt the original aim; not in the scope, which the game turns by
+           them itself. */
+        int aim_free = plp->mode0 == 1 && plp->mode1 == 1 && !lock_aim() && pc_in_play(plp, 1);
+        if (g_tps.pad_modern ? stick && pad_cam : aim_free && tps_pad_sticks(&lx, &ly, &rx, &ry)) {
+            float ax = lx, ay = ly, dx, dy;
+            if (modern_stick(&rx, &ry, g_tps.pad_dead_look / 100.0f, 2.0f) > 0) recenter = 0, stick_moved = 1;
+            if (aim_free && tps_cam_active) {
+                modern_stick(&ax, &ay, g_tps.pad_dead_move / 100.0f, 2.0f);
+                tps_pad_dpad(&dx, &dy);
+                rx += ax + dx; ry += ay + dy;
+                rx = rx > 1 ? 1 : rx < -1 ? -1 : rx;
+                ry = ry > 1 ? 1 : ry < -1 ? -1 : ry;
+                stick_moved |= rx != 0 || ry != 0;
+            }
+            stick_yaw = -rx * STICK_YAW * g_tps.pad_sens_x / 100.0f;
+            stick_pitch = (g_tps.pad_invert_y ? -ry : ry) * STICK_PITCH * g_tps.pad_sens_y / 100.0f;
+        }
+    }
     if (!stick || !pad_cam) { run_was = qt_hold = back_wait = hold.held = 0; return 0; }
-    if (modern_stick(&rx, &ry, g_tps.pad_dead_look / 100.0f, 2.0f) > 0) recenter = 0, stick_moved = 1;
-    stick_yaw = -rx * STICK_YAW * g_tps.pad_sens_x / 100.0f;
-    stick_pitch = (g_tps.pad_invert_y ? -ry : ry) * STICK_PITCH * g_tps.pad_sens_y / 100.0f;
     m = modern_stick(&lx, &ly, g_tps.pad_dead_move / 100.0f, 1.0f);
     run = bind_held(B_TPS_RUN, BIND_PAD, bind_keys(), 0);
     if (m > 0 && plp->mode0 == 1) {   /* (hits, grabs: the game's own stick directions) */
@@ -684,6 +715,23 @@ static int pad_sticks(unsigned int* pad)
     return qt_hold > 0 ? qt_hold-- : 0;
 }
 
+/* the Modern gamepad outside third-person play: its rows give the game rows their buttons back, so the
+   inventory (Y) and the map (View) it opened did not close with the same button, as the game's do with
+   theirs. A press of the row's button made while that screen is up closes it (the game's status / map bit). */
+static unsigned toggle_closes(void)
+{
+    static int prev[2];
+    static const int row[2] = { B_TPS_STATUS, B_TPS_MAP };
+    unsigned r = 0;
+    int scr = (sys->ts_flg & 0x80) ? !(sys->ts_flg & 0x200) ? 0 : !(sys->ts_flg & 0x400) ? 1 : -1 : -1;
+    for (int i = 0; i < 2; i++) {   /* (the press that opened it began in play: no new press) */
+        int now = bind_pad_raw(row[i]);
+        if (now && !prev[i] && scr == i && g_tps.pad_modern && !g_tps.pad_play) r |= i ? 0x2000 : 0x4000;
+        prev[i] = now;
+    }
+    return r;
+}
+
 /* pad.c bhSetPad, before pad_ps is derived: the keyboard/mouse layout as the game's
    virtual pad bits (independent of the controller key type) */
 unsigned int tps_pad(unsigned int pad)
@@ -691,6 +739,7 @@ unsigned int tps_pad(unsigned int pad)
     unsigned k;
     int scope;
     if (sys->ss_flg & 0x400000) return pad;   /* attract demo playback */
+    pad |= toggle_closes();
     k = tps_input_keys(plp && pad_sticks(&pad));
     pad_steer = (pad & 0xF) != 0 && !pad_cam;   /* (the gamepad: its stick, or a d-pad turn: the camera stays) */
     scope = in_scope();
@@ -727,6 +776,7 @@ unsigned int tps_pad(unsigned int pad)
     if (k & TPS_K_CANCEL) pad |= 0x1000;
     if (k & TPS_K_MAP) pad |= 0x2000;
     if (k & TPS_K_STATUS) pad |= 0x4000;
+    if (k & TPS_K_OPTIONS) pad |= 0x8000;   /* (the gamepad's, Modern) */
     /* free aim: always the straight aim pose; tps_calc_model bends the upper body to the pitch */
     if (g_tps.aiming && !lock_aim() && plp && plp->mode1 == 1) pad &= ~0x63;
     if (pad & 0x1) pad &= ~0x42;   /* as bhSetPad: forward wins, right wins */
@@ -1541,6 +1591,7 @@ void tps_frame(void)
     /* the gamepad's third-person rows play while our camera is, the game not frozen (menus,
        messages, pick-ups, their fades), through hits, grabs and weapon loads (a held trigger or
        quick knife stays held) */
+    g_tps.kb_play = on && pc_in_game() && !pc_options_up();
     g_tps.pad_play = on && g_tps.pad_modern && (tps_cam_active || in_scope()) && sys && (sys->sp_flg & 0x40) && !(sys->ss_flg & 0x400000);
     /* with or without third person: the player has control, so no menu has the mouse (menu_mouse.c);
        the co-op trade screen is open in play */

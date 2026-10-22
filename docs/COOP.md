@@ -5,7 +5,7 @@ over the internet or a LAN (UDP). Co-op is an optional addon: with it off the ga
 as without it (every hook is `#ifdef TARGET_PC` and `if (coop_on)`).
 
 Part 1 is for players: how to host, join and play. Part 2 is the reference: architecture,
-protocol 21, security and limits. Related: [SERVER.md](SERVER.md) (the optional co-op server),
+protocol 22, security and limits. Related: [SERVER.md](SERVER.md) (the optional co-op server),
 [USER_GUIDE.md](USER_GUIDE.md) (settings, controls), [ACTORS.md](ACTORS.md) (models and voices),
 [ENEMIES.md](ENEMIES.md) (enemy options), [ARCHITECTURE.md](ARCHITECTURE.md),
 [BUILDING.md](BUILDING.md).
@@ -69,10 +69,10 @@ drawn in the game's own style; your model turns in a 3D preview on the left. It 
 **Step 3: GAME RULES** (host): **LOOT** (Shared (one pickup) / Individual (each their own)),
 **IMPORTANT ITEMS** (For both / Shared; only with shared loot, see "Loot modes"), **FREEZE ON TRADE**, **CUTSCENE SKIP** (Together /
 Each alone, see "Cutscenes"), **INK RIBBONS** (Needed / Not needed, see "Saving without ink
-ribbons"), and the enemy options **EXTRA ENEMIES**, **REARRANGED**, **RANDOMIZER**, **VARIETY**
+ribbons"), **GAME OVER** (Each player / Both, see "Game over"), and the enemy options **EXTRA ENEMIES**, **REARRANGED**, **RANDOMIZER**, **VARIETY**
 (Wild / Mild) and **EVENT ENEMIES** (both shown only with the randomizer on), **SEED**, **NEW
 RANDOM SEED**. The joiner
-sees the host's values read-only (THE HOST'S RULES) once connected.
+sees the host's GAME OVER rule and enemy options read-only (THE HOST'S RULES) once connected.
 
 Both players then see each other in the lobby, with model, name and what the other chose. The
 host picks **START THE GAME**; the partner enters the host's game in the host's room once the host
@@ -209,7 +209,7 @@ the co-op server ..." (name lookup, at most 5 s, never stalls the game), "The ho
   direct session goes on, a relayed one ends.
 * The server frees a vanished joiner's place after `member_timeout` (default 10 s); see also
   "Rejoin after a crash".
-* Game and server must speak the same server protocol (3); the game protocol (20) is end to end.
+* Game and server must speak the same server protocol (3); the game protocol (22) is end to end.
 
 ## In the game
 
@@ -269,6 +269,50 @@ a cutscene both of you are watching in the same room is skipped only when **both
   while you wait, yours is skipped then.
 
 *Each alone* (`coop_skip_sync = 0`): the button skips your own scene at once, as before.
+
+### Game over
+
+What happens when one of you dies is the host's rule **GAME OVER** (lobby GAME RULES, F1 / ENHANCED
+SETTINGS CO-OP "Game over (host)"; ini `coop_gameover`, 0 *Each player* (default), 1 *Both*). It can
+change during a session; the joiner sees it under THE HOST'S RULES. The game's Retry (YES on "Retry?")
+starts again from its **continue point**: the room scripts set it as you enter a room, saving sets it, and
+a new or loaded game starts with one. **For playing the story together, *Both* is the better choice**: the
+two of you always stay at the same point.
+
+**Both**: one game over is both players'.
+
+* When either of you dies, the partner gets the game over screen too: at once when it is in control; a
+  partner in a menu, a cutscene or a door gets it when it is back in control. Being in another room makes
+  no difference.
+* Only the host is asked "Retry? Yes / No". The joiner's screen stays on YOU DIED until the host answers.
+* **Yes**: both start again from the host's continue point, together in that room, each with the items
+  it had at that point. What either of you collected since lies there again, used keys are back, and the
+  world and both inventories match. A joiner that joined after that point gets the items it joined with.
+  A joiner still busy (menu, cutscene) when the host answered skips its own game over screen and is taken
+  there once it is back in control.
+* **No**: the host goes to the title, the session ends, and the joiner's game goes to the title too. The
+  same happens when the session ends while the joiner waits for the answer (the host quit or the
+  connection was lost).
+
+**Each player** (default, as before this rule): only the one who died gets the game over screen; the
+partner plays on.
+
+* **The joiner dies**: Yes takes it back into the host's game, into the host's room, with the items it
+  had when it died and full health (its own continue point plays no part). The world is the host's and
+  went on meanwhile, so nothing it took is lost or doubled. No: it goes to the title and the session ends
+  (see "Leaving and disconnecting"); the host plays on alone.
+* **The host dies**: Yes restarts the host's game from its continue point, with the host's items from
+  then, as in single player. The host's game is the shared one, so the world goes back with it: the joiner
+  is pulled into the host's room and finds the world as it was at that point, but keeps the items it has
+  now. That means:
+  * Supplies and weapons the joiner picked up since then lie there again; with shared loot one of you
+    can take them a second time.
+  * Doors unlocked and story events since then are undone: locked again, and played again.
+  * Key items go to both players, and a key used up in a lock leaves both inventories. After the host's
+    Retry the host has the keys of its continue point again, so the doors locked again can always be
+    opened by the host; the joiner may lack such a key (the host opens the door, or trades the key).
+  * No: the host goes to the title, the session ends, and the joiner plays on alone ("The host left the
+    game").
 
 ### Name tags
 
@@ -498,7 +542,7 @@ Every way out ends the session on both sides; hosting or joining again works at 
 | Leaving the lobby (BACK from step 1, cancel, right click; not START THE GAME) | session stopped | "The host closed the lobby" / "<name> left" |
 | LEAVE, CLOSE THE LOBBY, F3 Disconnect | session stopped | as below |
 | Quitting, closing the window | goodbye sent at exit | as below |
-| Back at the title from a game of this session (game over "No", OPTION's RETURN TO TITLE) | "Back at the title: the co-op session ended" | as below |
+| Back at the title from a game of this session (game over "No", OPTION's RETURN TO TITLE) | "Back at the title: the co-op session ended" | as below; with GAME OVER *Both*, a joiner at or heading for the shared game over goes to the title too |
 | Goodbye from the host | | joiner: "The host closed the lobby" / "The host left the game"; in game it plays on alone |
 | Goodbye from the joiner | | host: "<name> left - hosting on UDP port ..., waiting for a partner"; in game it plays on alone |
 | Crash, network gone | | after 3 s "not responding"; after 15 s joiner: "Lost the connection to the host", host: back to waiting ("The partner timed out") |
@@ -553,6 +597,7 @@ only on the host; "locked" ones cannot change during a session.
 | Loot (host), locked | `coop_loot` | 0 Shared, 1 Individual (0) |
 | Important items for both (host), locked | `coop_important` | 0/1 (1); shared loot only |
 | Synchronized cutscene skip (host) | `coop_skip_sync` | 0/1 (1) |
+| Game over (host) | `coop_gameover` | 0 Each player, 1 Both (0); see "Game over" |
 | Freeze enemies while trading (host) | `coop_trade_freeze` | 0/1 (1) |
 | Remember partner inventories (host) | `coop_remember` | 0/1 (1) |
 | Connection, locked | `coop_conn` | 0 Automatic, 1 Direct (P2P), 2 Via server (0) |
@@ -845,6 +890,30 @@ floor or trigger, "Yes" chosen, an item used) hold only where the player did it.
   partner's id **and** tag replaces the stale session at once. Session ids are random (`rdv_random`).
   The host remembers a partner that went without a goodbye and gives its rejoin the record.
 
+### Game over
+
+* **Both** (`OPT_GAMEOVER_BOTH`): each game sends `PF_GAME_OVER` while its game over task
+  (`gameover.c`, task 14: `tk_flg` 0x4000 set, `ts_flg` 0x4000 clear) runs. A new `PF_GAME_OVER` of the
+  partner (an edge, not the level: a joiner still in its game over while the host's continued game runs
+  starts nothing there) starts ours the way the scripts' `bhGameOverSet` does (`ts_flg &= ~0x4000`,
+  `gov_md0` = `gov_md1` = 0), once our player is in control (`local_visible`, alive, the joiner with no
+  game state on its way). The joiner's game over is held before its question (`gov_ct` kept below the
+  50 at which `bhMainGameOver` asks).
+* The host keeps the joiner's items at its continue point: `room.c bhPushGameData` (decomp hook) calls
+  `coop_retry_point`, which copies the joiner's latest complete `EV_OWN`; a joiner that joins later
+  counts with its first one. The push of the host's own Retry restart is the same point and keeps them.
+  The game state the host's Retry sends goes with those items in place of the joiner's (`EV_BLOB` `pad`
+  2), and the joiner loads it straight from its game over (`ts_flg |= 0x4000` first, as the game's own
+  continue). `EV_OWN` carries in `tid` the last game state the joiner got, so items it sent before that
+  continue reached it are not taken as its current ones.
+* No: the host's session ends at the title as usual; a joiner whose session ends while it waits in (or
+  for) the shared game over calls `bhReturnTitle`.
+* **Each player**: the joiner's own Retry restores its own continue point first; until the host's game
+  state is loaded it keeps the items it died with (`own_hold`: no `own` snapshot of the restarted game),
+  which `own_restore` puts back. Before, a host busy in a menu or a cutscene sent its state late and the
+  joiner kept its continue point's items instead (the world kept the host's flags, so the items taken since
+  were gone).
+
 ### Ping and name tag timing
 
 Each datagram's arrival time comes from the network: Linux `SO_TIMESTAMPNS`; Windows a small thread
@@ -853,10 +922,10 @@ send time minus the echoed datagram's arrival. Sample = arrival - our clock - th
 smoothed (EWMA 0.1). The name tag's point goes with the recorded frame (`stream_point`) and is
 interpolated with the in-between frames; it snaps on camera cuts and in vanilla mode.
 
-## Protocol 21
+## Protocol 22
 
-`COOP_VERSION` is **21**; both players need builds with the same version (a mismatch is reported,
-e.g. "the host runs co-op protocol 20, we 21: both need the same build"). The co-op server does not
+`COOP_VERSION` is **22**; both players need builds with the same version (a mismatch is reported,
+e.g. "the host runs co-op protocol 21, we 22: both need the same build"). The co-op server does not
 look at the game protocol. Version history in short: 11 join code, 1200-byte datagrams, checked
 events, `EV_ATR`; 12 `EV_FX`; 13 `EV_GRANT`; 14 `EV_TSCREEN`; 15 `EV_GONE`; 16 player id and rejoin
 tag, `EV_OWN`; 17 trade requests; 18 voices; 19 the game rules `OPT_IMPORTANT`, `OPT_NO_RIBBON`,
@@ -865,7 +934,8 @@ shared loot as one pool (`EV_PICKUP` gives the partner only items for both; `und
 aim height in `EV_ENE_HIT`, unknown flag and option bits refused; 20 `EV_EOPTS` carries the
 randomizer's variety and event-enemy setting (the randomizer's choices changed, so builds of 19 would
 make other enemies from the same seed); 21 `COOP_HIT_PRECISE` in `EV_ENE_HIT` (third person
-"Precise hits", [THIRDPERSON.md](THIRDPERSON.md#precise-hits)). `Pose.pflg` and `Pose.flr` were added inside protocol 18
+"Precise hits", [THIRDPERSON.md](THIRDPERSON.md#precise-hits)); 22 the game rule `OPT_GAMEOVER_BOTH`,
+`PF_GAME_OVER`, `EV_BLOB` `pad` 2 and the `EV_OWN` `tid` (see "Game over"). `Pose.pflg` and `Pose.flr` were added inside protocol 18
 (0 means "not sent", and receivers fall back).
 
 All structures are little-endian, packed as the compiler lays them out on x86 (pinned by
@@ -896,13 +966,14 @@ over its datagrams.
 |---|---|
 | 0-15 | `magic` "COOP" (0x504F4F43), `version` u16, `type` u8, `flags` u8, `sid` (sender's session), `auth` (`coop_auth(join code, sid)`): all a relay needs |
 | 16-31 | `seq` (sender's frame counter; older poses dropped), `t_ms`, `echo_ms`, `echo_age` (ping) |
-| 32-39 | `chr`, `costume`, `stg`, `rom`, `pos` (room entry point), `opts` (host's game rules: `OPT_INDIVIDUAL` 1, `OPT_TRADE_FREEZE` 2, `OPT_IMPORTANT` 4, `OPT_NO_RIBBON` 8, `OPT_SKIP_SYNC` 16), `regroup` (host counter), `mfile` (sender's own part file - 10) |
+| 32-39 | `chr`, `costume`, `stg`, `rom`, `pos` (room entry point), `opts` (host's game rules: `OPT_INDIVIDUAL` 1, `OPT_TRADE_FREEZE` 2, `OPT_IMPORTANT` 4, `OPT_NO_RIBBON` 8, `OPT_SKIP_SYNC` 16, `OPT_GAMEOVER_BOTH` 32), `regroup` (host counter), `mfile` (sender's own part file - 10) |
 | 40-91 | position (3 floats), angles (3 ints), `mtn_no`, `frm_no` (the frame shown, before the step's advance: `actor_frame`), `mtn_md`, `hokan_count`, `hokan_rate`, `wpnr_no`, `hp`, `mode0`, `mode1`, `nev`, `nene` |
 | 92-107 | `stflg`, `ev_ack` (highest event id applied from the peer), `mset` (`MSET_OWN` -1, `MSET_ROOM` -2, `MSET_NONE` -3, or an enemy slot), `busy` (`BUSY_NONE/EVENT/MENU/BOX/TRADE`), `reject`, `voice_n`, `voice`, `pflg` (`flg & 6`: hit / held), `flr` (`flr_no + 3`, 0 not sent) |
 
 `flags`: `PF_IN_GAME` 1, `PF_VISIBLE` 2, `PF_ROOM_MTN` 4, `PF_WANT_BLOB` 8 (joiner asks for the
 game state), `PF_EXT` 16 (a `PoseExt` follows), `PF_CINE` 32 (in a cutscene its skip button could
-skip now), `PF_SKIP` 64 (pressed skip in it: waits for the partner).
+skip now), `PF_SKIP` 64 (pressed skip in it: waits for the partner), `PF_GAME_OVER` 128 (our game over
+runs; every bit of `flags` is in use).
 
 **Synchronized cutscene skip** (`OPT_SKIP_SYNC`): the skip button reaches the game as pad bit
 `0x10000` (`pad.c bhSetPad`; `system.c bhSysCallGame` sets `cb_flg 0x10000000`, which the room
@@ -934,7 +1005,7 @@ Slot, `mode[4]`, model index (`mlwP` as index into the enemy's `mdl[]`, -1..15),
 |---|---|---|---|
 | `EV_ENE_HIT` | 1 | either | Our shot hit a puppet: joints, damage, hit bits, hit point/direction, weapon; `flg` also carries the shooter's aim height (`at_flg & 0xE` << 8, with `COOP_HIT_AIM`) and `COOP_HIT_PRECISE` when the shooter's "Precise hits" judged it (a zombie's head then bursts only from a head hit) |
 | `EV_PLY_HIT` | 2 | host | A host enemy hit the partner's stand-in: hp delta, flag bits, modes, direction |
-| `EV_BLOB` | 3 | host | Game state chunk (save region; `pad` 1: its items are the joiner's saved ones) |
+| `EV_BLOB` | 3 | host | Game state chunk (save region; `pad` 1: its items are the joiner's saved ones; 2: the host's Retry of a shared game over, with the joiner's items of that continue point) |
 | `EV_FLAGS` | 4 | either | 1..6 changed flag words: set and cleared bits, base event id |
 | `EV_PICKUP` | 5 | either | Item taken: item for the partner too (0: spot only), spot, its `it_flg` bit; `undo` 1 (host only, bit given): both took that spot, the joiner's pickup goes back |
 | `EV_LOST` | 6 | either | A key item used up |
@@ -952,7 +1023,7 @@ Slot, `mode[4]`, model index (`mlwP` as index into the enemy's `mdl[]`, -1..15),
 | `EV_GRANT` | 18 | either | An event gave the sender an item: item, count, floor, position |
 | `EV_TSCREEN` | 19 | either | Trade screen op (below) |
 | `EV_GONE` | 20 | joiner | Dead enemies (up to 26: slot, type, model version) |
-| `EV_OWN` | 21 | joiner | The joiner's own items, chunk of 1564 bytes total |
+| `EV_OWN` | 21 | joiner | The joiner's own items, chunk of 1564 bytes total; `tid`: the last `EV_BLOB` transfer it got |
 | `EV_SKIP` | 22 | host | Both pressed skip: the cutscene ends now (`op` `SKIP_GO` 1; `stg`/`rom` the host's room) |
 
 Transfers (`EV_BLOB`, `EV_ESTATE`, `EV_OWN`) carry a transfer id, total size, offset (a multiple of

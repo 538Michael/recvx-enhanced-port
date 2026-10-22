@@ -95,7 +95,7 @@ int coop_check_event(const Event* e, int from_host)
         return fins(e->u.ph.dv, 3) ? COOP_OK : COOP_BAD_FLOAT;
     case EV_BLOB:
     case EV_ESTATE:
-        return xfer_fields_ok(e) && e->u.blob.pad <= (e->type == EV_BLOB) ? COOP_OK : COOP_BAD_FIELD;
+        return xfer_fields_ok(e) && e->u.blob.pad <= (e->type == EV_BLOB ? 2 : 0) ? COOP_OK : COOP_BAD_FIELD;   /* EV_BLOB: 1 saved items, 2 a shared continue */
     case EV_OWN:   /* the guest's own items, in chunks of 64 (only those that changed); pad 1 ends a change */
         return xfer_fields_ok(e) && e->u.blob.total == COOP_OWN_SIZE && e->u.blob.pad <= 1 ? COOP_OK : COOP_BAD_FIELD;
     case EV_FLAGS:

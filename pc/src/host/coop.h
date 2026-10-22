@@ -72,6 +72,7 @@ typedef struct CoopState {
     /* game rules of protocol 19 (host; the guest follows the host's, Pose.opts). No ink ribbons is g_config.no_ink_ribbon. */
     int important;                  /* shared loot: weapons and ink ribbons stay each player's own to take (ini coop_important) */
     int skip_sync;                  /* a cutscene both play is skipped when both pressed skip (ini coop_skip_sync) */
+    int gameover_both;              /* game over: 0 each player alone, 1 both (the host's CONTINUE / NO decides; ini coop_gameover) */
     int skip_detector;              /* the prison's metal detector (0/9) never goes off, its empty security boxes rest (ini coop_skip_detector) */
     int hide_ip;                    /* Hide IP addresses (ini hide_ip): on screen masked, coop_shown */
 } CoopState;
@@ -177,6 +178,8 @@ int coop_room_key(void);            /* game thread: the room we are in, sys->stg
 void coop_own_source(const void* save_region);
 /* game thread: apply g_coop.items as the joining inventory (the lobby and F3's Join); 1 = a save's items were read */
 int coop_items_apply(void);
+/* game thread, joining: the host's "Game over: Both" rule as its last pose had it (the lobby shows it) */
+int coop_host_gameover_both(void);
 /* the memory card (pc/src/ps2/mc.c, game thread): save file `slot` (SAVEDATA-nn) was written. The
    host's saved partner inventories go with its saves (a file per slot). */
 void coop_save_written(int slot);
@@ -185,6 +188,7 @@ void coop_save_written(int slot);
 void coop_control_remote(void);     /* game.c bhMainSequence, after bhControlPlayer */
 void coop_draw_remote(void);        /* game.c bhAllDrawModel, after the player's bhPutModel */
 void coop_textures_released(void);  /* ps2_NaTextureFunction.c njReleaseTextureAll */
+void coop_retry_point(void);       /* room.c bhPushGameData: our continue point moved */
 
 #ifdef __cplusplus
 }

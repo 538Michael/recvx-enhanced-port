@@ -79,7 +79,7 @@ unsigned tps_input_keys(int quickturn)
         { B_TPS_FWD, TPS_K_FWD }, { B_TPS_BACK, TPS_K_BACK }, { B_TPS_LEFT, TPS_K_LEFT }, { B_TPS_RIGHT, TPS_K_RIGHT },
         { B_TPS_RUN, TPS_K_RUN }, { B_TPS_ACTION, TPS_K_ACTION }, { B_TPS_CANCEL, TPS_K_CANCEL },
         { B_TPS_STATUS, TPS_K_STATUS }, { B_TPS_MAP, TPS_K_MAP }, { B_TPS_AIM, TPS_K_AIM }, { B_TPS_FIRE, TPS_K_FIRE },
-        { B_TPS_RECENTER, TPS_K_RECENTER },
+        { B_TPS_RECENTER, TPS_K_RECENTER }, { B_TPS_OPTIONS, TPS_K_OPTIONS },
     };
     const bool* k = bind_keys();
     int b = __atomic_load_n(&buttons, __ATOMIC_RELAXED), qt, pad = bind_gamepad() != NULL;
@@ -101,6 +101,15 @@ int tps_pad_sticks(float* lx, float* ly, float* rx, float* ry)
     *lx = axis(SDL_GAMEPAD_AXIS_LEFTX); *ly = -axis(SDL_GAMEPAD_AXIS_LEFTY);
     *rx = axis(SDL_GAMEPAD_AXIS_RIGHTX); *ry = -axis(SDL_GAMEPAD_AXIS_RIGHTY);
     return 1;
+}
+
+void tps_pad_dpad(float* x, float* y)
+{
+    SDL_Gamepad* g = (SDL_Gamepad*)bind_gamepad();
+    *x = *y = 0;
+    if (!g || !pad_game_input_enabled()) return;
+    *x = (float)(SDL_GetGamepadButton(g, SDL_GAMEPAD_BUTTON_DPAD_RIGHT) - SDL_GetGamepadButton(g, SDL_GAMEPAD_BUTTON_DPAD_LEFT));
+    *y = (float)(SDL_GetGamepadButton(g, SDL_GAMEPAD_BUTTON_DPAD_UP) - SDL_GetGamepadButton(g, SDL_GAMEPAD_BUTTON_DPAD_DOWN));
 }
 
 /* the gamepad played this frame: a button, a trigger or a stick past a third */

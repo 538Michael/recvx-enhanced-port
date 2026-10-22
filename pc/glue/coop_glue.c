@@ -2069,6 +2069,18 @@ static unsigned char regroups, seen_regroup;   /* host: regroups so far; client:
 static unsigned int* flag_block(void) { return sys->ev_flg; }
 static int in_session_game(void) { return (sys->tk_flg & 0x80) && !(sys->ss_flg & 0x400000); }   /* game task, not the attract demo */
 
+/* "Game over: Both" (OPT_GAMEOVER_BOTH, docs/COOP.md "Game over"): one game over is both players'; the host's CONTINUE / NO
+   decides. Each game sends PF_GAME_OVER while its game over runs. The host keeps the guest's items (EV_OWN) as they were at
+   its continue point (bhPushGameData -> coop_retry_point) and puts them into the game state its CONTINUE sends (EV_BLOB
+   pad 2), so both start from the same point with what each had there. EV_OWN's tid names the last game state the guest
+   got: the guest's items from before a shared continue reached it are not taken as its current ones. */
+static unsigned char own_done[COOP_OWN_SIZE], retry_own[COOP_OWN_SIZE];   /* host: the guest's items now; at our continue point */
+static int own_done_ok, retry_ok;
+static int go_was, go_cont, go_want, go_seen, go_held;   /* our game over ran; it ended in CONTINUE (host); the partner's
+                                                            started ours; its PF_GAME_OVER; we wait for the host's choice */
+static unsigned short cont_tid, own_tid;   /* host: the transfer of our last shared continue; guest: the last game state we got */
+static int go_running(void) { return (sys->tk_flg & 0x4000) && !(sys->ts_flg & 0x4000); }   /* gameover.c's task runs */
+static int rule(int opt);
 static void world_reset(void);
 static void trade_reset(void);
 static void ts_reset(void);
@@ -2078,6 +2090,7 @@ static void session_reset(void)
 {
     if (is_host) owned_drop(); else memset(owned, 0, sizeof(owned));
     own_live = own_sent_ok = 0;
+    own_done_ok = retry_ok = go_want = go_seen = 0; cont_tid = 0;   /* a new partner session: its items come again */
     in_last = 0; coop_ring_reset(&ring); blob_end = 0; snap_n = 0;
     coop_xfer_init(&blob_x, blob_in, sizeof(blob_in));   /* half a transfer of the old session is no use */
     coop_xfer_init(&estate_x, estate, sizeof(estate));
@@ -2093,6 +2106,7 @@ static void session_reset(void)
    game of its own starts with the new-game inventory of the session's game mode. */
 static struct { unsigned int itm[384], stflg[4]; char wno[4]; short hp[4]; } own;
 static int own_valid, own_fixed;   /* own_fixed: a source was given (coop_own_source), no snapshots */
+static int own_hold;               /* our own game restarted (continue after a game over): `own` keeps the items we died with */
 /* saved partner inventories (protocol 16, "saved partner inventories" below), the guest's side */
 static int blob_rec, want_rec;          /* the host's game state on its way carries our saved items; we requested them */
 static char note_msg[96];               /* "Restored your saved items ...": shown with the status line for a while */
@@ -2142,11 +2156,12 @@ static void own_restore(void)
     unsigned int box[160], ic = sys->ic_flg[15], spots[16];
     /* our saved items came with the state (the host's record of us): requested, or a rejoin after
        our game ended without a goodbye - not over the game we are playing (a resync) */
-    int i, rec = blob_rec && (want_rec || own_fixed || !own_valid);
+    int i, rec = blob_rec == 2 || (blob_rec && (want_rec || own_fixed || !own_valid));   /* 2: a shared game over's continue */
     memcpy(box, &sys->itm[64], sizeof(box));   /* the host's: with shared loot, the one box both use */
     memcpy(spots, &sys->itm[IMP_SPOTS], sizeof(spots));   /* the important item spots the host's game knows */
     own_fixed = 0;   /* a given source applies to this join; from now on our game state */
-    if (rec) note("Restored your saved items from the host");   /* already in place: the host put them into the state */
+    if (rec) note(blob_rec == 2 ? "Game over for both: back at the host's continue point, with the items you had there"
+                                : "Restored your saved items from the host");   /* already in place: the host put them into the state */
     else if (own_valid) {
         memcpy(sys->itm, own.itm, sizeof(own.itm));
         memcpy(sys->ply_stflg, own.stflg, sizeof(own.stflg));
@@ -2238,6 +2253,7 @@ static void enemy_sync(void)
 }
 
 static int blob_record(unsigned char* b);
+static void own_put(unsigned char* b, const unsigned char* o);
 static void inv_log(const char* tag);
 /* host: the save region as a save at this moment holds it (bhPushGameData without writing
    the retry copy) */
@@ -2256,9 +2272,17 @@ static void send_blob(void)
     memcpy(blob, &sys->version, n);
     memcpy(&sys->version, keep, n);
     rec = blob_record(blob);   /* a partner's saved items in place of ours (saved partner inventories) */
+    if (go_cont && rule(OPT_GAMEOVER_BOTH) && retry_ok) {   /* our CONTINUE of a shared game over: the guest's items as at this point */
+        own_put(blob, retry_own);
+        memcpy(own_done, retry_own, COOP_OWN_SIZE);   /* what it has once it loaded this state */
+        rec = 2;
+        host_log("coop: game over for both: the partner continues with its items as at our continue point\n");
+    }
+    go_cont = 0;
     eopts_send();   /* the guest loads its first room with the host's enemy options */
     kept_send();    /* and the records our randomizer kept in it */
     if (!++xfer_tid) xfer_tid = 1;
+    if (rec == 2) cont_tid = xfer_tid;
     for (off = 0; off < n; off += 64) {
         Event e = { 0 };
         e.type = EV_BLOB;
@@ -2285,6 +2309,8 @@ static void load_blob(void)
     if (sys->ss_flg & 0x400000) sys->keytype = sys->pdm_keytpb;
     sys->ss_flg &= ~0xC00000;
     if (sys->tk_flg & 0x8) pc_title_leave();   /* from the title (its menu or the lobby): as the title ends */
+    if (go_running()) sys->ts_flg |= 0x4000;   /* from our game over (the host's CONTINUE of a shared one): as its continue */
+    own_hold = go_held = 0;
     pc_adv_in_game();   /* the option screen's app mode: in a game (the title's own game choices set it) */
     bhPopGameData();
     sys->retry_ct = retry;   /* not a retry */
@@ -2400,31 +2426,47 @@ static void partner_gone(int bye)
    session; 1 when they are in */
 static int blob_record(unsigned char* b)
 {
-#define BO(f) ((char*)&sys->f - (char*)&sys->version)
-#define OO(f) offsetof(__typeof__(own), f)
     Rec* r;
-    unsigned int box[160];
     char m[96];
     if (!id_ok || rec_done || !g_coop.remember) return 0;
     rec_done = 1;
     if (!(rx_ext.items == ITEMS_HOST || id_rejoin) || !(r = rec_find(id_pid))) return 0;
+    own_put(b, r->own);
+    if (id_name[0]) snprintf(m, sizeof(m), "Restored %s's saved items", id_name);
+    else snprintf(m, sizeof(m), "Restored the partner's saved items");
+    note(m);
+    return 1;
+}
+
+/* host: a guest's items (EV_OWN bytes) in place of ours in a game state we send it */
+static void own_put(unsigned char* b, const unsigned char* o)
+{
+#define BO(f) ((char*)&sys->f - (char*)&sys->version)
+#define OO(f) offsetof(__typeof__(own), f)
+    unsigned int box[160];
     memcpy(box, b + BO(itm) + 64 * 4, sizeof(box));
-    memcpy(b + BO(itm), r->own + OO(itm), sizeof(own.itm));
+    memcpy(b + BO(itm), o + OO(itm), sizeof(own.itm));
     {   /* the important item spots both games know (the guest keeps its own pickups of them: imp_restore) */
         unsigned int* spots = (unsigned int*)(b + BO(itm)) + IMP_SPOTS;
         int k;
         for (k = 0; k < 16; k++) spots[k] |= sys->itm[IMP_SPOTS + k];
     }
     if (!g_coop.loot) memcpy(b + BO(itm) + 64 * 4, box, sizeof(box));   /* shared loot: one item box, ours */
-    memcpy(b + BO(ply_stflg), r->own + OO(stflg), sizeof(own.stflg));
-    memcpy(b + BO(ply_wno), r->own + OO(wno), sizeof(own.wno));
-    memcpy(b + BO(ply_hp), r->own + OO(hp), sizeof(own.hp));
+    memcpy(b + BO(ply_stflg), o + OO(stflg), sizeof(own.stflg));
+    memcpy(b + BO(ply_wno), o + OO(wno), sizeof(own.wno));
+    memcpy(b + BO(ply_hp), o + OO(hp), sizeof(own.hp));
 #undef BO
 #undef OO
-    if (id_name[0]) snprintf(m, sizeof(m), "Restored %s's saved items", id_name);
-    else snprintf(m, sizeof(m), "Restored the partner's saved items");
-    note(m);
-    return 1;
+}
+
+/* room.c bhPushGameData (host): our continue point moved - a room's retry point, a save, a game (re)start. The guest's
+   items as they are now go with it; the push of our own CONTINUE's restart is the same point, it keeps them. */
+void coop_retry_point(void)
+{
+    if (!is_host || echo_delay || go_cont) return;
+    retry_ok = own_done_ok;
+    if (retry_ok) memcpy(retry_own, own_done, COOP_OWN_SIZE);
+    if (trace) fprintf(stderr, "coop: continue point in %d/%d (the partner's items %s)\n", sys->stg_no, sys->rom_no, retry_ok ? "kept with it" : "not known yet");
 }
 
 /* host: EV_OWN, a chunk of the guest's items; a change's last chunk makes them its record */
@@ -2432,6 +2474,11 @@ static void apply_own(const Event* e)
 {
     Rec* r;
     memcpy(own_in + e->u.blob.off, e->u.blob.data, e->u.blob.len);
+    if (e->u.blob.pad && (!cont_tid || (short)(e->u.blob.tid - cont_tid) >= 0)) {   /* not from before our last shared continue reached it */
+        memcpy(own_done, own_in, COOP_OWN_SIZE);
+        own_done_ok = 1;
+        if (!retry_ok) { memcpy(retry_own, own_in, COOP_OWN_SIZE); retry_ok = 1; }   /* it joined after our continue point: as it joined */
+    }
     if (!e->u.blob.pad || !id_ok || zero16(id_pid) || !g_coop.remember) return;
     if (!(r = rec_find(id_pid))) {
         if (rec_n == REC_MAX) { memmove(recs, recs + 1, sizeof(Rec) * (REC_MAX - 1)); rec_n--; }   /* ponytail: the oldest player out; 16 partners per playthrough */
@@ -2458,6 +2505,7 @@ static void own_send(void)
         int len = COOP_OWN_SIZE - off < 64 ? COOP_OWN_SIZE - off : 64;
         if (own_sent_ok && off < last && !memcmp(b + off, own_sent + off, len)) continue;
         e.type = EV_OWN;
+        e.u.blob.tid = own_tid;   /* the game state these items go with (a shared continue replaces them) */
         e.u.blob.total = COOP_OWN_SIZE;
         e.u.blob.off = off;
         e.u.blob.len = len;
@@ -2558,7 +2606,8 @@ static int item_word(int w) { return w >= IT_FLG && w < IT_FLG + 32; }
    follows the host's last pose (OPT_IMPORTANT, OPT_SKIP_SYNC) */
 static int rule(int opt)
 {
-    if (is_host) return opt == OPT_IMPORTANT ? g_coop.important : opt == OPT_SKIP_SYNC ? g_coop.skip_sync : opt == OPT_SKIP_DETECTOR && g_coop.skip_detector;
+    if (is_host) return opt == OPT_IMPORTANT ? g_coop.important : opt == OPT_SKIP_SYNC ? g_coop.skip_sync : opt == OPT_GAMEOVER_BOTH ? g_coop.gameover_both :
+                        opt == OPT_SKIP_DETECTOR && g_coop.skip_detector;
     return peer_opts >= 0 && (peer_opts & opt);
 }
 
@@ -2846,7 +2895,8 @@ static int apply_session_event(const Event* e)
         if (coop_xfer_chunk(&blob_x, e->u.blob.tid, e->u.blob.total, e->u.blob.off, e->u.blob.len, e->u.blob.data) == 1) {
             if (!blob_valid(blob_in)) { host_log("coop: the host's game state is not valid here: ignored\n"); coop_xfer_reset(&blob_x); return 1; }
             memcpy(blob, blob_in, SAVE_SIZE);
-            blob_rec = e->u.blob.pad;   /* its items are our saved ones */
+            blob_rec = e->u.blob.pad;   /* its items are our saved ones (2: as at the host's continue point) */
+            own_tid = e->u.blob.tid;
             coop_xfer_reset(&blob_x);
             pop_pending = 1;
             need_blob = 0;
@@ -3015,15 +3065,59 @@ static void session(void)
         }
     } else {
         if (popping && tx_in_game) popping = 0;
-        if (tx_in_game && in_session_game() && !popping && !pop_pending && !own_fixed) { own_snapshot(); own_send(); }
+        if ((sys->tk_flg & 0x20) && own_live && !popping && !pop_pending) own_hold = 1;   /* our own CONTINUE restored our continue
+            point's items, but the host's game goes on: we take back the items we died with (before, whichever came first) */
+        if (tx_in_game && in_session_game() && !popping && !pop_pending && !own_fixed && !own_hold) { own_snapshot(); own_send(); }
         if ((sys->tk_flg & 0x28) && !popping && !pop_pending) need_blob = 1;   /* title, or a game (re)start of our own */
         /* load at the title or while we are in control (not from a menu, an event, a door) */
-        if (pop_pending && ((sys->tk_flg & 0x8) || (tx_in_game && local_visible()))) load_blob();
+        if (pop_pending && ((sys->tk_flg & 0x8) || (tx_in_game && local_visible()) || (go_running() && rule(OPT_GAMEOVER_BOTH)))) load_blob();
         if (need_blob || pop_pending || popping) return;
         follow();
     }
     if (tx_in_game && game) { gate_release(); diff_flags(); }
 }
+
+/* "Game over: Both" (state above own_restore): the partner's game over starts ours once we are in control (not in
+   a menu, a cutscene, a door; as the scripts' bhGameOverSet). The guest's screen stays before CONTINUE / NO: the host's
+   answer counts for both - its CONTINUE's game state (EV_BLOB pad 2) is loaded straight from the game over, its NO ends
+   the session at the title, and gameover_ended takes the guest there too. Edges, not levels: a guest still in its game
+   over while the host's continued game runs again starts nothing there. */
+void bhReturnTitle(void);
+static void gameover_frame(void)
+{
+    int on = have_rx && (rx.flags & PF_GAME_OVER), both = rule(OPT_GAMEOVER_BOTH);
+    if (go_running()) { go_was = 1; go_want = 0; tx.flags |= PF_GAME_OVER; }
+    else if (go_was) { go_was = 0; go_cont = (sys->tk_flg & 0x20) != 0; go_held = 0; }   /* CONTINUE restarts the game, NO goes to the title */
+    if (!have_peer) go_cont = 0;
+    if (have_rx) {
+        if (on && !go_seen && both) go_want = 1;   /* the partner's game over started */
+        if (!on || !both) go_want = 0;            /* or it is over again (continued) */
+        go_seen = on;
+    }
+    if (go_want && in_session_game() && tx_in_game && local_visible() && plp->hp >= 0 && (is_host || (!need_blob && !pop_pending && !popping))) {
+        host_log("coop: game over for both: the partner's game is over, ours too\n");
+        sys->ts_flg &= ~0x4000;
+        *(int*)&sys->gov_md0 = 0;   /* gov_md0, gov_md1 */
+        go_want = 0;
+    }
+    if (!is_host && both && go_running() && sys->gov_md0 == 2 && sys->gov_md1 == 1 && sys->gov_ct >= 48) {
+        sys->gov_ct = 47;   /* gameover.c asks CONTINUE / NO at 50: the host's answer counts */
+        if (!go_held) note("Game over for both: the host answers Retry for both of you");
+        go_held = 1;
+    }
+}
+
+/* guest, the session ends: a shared game over that waited for the host (or the host's game over we were to follow)
+   goes to the title, as the host's NO did there (a host that left or was lost cannot answer either) */
+static void gameover_ended(void)
+{
+    if (is_host || !rule(OPT_GAMEOVER_BOTH) || !(go_held || go_want || (rx.flags & PF_GAME_OVER)) || !(sys && (sys->tk_flg & 0x80))) return;
+    host_log("coop: game over for both: the host's game ended, back to the title\n");
+    bhReturnTitle();
+}
+
+/* the lobby: the host's "Game over" rule as this session has it */
+int coop_host_gameover_both(void) { return rule(OPT_GAMEOVER_BOTH); }
 
 /* ---------------------------------------------------------------- world events (M8) */
 /* The room script changes the world in blocks of its per-frame part (scd1) that test a world
@@ -5248,6 +5342,7 @@ static void stop(void)
     left_msg[0] = 0;
     id_ok = id_rejoin = crash_ok = rec_done = 0;
     own_live = own_sent_ok = blob_rec = want_rec = 0;
+    own_hold = go_was = go_cont = go_want = go_seen = go_held = 0;
     peer_opts = -1;
     spawn_pending(0);
     enemy_opts_from_host(NULL);   /* single player again: our own enemy options */
@@ -5873,7 +5968,7 @@ void coop_frame(void)
     else tx_ext.rec = !g_coop.remember ? REC_OFF : !id_ok ? REC_UNKNOWN : rec_have(id_pid) ? REC_HAVE : REC_NONE;
     tx.opts = is_host ? (g_coop.loot ? OPT_INDIVIDUAL : 0) | (g_coop.trade_freeze ? OPT_TRADE_FREEZE : 0) | (g_coop.important ? OPT_IMPORTANT : 0) |
                         (pc_cfg_no_ink_ribbon() ? OPT_NO_RIBBON : 0) | (g_coop.skip_sync ? OPT_SKIP_SYNC : 0) |
-                        (g_coop.skip_detector ? OPT_SKIP_DETECTOR : 0) : 0;
+                        (g_coop.gameover_both ? OPT_GAMEOVER_BOTH : 0) | (g_coop.skip_detector ? OPT_SKIP_DETECTOR : 0) : 0;
     tx.regroup = regroups;
     tx.seq = frame_no;
     if (echo_delay) {
@@ -5902,6 +5997,7 @@ void coop_frame(void)
         if (bye_reason) {   /* the guest's session ends; in game it goes on in single player */
             const char* why = bye_reason;
             host_log("coop: session ended: %s\n", why);
+            gameover_ended();
             stop();
             snprintf(g_coop.status, sizeof(g_coop.status), "%s", why);
             tx_in_game = 0;
@@ -5920,6 +6016,7 @@ void coop_frame(void)
         apply_snapshots();
         proxy_ok = is_host && p2_show && !p2_busy;   /* a busy partner is no target (as the paused game in single player) */
         if (sys) session();
+        if (sys && plp) gameover_frame();
         if (sys && plp) enemy_sync();
         if (sys && plp) trade_frame();
         if (sys && plp) ts_frame();
