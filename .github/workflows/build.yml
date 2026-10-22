@@ -33,9 +33,10 @@ jobs:
         with:
           submodules: recursive   # decomp + its header submodules; the mwcc submodule is `update = none` and skipped
       - name: Install dependencies
+        timeout-minutes: 10   # a hung apt mirror fails the job instead of blocking it for hours
         run: |
           sudo dpkg --add-architecture i386
-          sudo apt-get update
+          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update
           # SDL is built from source and dlopen()s these at run time; the :i386 -dev packages give it
           # the headers and sonames of the backends (X11, Wayland, ALSA, PipeWire, ...); libpulse-dev:i386
           # is left out: it pulls libglib2.0-dev:i386, which conflicts with the runner's amd64 GLib tools
@@ -88,10 +89,11 @@ jobs:
         with:
           submodules: recursive
       - name: Install dependencies
+        timeout-minutes: 10   # a hung apt mirror fails the job instead of blocking it for hours
         # Ubuntu's mingw-w64 (GCC 13, msvcrt) with POSIX threads; the local reference build uses
         # Arch's mingw-w64-gcc (GCC 16, UCRT): see docs/BUILDING.md "Continuous integration"
         run: |
-          sudo apt-get update
+          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update
           sudo apt-get install -y --no-install-recommends g++-mingw-w64-i686-posix gcc-mingw-w64-i686-posix \
             binutils-mingw-w64-i686 mingw-w64-i686-dev ninja-build ccache zip
           sudo update-alternatives --set i686-w64-mingw32-gcc /usr/bin/i686-w64-mingw32-gcc-posix
@@ -118,7 +120,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7   # pc/server builds without the decomp
       - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends nftables
+        timeout-minutes: 10   # a hung apt mirror fails the job instead of blocking it for hours
+        run: sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update && sudo apt-get install -y --no-install-recommends nftables
       - name: Build
         run: |
           cmake -S pc/server -B build-server -DCMAKE_BUILD_TYPE=Release
