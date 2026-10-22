@@ -1,4 +1,4 @@
-/* Online co-op wire format (protocol 22, docs/COOP.md "Protocol 21" and "Security") and
+/* Online co-op wire format (protocol 22, docs/COOP.md "Protocol 22" and "Security") and
    the checks every received packet passes before it may change anything. No game state here:
    pc/glue/coop_glue.c applies what passes; pc/tests/test_coop.c feeds malformed packets. */
 #ifndef RECVX_COOP_PROTO_H
@@ -21,7 +21,7 @@ extern "C" {
                                            20: EV_EOPTS variety and event enemies (the randomizer's choices changed);
                                            21: COOP_HIT_PRECISE (third person "Precise hits");
                                            22: OPT_GAMEOVER_BOTH, PF_GAME_OVER, EV_BLOB pad 2 (a shared game over's continue),
-                                               EV_OWN tid (the last game state the guest loaded) */
+                                               EV_OWN tid (the last game state the guest loaded); OPT_SKIP_DETECTOR */
 #define COOP_DGRAM_MAX 1200             /* bytes per datagram (below every internet path MTU) */
 #define COOP_EV_FRAME 16                /* events per frame (over the frame's datagrams) */
 #define COOP_SNAP_FRAME 48              /* enemy snapshots per frame */
@@ -40,7 +40,8 @@ enum { OPT_INDIVIDUAL = 1, OPT_TRADE_FREEZE = 2,   /* Pose.opts: the host's sess
        OPT_NO_RIBBON = 8,               /* typewriters save without an ink ribbon */
        OPT_SKIP_SYNC = 16,              /* a cutscene both play is skipped once both pressed skip */
        OPT_GAMEOVER_BOTH = 32,          /* one player's game over is both players'; the host's CONTINUE / NO decides */
-       OPT_ALL = 63 };
+       OPT_SKIP_DETECTOR = 64,          /* the prison's metal detector (0/9) never goes off, its security boxes rest */
+       OPT_ALL = 127 };
 enum { BUSY_NONE, BUSY_EVENT, BUSY_MENU, BUSY_BOX, BUSY_TRADE };
 enum { MSET_OWN = -1, MSET_ROOM = -2, MSET_NONE = -3 };
 #define MNW_ROOM 0x7FFE

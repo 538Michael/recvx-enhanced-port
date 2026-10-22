@@ -346,6 +346,7 @@ static void test_dgrams(void)
     BADP(q.flags |= PF_GAME_OVER, COOP_OK);       /* protocol 22: our game over runs (every flag bit is in use) */
     BADP(q.opts = OPT_ALL, COOP_OK);              /* every game rule */
     BADP(q.opts = OPT_GAMEOVER_BOTH, COOP_OK);    /* protocol 22: "Game over: Both" */
+    BADP(q.opts = OPT_SKIP_DETECTOR, COOP_OK);    /* protocol 22: the metal detector rule */
     BADP(q.opts = OPT_ALL + 1, COOP_BAD_FIELD);
     BADP(q.opts = 0x80, COOP_BAD_FIELD);
     {   /* the PoseExt's enumerations (protocol 16) */

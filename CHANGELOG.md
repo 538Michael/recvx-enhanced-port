@@ -15,6 +15,10 @@
   you dies you both get the game over screen and the host answers for both: Yes takes both of you
   back to the last continue point together, each with the items you had there; No takes both of
   you to the title. Recommended when you play the story together. Both players need this version.
+- **Metal detector skipped** (lobby GAME RULES, METAL DETECTOR; CO-OP settings page; on by default):
+  in co-op the prison's metal detector lets both of you walk through with your weapons. It never
+  stops you or sounds the alarm, and its security boxes stay shut. A box that still holds items from
+  before opens until you have taken them out. *As original* keeps the detector as in single player.
 
 ### Fixes
 

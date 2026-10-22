@@ -582,10 +582,10 @@ enum { R_MODE, R_HOSTSTEP, R_JOINSTEP,
        R_SERVER, R_PORT, R_ADDR, R_PW, R_RELAY,
        R_NAME, R_CHAR,
        R_START, R_ITEMS, R_FOLLOW, R_RULES,
-       R_LOOT, R_IMP, R_TFREEZE, R_SKIPS, R_RIBBON, R_GOVER, R_EXTRA, R_PLACE, R_RAND, R_VARIETY, R_EVENTS, R_SEED, R_RSEED,
+       R_LOOT, R_IMP, R_TFREEZE, R_SKIPS, R_RIBBON, R_GOVER, R_DETECTOR, R_EXTRA, R_PLACE, R_RAND, R_VARIETY, R_EVENTS, R_SEED, R_RSEED,
        R_HOST, R_GO, R_COPY, R_RCOPY, R_KICK, R_STOP, R_JOIN,
        R_BACK, R_N };
-static const unsigned char row_group[R_N] = { 0, 1, 1, 0, 0, 0, 0, 0, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 6 };
+static const unsigned char row_group[R_N] = { 0, 1, 1, 0, 0, 0, 0, 0, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 6 };
 enum { F_NONE, F_NAME, F_ADDR, F_PORT, F_SEED, F_SERVER, F_PW };
 
 static struct {
@@ -640,7 +640,7 @@ static int row_locked(int r)
     case R_MODE: case R_PORT: case R_LOOT: case R_IMP: case R_ADDR: case R_RELAY: case R_SERVER: case R_PW: return session_on();
     case R_HOSTSTEP: return joining();
     case R_JOINSTEP: return hosting();
-    case R_GOVER: case R_EXTRA: case R_PLACE: case R_RAND: case R_VARIETY: case R_EVENTS: case R_SEED: return lb.role != 0;   /* the host's choice */
+    case R_GOVER: case R_DETECTOR: case R_EXTRA: case R_PLACE: case R_RAND: case R_VARIETY: case R_EVENTS: case R_SEED: return lb.role != 0;   /* the host's choice */
     case R_RCOPY: return !g_coop.room[0];
     default: return 0;
     }
@@ -781,6 +781,7 @@ static void change(int r, int dir)
     case R_IMP: g_coop.important ^= 1; break;
     case R_SKIPS: g_coop.skip_sync ^= 1; break;
     case R_GOVER: g_coop.gameover_both ^= 1; break;
+    case R_DETECTOR: g_coop.skip_detector ^= 1; break;
     case R_RIBBON: settings_step(lset("No ink ribbons needed"), dir); break;   /* the GAMEPLAY setting (g_config) */
     case R_START: g_coop.start = step_choice(g_coop.start, dir, 0, n_saves + 2, start_valid); break;
     case R_ITEMS: g_coop.items = step_choice(g_coop.items, dir, COOP_ITEMS_HOST, n_saves - 1, items_valid); break;
@@ -798,7 +799,7 @@ static void change(int r, int dir)
 
 static int has_value(int r)
 {
-    return r == R_MODE || r == R_RELAY || r == R_CHAR || r == R_LOOT || r == R_IMP || r == R_TFREEZE || r == R_SKIPS || r == R_RIBBON || r == R_GOVER || r == R_START || r == R_ITEMS || r == R_FOLLOW ||
+    return r == R_MODE || r == R_RELAY || r == R_CHAR || r == R_LOOT || r == R_IMP || r == R_TFREEZE || r == R_SKIPS || r == R_RIBBON || r == R_GOVER || r == R_DETECTOR || r == R_START || r == R_ITEMS || r == R_FOLLOW ||
            r == R_EXTRA || r == R_PLACE || r == R_RAND || r == R_VARIETY || r == R_EVENTS;
 }
 
@@ -997,6 +998,7 @@ static void row_text(int r, char* label, char* val, int n)
     case R_IMP: strcpy(label, "IMPORTANT ITEMS"); snprintf(val, n, "%s", g_coop.important ? "For both" : "Shared"); break;
     case R_SKIPS: strcpy(label, "CUTSCENE SKIP"); snprintf(val, n, "%s", g_coop.skip_sync ? "Together" : "Each alone"); break;
     case R_GOVER: strcpy(label, "GAME OVER"); snprintf(val, n, "%s", (lb.role ? coop_host_gameover_both() : g_coop.gameover_both) ? "Both" : "Each player"); break;
+    case R_DETECTOR: strcpy(label, "METAL DETECTOR"); snprintf(val, n, "%s", (lb.role ? coop_skip_detector() : g_coop.skip_detector) ? "Skipped" : "As original"); break;
     case R_RIBBON: strcpy(label, "INK RIBBONS"); snprintf(val, n, "%s", settings_get(lset("No ink ribbons needed")) ? "Not needed" : "Needed"); break;
     case R_START: strcpy(label, "START"); start_label(val, n, g_coop.start); break;
     case R_RULES: strcpy(label, lb.role ? "THE HOST'S RULES" : "GAME RULES"); break;
@@ -1052,10 +1054,11 @@ static const char* row_help(int r)
     case R_START: return "What the game starts from: a new game (normal, easy, very easy) or one of your saves.";
     case R_ITEMS: return "The inventory you join with: the one the host kept for you from your last visit, a new inventory, or that of one of your saves.";
     case R_FOLLOW: return eset(&g_coop.follow)->help;
-    case R_RULES: return host ? "Loot, enemies freezing while you trade, cutscene skips, ink ribbons, game over and the enemy options (extra enemies, rearranged, randomizer and its variety and event enemies, seed)."
-                              : "The host's game over rule and enemy options (read-only).";
+    case R_RULES: return host ? "Loot, enemies freezing while you trade, cutscene skips, ink ribbons, game over, the metal detector and the enemy options (extra, rearranged, randomizer, variety, event enemies, seed)."
+                              : "The host's game over and metal detector rules and enemy options (read-only).";
     case R_LOOT: return "Shared: each item lies there once - whoever takes it has it, so you split the supplies; one item box. Individual: each finds their own copy and has their own box. Keys and story go to both.";
     case R_TFREEZE: return eset(&g_coop.trade_freeze)->help;
+    case R_DETECTOR: return "Skipped: the prison's metal detector lets both of you pass with weapons and its security boxes stay shut (one holding items still opens). As original: as in single player.";
     case R_IMP: return "For both: weapons and ink ribbons lie there for each of you, each takes their own copy. Shared: they are one pickup like ammo and herbs - whoever takes it has it.";
     case R_SKIPS: return "Together: a cutscene both of you watch is skipped when both press skip; the partner sees that you want to. Each alone: as in single player.";
     case R_RIBBON: return "Not needed: typewriters save without an ink ribbon and use none up (for both players; also in single player, ENHANCED SETTINGS GAMEPLAY).";

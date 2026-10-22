@@ -60,7 +60,7 @@ extern const int WpnAngTab[21][3];
 extern NJS_POINT3 PlayerPos;            /* sdfunc.c: where CallPlayerVoice plays */
 
 CoopState g_coop = { .port = COOP_DEFAULT_PORT, .join = "127.0.0.1:7140", .follow = 1, .upnp = 1, .nametag = 1, .items = COOP_ITEMS_HOST, .server = COOP_DEFAULT_SERVER, .trade_freeze = 1, .remember = 1, .peer_rec = -1,
-                    .important = 1, .skip_sync = 1 };
+                    .important = 1, .skip_sync = 1, .skip_detector = 1 };
 int coop_on;
 int appear_on;                          /* co-op off, "You appear as" in use: our-player hooks only */
 
@@ -2606,9 +2606,14 @@ static int item_word(int w) { return w >= IT_FLG && w < IT_FLG + 32; }
    follows the host's last pose (OPT_IMPORTANT, OPT_SKIP_SYNC) */
 static int rule(int opt)
 {
-    if (is_host) return opt == OPT_IMPORTANT ? g_coop.important : opt == OPT_SKIP_SYNC ? g_coop.skip_sync : opt == OPT_GAMEOVER_BOTH && g_coop.gameover_both;
+    if (is_host) return opt == OPT_IMPORTANT ? g_coop.important : opt == OPT_SKIP_SYNC ? g_coop.skip_sync : opt == OPT_GAMEOVER_BOTH ? g_coop.gameover_both :
+                        opt == OPT_SKIP_DETECTOR && g_coop.skip_detector;
     return peer_opts >= 0 && (peer_opts & opt);
 }
+
+/* the host's rule "Metal detector: Skipped" (OPT_SKIP_DETECTOR, protocol 22): pc/glue/detector_glue.c in a session, the
+   guest's lobby (the host's value) */
+int coop_skip_detector(void) { return rule(OPT_SKIP_DETECTOR); }
 
 /* event.c bhPlItemCheck, ps2_McSaveFile.c mcWriteStartSaveFile: typewriters save without an ink ribbon and use none.
    The setting (single player, and the host); a guest plays by the host's rule once it knows it. */
@@ -5963,7 +5968,7 @@ void coop_frame(void)
     else tx_ext.rec = !g_coop.remember ? REC_OFF : !id_ok ? REC_UNKNOWN : rec_have(id_pid) ? REC_HAVE : REC_NONE;
     tx.opts = is_host ? (g_coop.loot ? OPT_INDIVIDUAL : 0) | (g_coop.trade_freeze ? OPT_TRADE_FREEZE : 0) | (g_coop.important ? OPT_IMPORTANT : 0) |
                         (pc_cfg_no_ink_ribbon() ? OPT_NO_RIBBON : 0) | (g_coop.skip_sync ? OPT_SKIP_SYNC : 0) |
-                        (g_coop.gameover_both ? OPT_GAMEOVER_BOTH : 0) : 0;
+                        (g_coop.gameover_both ? OPT_GAMEOVER_BOTH : 0) | (g_coop.skip_detector ? OPT_SKIP_DETECTOR : 0) : 0;
     tx.regroup = regroups;
     tx.seq = frame_no;
     if (echo_delay) {
