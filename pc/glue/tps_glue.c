@@ -137,6 +137,18 @@ static void deactivate(void)
     if (sys && !(sys->st_flg & 0x1)) sys->gm_flg |= 0x800;
 }
 
+/* system.c bhExitGame (cheat_game_exit): the game ends (the title, a game over, a load). tps_camera, which
+   switches our camera off, only runs in a game, so the ended game's camera stayed "active": the gamepad's
+   third-person rows kept the buttons they use (Cross, d-pad down, the shoulders, ...) in the title menu, and
+   the next game started with the old camera instead of behind the character */
+void tps_game_exit(void)
+{
+    dual_e = -1;
+    aim_h = 0;
+    recenter = 0;
+    tps_cam_active = g_tps.cam_active = g_tps.aiming = g_tps.pad_play = cut_cam_ok = 0;
+}
+
 /* the weapon raised; not the reload of a lowered weapon (reload_glue.c), which keeps the walking camera */
 static int aiming(void) { return tps_cam_active && plp->mode0 == 1 && plp->mode1 == 1 && !reload_at_rest(); }
 
