@@ -10,22 +10,13 @@
 
 ### Third person
 
-- **Precise hits**: a new THIRD PERSON option, on by default. Over the shoulder, enemies were still
-  hit by the game's very wide hit test, so a shot that went past an enemy often hit it anyway. Now a
-  shot hits only where the crosshair is actually on the enemy's body, as it walks, crawls or lies, and
-  big enemies are hit on their big bodies. Head hits do more damage, and a zombie's head bursts with
-  the magnum, shotgun or sniper rifle only when you really hit the head. The shotgun keeps a narrow
-  spread; explosives, the bow gun, the linear launcher and the knife work as before, and bosses keep
-  their weak spots. Off gives the old behaviour; the fixed cameras are unchanged. Co-op partners need
-  this version.
+- **Precise hits** (THIRD PERSON, on by default): shots only hit where the crosshair is actually on
+  an enemy's body, and head hits do more damage. Co-op partners need this version.
 
 ### Performance
 
-- **Steady game speed in heavy effect scenes**: with in-between frames on, a scene full of fire
-  and effects, such as Alexia's burning hall, could slow the game itself down and make it feel
-  sluggish when the graphics card could not keep up, even though the frame rate looked fine. The
-  game now keeps its normal speed, and only shows fewer in-between frames while the graphics card
-  is busy.
+- **Steady game speed with many effects**: in scenes with a lot of 2D effects the game itself could
+  slow down. This is fixed.
 
 ## 0.6.5 (2026-10-21)
 
