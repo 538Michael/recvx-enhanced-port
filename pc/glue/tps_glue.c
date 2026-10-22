@@ -764,7 +764,8 @@ static int aimable(const BH_PWORK* e) { return (e->flg & 0x1) && (e->flg & 0x20)
 #define SHOTGUN_MAX 3.0f      /* at most this */
 unsigned char tps_hit_precise[128];   /* per enemy slot: its last gun hit was precise, as weapon + 1 (0: not; coop_glue.c) */
 static float xr[7];                   /* the crosshair's ray (aim_at_crosshair): from, direction, length to its wall */
-static int ticks, xr_tick = -1;       /* tps_player calls; the one in which it was cast (a shot in the mode handler before the next: the same) */
+static int dual_yaw;                  /* dual weapons, precise hits: the yaw of the gun turned to another enemy (dual_aim) */
+static int ticks, xr_tick = -1;      /* tps_player calls; the one in which it was cast (a shot in the mode handler before the next: the same) */
 
 int pc_precise_hits(void)
 {
@@ -852,6 +853,7 @@ int pc_precise_hit(BH_PWORK* pp, int wpn, const float* c1, const float* c2, floa
 {
     float p[3], d[3], l, t;
     int j = -1, no, k, x = tps_cam_active && xr_tick == ticks;   /* x: the crosshair's ray */
+    if (dual_e >= 0 && abs((short)(plp->way - dual_yaw)) < DEG(1.0f)) x = 0;   /* the dual gun turned to another enemy (dual_aim): its own ray */
     if (x)
         for (k = 0, l = xr[6]; k < 3; k++) p[k] = xr[k], d[k] = xr[3 + k];
     else {
@@ -1044,7 +1046,7 @@ static void dual_aim(int ay0, int prev)
     int cls = plp->at_flg & 0xE, left = 0, keep = 0, prec = pc_precise_hits();
     muzzle(9, ay0, r);
     muzzle(13, ay0, l);
-    for (int i = 0; !prec && i < sys->ewk_n; i++) {   /* (precise hits: no other enemy, both at the crosshair) */
+    for (int i = 0; i < sys->ewk_n; i++) {
         BH_PWORK* e = &ene[i];
         const NJS_CAPSULE* c = &e->watr;
         float x = (c->c1.x + c->c2.x) / 2 - plp->px, y = (c->c1.y + c->c2.y) / 2 - plp->py, z = (c->c1.z + c->c2.z) / 2 - plp->pz;
@@ -1071,6 +1073,27 @@ static void dual_aim(int ay0, int prev)
             k = bhCheckC2WallN(&cap, 0x40000400);
             sys->apos = apos; sys->ahtp = ahtp;
             if (k) continue;
+        }
+        if (prec) {   /* precise hits: only an enemy that arm's own shot, turned to it, hits (CheckGunHit: from the muzzle at
+                         chest height along Rx(wax) Ry(ay + the arm's yaw)) before another enemy or a wall */
+            const float* m = arm == 2 ? l : r;
+            float tt[3] = { plp->px + x, plp->py + y, plp->pz + z }, o[3] = { m[0], plp->py + 11.0f, m[2] }, te, tn = -1, tw = -1, tq;
+            NJS_MATRIX mx;
+            NJS_VECTOR v = { 0, 0, -1 }, dv;
+            NJS_LINE line;
+            int ya = (short)(plp->ay + arm_yaw(m, tt)), j, n;
+            njUnitMatrix(&mx);
+            njRotateXYZ(&mx, plp->wax, ya, 0);
+            njCalcVector(&mx, &v, &dv);
+            if ((te = body_ray(e, o, &dv.x, 0, &j, &n)) < 0) continue;
+            for (int q = 0; q < sys->ewk_n; q++)
+                if (q != i && aimable(&ene[q]) && (tq = body_ray(&ene[q], o, &dv.x, 0, &j, &n)) >= 0 && (tn < 0 || tq < tn)) tn = tq;
+            line.px = o[0]; line.py = o[1]; line.pz = o[2]; line.vx = dv.x * te; line.vy = dv.y * te; line.vz = dv.z * te;
+            apos = sys->apos; ahtp = sys->ahtp;
+            if (bhCheckL2Wall(&line, 0x400, &tq)) tw = tq;
+            sys->apos = apos; sys->ahtp = ahtp;
+            if (!pc_dual_take(te, tn, tw)) continue;
+            dual_yaw = ya;
         }
         best = d; dual_e = i; left = arm == 2; keep = i == prev;
         t[0] = plp->px + x; t[1] = plp->py + y; t[2] = plp->pz + z;

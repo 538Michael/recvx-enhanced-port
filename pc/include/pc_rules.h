@@ -85,6 +85,13 @@ static inline float pc_ray_capsule(const float* p, const float* d, const float* 
     return t;
 }
 
+/* dual weapons with precise hits: the second gun turns to an enemy only if its own ray, turned to it, meets
+   that enemy's body (te: where, -1 not) before any other enemy's (tn, -1 none) and before a wall (tw, -1 none) */
+static inline int pc_dual_take(float te, float tn, float tw)
+{
+    return te >= 0 && (tn < 0 || te <= tn) && (tw < 0 || te <= tw);
+}
+
 /* ---------------------------------------------------------------- music on a warp (cheat_glue.c) */
 /* after the entry script of a room reached without a door, with the music that played before it
    (was, was_vol) stopped as a door does: the new music request. The same music asked for again plays

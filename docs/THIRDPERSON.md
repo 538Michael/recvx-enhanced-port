@@ -477,8 +477,18 @@ Free aim now sets them every tick (`dual_aim`, after `aim_at_crosshair`; not whi
 * Shots therefore go where each arm points; the pitch, bend and aim height are the crosshair
   target's as for single weapons, so lying zombies are hit the same way. The fixed cameras and
   "Game auto-aim" with the mouse keep the game's own dual targeting.
-* With [Precise hits](#precise-hits) neither arm takes another enemy (that would be a lock-on):
-  both aim at the crosshair target, and each shot is tested on its own along the crosshair's ray.
+* With [Precise hits](#precise-hits) the other arm takes that enemy only if its own shot, turned to it,
+  would hit it (`dual_aim`, `pc_dual_take`): the ray `CheckGunHit` casts, from that arm's muzzle at
+  chest height along `Rx(wax) Ry(ay + its yaw)`, must enter the enemy's joint volumes before any other
+  enemy's and before a wall. A second enemy beside that ray (other height or distance than the
+  crosshair target, as the pitch is shared), behind another or behind a wall is not taken, and both
+  arms aim at the crosshair. Shots: the arm at the crosshair is tested along the crosshair's ray, the
+  turned arm along its own ray (`pc_precise_hit`: the shot's yaw `way` is the turned arm's).
+  Measured (two zombies spawned in 3/0, SMG and Gold Lugers): 15 degrees apart the other arm turned
+  23 times and hit the second zombie 26 times along its own ray; with the second zombie at a lower
+  pitch, never; beyond 45 degrees, never. Off: as before Precise hits (pose and health traces
+  identical to that build). The fixed cameras run none of this: dual-weapon runs with one and two
+  zombies are frame- and health-identical to v0.6.0.
 * Co-op: each arm's hits reach the partner as any hit (`EV_ENE_HIT` per enemy hit, with the aim
   height). The partner draws our motions only, without the arms' turn, as it shows no aim pitch.
 
@@ -526,7 +536,8 @@ and free aim (not "Game auto-aim" with the mouse: its lock-on needs the wide tes
   crosshair if the ray meets one, else the volumes 0.3 units wider plus 0.06 per unit of distance (3.4
   degrees either side), at most 3. Every enemy in it is hit, each with its own hit point, joint and
   distance (the game gave all of them the nearest one's).
-* **Dual weapons**: both arms at the crosshair ([Dual weapons](#dual-weapons)), each shot tested.
+* **Dual weapons**: the second gun turns to another enemy only when its own ray would hit it
+  ([Dual weapons](#dual-weapons)); each shot tested along its gun's ray.
 * **Not changed**: the knife (`bhCheckKnifeAtari`), the bow gun's arrows, the grenade, rocket and
   linear launchers (projectiles and blasts: `bhCheckFlyAtari`, `bhCheckBombAtari`).
 

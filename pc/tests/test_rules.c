@@ -100,6 +100,12 @@ static void precise(void)
         const float up[3] = { 0, 1, 0 }, below[3] = { 0, -20, -10 };
         CHECK(NEAR(pc_ray_capsule(below, up, a, b, 1, &m), 17));
     }
+    /* the second gun's turn: its ray meets the enemy, first */
+    CHECK(pc_dual_take(20, -1, -1));
+    CHECK(pc_dual_take(20, 25, 30));
+    CHECK(!pc_dual_take(-1, -1, -1));    /* beside the turned ray */
+    CHECK(!pc_dual_take(20, 15, -1));    /* another enemy in front of it */
+    CHECK(!pc_dual_take(20, -1, 12));    /* behind a wall */
     /* a sphere (a == b) */
     {
         const float c[3] = { 0, 0, -10 };
