@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Gameplay
+
+- **No "Now Loading..." text with fast loading**: with Fast loading on, the black load screen
+  between rooms, after starting a new game and after loading a save no longer shows the
+  "Now Loading..." text. With Fast loading off it shows as before.
+
 ## 0.6.6 (2026-10-22)
 
 ### Gameplay

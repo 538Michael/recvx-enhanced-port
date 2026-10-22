@@ -665,7 +665,9 @@ ITEMS choice, `RECVX_TEST_SAVE`, the host's partner records (`coop-partners-nn.b
   delivered inside (the disc read polls interrupts) leaves the downloads and the file manager to it.
   The room's effects run in every frame of the load (`ef_flg` bit 0, steps 10-16) and take random
   numbers; with the shorter load they are topped up to 30 frames at step 16, the shortest original
-  load, so rain and smoke look settled. Not in the attract demo (it replays recorded input from
+  load, so rain and smoke look settled. The load screen's "Now Loading..." (`bhSysCallMonitor`,
+  message 491 while `NowLoadDisp` is set) is not drawn; only the text, the load's steps are
+  unchanged. Not in the attract demo (it replays recorded input from
   `srand(1)` at the load). Off, frames are identical to a build without the setting; on, every load
   is shorter and the frames after it (and the random sequence) differ. The log line `room: RM_xxxx ready N frames after
   the door` (or `the game start`) gives the length of each load.
