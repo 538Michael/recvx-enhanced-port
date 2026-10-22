@@ -16,7 +16,7 @@
 ### Performance
 
 - **Steady game speed with many effects**: in scenes with a lot of 2D effects the game itself could
-  slow down. This is fixed.
+  slow down. The renderer was adjusted so these scenes play smoother.
 
 ## 0.6.5 (2026-10-21)
 
