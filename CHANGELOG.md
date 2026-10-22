@@ -11,7 +11,7 @@
 ### Third person
 
 - **Precise hits** (THIRD PERSON, on by default): shots only hit where the crosshair is actually on
-  an enemy's body, and head hits do more damage. Co-op partners need this version.
+  an enemy's body, and head hits do more damage.
 
 ### Performance
 
