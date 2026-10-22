@@ -59,6 +59,7 @@ int  bind_event(const void* sdl_event); /* main thread, first: 1 = consumed by a
 int  bind_held(int row, int dev, const bool* keys, int mouse);  /* any slot of the row is down (a reload combination's press counts only for the reload) */
 int  bind_combo(int row, int dev, int slot);                    /* a reload slot another row of its group shares: it reloads as Aim + that button */
 void bind_combo_frame(int on, const bool* keys, int mouse);     /* each pad report, first: which reload combinations were pressed with aim held */
+int  bind_pad_raw(int row);                                     /* the gamepad holds an input of the row, whichever set reads it now */
 int  bind_hotkey(const void* sdl_event, int row);               /* a key-down event of this hotkey */
 void* bind_gamepad(void);              /* the open SDL_Gamepad (pad.c) */
 void bind_set_gamepad(void* gamepad);

@@ -147,6 +147,9 @@ stick is added. Modern, as the RE2/RE4 remakes (button map:
   menus, messages, pick-ups, events and doors the gamepad is the DualShock 2 of the KEY CONFIG
   type, as in Classic. An input held when `pad_play` changes counts for neither set until it is
   let go (`bindings.c pad_row_reads`), so the button that opened a menu does not also act in it.
+  A new press of the inventory, map or options row while its screen is up closes it, as the game's
+  own buttons toggle theirs (`tps_pad` `toggle_closes`: the status / map bit; OPTION:
+  `pc_options_mouse0` adds Select; both read the row raw with `bind_pad_raw`).
   Hits, grabs and weapon loads keep `pad_play` (a held trigger stays held).
 * **Mixed devices**: `pad_cam` is the device used last (any gamepad button or stick past a third:
   the gamepad; mouse motion, a key or a mouse button: keyboard/mouse). With the gamepad the camera

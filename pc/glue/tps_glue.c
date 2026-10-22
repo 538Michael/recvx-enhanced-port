@@ -715,6 +715,23 @@ static int pad_sticks(unsigned int* pad)
     return qt_hold > 0 ? qt_hold-- : 0;
 }
 
+/* the Modern gamepad outside third-person play: its rows give the game rows their buttons back, so the
+   inventory (Y) and the map (View) it opened did not close with the same button, as the game's do with
+   theirs. A press of the row's button made while that screen is up closes it (the game's status / map bit). */
+static unsigned toggle_closes(void)
+{
+    static int prev[2];
+    static const int row[2] = { B_TPS_STATUS, B_TPS_MAP };
+    unsigned r = 0;
+    int scr = (sys->ts_flg & 0x80) ? !(sys->ts_flg & 0x200) ? 0 : !(sys->ts_flg & 0x400) ? 1 : -1 : -1;
+    for (int i = 0; i < 2; i++) {   /* (the press that opened it began in play: no new press) */
+        int now = bind_pad_raw(row[i]);
+        if (now && !prev[i] && scr == i && g_tps.pad_modern && !g_tps.pad_play) r |= i ? 0x2000 : 0x4000;
+        prev[i] = now;
+    }
+    return r;
+}
+
 /* pad.c bhSetPad, before pad_ps is derived: the keyboard/mouse layout as the game's
    virtual pad bits (independent of the controller key type) */
 unsigned int tps_pad(unsigned int pad)
@@ -722,6 +739,7 @@ unsigned int tps_pad(unsigned int pad)
     unsigned k;
     int scope;
     if (sys->ss_flg & 0x400000) return pad;   /* attract demo playback */
+    pad |= toggle_closes();
     k = tps_input_keys(plp && pad_sticks(&pad));
     pad_steer = (pad & 0xF) != 0 && !pad_cam;   /* (the gamepad: its stick, or a d-pad turn: the camera stays) */
     scope = in_scope();

@@ -616,6 +616,15 @@ int bind_held(int row, int dev, const bool* keys, int mouse)
     return 0;
 }
 
+int bind_pad_raw(int row)
+{
+    for (int s = 0; s < BIND_SLOTS; s++) {
+        int c = bind_get(row, BIND_PAD, s);
+        if (c && gamepad && pad_down(c)) return 1;
+    }
+    return 0;
+}
+
 int bind_hotkey(const void* e, int row)
 {
     const SDL_Event* ev = (const SDL_Event*)e;

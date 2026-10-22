@@ -15,6 +15,7 @@
 #include "../src/host/settings.h"
 #include "../src/host/bindings.h"
 #include "../src/host/menu_mouse.h"
+#include "../src/host/tps.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -177,10 +178,15 @@ void pc_options_rows0(void)
 
 /* DisplayOptionPlateLevel0 before it reads the pad: hovering a row selects it, a click confirms
    it (on STEREO/MONO, ON/OFF: picks that value), a right click leaves the option screen */
+static int opt_held = 1;   /* the Modern gamepad's options button (below) was down last frame; 1 when OPTION opens */
 void pc_options_mouse0(int port)
 {
     ADV_WORK* ap = &AdvWork;
-    int hit = -1;
+    int hit = -1, opt = bind_pad_raw(B_TPS_OPTIONS);
+    /* third person with the Modern gamepad: its options button (Start) opened OPTION in the game, and a new press
+       leaves it, as View / Back opens and leaves it with the game's buttons */
+    if (opt && !opt_held && g_tps.on && g_tps.pad_modern && pc_in_game()) Pad[port].press |= P_SELECT;
+    opt_held = opt;
     menu_mouse_take(&mt);
     if (mt.x >= 32 && mt.x < 608 && mt.y >= 160 && mt.y < 384) {   /* rows 32 px apart, their values on the right */
         hit = (int)(mt.y - 160) / 32;
@@ -596,6 +602,7 @@ int pc_options_pc(int port, int flag)
 void pc_options_close(void)
 {
     quit.open = 0;
+    opt_held = 1;
     if (st.any_pending)
         for (int i = 0; i < g_settings_n && i < (int)sizeof(st.pending); i++)
             if (st.pending[i]) { st.pending[i] = 0; settings_act(&g_settings[i]); }

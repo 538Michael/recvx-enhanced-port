@@ -273,6 +273,36 @@ rifle and the linear launcher aim through their scope: the mouse turns it (at th
 sensitivity, slower while zoomed in), Shift held zooms in, left mouse fires, letting go of right
 mouse leaves it. With a gamepad see [Third person with a gamepad](#third-person-with-a-gamepad).
 
+### Controls by scheme
+
+The default bindings with the game's KEY CONFIG type A (the other types move the game's actions
+between the PS2 buttons; the third-person keys and the Modern gamepad's buttons stay). Gamepad as
+Xbox / PlayStation; keyboard in brackets.
+
+| Action | Fixed cameras (Classic or Modern) | Third person, keyboard and mouse | Third person, gamepad Classic | Third person, gamepad Modern |
+|---|---|---|---|---|
+| Move | d-pad, left stick (arrows): tank, or where it points on screen with Modern | W/S/A/D (camera A: towards them on screen) | d-pad, left stick: tank | left stick, seen from the camera; d-pad: tank |
+| Run | B / Circle held (X) | Shift | B / Circle | X / Square, or the stick pushed far |
+| Quick turn | back + run; Modern: the Quick turn row (unbound) | S + Shift | back + run | d-pad down, or stick back + run |
+| Aim | RB / R1 (W) | right mouse | RB / R1 | LT / L2 |
+| Aim while aiming | d-pad, left stick (arrows): turn, up / down | the mouse | right stick, left stick, d-pad | right stick, left stick, d-pad |
+| Fire | A / Cross (Z) while aiming | left mouse | A / Cross | RT / R2 |
+| Reload | RB + Y (R) | R | RB + Y | RB / R1 |
+| Quick knife (hold) | RT / R2 (Space) | Space | RT / R2 | LB / L1 |
+| Action, confirm | A / Cross (Z) | E | A / Cross | A / Cross |
+| Cancel | B / Circle (X) | Q | B / Circle | B / Circle |
+| Inventory | Menu / Start, right stick click (Enter) | Tab | Menu / Start | Y / Triangle |
+| Map | Y / Triangle (S) | M | Y / Triangle | View / Back |
+| OPTION | View / Back (Backspace) | Backspace | View / Back | Menu / Start |
+| Scope zoom | LB / L1 held (Q) | Shift held | LB / L1 held | right stick click, or X held |
+| Stairs | walk into them (Auto-climb stairs) or action | as fixed | as fixed | as fixed |
+
+Menus, messages, the inventory's screens and events use the game's buttons with every scheme
+(confirm A / Cross (Z), cancel B / Circle (X), L1 / R1 (Q / W) for the map's zoom and the pages of
+ENHANCED SETTINGS); with the keyboard in third person the third-person keys (W/A/S/D, E, Q, Tab,
+M) also work in the inventory, map, item box and messages, while the title menus and OPTION take
+the game's keys only. The co-op guest plays with the same controls as in single player.
+
 ### Third person with a gamepad
 
 THIRD PERSON page: **Gamepad controls** = **Modern (twin-stick)**, the default (ini
@@ -317,7 +347,9 @@ has the quick turn on RB gets the new default.
   enemy the aim slows down and drifts slightly towards it while you move the stick.
 - **Menus, messages, events**: the gamepad works as the game's KEY CONFIG type sets it (as in
   Classic); the third-person buttons only play while the third-person camera does. A button held
-  through the change (the one that opened the inventory, say) does nothing until let go.
+  through the change (the one that opened the inventory, say) does nothing until let go. The
+  buttons that open the inventory (Y), the map (View) and OPTION (Start) also close them, as the
+  game's own buttons do.
 - **Mouse and keyboard together** (input source Auto): the camera follows the device used last;
   the gamepad's right stick turns it freely, the mouse as set in "Mouse/keyboard camera".
 - Settings (THIRD PERSON page, GAMEPAD): stick camera speed X / Y (`tps_pad_sens_x`,
