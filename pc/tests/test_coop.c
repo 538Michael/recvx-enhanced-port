@@ -342,6 +342,7 @@ static void test_dgrams(void)
     BADP(q.flags |= PF_CINE | PF_SKIP, COOP_OK);   /* protocol 19: in a cutscene, wants to skip it */
     BADP(q.flags |= 128, COOP_BAD_FIELD);         /* a flag this protocol does not have */
     BADP(q.opts = OPT_ALL, COOP_OK);              /* every game rule */
+    BADP(q.opts = OPT_SKIP_DETECTOR, COOP_OK);    /* protocol 22: the metal detector rule */
     BADP(q.opts = OPT_ALL + 1, COOP_BAD_FIELD);
     BADP(q.opts = 0x80, COOP_BAD_FIELD);
     {   /* the PoseExt's enumerations (protocol 16) */
