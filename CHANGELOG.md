@@ -8,6 +8,14 @@
   between rooms, after starting a new game and after loading a save no longer shows the
   "Now Loading..." text. With Fast loading off it shows as before.
 
+### Co-op
+
+- **Game over for both** (lobby GAME RULES, GAME OVER; CO-OP settings page): the host chooses
+  whether a game over is each player's own (as before) or both players'. With *Both*, when one of
+  you dies you both get the game over screen and the host answers for both: Yes takes both of you
+  back to the last continue point together, each with the items you had there; No takes both of
+  you to the title. Recommended when you play the story together. Both players need this version.
+
 ### Fixes
 
 - **Title menu after returning to the title**: after RETURN TO TITLE, a game over or the end of a
