@@ -576,21 +576,23 @@ static void font_release(void)
 /* ---------------------------------------------------------------- the lobby */
 /* In steps (docs/COOP.md "Lobby"): 1 how to connect (Direct / Via server) and Host or Join,
    2 only that choice's rows plus the player and game rows, 3 the game rules (host: edits them,
-   guest: the host's, read-only). BACK goes one step back; from step 1 it leaves the lobby.
+   guest: the host's, read-only), with their pages 4 enemies and 5 extra events. BACK goes one step
+   back (from a page: to its GAME RULES entry); from step 1 it leaves the lobby.
    The rows in display order; a gap where the group changes. */
 enum { R_MODE, R_HOSTSTEP, R_JOINSTEP,
        R_SERVER, R_PORT, R_ADDR, R_PW, R_RELAY,
        R_NAME, R_CHAR,
        R_START, R_ITEMS, R_FOLLOW, R_RULES,
-       R_LOOT, R_IMP, R_TFREEZE, R_SKIPS, R_RIBBON, R_GOVER, R_DETECTOR, R_EXTRA, R_PLACE, R_RAND, R_VARIETY, R_EVENTS, R_SEED, R_RSEED,
+       R_LOOT, R_IMP, R_TFREEZE, R_SKIPS, R_RIBBON, R_GOVER, R_ENEMYPG, R_EVENTPG,
+       R_EXTRA, R_PLACE, R_RAND, R_VARIETY, R_EVENTS, R_SEED, R_RSEED, R_DETECTOR,
        R_HOST, R_GO, R_COPY, R_RCOPY, R_KICK, R_STOP, R_JOIN,
        R_BACK, R_N };
-static const unsigned char row_group[R_N] = { 0, 1, 1, 0, 0, 0, 0, 0, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 6 };
+static const unsigned char row_group[R_N] = { 0, 1, 1, 0, 0, 0, 0, 0, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 7, 7, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 6 };
 enum { F_NONE, F_NAME, F_ADDR, F_PORT, F_SEED, F_SERVER, F_PW };
 
 static struct {
     int open, row, role;                /* role 0 host, 1 join */
-    int step;                           /* 1 connection and role, 2 its options, 3 game rules */
+    int step;                           /* 1 connection and role, 2 its options, 3 game rules, 4 / 5 its pages */
     int mode;                           /* 0 direct (P2P), 1 via a co-op server (g_coop.conn Automatic or Via server) */
     int edit;                           /* F_* being edited */
     char buf[128];
@@ -614,9 +616,11 @@ static int row_visible(int r)
     int host = lb.role == 0, srv = lb.mode;
     if (r == R_BACK) return 1;
     if (lb.step == 1) return r == R_MODE || r == R_HOSTSTEP || r == R_JOINSTEP;
-    if (r == R_VARIETY || r == R_EVENTS) return lb.step == 3 && shown_eo()->rand;   /* only the randomizer has them */
-    if (lb.step == 3) return (r >= R_GOVER && r <= R_SEED) || ((r == R_LOOT || r == R_TFREEZE || r == R_SKIPS || r == R_RIBBON || r == R_RSEED) && host) ||
+    if (r == R_VARIETY || r == R_EVENTS) return lb.step == 4 && shown_eo()->rand;   /* only the randomizer has them */
+    if (lb.step == 3) return r == R_GOVER || r == R_ENEMYPG || r == R_EVENTPG || ((r == R_LOOT || r == R_TFREEZE || r == R_SKIPS || r == R_RIBBON) && host) ||
                              (r == R_IMP && host && !g_coop.loot);   /* only shared loot has it */
+    if (lb.step == 4) return (r >= R_EXTRA && r <= R_SEED) || (r == R_RSEED && host);
+    if (lb.step == 5) return r == R_DETECTOR;
     switch (r) {
     case R_PORT: return host && !srv;
     case R_SERVER: case R_PW: case R_RELAY: return srv;   /* the co-op server (docs/SERVER.md) */
@@ -835,8 +839,8 @@ static int back(void)
 {
     CallSystemSe(0, 0);
     if (lb.step <= 1) return 1;
-    lb.step--;
-    lb.row = lb.step == 2 ? R_RULES : lb.role ? R_JOINSTEP : R_HOSTSTEP;
+    if (lb.step > 3) { lb.row = lb.step == 4 ? R_ENEMYPG : R_EVENTPG; lb.step = 3; }
+    else { lb.step--; lb.row = lb.step == 2 ? R_RULES : lb.role ? R_JOINSTEP : R_HOSTSTEP; }
     if (!row_selectable(lb.row)) lb.row = first_row();
     host_log("lobby: back to step %d\n", lb.step);
     return 0;
@@ -859,6 +863,8 @@ static int activate(int r)
     case R_HOSTSTEP: lb.role = 0; step_to(2); return 0;
     case R_JOINSTEP: lb.role = 1; step_to(2); return 0;
     case R_RULES: step_to(3); return 0;
+    case R_ENEMYPG: step_to(4); return 0;
+    case R_EVENTPG: step_to(5); return 0;
     case R_NAME: edit_begin(F_NAME); return 0;
     case R_PORT: edit_begin(F_PORT); return 0;
     case R_SEED: edit_begin(F_SEED); return 0;
@@ -976,6 +982,8 @@ static const char* heading(void)
     static char h[64];
     if (lb.step == 1) return "HOW DO YOU WANT TO PLAY?";
     if (lb.step == 3) return lb.role ? "THE HOST'S GAME RULES" : "GAME RULES";
+    if (lb.step > 3) return lb.step == 4 ? (lb.role ? "THE HOST'S RULES - ENEMIES" : "GAME RULES - ENEMIES")
+                                         : (lb.role ? "THE HOST'S RULES - EXTRA EVENTS" : "GAME RULES - EXTRA EVENTS");
     snprintf(h, sizeof(h), "%s - %s", lb.role ? "JOIN A GAME" : "HOST A GAME", lb.mode ? "VIA SERVER" : "DIRECT (P2P)");
     return h;
 }
@@ -1002,6 +1010,18 @@ static void row_text(int r, char* label, char* val, int n)
     case R_RIBBON: strcpy(label, "INK RIBBONS"); snprintf(val, n, "%s", settings_get(lset("No ink ribbons needed")) ? "Not needed" : "Needed"); break;
     case R_START: strcpy(label, "START"); start_label(val, n, g_coop.start); break;
     case R_RULES: strcpy(label, lb.role ? "THE HOST'S RULES" : "GAME RULES"); break;
+    case R_ENEMYPG: {   /* a page: what is on (draw_rows adds its arrow) */
+        const char* on[3] = { eo->extra ? "Extra" : NULL, eo->place ? "Rearranged" : NULL, eo->rand ? "Randomizer" : NULL };
+        int k, m = 0;
+        strcpy(label, "ENEMIES");
+        for (k = 0; k < 3; k++) if (on[k]) m += snprintf(val + m, n - m, "%s%s", m ? ", " : "", on[k]);
+        if (!m) snprintf(val, n, "As original");
+        break;
+    }
+    case R_EVENTPG:
+        strcpy(label, "EXTRA EVENTS");
+        snprintf(val, n, "%s", (lb.role ? coop_skip_detector() : g_coop.skip_detector) ? "Detector skipped" : "As original");
+        break;
     case R_HOST: strcpy(label, "OPEN THE LOBBY"); break;
     case R_GO: strcpy(label, "START THE GAME"); break;
     case R_STOP: strcpy(label, "CLOSE THE LOBBY"); break;
@@ -1054,8 +1074,11 @@ static const char* row_help(int r)
     case R_START: return "What the game starts from: a new game (normal, easy, very easy) or one of your saves.";
     case R_ITEMS: return "The inventory you join with: the one the host kept for you from your last visit, a new inventory, or that of one of your saves.";
     case R_FOLLOW: return eset(&g_coop.follow)->help;
-    case R_RULES: return host ? "Loot, enemies freezing while you trade, cutscene skips, ink ribbons, game over, the metal detector and the enemy options (extra, rearranged, randomizer, variety, event enemies, seed)."
-                              : "The host's game over and metal detector rules and enemy options (read-only).";
+    case R_RULES: return host ? "Loot, enemies freezing while you trade, cutscene skips, ink ribbons and game over; the enemy options and extra events have a page each."
+                              : "The host's game over rule, enemy options and extra events (read-only).";
+    case R_ENEMYPG: return host ? "A page of enemy options: extra enemies, rearranged enemies and the randomizer (variety, event enemies, seed)."
+                                : "The host's enemy options: extra enemies, rearranged enemies and the randomizer (read-only).";
+    case R_EVENTPG: return host ? "A page of rules for single events: the prison's metal detector." : "The host's rules for single events: the prison's metal detector (read-only).";
     case R_LOOT: return "Shared: each item lies there once - whoever takes it has it, so you split the supplies; one item box. Individual: each finds their own copy and has their own box. Keys and story go to both.";
     case R_TFREEZE: return eset(&g_coop.trade_freeze)->help;
     case R_DETECTOR: return "Skipped: the prison's metal detector lets both of you pass with weapons and its security boxes stay shut (one holding items still opens). As original: as in single player.";
@@ -1080,7 +1103,7 @@ static const char* row_help(int r)
     case R_JOIN: return session_on() ? "Leaves the host's lobby." : "Joins the host's lobby; the host starts the game.";
     case R_BACK:
         return lb.step == 1 ? "Back to the title menu; an open lobby or session closes."
-             : lb.step == 2 ? "Back to choosing how to connect (an open lobby stays open)." : "Back to the lobby.";
+             : lb.step == 2 ? "Back to choosing how to connect (an open lobby stays open)." : lb.step == 3 ? "Back to the lobby." : "Back to the game rules.";
     default: return "";
     }
 }
@@ -1150,8 +1173,10 @@ static void draw_rows(void)
             if (!locked) { arrow(VAL_X, y + 9, -1, col); arrow(VAL_X + 14 + w + 12, y + 9, 1, col); }
             text(VAL_X + 12, y + (ROW_SC - sc) * 14, val, sc, col);
         } else if (val[0] || lb.edit) {
-            float w = text_w(val, ROW_SC), sc = w > 220 ? ROW_SC * 220 / w : ROW_SC;   /* a long address: narrower */
+            int page = r == R_ENEMYPG || r == R_EVENTPG;   /* opens a page: an arrow after it */
+            float lim = page ? 196.0f : 220.0f, w = text_w(val, ROW_SC), sc = w > lim ? ROW_SC * lim / w : ROW_SC;   /* a long address: narrower */
             text(VAL_X, y + (ROW_SC - sc) * 14, val, sc, col);
+            if (page) arrow(VAL_X + (sc < ROW_SC ? lim : w) + 16, y + 9, 1, col);
             if (sel && lb.edit && (lb.spin & 16)) {   /* caret */
                 char pre[128];
                 snprintf(pre, sizeof(pre), "%.*s", lb.caret, lb.buf);
