@@ -120,8 +120,6 @@ with mingw-w64: see [docs/BUILDING.md](docs/BUILDING.md).
 
 - **[recvx-decomp](https://github.com/AshfordFamily/recvx-decomp)** by AshfordFamily and its
   contributors: the decompilation this port is built on (MIT).
-- **[SkeletonPicture](https://github.com/SkeletonPicture)** for hosting the Katana SDK and CRI
-  Middleware header repositories the decomp uses as submodules.
 - Libraries: [SDL 3](https://github.com/libsdl-org/SDL) (zlib),
   [Dear ImGui](https://github.com/ocornut/imgui) (MIT),
   [miniupnpc and libnatpmp](https://github.com/miniupnp) (BSD-3-Clause),
