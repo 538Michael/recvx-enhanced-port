@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- **Co-op: stuck in the load screen when following the host**: some rooms change once a key item
+  has been used (the prison yard after its gate opened). A joining player who followed the host
+  into or out of such a room could load the wrong version of it and crash, or wait in the load
+  screen for good until the session dropped. Following now loads the room as the host has it.
+
 ## 0.6.6 (2026-10-22)
 
 ### Gameplay
