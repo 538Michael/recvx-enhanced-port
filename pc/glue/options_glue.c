@@ -54,7 +54,10 @@ static unsigned int ok_button(void) { return (sys->keytype & 3) < 3 ? AdvGetOkBu
 static unsigned int cancel_button(void) { return (sys->keytype & 3) < 3 ? AdvGetCancelButton() : 0x20; }
 
 /* Adv_GameOptionScreen, every frame: the OS cursor shows while the option screen is up */
-void pc_options_frame(void) { g_menu_mouse.active = 1; }
+static int options_up;
+void pc_options_frame(void) { g_menu_mouse.active = 1; options_up = 1; }
+/* tps_frame, once per game frame: the option screen ran in this frame (taken, so nothing is left over when it ends) */
+int pc_options_up(void) { int r = options_up; options_up = 0; return r; }
 void pc_tex_keep_original(int texno);   /* texture_glue.c: our entries are cut from the option textures */
 
 /* ---------------------------------------------------------------- level 0: ENHANCED SETTINGS, RETURN TO TITLE
@@ -261,6 +264,17 @@ static void build_rows(void)
     if (st.sel >= nrows) st.sel = nrows - 1;
 }
 
+/* what switches the page (L1 / R1) on the device in use: the gamepad's names (LB / RB on an Xbox pad), else the keys */
+static const char* page_keys(char* buf, int n)
+{
+    char a[32], b[32];
+    int dev = bind_gamepad() ? BIND_PAD : BIND_KB;
+    bind_code_name(dev, bind_get(B_L1, dev, 0), a, sizeof(a));
+    bind_code_name(dev, bind_get(B_R1, dev, 0), b, sizeof(b));
+    snprintf(buf, n, "%s/%s", a, b);
+    return buf;
+}
+
 static void say(const char* m) { snprintf(st.msg, sizeof(st.msg), "%s", m); st.msg_t = 120; }
 
 static void move_sel(int dir)
@@ -401,7 +415,7 @@ static void draw_row(int i, int sel)
         pc_ui_arrow(320 + w / 2 + 14, y + 9, 1, col);
         snprintf(t, sizeof(t), "%d/%d", st.page + 1, SP_COUNT);
         pc_ui_text(560, y + 2, t, 0.45f, 0xFF909090);
-        pc_ui_text(48, y + 2, "L1  R1", 0.45f, 0xFF909090);
+        pc_ui_text(48, y + 2, page_keys(t, sizeof(t)), 0.45f, 0xFF909090);
         return;
     }
     case K_GROUP: pc_ui_text(X_LABEL - 6, y + 2, g_settings[r->idx].group, 0.45f, 0xFFE0C080); return;
@@ -472,7 +486,8 @@ static void draw_help(void)
         col = 0xFFFFE080;
     } else if (st.msg_t > 0) { st.msg_t--; snprintf(t, sizeof(t), "%s", st.msg); col = 0xFFFFE080; }
     else switch (r->kind) {
-    case K_PAGE: snprintf(t, sizeof(t), "Left/right or L1/R1 change the page, up/down choose a setting. Changes are saved at once; F1 shows the same settings."); break;
+    case K_PAGE: snprintf(t, sizeof(t), "Left/right or %s change the page, up/down choose a setting. Changes are saved at once; F1 shows the same settings.",
+                          page_keys(nm, sizeof(nm))); break;
     case K_DEVICE: snprintf(t, sizeof(t), "%s", st.dev ? bind_pad_desc() : "The game's buttons, third-person keys and hotkeys."); break;
     case K_RESET: snprintf(t, sizeof(t), "All %s bindings back to the defaults.", st.dev ? "gamepad" : "keyboard and mouse"); break;
     case K_BACK: snprintf(t, sizeof(t), "Back to the OPTION screen (also cancel or a right click)."); break;

@@ -522,8 +522,8 @@ static int code_down(int row, int dev, int c, const bool* keys, int mouse)
 {
     if (dev == BIND_KB) {
         if (!input_accept(g_input_source, 0, BIND_KB, 0)) return 0;   /* Gamepad only */
-        /* third person takes the keys it uses over (W/A/S/Q by default) */
-        if (bind_rows[row].group == BG_GAME && g_tps.on && tps_uses(BIND_KB, c)) return 0;
+        /* third person takes the keys it uses over (W/A/S/Q by default), in a game outside OPTION (kb_play) */
+        if (bind_rows[row].group == BG_GAME && g_tps.kb_play && tps_uses(BIND_KB, c)) return 0;
         return c >= BIND_MOUSE ? (mouse & SDL_BUTTON_MASK(c - BIND_MOUSE)) != 0 : c < SDL_SCANCODE_COUNT && keys[c];
     }
     return gamepad && pad_row_reads(row, c) && pad_down(c);

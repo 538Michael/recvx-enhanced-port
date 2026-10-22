@@ -34,6 +34,7 @@ int reload_at_rest(void);      /* reload_glue.c */
 int pc_in_play(const BH_PWORK* p, int scope);
 int pc_in_game(void);           /* options_glue.c */
 int pc_trade_screen(void);      /* trade_glue.c */
+int pc_options_up(void);        /* options_glue.c */
 
 static float yaw, pitch;          /* camera, game angle units (65536 = 360 deg); pitch > 0 looks up */
 static float mouse_dx, mouse_dy;  /* this frame's mouse motion, pixels */
@@ -1553,6 +1554,7 @@ void tps_frame(void)
     /* the gamepad's third-person rows play while our camera is, the game not frozen (menus,
        messages, pick-ups, their fades), through hits, grabs and weapon loads (a held trigger or
        quick knife stays held) */
+    g_tps.kb_play = on && pc_in_game() && !pc_options_up();
     g_tps.pad_play = on && g_tps.pad_modern && (tps_cam_active || in_scope()) && sys && (sys->sp_flg & 0x40) && !(sys->ss_flg & 0x400000);
     /* with or without third person: the player has control, so no menu has the mouse (menu_mouse.c);
        the co-op trade screen is open in play */

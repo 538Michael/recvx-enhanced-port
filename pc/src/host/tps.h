@@ -34,6 +34,9 @@ typedef struct TpsConfig {
     volatile int aiming;      /* weapon raised (crosshair) */
     volatile int pad_play;    /* modern gamepad scheme in third-person play: the gamepad's third-person
                                  rows play instead of its game rows (bindings.c) */
+    volatile int kb_play;     /* third person in a game, no OPTION screen up: the keyboard's third-person keys
+                                 take theirs over from the game rows (bindings.c); the title menus and OPTION
+                                 read the DS2 buttons, so there Q/W/A/S are L1/R1/Square/Triangle again */
 } TpsConfig;
 
 extern TpsConfig g_tps;
