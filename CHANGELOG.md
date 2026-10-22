@@ -8,6 +8,17 @@
   between rooms, after starting a new game and after loading a save no longer shows the
   "Now Loading..." text. With Fast loading off it shows as before.
 
+### Fixes
+
+- **Title menu after returning to the title**: after RETURN TO TITLE, a game over or the end of a
+  co-op session in third person, the gamepad could move in the title menu but not select anything.
+- **ENHANCED SETTINGS pages**: with third person on, the keyboard's Q and W did not switch pages in
+  the title menus and OPTION. The page row now names the buttons of your device.
+- **Classic gamepad aiming in third person**: the crosshair only moved with the game's auto-aim.
+  The right stick aims now, and the left stick and d-pad move the crosshair while aiming.
+- **Modern gamepad in third person**: Start opens OPTION, which the gamepad could not reach before,
+  and Y, View and Start close the inventory, map and OPTION again.
+
 ## 0.6.6 (2026-10-22)
 
 ### Gameplay

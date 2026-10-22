@@ -15,6 +15,7 @@
 #include "../src/host/settings.h"
 #include "../src/host/bindings.h"
 #include "../src/host/menu_mouse.h"
+#include "../src/host/tps.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -54,7 +55,10 @@ static unsigned int ok_button(void) { return (sys->keytype & 3) < 3 ? AdvGetOkBu
 static unsigned int cancel_button(void) { return (sys->keytype & 3) < 3 ? AdvGetCancelButton() : 0x20; }
 
 /* Adv_GameOptionScreen, every frame: the OS cursor shows while the option screen is up */
-void pc_options_frame(void) { g_menu_mouse.active = 1; }
+static int options_up;
+void pc_options_frame(void) { g_menu_mouse.active = 1; options_up = 1; }
+/* tps_frame, once per game frame: the option screen ran in this frame (taken, so nothing is left over when it ends) */
+int pc_options_up(void) { int r = options_up; options_up = 0; return r; }
 void pc_tex_keep_original(int texno);   /* texture_glue.c: our entries are cut from the option textures */
 
 /* ---------------------------------------------------------------- level 0: ENHANCED SETTINGS, RETURN TO TITLE
@@ -174,10 +178,15 @@ void pc_options_rows0(void)
 
 /* DisplayOptionPlateLevel0 before it reads the pad: hovering a row selects it, a click confirms
    it (on STEREO/MONO, ON/OFF: picks that value), a right click leaves the option screen */
+static int opt_held = 1;   /* the Modern gamepad's options button (below) was down last frame; 1 when OPTION opens */
 void pc_options_mouse0(int port)
 {
     ADV_WORK* ap = &AdvWork;
-    int hit = -1;
+    int hit = -1, opt = bind_pad_raw(B_TPS_OPTIONS);
+    /* third person with the Modern gamepad: its options button (Start) opened OPTION in the game, and a new press
+       leaves it, as View / Back opens and leaves it with the game's buttons */
+    if (opt && !opt_held && g_tps.on && g_tps.pad_modern && pc_in_game()) Pad[port].press |= P_SELECT;
+    opt_held = opt;
     menu_mouse_take(&mt);
     if (mt.x >= 32 && mt.x < 608 && mt.y >= 160 && mt.y < 384) {   /* rows 32 px apart, their values on the right */
         hit = (int)(mt.y - 160) / 32;
@@ -259,6 +268,17 @@ static void build_rows(void)
     }
     rows[nrows++] = (Row){ K_BACK, 0 };
     if (st.sel >= nrows) st.sel = nrows - 1;
+}
+
+/* what switches the page (L1 / R1) on the device in use: the gamepad's names (LB / RB on an Xbox pad), else the keys */
+static const char* page_keys(char* buf, int n)
+{
+    char a[32], b[32];
+    int dev = bind_gamepad() ? BIND_PAD : BIND_KB;
+    bind_code_name(dev, bind_get(B_L1, dev, 0), a, sizeof(a));
+    bind_code_name(dev, bind_get(B_R1, dev, 0), b, sizeof(b));
+    snprintf(buf, n, "%s/%s", a, b);
+    return buf;
 }
 
 static void say(const char* m) { snprintf(st.msg, sizeof(st.msg), "%s", m); st.msg_t = 120; }
@@ -401,7 +421,7 @@ static void draw_row(int i, int sel)
         pc_ui_arrow(320 + w / 2 + 14, y + 9, 1, col);
         snprintf(t, sizeof(t), "%d/%d", st.page + 1, SP_COUNT);
         pc_ui_text(560, y + 2, t, 0.45f, 0xFF909090);
-        pc_ui_text(48, y + 2, "L1  R1", 0.45f, 0xFF909090);
+        pc_ui_text(48, y + 2, page_keys(t, sizeof(t)), 0.45f, 0xFF909090);
         return;
     }
     case K_GROUP: pc_ui_text(X_LABEL - 6, y + 2, g_settings[r->idx].group, 0.45f, 0xFFE0C080); return;
@@ -472,7 +492,8 @@ static void draw_help(void)
         col = 0xFFFFE080;
     } else if (st.msg_t > 0) { st.msg_t--; snprintf(t, sizeof(t), "%s", st.msg); col = 0xFFFFE080; }
     else switch (r->kind) {
-    case K_PAGE: snprintf(t, sizeof(t), "Left/right or L1/R1 change the page, up/down choose a setting. Changes are saved at once; F1 shows the same settings."); break;
+    case K_PAGE: snprintf(t, sizeof(t), "Left/right or %s change the page, up/down choose a setting. Changes are saved at once; F1 shows the same settings.",
+                          page_keys(nm, sizeof(nm))); break;
     case K_DEVICE: snprintf(t, sizeof(t), "%s", st.dev ? bind_pad_desc() : "The game's buttons, third-person keys and hotkeys."); break;
     case K_RESET: snprintf(t, sizeof(t), "All %s bindings back to the defaults.", st.dev ? "gamepad" : "keyboard and mouse"); break;
     case K_BACK: snprintf(t, sizeof(t), "Back to the OPTION screen (also cancel or a right click)."); break;
@@ -581,6 +602,7 @@ int pc_options_pc(int port, int flag)
 void pc_options_close(void)
 {
     quit.open = 0;
+    opt_held = 1;
     if (st.any_pending)
         for (int i = 0; i < g_settings_n && i < (int)sizeof(st.pending); i++)
             if (st.pending[i]) { st.pending[i] = 0; settings_act(&g_settings[i]); }

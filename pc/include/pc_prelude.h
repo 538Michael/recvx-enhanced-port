@@ -260,6 +260,7 @@ void  trade_textures_released(void);        /* njReleaseTextureAll */
 /* quick knife (pc/glue/knife_glue.c) */
 unsigned int knife_pad(unsigned int pad);
 void knife_game_exit(void);   /* cheat_game_exit (bhExitGame): the knife's state of that game goes */
+void tps_game_exit(void);     /* cheat_game_exit (bhExitGame): the third-person camera of that game goes (tps_glue.c) */
 /* modern controls for the fixed cameras (pc/glue/modern_glue.c): nothing while they are off */
 unsigned int modern_pad(unsigned int pad);   /* pad.c bhSetPad, before knife_pad */
 void  modern_player(void);                    /* player.c bhControlPlayer, after the mode handler */

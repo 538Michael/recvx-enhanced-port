@@ -106,8 +106,9 @@ All PC settings are available in two places that edit the same values:
 
 - **OPTION -> ENHANCED SETTINGS**: in the game's own OPTION screen (title menu, or Select in
   game) next to EXIT: select EXIT and press right (or click it). Drawn in the game's style, with
-  the pages DISPLAY, GAMEPLAY, CONTROLS, THIRD PERSON, AUDIO, APPEARANCE, CO-OP and EXTRAS. Left/right or
-  L1/R1 on the page row switch pages, up/down (or the mouse wheel) choose a setting, left/right
+  the pages DISPLAY, GAMEPLAY, CONTROLS, THIRD PERSON, AUDIO, APPEARANCE, CO-OP and EXTRAS. L1/R1
+  (LB/RB, keyboard Q/W, as the page row names them) switch pages from anywhere, both ways round
+  the eight, as do left/right on the page row; up/down (or the mouse wheel) choose a setting, left/right
   change it, cancel or a right click goes back. Long pages scroll; the bottom lines explain the
   selected setting, or why it cannot change right now. "(next start)" marks a setting that takes
   effect when the game starts again.
@@ -204,7 +205,9 @@ side, mouse sensitivity, invert Y, crosshair, the game's auto-aim and the gamepa
 - **Light and fog** (`tps_atmos`): Per cut (original) or Smooth (fades over a second when the
   room's camera cut changes).
 - **Gamepad controls** (`tps_pad_controls`): **Modern (twin-stick)** (default) or Classic (tank
-  controls through the game's buttons, the camera behind).
+  controls through the game's buttons, the camera behind). In Classic the weapon is raised with the
+  game's aim button (R1); the right stick, the left stick and the d-pad then move the crosshair
+  (with "Game auto-aim" on, the game's lock-on instead).
 - **Precise hits** (`tps_precise_hits`, on by default): with free aim a shot hits an enemy only where
   the crosshair meets its body (head, torso, arms, legs as it moves, crawls or lies); a shot beside it
   misses. A head hit does half again the damage (zombies, Cerberus, Bandersnatch, Tyrant, Alexia's
@@ -270,6 +273,36 @@ rifle and the linear launcher aim through their scope: the mouse turns it (at th
 sensitivity, slower while zoomed in), Shift held zooms in, left mouse fires, letting go of right
 mouse leaves it. With a gamepad see [Third person with a gamepad](#third-person-with-a-gamepad).
 
+### Controls by scheme
+
+The default bindings with the game's KEY CONFIG type A (the other types move the game's actions
+between the PS2 buttons; the third-person keys and the Modern gamepad's buttons stay). Gamepad as
+Xbox / PlayStation; keyboard in brackets.
+
+| Action | Fixed cameras (Classic or Modern) | Third person, keyboard and mouse | Third person, gamepad Classic | Third person, gamepad Modern |
+|---|---|---|---|---|
+| Move | d-pad, left stick (arrows): tank, or where it points on screen with Modern | W/S/A/D (camera A: towards them on screen) | d-pad, left stick: tank | left stick, seen from the camera; d-pad: tank |
+| Run | B / Circle held (X) | Shift | B / Circle | X / Square, or the stick pushed far |
+| Quick turn | back + run; Modern: the Quick turn row (unbound) | S + Shift | back + run | d-pad down, or stick back + run |
+| Aim | RB / R1 (W) | right mouse | RB / R1 | LT / L2 |
+| Aim while aiming | d-pad, left stick (arrows): turn, up / down | the mouse | right stick, left stick, d-pad | right stick, left stick, d-pad |
+| Fire | A / Cross (Z) while aiming | left mouse | A / Cross | RT / R2 |
+| Reload | RB + Y (R) | R | RB + Y | RB / R1 |
+| Quick knife (hold) | RT / R2 (Space) | Space | RT / R2 | LB / L1 |
+| Action, confirm | A / Cross (Z) | E | A / Cross | A / Cross |
+| Cancel | B / Circle (X) | Q | B / Circle | B / Circle |
+| Inventory | Menu / Start, right stick click (Enter) | Tab | Menu / Start | Y / Triangle |
+| Map | Y / Triangle (S) | M | Y / Triangle | View / Back |
+| OPTION | View / Back (Backspace) | Backspace | View / Back | Menu / Start |
+| Scope zoom | LB / L1 held (Q) | Shift held | LB / L1 held | right stick click, or X held |
+| Stairs | walk into them (Auto-climb stairs) or action | as fixed | as fixed | as fixed |
+
+Menus, messages, the inventory's screens and events use the game's buttons with every scheme
+(confirm A / Cross (Z), cancel B / Circle (X), L1 / R1 (Q / W) for the map's zoom and the pages of
+ENHANCED SETTINGS); with the keyboard in third person the third-person keys (W/A/S/D, E, Q, Tab,
+M) also work in the inventory, map, item box and messages, while the title menus and OPTION take
+the game's keys only. The co-op guest plays with the same controls as in single player.
+
 ### Third person with a gamepad
 
 THIRD PERSON page: **Gamepad controls** = **Modern (twin-stick)**, the default (ini
@@ -292,7 +325,8 @@ behind). As in the Resident Evil 2 and 4 remakes:
 | D-pad down | quick turn (the camera swings round with the character) | `pad_tps_quickturn` |
 | Right stick click | camera behind the character; in the scope: zoom in / out | `pad_tps_recenter` |
 | Left stick pulled back + run | quick turn | |
-| D-pad up / left / right, Start | as before (d-pad: tank turn and walk; Start: options) | |
+| Menu / Options (Start) | options (the OPTION screen; View / Share is the map here) | `pad_tps_options` |
+| D-pad up / left / right | as before: tank turn and walk; while aiming they move the crosshair | |
 
 The sniper rifle and the linear launcher aim through their scope: hold LT, aim with the right stick
 (the left stick and d-pad turn it as in the original), click the right stick to zoom in or out, RT
@@ -307,12 +341,15 @@ has the quick turn on RB gets the new default.
   than 100 degrees away turns it on the spot first. After a quick turn or "camera behind" the
   held stick keeps its meaning until it turns or is let go, so you keep running the way you
   were going.
-- **Aiming** is free aim, exactly as with the mouse (the same crosshair, shot and pose). With
+- **Aiming** is free aim, exactly as with the mouse (the same crosshair, shot and pose). The left
+  stick and the d-pad move the crosshair too while aiming. With
   **Game auto-aim** on, the gamepad gets a gentle aim assist instead of the lock-on: near an
   enemy the aim slows down and drifts slightly towards it while you move the stick.
 - **Menus, messages, events**: the gamepad works as the game's KEY CONFIG type sets it (as in
   Classic); the third-person buttons only play while the third-person camera does. A button held
-  through the change (the one that opened the inventory, say) does nothing until let go.
+  through the change (the one that opened the inventory, say) does nothing until let go. The
+  buttons that open the inventory (Y), the map (View) and OPTION (Start) also close them, as the
+  game's own buttons do.
 - **Mouse and keyboard together** (input source Auto): the camera follows the device used last;
   the gamepad's right stick turns it freely, the mouse as set in "Mouse/keyboard camera".
 - Settings (THIRD PERSON page, GAMEPAD): stick camera speed X / Y (`tps_pad_sens_x`,
