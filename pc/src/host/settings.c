@@ -311,6 +311,7 @@ static const char* const fps_limits[] = { "Off (display rate)", "30", "60", "90"
 static const char* const aspects[] = { "4:3 (original)", "Stretch to window", "Widescreen (hor+)" };
 static const char* const save_systems[] = { "Native files", "Memory card (original)" };
 static const char* const loots[] = { "Shared", "Individual" };
+static const char* const gameovers[] = { "Each player", "Both" };
 static const char* const conns[] = { "Automatic", "Direct (P2P)", "Via server" };
 static const char* const atmos_names[] = { "Per cut (original)", "Smooth" };
 static const char* const free_cam_names[] = { "B (behind character)", "A (free)" };
@@ -446,6 +447,8 @@ const Setting g_settings[] = {
       .help = "Shared loot: weapons and ink ribbons lie there for each player (taking one leaves the partner's). Off: they are one pickup like ammo and herbs." },
     { SP_COOP, "Synchronized cutscene skip (host)", V(g_coop.skip_sync), 0, 1, 1,
       .help = "A cutscene both of you watch is skipped once both pressed skip; the partner sees that you want to." },
+    { SP_COOP, "Game over (host)", V(g_coop.gameover_both), 0, 1, 1, gameovers,
+      .help = "Each player: whoever dies retries alone. Both: one game over is both players' and the host answers Retry for both - Yes takes both back to the last continue point with the items each had there, No takes both to the title." },
     { SP_COOP, "Freeze enemies while trading (host)", V(g_coop.trade_freeze), 0, 1, 1, .help = "While both players are in the trade screen the room's enemies stand still (the host's setting counts)." },
     { SP_COOP, "Remember partner inventories (host)", V(g_coop.remember), 0, 1, 1, .flags = SET_F1,
       .help = "Keep each partner's items when it leaves, kept with your saves: it can join again with them (ITEMS: Saved with the host), and gets them back after its game crashed." },

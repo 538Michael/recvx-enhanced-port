@@ -69,6 +69,7 @@ static const struct { const char* key; int* val; int lo, hi; } keys[] = {
     { "coop_remember", &g_coop.remember, 0, 1 },          /* host: saved partner inventories */
     { "coop_important", &g_coop.important, 0, 1 },        /* host, shared loot: weapons and ink ribbons for both */
     { "coop_skip_sync", &g_coop.skip_sync, 0, 1 },        /* host: a cutscene is skipped when both press skip */
+    { "coop_gameover", &g_coop.gameover_both, 0, 1 },     /* host: 0 each player, 1 both (one game over is both players') */
     { "hide_ip", &g_coop.hide_ip, 0, 1 },                /* Hide IP addresses: on screen masked (coop_shown) */
     { "coop_start", &g_coop.start, 0, 1000002 },
     { "menu_mouse", (int*)&g_menu_mouse.on, 0, 1 },
