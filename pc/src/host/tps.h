@@ -48,6 +48,7 @@ enum { TPS_K_FWD = 1, TPS_K_BACK = 2, TPS_K_LEFT = 4, TPS_K_RIGHT = 8, TPS_K_RUN
 unsigned tps_input_keys(int quickturn);       /* quickturn: also hold the quick turn (gamepad gesture) */
 void tps_take_mouse(float* dx, float* dy);   /* pixels moved since the last call */
 int tps_pad_sticks(float* lx, float* ly, float* rx, float* ry);   /* the gamepad's sticks, -1..1, y up; 0 = none */
+void tps_pad_dpad(float* x, float* y);       /* the gamepad's d-pad: -1, 0 or 1 each, y up */
 int tps_pad_touched(void);                   /* any gamepad button or stick in use */
 int tps_kbm_touched(void);                   /* any key or mouse button down (the mouse motion: tps_take_mouse) */
 /* main thread */

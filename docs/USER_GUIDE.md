@@ -205,7 +205,9 @@ side, mouse sensitivity, invert Y, crosshair, the game's auto-aim and the gamepa
 - **Light and fog** (`tps_atmos`): Per cut (original) or Smooth (fades over a second when the
   room's camera cut changes).
 - **Gamepad controls** (`tps_pad_controls`): **Modern (twin-stick)** (default) or Classic (tank
-  controls through the game's buttons, the camera behind).
+  controls through the game's buttons, the camera behind). In Classic the weapon is raised with the
+  game's aim button (R1); the right stick, the left stick and the d-pad then move the crosshair
+  (with "Game auto-aim" on, the game's lock-on instead).
 - **Precise hits** (`tps_precise_hits`, on by default): with free aim a shot hits an enemy only where
   the crosshair meets its body (head, torso, arms, legs as it moves, crawls or lies); a shot beside it
   misses. A head hit does half again the damage (zombies, Cerberus, Bandersnatch, Tyrant, Alexia's
@@ -308,7 +310,8 @@ has the quick turn on RB gets the new default.
   than 100 degrees away turns it on the spot first. After a quick turn or "camera behind" the
   held stick keeps its meaning until it turns or is let go, so you keep running the way you
   were going.
-- **Aiming** is free aim, exactly as with the mouse (the same crosshair, shot and pose). With
+- **Aiming** is free aim, exactly as with the mouse (the same crosshair, shot and pose). The left
+  stick and the d-pad move the crosshair too while aiming. With
   **Game auto-aim** on, the gamepad gets a gentle aim assist instead of the lock-on: near an
   enemy the aim slows down and drifts slightly towards it while you move the stick.
 - **Menus, messages, events**: the gamepad works as the game's KEY CONFIG type sets it (as in

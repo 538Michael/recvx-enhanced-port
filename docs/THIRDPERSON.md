@@ -88,8 +88,8 @@ from the same point along the same angles, so it goes where the scope's centre i
   (`pad_tps_recenter`, which has nothing to recenter there) switches the zoom on and off: the
   stick that aims holds no button well, and LB, the game's zoom (L1), is the quick knife here. The
   zoom ends with the scope. Run (X) held zooms too, as Shift does.
-* **Gamepad, Classic**: the game's own scope controls, unchanged (R1 aims, the left stick and d-pad
-  turn it, L1 zooms).
+* **Gamepad, Classic**: the game's own scope controls (R1 aims, the left stick and d-pad turn it, L1
+  zooms), and the right stick turns it as in Modern.
 * **Widescreen**: the view through the scope is hor+ as the normal view, and its tint fills the
   width as the DISPLAY setting "Screen effects" says (Original keeps it 4:3, Off leaves it out);
   the reticle stays round in the middle, where the shots go.
@@ -103,7 +103,13 @@ from the same point along the same angles, so it goes where the scope's centre i
 
 Setting "Gamepad controls" (THIRD PERSON page, ini `tps_pad_controls`): **Modern (twin-stick)**,
 the default, or Classic (the gamepad as a DualShock 2 through the game rows: tank controls, the
-camera behind, no camera or aim stick). Modern, as the RE2/RE4 remakes (button map:
+camera behind, no camera stick). The game's own turn while aiming cannot move free aim's crosshair
+(the shot follows it), so in Classic the right stick, which no key type uses (the game reads only
+the left stick), aims while the weapon is raised, at the stick aiming speed as in Modern; with
+"Game auto-aim" Classic keeps the game's lock-on. In both schemes, while aiming freely, the left
+stick and the d-pad also move the crosshair (left / right turn it, up / down raise and lower it, as
+they turn and tilt the original aim); in the scope the game turns by them itself and only the right
+stick is added. Modern, as the RE2/RE4 remakes (button map:
 [USER_GUIDE.md](USER_GUIDE.md#third-person-with-a-gamepad)):
 
 * **Left stick**: walks towards its direction seen from the camera (`modern_target` with the
@@ -149,8 +155,9 @@ camera behind, no camera or aim stick). Modern, as the RE2/RE4 remakes (button m
 Hooks: `tps_pad` (`pad_sticks`: device, right stick as `stick_yaw`/`stick_pitch`, left stick into
 the virtual bits; the quick-turn gesture into `tps_input_keys`), `tps_camera` (orbit, recenter),
 `tps_player` (the turn towards the stick; the right stick and the assist while aiming), `knife_pad`
-(`pad_quick_knife` also reads `pad_tps_knife`). Classic changes nothing: `pad_play` stays 0 and
-every gamepad path is the one from before.
+(`pad_quick_knife` also reads `pad_tps_knife`). Classic keeps `pad_play` 0 and the game rows; only
+while aiming freely `pad_sticks` turns the right stick (and the left stick and d-pad, both schemes)
+into `stick_yaw` / `stick_pitch`.
 
 ### Settings
 

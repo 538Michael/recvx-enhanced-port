@@ -656,10 +656,28 @@ static int pad_sticks(unsigned int* pad)
     if (!g_tps.pad_modern) pad_cam = 0;
     stick_yaw = stick_pitch = 0;
     stick_moved = pad_move = 0;
+    {   /* the right stick turns the camera (Modern) and aims. Classic keeps the game's buttons, whose turn while aiming
+           cannot move free aim's crosshair (the shot follows the crosshair), so there the right stick (free in every key
+           type: the game reads only the left one) aims too. In both, while aiming freely, the left stick and the d-pad
+           also move the crosshair, as they turn and tilt the original aim; not in the scope, which the game turns by
+           them itself. */
+        int aim_free = plp->mode0 == 1 && plp->mode1 == 1 && !lock_aim() && pc_in_play(plp, 1);
+        if (g_tps.pad_modern ? stick && pad_cam : aim_free && tps_pad_sticks(&lx, &ly, &rx, &ry)) {
+            float ax = lx, ay = ly, dx, dy;
+            if (modern_stick(&rx, &ry, g_tps.pad_dead_look / 100.0f, 2.0f) > 0) recenter = 0, stick_moved = 1;
+            if (aim_free && tps_cam_active) {
+                modern_stick(&ax, &ay, g_tps.pad_dead_move / 100.0f, 2.0f);
+                tps_pad_dpad(&dx, &dy);
+                rx += ax + dx; ry += ay + dy;
+                rx = rx > 1 ? 1 : rx < -1 ? -1 : rx;
+                ry = ry > 1 ? 1 : ry < -1 ? -1 : ry;
+                stick_moved |= rx != 0 || ry != 0;
+            }
+            stick_yaw = -rx * STICK_YAW * g_tps.pad_sens_x / 100.0f;
+            stick_pitch = (g_tps.pad_invert_y ? -ry : ry) * STICK_PITCH * g_tps.pad_sens_y / 100.0f;
+        }
+    }
     if (!stick || !pad_cam) { run_was = qt_hold = back_wait = hold.held = 0; return 0; }
-    if (modern_stick(&rx, &ry, g_tps.pad_dead_look / 100.0f, 2.0f) > 0) recenter = 0, stick_moved = 1;
-    stick_yaw = -rx * STICK_YAW * g_tps.pad_sens_x / 100.0f;
-    stick_pitch = (g_tps.pad_invert_y ? -ry : ry) * STICK_PITCH * g_tps.pad_sens_y / 100.0f;
     m = modern_stick(&lx, &ly, g_tps.pad_dead_move / 100.0f, 1.0f);
     run = bind_held(B_TPS_RUN, BIND_PAD, bind_keys(), 0);
     if (m > 0 && plp->mode0 == 1) {   /* (hits, grabs: the game's own stick directions) */

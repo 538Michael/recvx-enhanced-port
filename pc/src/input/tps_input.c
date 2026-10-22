@@ -103,6 +103,15 @@ int tps_pad_sticks(float* lx, float* ly, float* rx, float* ry)
     return 1;
 }
 
+void tps_pad_dpad(float* x, float* y)
+{
+    SDL_Gamepad* g = (SDL_Gamepad*)bind_gamepad();
+    *x = *y = 0;
+    if (!g || !pad_game_input_enabled()) return;
+    *x = (float)(SDL_GetGamepadButton(g, SDL_GAMEPAD_BUTTON_DPAD_RIGHT) - SDL_GetGamepadButton(g, SDL_GAMEPAD_BUTTON_DPAD_LEFT));
+    *y = (float)(SDL_GetGamepadButton(g, SDL_GAMEPAD_BUTTON_DPAD_UP) - SDL_GetGamepadButton(g, SDL_GAMEPAD_BUTTON_DPAD_DOWN));
+}
+
 /* the gamepad played this frame: a button, a trigger or a stick past a third */
 int tps_pad_touched(void)
 {
