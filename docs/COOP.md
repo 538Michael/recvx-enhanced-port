@@ -69,10 +69,13 @@ drawn in the game's own style; your model turns in a 3D preview on the left. It 
 **Step 3: GAME RULES** (host): **LOOT** (Shared (one pickup) / Individual (each their own)),
 **IMPORTANT ITEMS** (For both / Shared; only with shared loot, see "Loot modes"), **FREEZE ON TRADE**, **CUTSCENE SKIP** (Together /
 Each alone, see "Cutscenes"), **INK RIBBONS** (Needed / Not needed, see "Saving without ink
-ribbons"), **GAME OVER** (Each player / Both, see "Game over"), and the enemy options **EXTRA ENEMIES**, **REARRANGED**, **RANDOMIZER**, **VARIETY**
+ribbons"), **GAME OVER** (Each player / Both, see "Game over"), **METAL DETECTOR** (Skipped /
+As original, see "Metal detector"), and the enemy options **EXTRA ENEMIES**, **REARRANGED**, **RANDOMIZER**, **VARIETY**
 (Wild / Mild) and **EVENT ENEMIES** (both shown only with the randomizer on), **SEED**, **NEW
 RANDOM SEED**. The joiner
-sees the host's GAME OVER rule and enemy options read-only (THE HOST'S RULES) once connected.
+sees the host's GAME OVER and METAL DETECTOR rules and enemy options read-only (THE HOST'S RULES)
+once connected. The GAME RULES page fills the screen with the randomizer's two rows shown; more rules
+need a page of their own.
 
 Both players then see each other in the lobby, with model, name and what the other chose. The
 host picks **START THE GAME**; the partner enters the host's game in the host's room once the host
@@ -437,6 +440,26 @@ An item that is the triggering player's alone: nothing goes on the partner's flo
 loot a partner who watched the event and got one too gives it back at once ("... from the partner's
 event is the partner's").
 
+### Metal detector
+
+The prison's metal detector room (where you have to put metal items in a security box before
+walking through) is the host's rule **METAL DETECTOR** (lobby GAME RULES, F1 / ENHANCED SETTINGS
+CO-OP "Metal detector (host)"; ini `coop_skip_detector`, 1 *Skipped* (default), 0 *As original*). It
+can change during a session; the joiner sees it under THE HOST'S RULES.
+
+**Skipped**: both of you walk through with your weapons, the lighter and everything else. The
+detector never goes off (no "!" stop, no alarm, the shutters stay open), and the two security
+boxes stay shut. Coming back to the north box does not remind you to take your items. Nothing else
+in the room changes: its doors and the way on are as after a clean pass, which in the original sets
+nothing either.
+
+A security box that still holds items (put there before the rule applied: an earlier game, a save,
+playing alone before joining) opens as usual until you have taken everything out; then it stays shut
+too. Nothing is moved for you, so nothing can get lost. An alarm that already went off (a save made
+with the shutters down) is released at its switch, as in the original.
+
+**As original**: as in single player. Outside a session the rule plays no part.
+
 ### Saving without ink ribbons
 
 **No ink ribbons needed** (lobby INK RIBBONS *Not needed*, F3 "No ink ribbons needed (host)",
@@ -598,6 +621,7 @@ only on the host; "locked" ones cannot change during a session.
 | Important items for both (host), locked | `coop_important` | 0/1 (1); shared loot only |
 | Synchronized cutscene skip (host) | `coop_skip_sync` | 0/1 (1) |
 | Game over (host) | `coop_gameover` | 0 Each player, 1 Both (0); see "Game over" |
+| Metal detector (host) | `coop_skip_detector` | 0 As original, 1 Skipped (1); see "Metal detector" |
 | Freeze enemies while trading (host) | `coop_trade_freeze` | 0/1 (1) |
 | Remember partner inventories (host) | `coop_remember` | 0/1 (1) |
 | Connection, locked | `coop_conn` | 0 Automatic, 1 Direct (P2P), 2 Via server (0) |
@@ -647,7 +671,9 @@ around `bhJumpEnemy` (`coop_enemy_begin/end`), `event.c bhControlEvent` (`coop_s
 `ps2_NaTextureFunction.c njReleaseTextureAll` (`coop_textures_released`), `system.c
 bhSysCallMonitor` before a character switch releases the player's textures (`coop_player_unload`,
 also without co-op), and the title menu in
-`adv.c` / `system.c` (the MULTIPLAYER row and the lobby mode). Not co-op only: `event.c
+`adv.c` / `system.c` (the MULTIPLAYER row and the lobby mode), `event.c bhControlEvent` before scd1
+(`pc_detector_scd1`) and `event.c bhPlItemCheck` (`pc_detector_skipped`) for the metal detector
+(`detector_glue.c`, see below). Not co-op only: `event.c
 bhPlItemCheck` and `ps2_McSaveFile.c mcWriteStartSaveFile` ask `pc_no_ink_ribbon()` (the setting,
 in co-op the host's rule) whether a typewriter needs and uses an ink ribbon.
 
@@ -914,6 +940,30 @@ floor or trigger, "Yes" chosen, an item used) hold only where the player did it.
   joiner kept its continue point's items instead (the world kept the host's flags, so the items taken since
   were gone).
 
+### Metal detector
+
+Room 0/9's script (event 0, started on entering floor zone 3, the north side with security box
+`sys->itm[192..223]` at trigger 11, or floor 4, the south-west side with box `[224..255]` at trigger 12)
+clears `rm_flg` bit 2 and sets it for each metal item `PlItemCheck` finds in the bag; carried that way,
+entering zone 3 or 4 plays the "!" stop, and a gate zone (floor 5, 6) sounds the alarm: `ev_flg` bit 53
+(shared progress), the shutters down, `ky_flg` bit 15 cleared, until the release switch (triggers 6, 7).
+A clean pass sets no flag: the room's entry script opens the shutters and sets `ky_flg` bit 15 while
+bit 53 is clear. Triggers 11 and 12 (type 3) start events 18 / 19, which open the box screen on
+`cb_flg` 0x80000 / 0x100000 (`sub1.c` `ItemBoxInit`). Coming from zone 4 to zone 3 (`rm_flg` bit 10) plays
+the reminder "Take the metal items you placed into the security box with you" (events 30, 32).
+
+`OPT_SKIP_DETECTOR` (the host's `coop_skip_detector`; `coop_skip_detector()` is the session's value), in
+`detector_glue.c`, only in 0/9 and only while `coop_on`:
+
+* `bhPlItemCheck` finds nothing: every `PlItemCheck` of that room is event 0's, so `rm_flg` bit 2 stays
+  clear and the stop, the alarm and its flags never happen, on both sides alike.
+* Before scd1 each frame: a security box with no item in it has its trigger off (`flg` bit 0, as the
+  script's `EtcAtariSet` does; the script never turns these two off, so on again is the room's own
+  state); one with items keeps it until it is empty. With box 192 empty, `rm_flg` bit 10 is cleared in
+  zone 3 before scd1 tests it (no reminder). The rule off in a session puts both triggers back on.
+
+No item is ever moved: what a box holds stays reachable through its own screen.
+
 ### Ping and name tag timing
 
 Each datagram's arrival time comes from the network: Linux `SO_TIMESTAMPNS`; Windows a small thread
@@ -934,8 +984,9 @@ shared loot as one pool (`EV_PICKUP` gives the partner only items for both; `und
 aim height in `EV_ENE_HIT`, unknown flag and option bits refused; 20 `EV_EOPTS` carries the
 randomizer's variety and event-enemy setting (the randomizer's choices changed, so builds of 19 would
 make other enemies from the same seed); 21 `COOP_HIT_PRECISE` in `EV_ENE_HIT` (third person
-"Precise hits", [THIRDPERSON.md](THIRDPERSON.md#precise-hits)); 22 the game rule `OPT_GAMEOVER_BOTH`,
-`PF_GAME_OVER`, `EV_BLOB` `pad` 2 and the `EV_OWN` `tid` (see "Game over"). `Pose.pflg` and `Pose.flr` were added inside protocol 18
+"Precise hits", [THIRDPERSON.md](THIRDPERSON.md#precise-hits)); 22 the game rules `OPT_GAMEOVER_BOTH`
+and `OPT_SKIP_DETECTOR`, `PF_GAME_OVER`, `EV_BLOB` `pad` 2 and the `EV_OWN` `tid` (see "Game over",
+"Metal detector"). `Pose.pflg` and `Pose.flr` were added inside protocol 18
 (0 means "not sent", and receivers fall back).
 
 All structures are little-endian, packed as the compiler lays them out on x86 (pinned by
@@ -966,7 +1017,7 @@ over its datagrams.
 |---|---|
 | 0-15 | `magic` "COOP" (0x504F4F43), `version` u16, `type` u8, `flags` u8, `sid` (sender's session), `auth` (`coop_auth(join code, sid)`): all a relay needs |
 | 16-31 | `seq` (sender's frame counter; older poses dropped), `t_ms`, `echo_ms`, `echo_age` (ping) |
-| 32-39 | `chr`, `costume`, `stg`, `rom`, `pos` (room entry point), `opts` (host's game rules: `OPT_INDIVIDUAL` 1, `OPT_TRADE_FREEZE` 2, `OPT_IMPORTANT` 4, `OPT_NO_RIBBON` 8, `OPT_SKIP_SYNC` 16, `OPT_GAMEOVER_BOTH` 32), `regroup` (host counter), `mfile` (sender's own part file - 10) |
+| 32-39 | `chr`, `costume`, `stg`, `rom`, `pos` (room entry point), `opts` (host's game rules: `OPT_INDIVIDUAL` 1, `OPT_TRADE_FREEZE` 2, `OPT_IMPORTANT` 4, `OPT_NO_RIBBON` 8, `OPT_SKIP_SYNC` 16, `OPT_GAMEOVER_BOTH` 32, `OPT_SKIP_DETECTOR` 64), `regroup` (host counter), `mfile` (sender's own part file - 10) |
 | 40-91 | position (3 floats), angles (3 ints), `mtn_no`, `frm_no` (the frame shown, before the step's advance: `actor_frame`), `mtn_md`, `hokan_count`, `hokan_rate`, `wpnr_no`, `hp`, `mode0`, `mode1`, `nev`, `nene` |
 | 92-107 | `stflg`, `ev_ack` (highest event id applied from the peer), `mset` (`MSET_OWN` -1, `MSET_ROOM` -2, `MSET_NONE` -3, or an enemy slot), `busy` (`BUSY_NONE/EVENT/MENU/BOX/TRADE`), `reject`, `voice_n`, `voice`, `pflg` (`flg & 6`: hit / held), `flr` (`flr_no + 3`, 0 not sent) |
 
@@ -1158,7 +1209,8 @@ the session's code. A takeover needs a non-zero tag that matches.
 * Synchronized skip: the skip waits for the partner's pose (one way trip) and, when the joiner asked
   second, its skip comes one round trip after its press. A scene the partner has not started yet
   (it replays it a moment later) does not hold the first press.
-* The joiner's lobby shows the host's enemy options, not its loot, skip and ink ribbon rules.
+* The joiner's lobby shows the host's game over and metal detector rules and enemy options, not its
+  loot, skip and ink ribbon rules.
 
 ## Test aids
 

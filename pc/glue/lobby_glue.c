@@ -1054,11 +1054,11 @@ static const char* row_help(int r)
     case R_START: return "What the game starts from: a new game (normal, easy, very easy) or one of your saves.";
     case R_ITEMS: return "The inventory you join with: the one the host kept for you from your last visit, a new inventory, or that of one of your saves.";
     case R_FOLLOW: return eset(&g_coop.follow)->help;
-    case R_RULES: return host ? "Loot, enemies freezing while you trade, cutscene skips, ink ribbons, game over, the metal detector and the enemy options (extra enemies, rearranged, randomizer and its variety and event enemies, seed)."
+    case R_RULES: return host ? "Loot, enemies freezing while you trade, cutscene skips, ink ribbons, game over, the metal detector and the enemy options (extra, rearranged, randomizer, variety, event enemies, seed)."
                               : "The host's game over and metal detector rules and enemy options (read-only).";
     case R_LOOT: return "Shared: each item lies there once - whoever takes it has it, so you split the supplies; one item box. Individual: each finds their own copy and has their own box. Keys and story go to both.";
     case R_TFREEZE: return eset(&g_coop.trade_freeze)->help;
-    case R_DETECTOR: return "Skipped: the prison's metal detector lets both of you through with weapons, and its security boxes stay shut (one still holding your items opens). As original: leave metal items in the box to pass.";
+    case R_DETECTOR: return "Skipped: the prison's metal detector lets both of you pass with weapons and its security boxes stay shut (one holding items still opens). As original: as in single player.";
     case R_IMP: return "For both: weapons and ink ribbons lie there for each of you, each takes their own copy. Shared: they are one pickup like ammo and herbs - whoever takes it has it.";
     case R_SKIPS: return "Together: a cutscene both of you watch is skipped when both press skip; the partner sees that you want to. Each alone: as in single player.";
     case R_RIBBON: return "Not needed: typewriters save without an ink ribbon and use none up (for both players; also in single player, ENHANCED SETTINGS GAMEPLAY).";
