@@ -24,6 +24,7 @@ int coop_check_pose(const Pose* p)
     if (!fin(p->px) || !fin(p->py) || !fin(p->pz)) return COOP_BAD_FLOAT;
     if (p->busy > BUSY_TRADE || p->mset < MSET_NONE || p->mset >= 128) return COOP_BAD_FIELD;
     if (p->flr > 32) return COOP_BAD_FIELD;   /* flr_no + 3: rooms have floors -2..29 (rom->grand[2 + flr_no], 32 entries); 0 not sent */
+    if (p->rcase > 10) return COOP_BAD_FIELD;   /* room case + 1: cases 0..9 (one digit of the file name); 0 not sent */
     if ((p->flags & ~PF_ALL) || (p->opts & ~OPT_ALL)) return COOP_BAD_FIELD;   /* only the flags and game rules this protocol has */
     return COOP_OK;
 }

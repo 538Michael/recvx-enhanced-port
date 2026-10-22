@@ -123,6 +123,14 @@ static uint32_t echo_t;
 static uint64_t echo_arr;
 static double ping_f = -1;
 int coop_room_key(void) { return sys->stg_no * 256 + sys->rom_no; }
+/* the partner's pose is from our room: the same stage and room, and the same room case (a room's cases are
+   different room files: other enemies, objects, script); a build that does not send its case: any */
+static int my_case(void)   /* the room loaded (bhFinishRoom keeps it in the _b fields); in a door to another room, the next one's */
+{
+    return sys->stg_no == sys->stg_nob && sys->rom_no == sys->rom_nob ? sys->rcase_b : sys->rcase;
+}
+static int partner_here(void) { return rx.stg == sys->stg_no && rx.rom == sys->rom_no && (!rx.rcase || rx.rcase - 1 == my_case()); }
+static int rx_room(void) { return (rx.stg * 256 + (unsigned char)rx.rom) | rx.rcase << 16; }   /* the partner's room and case (follow) */
 /* test aids count the host's frames (the client takes them from its pose): both act together */
 static unsigned int test_clock(void) { return is_host ? frame_no : have_rx ? rx.seq : 0; }
 
@@ -615,6 +623,7 @@ void coop_control_remote(void)
     tx.chr = !g_coop.chr ? sys->ply_id : g_coop.chr == 5 ? 0 : g_coop.chr >= COOP_CHR_ACTOR ? 4 + g_coop.chr - COOP_CHR_ACTOR : g_coop.chr - 1;
     tx.costume = !g_coop.chr ? sys->costume & 3 : g_coop.chr == 5;
     tx.stg = sys->stg_no; tx.rom = sys->rom_no; tx.pos = sys->pos_no;
+    tx.rcase = (unsigned)my_case() <= 9 ? (uint8_t)(my_case() + 1) : 0;   /* (sys->rcase alone: a door's script picks the next room's before it leaves) */
     tx.px = plp->px; tx.py = plp->py; tx.pz = plp->pz;
     tx.ax = plp->ax; tx.ay = plp->ay; tx.az = plp->az;
     tx.mtn_no = plp->mtn_no; tx.frm_no = actor_frame(plp); tx.mtn_md = plp->mtn_md;   /* the frame shown, not the next one */
@@ -648,7 +657,7 @@ void coop_control_remote(void)
     /* the partner. One that is busy (cutscene, menu, item box: M8) and was shown in this room
        stays, frozen in its last pose: it is drawn only (enemies do not target it, proxy_ok) */
     if (!have_rx || !local_visible()) return;
-    if (rx.stg != sys->stg_no || rx.rom != sys->rom_no) { p2_seen_room = -1; return; }
+    if (!partner_here()) { p2_seen_room = -1; return; }
     p2_busy = (rx.flags & (PF_IN_GAME | PF_VISIBLE)) != (PF_IN_GAME | PF_VISIBLE) ? rx.busy : rx.busy == BUSY_TRADE ? BUSY_TRADE : 0;   /* trading: drawn live, no target */
     if ((rx.flags & (PF_IN_GAME | PF_VISIBLE)) != (PF_IN_GAME | PF_VISIBLE) && (!p2_busy || p2_seen_room != coop_room_key() || p2_chr < 0)) return;
     if (rx.chr < 0 || rx.chr > 3 + ACTOR_MODELS || rx.costume < 0 || rx.costume > 3 || rx.mfile < 0 || rx.mfile > 15) return;
@@ -1233,7 +1242,7 @@ static void enemy_epoch(void)
     if (frame_no - enemy_frame > 1) { memset(tgt, 0, sizeof(tgt)); memset(atk, 0, sizeof(atk)); }
 }
 
-static int same_room(void) { return have_rx && (rx.flags & PF_IN_GAME) && rx.stg == sys->stg_no && rx.rom == sys->rom_no; }
+static int same_room(void) { return have_rx && (rx.flags & PF_IN_GAME) && partner_here(); }
 /* not in a door transition, nor in a cutscene of ours (M8): its event drives the enemies and waits
    for their motions (FrameCheck), which a puppet only shows as snapshots let it - they run here
    then and take the host's state again afterwards */
@@ -2321,7 +2330,7 @@ static void load_blob(void)
     pop_pending = 0;
     popping = 1;
     follow_pending = 0;
-    host_room = rx.stg * 256 + (unsigned char)rx.rom;
+    host_room = rx_room();
     seen_regroup = rx.regroup;   /* we start in the host's room */
     host_log("coop: joined the host's game (stage %d room %d)\n", sys->stg_no, sys->rom_no);
 }
@@ -3000,12 +3009,12 @@ static void follow(void)
 {
     int room;
     if (!have_rx || !(rx.flags & PF_IN_GAME)) return;
-    room = rx.stg * 256 + (unsigned char)rx.rom;
+    room = rx_room();
     if (rx.regroup != seen_regroup) { seen_regroup = rx.regroup; follow_pending = 2; }
     if (room != host_room) { host_room = room; if (!follow_pending) follow_pending = 1; }
     if (follow_pending == 1 && !g_coop.follow) follow_pending = 0;   /* "Follow host" off (also when switched off meanwhile) */
     if (!follow_pending) return;
-    if (rx.stg == sys->stg_no && rx.rom == sys->rom_no) { follow_pending = 0; return; }
+    if (partner_here()) { follow_pending = 0; return; }
     if (!tx_in_game || (sys->gm_flg & 0x9) || (sys->cb_flg & 0x1)) return;   /* as the door trigger */
     if (plp->mode0 == 4 || plp->mode0 == 6) return;   /* not out of a grab */
     if (!room_exists(rx.stg, rx.rom, -1) || rx.pos < 0 || rx.pos >= 60) {   /* a room this build does not have: stay */
@@ -3014,7 +3023,7 @@ static void follow(void)
         return;
     }
     host_log("coop: %s the host to stage %d room %d\n", follow_pending == 2 ? "regroup: pulled to" : "following", rx.stg, rx.rom);
-    cheat_room_warp(rx.stg, rx.rom, (unsigned char)rx.pos);
+    cheat_room_warp(rx.stg, rx.rom, (unsigned char)rx.pos, rx.rcase - 1);   /* its room case (-1: not sent, ours) */
     follow_pending = 0;
 }
 
@@ -5104,8 +5113,7 @@ static int cine_now(void)
 /* the partner plays a cutscene in our room too: a skip waits for both */
 static int skip_together(void)
 {
-    return coop_on && have_peer && !echo_delay && rule(OPT_SKIP_SYNC) && have_rx && (rx.flags & PF_CINE) && rx.stg == sys->stg_no &&
-           rx.rom == sys->rom_no;
+    return coop_on && have_peer && !echo_delay && rule(OPT_SKIP_SYNC) && have_rx && (rx.flags & PF_CINE) && partner_here();
 }
 static void skip_now(const char* why)
 {

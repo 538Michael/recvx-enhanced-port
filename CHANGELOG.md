@@ -25,6 +25,9 @@
   The right stick aims now, and the left stick and d-pad move the crosshair while aiming.
 - **Modern gamepad in third person**: Start opens OPTION, which the gamepad could not reach before,
   and Y, View and Start close the inventory, map and OPTION again.
+- **Co-op: stuck loading after key events**: a joining player following the host through a room
+  that changes after a key item is used (like the prison yard after its gate opens) could hang on
+  the load screen or disconnect. Following now loads the room as the host has it.
 
 ## 0.6.6 (2026-10-22)
 

@@ -342,6 +342,9 @@ static void test_dgrams(void)
     BADP(q.flr = 255, COOP_BAD_FIELD);
     BADP(q.flr = 32, COOP_OK);                    /* floors -2..29, 0 = not sent */
     BADP(q.flr = 1, COOP_OK);
+    BADP(q.rcase = 10, COOP_OK);                  /* room case 9 (+ 1), 0 = not sent */
+    BADP(q.rcase = 11, COOP_BAD_FIELD);
+    BADP(q.rcase = 255, COOP_BAD_FIELD);
     BADP(q.flags |= PF_CINE | PF_SKIP, COOP_OK);   /* protocol 19: in a cutscene, wants to skip it */
     BADP(q.flags |= PF_GAME_OVER, COOP_OK);       /* protocol 22: our game over runs (every flag bit is in use) */
     BADP(q.opts = OPT_ALL, COOP_OK);              /* every game rule */

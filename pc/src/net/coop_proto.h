@@ -73,7 +73,9 @@ typedef struct Pose {
     uint32_t stflg;
     uint32_t ev_ack;                    /* highest event id applied from the peer */
     int16_t mset;                       /* MSET_OWN, MSET_ROOM, or the enemy slot whose set mtn_no indexes */
-    uint8_t busy, reject;               /* BUSY_*; PKT_REJECT: COOP_REJ_* */
+    uint8_t busy;                       /* BUSY_* */
+    union { uint8_t reject, rcase; };   /* PKT_REJECT, PKT_BYE: COOP_REJ_*. PKT_POSE: the room case of the room the sender
+                                           is in, + 1 (0: not sent, a build before it): its room file RM_<stg><rom><case> */
     uint8_t voice_n, voice;             /* counts the sender's player voices; the last one's program (SE 0x400 + voice) */
     uint8_t pflg;                       /* the sender's player flg & 6 (2, 4: being hit or held: enemies wait) */
     uint8_t flr;                        /* the sender's floor (flr_no + 3); 0: not sent (a build before this field) */

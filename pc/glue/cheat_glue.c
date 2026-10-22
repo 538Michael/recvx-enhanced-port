@@ -398,9 +398,25 @@ void cheat_game_exit(void) { warp_sound = 0; nsite = recording = 0; knife_game_e
 /* the game's own door transition (door type 255: no animation), for the teleport, the co-op
    follow and test aids. An enemy grab plays the player on the enemy's motion set (en01sub.c);
    the new room frees it, and the room change would animate from it (crash in bhSetMotion), so
-   take the player's own set back first, as the game does when a grab ends. */
-void cheat_room_warp(int stg, int rom, int pos)
+   take the player's own set back first, as the game does when a grab ends.
+   The room file is RM_<stage><room><case>: a door's script picks the case (RoomCaseNo) before it calls the
+   door, a warp has none of its own. It loads `rcase` (the co-op host's), or our case as it is, as the room
+   has it; else the room's first case. A case only another room has (the prison yard 0/3 has two, 0/10 one)
+   was a file the loader waited for for good: stuck in the load screen. */
+int GetFileSize(char* FileName);   /* gdlib.c: 0 when neither the disc nor the mods folder has it */
+static int room_case_exists(int stg, int rom, int c)
 {
+    char name[16];
+    snprintf(name, sizeof(name), "rm_%1d%02d%1d.rdx", stg, rom, c);   /* as system.c's room load names it */
+    return c >= 0 && c <= 9 && GetFileSize(name) != 0;
+}
+void cheat_room_warp(int stg, int rom, int pos, int rcase)
+{
+    int c;
+    if (rcase < 0) rcase = sys->rcase;
+    for (c = 0; c <= 9 && !room_case_exists(stg, rom, rcase); c++)
+        if (room_case_exists(stg, rom, c)) { host_log("warp: room %d/%d has no case %d: case %d\n", stg, rom, rcase, c); rcase = c; }
+    sys->rcase = (char)rcase;
     plp->mnwP = plp->mnwPb;
     warp_sound = 1;
     bhSetDoorDemo(0, stg, rom, pos, 255);
@@ -415,7 +431,7 @@ static void teleport(int stg, int rom, int pos)
         sys->cb_flg |= 0x80;
         pl = NULL;
     }
-    cheat_room_warp(stg, rom, pos);
+    cheat_room_warp(stg, rom, pos, -1);
 }
 
 /* Testing aid for headless runs, keyed to game frames since start (frames in which the game
