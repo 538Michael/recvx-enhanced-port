@@ -295,7 +295,8 @@ behind). As in the Resident Evil 2 and 4 remakes:
 | D-pad down | quick turn (the camera swings round with the character) | `pad_tps_quickturn` |
 | Right stick click | camera behind the character; in the scope: zoom in / out | `pad_tps_recenter` |
 | Left stick pulled back + run | quick turn | |
-| D-pad up / left / right, Start | as before (d-pad: tank turn and walk; Start: options) | |
+| Menu / Options (Start) | options (the OPTION screen; View / Share is the map here) | `pad_tps_options` |
+| D-pad up / left / right | as before: tank turn and walk; while aiming they move the crosshair | |
 
 The sniper rifle and the linear launcher aim through their scope: hold LT, aim with the right stick
 (the left stick and d-pad turn it as in the original), click the right stick to zoom in or out, RT

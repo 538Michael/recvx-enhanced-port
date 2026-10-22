@@ -139,10 +139,11 @@ stick is added. Modern, as the RE2/RE4 remakes (button map:
   another action as Aim + button ([USER_GUIDE.md](USER_GUIDE.md#reload)).
 * **Bindings**: the gamepad set has its own third-person rows (ini `pad_tps_aim`, `pad_tps_fire`,
   `pad_tps_action`, `pad_tps_cancel`, `pad_tps_run`, `pad_tps_inventory`, `pad_tps_map`,
-  `pad_tps_reload`, `pad_tps_quickturn`, `pad_tps_knife`, `pad_tps_recenter`). They play only
+  `pad_tps_reload`, `pad_tps_quickturn`, `pad_tps_knife`, `pad_tps_options`, `pad_tps_recenter`;
+  options on Start, as the game's Select is the map here and type D's L2 the aim). They play only
   while `g_tps.pad_play` (`tps_frame`: third person on and Modern, our camera active, the game not
   frozen, no attract demo) and then take their buttons over from the game rows (the d-pad but its
-  down, Start and anything else they do not use stay the game's). In
+  down and anything else they do not use stay the game's). In
   menus, messages, pick-ups, events and doors the gamepad is the DualShock 2 of the KEY CONFIG
   type, as in Classic. An input held when `pad_play` changes counts for neither set until it is
   let go (`bindings.c pad_row_reads`), so the button that opened a menu does not also act in it.

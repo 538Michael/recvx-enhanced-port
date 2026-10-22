@@ -44,7 +44,8 @@ extern TpsConfig g_tps;
 /* input (pc/src/input/tps_input.c), called on the game thread */
 enum { TPS_K_FWD = 1, TPS_K_BACK = 2, TPS_K_LEFT = 4, TPS_K_RIGHT = 8, TPS_K_RUN = 16, TPS_K_ACTION = 32,
        TPS_K_STATUS = 64, TPS_K_MAP = 128, TPS_K_AIM = 256, TPS_K_FIRE = 512, TPS_K_CANCEL = 1024,
-       TPS_K_QUICKTURN = 2048 /* with BACK (and RUN): the quick-turn row */, TPS_K_RECENTER = 4096 };
+       TPS_K_QUICKTURN = 2048 /* with BACK (and RUN): the quick-turn row */, TPS_K_RECENTER = 4096,
+       TPS_K_OPTIONS = 8192 };
 unsigned tps_input_keys(int quickturn);       /* quickturn: also hold the quick turn (gamepad gesture) */
 void tps_take_mouse(float* dx, float* dy);   /* pixels moved since the last call */
 int tps_pad_sticks(float* lx, float* ly, float* rx, float* ry);   /* the gamepad's sticks, -1..1, y up; 0 = none */

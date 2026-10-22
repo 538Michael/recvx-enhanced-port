@@ -758,6 +758,7 @@ unsigned int tps_pad(unsigned int pad)
     if (k & TPS_K_CANCEL) pad |= 0x1000;
     if (k & TPS_K_MAP) pad |= 0x2000;
     if (k & TPS_K_STATUS) pad |= 0x4000;
+    if (k & TPS_K_OPTIONS) pad |= 0x8000;   /* (the gamepad's, Modern) */
     /* free aim: always the straight aim pose; tps_calc_model bends the upper body to the pitch */
     if (g_tps.aiming && !lock_aim() && plp && plp->mode1 == 1) pad &= ~0x63;
     if (pad & 0x1) pad &= ~0x42;   /* as bhSetPad: forward wins, right wins */

@@ -220,6 +220,12 @@ int main(void)
         SDL_UpdateGamepads();
         CHECK(bind_held(B_TPS_FIRE, BIND_PAD, keys, 0) && !bind_held(B_QUICKKNIFE, BIND_PAD, keys, 0));
         CHECK(bind_held(B_TPS_RUN, BIND_PAD, keys, 0) && !bind_held(B_SQUARE, BIND_PAD, keys, 0));
+        /* Start opens the options there (Select is the map, L2 of type D the aim) */
+        SDL_SetJoystickVirtualButton(j, SDL_GAMEPAD_BUTTON_START, true);
+        SDL_UpdateGamepads();
+        CHECK(bind_held(B_TPS_OPTIONS, BIND_PAD, keys, 0) && !bind_held(B_START, BIND_PAD, keys, 0));
+        SDL_SetJoystickVirtualButton(j, SDL_GAMEPAD_BUTTON_START, false);
+        SDL_UpdateGamepads();
         g_tps.pad_play = 0;   /* a menu: the game rows again, once let go */
         CHECK(!bind_held(B_QUICKKNIFE, BIND_PAD, keys, 0) && !bind_held(B_TPS_FIRE, BIND_PAD, keys, 0) && !bind_held(B_SQUARE, BIND_PAD, keys, 0));
         SDL_SetJoystickVirtualAxis(j, SDL_GAMEPAD_AXIS_RIGHT_TRIGGER, -32768);
