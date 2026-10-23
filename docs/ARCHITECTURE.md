@@ -554,7 +554,12 @@ village, collision. The render thread (GS emulation, replays: `r_exec`, `r_inter
   after one (the stairs of 1/0 cut on the frame control returns): then the current camera. Untouched: aiming (`mode1` 1), the quick-turn row (back only), the game's
   own turns (`flg 0x100000`), third person, menus, events and doors; special moves (`mode2` 12 and
   above 13: stairs, steps, pushing) only get forward, when the direction is within 90 degrees of
-  the facing. Only `plp == &ply`, so in co-op only the local player; nothing is sent.
+  the facing. Only `plp == &ply`, so in co-op only the local player; nothing is sent. Combined
+  (`fixed_cam_controls = 2`, the default): `pad.c` also tells whether a digital direction came
+  from the gamepad's d-pad rows (or `RECVX_INPUT`) and not the keyboard; `modern_pad` leaves
+  those bits to the game (tank controls), the stick past its dead zone wins over them. recvx.ini
+  carries `fixed_cam_version = 1`; in a file without it a Modern `1` (the default then, always
+  written) becomes Combined, a Classic `0` stays.
 - **Mouse in menus** (`pc/glue/menu_glue.c`, hook at the end of `bhSetPad`;
   `input/menu_mouse.c` on the main thread): the mouse drives the screens' own cursor state, so
   keyboard and gamepad work unchanged. Window positions map to the game's 640x480 2D space through
