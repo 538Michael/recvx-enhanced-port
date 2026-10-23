@@ -83,6 +83,7 @@ int main(int argc, char** argv)
     fclose(f);
     CHECK(rd(d) == CVXM_MAGIC && rd(d + 4) == CVXM_VERSION && rd(d + 8) == 60 && rd(d + 20) == 4 && rd(d + 24) == 18);   /* 18 nodes kept */
     CHECK(!memcmp(d + 64, "MDL", 3) && d[67] == 0xbc && rd(d + 60) + 64 + 4 <= rd(d + 12));
+    CHECK(d[28] == 255 && d[32] == 255);   /* no face bones */
     {   /* the texture chunks follow each other (the game's loader steps by 32 + size) up to the end chunk */
         uint32_t q = rd(d + 12), k = 0;
         while (q + 8 <= n && rd(d + q) == 0x324D4954) { CHECK(rd(d + q + 32 + 8) == 0xF00000 + k); q += 32 + rd(d + q + 4); k++; }

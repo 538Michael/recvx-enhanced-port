@@ -19,17 +19,23 @@ lists what was extracted; it is built so other games can be added as further sou
 | 4. F4 window | done: disc image, what to extract, progress, results table from the manifest (also after a restart) |
 | 5. Notes for later (voices, ad-libs, animations) | first findings ("Notes for later") |
 | 6. Verification | headless extraction, glTF/`.cvxm` checks and previews, in-game shots, ctest (`import`, `appear`), Linux and Windows builds, layout check |
+| 7. Posture (round 2) | fixed: the retargeting's rest correction bent the imported meshes (hunched shoulders, head down); imported models now take the source's rotations as they are ("Posture") |
+| 8. Faces (round 2) | blinking (lids, the player characters' timing) and the jaw from the cutscene double's lip sync ("Faces"); the jaw path is checked with a forced angle, not yet in a talking cutscene |
 
 Resume notes: build with `cmake --build build`; headless run:
 `RECVX_MODS=<out> RECVX_IMPORT=outbreak2 RECVX_IMPORT_ISO=<image> build/pc/recvx --save-dir <tmp>`
 (`RECVX_IMPORT_WHAT` = 1 players, 2 NPCs, 4 enemies, summed; exit status 0 = no failures).
 Check the output with `pc/tools/import_check.py <model>.glb|.cvxm out.png`. In game:
 `RECVX_MODS=<out> RECVX_APPEAR=30:68` shows the first imported model (chr `COOP_CHR_IMPORT` = 68).
+Test aids: `RECVX_IMPORT_POSE=file` (per pose of slot 0 the node matrices in the base's frame;
+the double's jaw angle is logged), `RECVX_IMPORT_JAW=deg` (the jaw held open). Posture and face
+previews were rendered offline from such dumps (exploration scripts outside the repository).
 
 ### Next steps
 
-1. Faces: the eye, lid and mouth nodes are merged into the head (no blinking, no lip sync);
-   map them to a face mask or drive them from the CVX double's lip data.
+1. Faces: check the jaw in a talking cutscene (a room whose cutscene starts on entry with the
+   story flags set: `pc/tools/enemies.py room` lists the doubles' `FaceRep`/lip ops); eye
+   direction (Outbreak's eye mesh scrolls its UVs) and expressions are not done.
 2. Fingers are merged into the hands (OB's fist / open-hand poses are lost); the weapon grip
    could close them.
 3. The high-detail models (`HP*.nbd`: 512x512 textures, a separate head model with face bones)
@@ -156,8 +162,9 @@ can map ([ACTORS.md](ACTORS.md#retargeting)). `imp_write_cvxm` (impmodel.c) buil
 
 * **Skeleton**: the nodes of the lower and upper body groups that bend (offset not zero) are
   kept: root, hips (node 1, the pelvis), spine, chest, neck, head, both arms (clavicle, shoulder,
-  elbow, wrist), both legs (hip, knee, ankle) = 20 nodes, in pre-order with children by index.
-  Fingers, face and the zero-length pivots go to their nearest kept ancestor (weights included).
+  elbow, wrist), both legs (hip, knee, ankle) = 20 nodes, plus the five face bones (four lids, the
+  jaw; "Faces") = 25, in pre-order with children by index. Fingers, the face root and the
+  zero-length pivots go to their nearest kept ancestor (weights included).
   All bind angles are 0 (a T-pose), as `rig_build` wants; the model is turned 180 degrees about y
   (Outbreak faces +z, Code: Veronica -z: a rotation, no mirroring) and scaled by 0.1 (the hips at
   11 units, as Claire's). `rig_build` finds the full map (pelvis, spine, chest, neck, head, 2 x 4
@@ -184,8 +191,49 @@ can map ([ACTORS.md](ACTORS.md#retargeting)). `imp_write_cvxm` (impmodel.c) buil
 Checked in game: walking, running, the handgun aimed and fired (the gun in the model's hand),
 zombie grabs, third person; front and back views (`RECVX_TPS_ORBIT`).
 
-Limits: no face animation, no finger poses; costume pieces that hang (Cindy's ponytail chain,
-coats) follow their body node rigidly; the co-op partner sees the played character.
+Limits: no finger poses or expressions; costume pieces that hang (Cindy's ponytail chain,
+coats) follow their body node rigidly; skirts tear open a little in long strides (Outbreak's own
+weights put the skirt on the legs); the feet sink up to ~0.5 units (5 cm) into the floor at the
+toe-off of the walk (the model has no toe bone; Claire's foot pitch is copied to its ankle); the
+co-op partner sees the played character.
+
+### Posture
+
+The first version looked hunched: shoulders pulled up, the head bent forward and down, sleeves
+crushed, arms tucked in. Cause: the retargeting (`actor_glue.c retarget`) turns every mapped bone
+by a rest correction, the rotation taking the model's rest bone onto the source's (the player's),
+so that a catalogue model whose arms rest lower or more forward bends at the same joints. An
+imported model is skinned to its own T-pose, which is the player's rest pose too, and its bones
+are placed differently: Claire's clavicle bone runs from the sternum up to the shoulder joint,
+Outbreak's starts at the shoulder and runs sideways, so the correction turned Outbreak's whole
+shoulder region up by ~60 degrees; Claire's neck-to-head bone leans, Outbreak's is upright, so the
+head went forward. The skinned mesh follows these rotations even at rest. Fix: an imported model
+(`d->skin`) takes the source's world rotations unchanged (the delta from the common T-pose);
+positions still come from its own bone offsets, the root height and feet adjustment and the
+two-hand IK as before. Checked for all 30 models in idle, walk, run, aim and fire, front and side
+(offline renders of the dumped poses), and in game.
+
+### Faces
+
+Outbreak's player models move their faces with five bones under the head (group 2): upper and
+lower lid per eye (23..26, a centimetre apart, the lid vertices weighted 25..100% to them) and
+the jaw (27, at the ear, the chin and lower lip weighted to it; the mouth has teeth and an
+inside). The eyes are a separate small mesh behind the lids. The converter keeps these five bones
+(roles found from the positions: the lowest is the jaw, per side the higher lid is the upper one)
+and lists them in the `.cvxm` header (version 2; version 1 files still load, without a face).
+
+Code: Veronica: the player characters blink by switching the head's texture list (`player.c`,
+`PlyEyeTab`: after 30 ticks a 3% chance per tick, then 8 ticks: half, closed, half, open); the
+story cast's cutscene models talk with a face mask (`face.c`, `face_bh.c`: muscles and a jaw
+driven per phoneme from the room's lip data, `bhLipSet`; `MASK_WORK.param.jawang` is the jaw
+angle in degrees).
+
+`actor_glue.c imp_face`, before the skinning of every pose: the same blink (own random numbers:
+the game's `rand()` is left alone), the upper lids moved down along the head's up axis by 1.7 x
+the lid gap at the closed step (the partial weights need more than the gap), the lower lids up by
+0.3; and while the model stands in for a cutscene double, the jaw turned by the double's current
+`jawang` (the lip sync the game computes for the double anyway). In gameplay the player has no
+lip data (voice calls are short sounds), so the mouth stays closed there.
 
 ## F4 window
 

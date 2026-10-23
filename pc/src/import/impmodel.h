@@ -9,7 +9,10 @@ typedef struct ImpNode {
     int parent;             /* -1: a root */
     float t[3], q[4];       /* local rest translation, rotation (x, y, z, w) */
     int keep;               /* a node of the converted (.cvxm) skeleton; 0: merged into its parent */
+    int face;               /* IMP_FACE_*: a face bone of the converted model (kept) */
 } ImpNode;
+
+enum { IMP_FACE_NONE, IMP_FACE_LID_UP_L, IMP_FACE_LID_LO_L, IMP_FACE_LID_UP_R, IMP_FACE_LID_LO_R, IMP_FACE_JAW, IMP_FACES };
 
 typedef struct ImpStrip { int first, n, tex; } ImpStrip;   /* idx[first .. first + n): a triangle strip; tex: texture slot or -1 */
 
@@ -46,11 +49,13 @@ int  imp_write_glb(const ImpModel* m, const char* path, const char* name, float 
 int  imp_write_cvxm(const ImpModel* m, const char* path, float scale, unsigned gindex, char* err, int en);
 
 /* .cvxm layout (little endian), read by pc/glue/actor_glue.c:
-     0  "RXIM", u32 version (1), u32 model chunk list offset (60: its u32 size word, the MLB at 64),
-        u32 texture block offset (64-aligned), u32 skin offset, u32 vertices, u32 nodes
+     0  "RXIM", u32 version (2), u32 model chunk list offset (60: its u32 size word, the MLB at 64),
+        u32 texture block offset (64-aligned), u32 skin offset, u32 vertices, u32 nodes,
+        28: u8 face[5]: the object index of each face bone (IMP_FACE_* - 1: upper and lower lid
+        left, upper and lower lid right, jaw), 255 none (version 1: no face table)
      model chunk list: u32 size, MLB (bhMlbBinRealize), u32 -1
      texture block: "TIM2" chunks as bhSetMemPvpTexture reads them, then an end chunk (-1)
      skin: per vertex float pos[3], nrm[3] (model space, the game's units), u8 node[4], float w[4] */
 #define CVXM_MAGIC 0x4D495852u   /* "RXIM" */
-#define CVXM_VERSION 1
+#define CVXM_VERSION 2
 typedef struct CvxmSkin { float pos[3], nrm[3]; unsigned char node[4]; float w[4]; } CvxmSkin;

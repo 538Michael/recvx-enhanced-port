@@ -577,6 +577,15 @@ int imp_write_cvxm(const ImpModel* m, const char* path, float scale, unsigned gi
 
     /* the file */
     put32(&f, CVXM_MAGIC); put32(&f, CVXM_VERSION); put32(&f, 60); put32(&f, 0); put32(&f, 0); put32(&f, (uint32_t)m->nv); put32(&f, (uint32_t)no);
+    {   /* the face bones: their places in the object array */
+        unsigned char face[IMP_FACES - 1];
+        memset(face, 255, sizeof(face));
+        for (int i = 0; i < no; i++) {
+            int r = m->node[kept[order[i]]].face;
+            if (r > 0 && r < IMP_FACES) face[r - 1] = (unsigned char)i;
+        }
+        put(&f, face, sizeof(face));
+    }
     align(&f, 60, 0);
     put32(&f, (uint32_t)(16 + mlb.n));
     {   /* MLB header: "MDL", status 0xbc (a chunk model, as the game's), header size, objects, texlist, objects */

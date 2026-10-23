@@ -368,12 +368,35 @@ static const char* const cast[8] = { "Kevin Ryman", "Mark Wilkins", "Jim Chapman
    move with their parent */
 static void keep_body(ImpModel* m)
 {
+    int jaw = -1;
     for (int i = 0; i < m->nn; i++) {
         ImpNode* n = &m->node[i];
         int group = n->keep;
         float l = fabsf(n->t[0]) + fabsf(n->t[1]) + fabsf(n->t[2]);
         n->keep = n->parent < 0 || (group <= 1 && l > 0.01f);
+        n->face = group == 2 && l > 0.01f;   /* (a face bone: its role below) */
+        if (n->face && (jaw < 0 || n->t[1] < m->node[jaw].t[1])) jaw = i;
     }
+    /* the face bones (lids at the eyes, the jaw below them; all on the face root under the head):
+       the lowest is the jaw; per side (x) the higher lid is the upper one. Kept only when all five are found. */
+    int lid[2][2] = { { -1, -1 }, { -1, -1 } }, n = 0;
+    for (int i = 0; i < m->nn; i++) {
+        ImpNode* d = &m->node[i];
+        if (!d->face || i == jaw) continue;
+        int s = d->t[0] > 0, k = lid[s][0] < 0 ? 0 : 1;
+        if (k == 1 && lid[s][1] >= 0) { n = -9; break; }
+        lid[s][k] = i;
+        n++;
+    }
+    for (int i = 0; i < m->nn; i++) m->node[i].face = 0;
+    if (n != 4 || jaw < 0) return;
+    for (int s = 0; s < 2; s++) {   /* (Outbreak x+ is the character's left) */
+        int up = m->node[lid[s][0]].t[1] > m->node[lid[s][1]].t[1] ? lid[s][0] : lid[s][1], lo = up == lid[s][0] ? lid[s][1] : lid[s][0];
+        m->node[up].face = s ? IMP_FACE_LID_UP_L : IMP_FACE_LID_UP_R;
+        m->node[lo].face = s ? IMP_FACE_LID_LO_L : IMP_FACE_LID_LO_R;
+    }
+    m->node[jaw].face = IMP_FACE_JAW;
+    for (int i = 0; i < m->nn; i++) if (m->node[i].face) m->node[i].keep = 1;
 }
 
 int ob2_extract(const char* isopath, const char* outdir, int what, ImportItem* items, int max, int* count)

@@ -83,6 +83,9 @@ typedef struct Disguise {
     const CvxmSkin* skin;               /* an imported model (.cvxm): its vertices skinned every pose (imp_skin) */
     float* vtx;                         /* its vertex chunk's data (position, normal per vertex) */
     int nv;
+    signed char fbone[IMP_FACES - 1];   /* its face bones (IMP_FACE_* - 1: lids, jaw), -1 none */
+    int blink, blink_wait;              /* the blink: step 0..7 of it (-1 none), ticks since the last */
+    unsigned int seed;                  /* (its own random numbers: the game's rand() stays the game's) */
     struct {   /* the player characters' cutscene models: the head part the scripts link to them (Claire's
                   ponytail, Wesker's sunglasses), from the character's part file (load_head) */
         O_WORK ow[16] __attribute__((aligned(16)));
@@ -101,6 +104,7 @@ static int dbl_tick;                    /* actor_double_tick is posing the doubl
                                            double of the tick, which takes the ponytail as the first one swung it */
 static BH_PWORK* dbl_posed;             /* the double the display actor's current pose was taken from */
 static void face_init(Disguise* d, int idx);
+static unsigned int k_seed;             /* imported models' blink seeds */
 /* the retargeting of docs/ACTORS.md "Retargeting" (limb roles along each chain, the root's height
    scaled, the aim solved on the drawn weapon, the camera scaled); RECVX_RETARGET=0: the previous one */
 int actor_retarget = 1;
@@ -963,7 +967,7 @@ static int load_import_model(Disguise* d, int k)
     fclose(f);
     if (!size) { host_log("actor: %s cannot be read\n", path); return 0; }
     nv = rd32(d->keep + 20); toff = rd32(d->keep + 12); soff = rd32(d->keep + 16);
-    if (rd32(d->keep) != CVXM_MAGIC || rd32(d->keep + 4) != CVXM_VERSION || rd32(d->keep + 8) != 60 || toff >= (unsigned)size ||
+    if (rd32(d->keep) != CVXM_MAGIC || rd32(d->keep + 4) < 1 || rd32(d->keep + 4) > CVXM_VERSION || rd32(d->keep + 8) != 60 || toff >= (unsigned)size ||
         (uint64_t)soff + (uint64_t)nv * sizeof(CvxmSkin) > (uint64_t)size || !list_len(d->keep + 60, d->keep + toff)) {
         host_log("actor: %s is not a model of this version\n", path);
         return 0;
@@ -980,7 +984,54 @@ static int load_import_model(Disguise* d, int k)
     d->skin = (const CvxmSkin*)(d->keep + soff);
     d->vtx = (float*)(p + 64);
     d->nv = (int)nv;
+    for (int k = 0; k < IMP_FACES - 1; k++)   /* (version 1: no face bones) */
+        d->fbone[k] = rd32(d->keep + 4) >= 2 && d->keep[28 + k] < d->w.mdl[0].obj_num ? (signed char)d->keep[28 + k] : -1;
+    d->blink = -1;
+    d->blink_wait = 0;
+    d->seed = 0x2545F491u * (unsigned)(k_seed++ + 1);
     return 1;
+}
+
+/* An imported model's face (its face bones, which otherwise follow the head): it blinks as the
+   player characters do (player.c: after 30 ticks a 3% chance per tick, then 8 ticks: lids half,
+   closed, half, open), and in cutscenes its jaw opens as far as the double's face mask's
+   (MASK_WORK param.jawang, set by the lip sync, bhControlMask) */
+static void imp_face(Disguise* d, const BH_PWORK* src, int step)
+{
+    static const unsigned char tab[8] = { 0, 0, 1, 1, 2, 2, 1, 0 };   /* PlyEyeTab: 0 open, 1 half, 2 closed */
+    O_WORK* ow = d->w.mlwP->owP;
+    const NJS_CNK_OBJECT* o = d->w.mlwP->objP;
+    float shut = 0, jaw = 0;
+    int k;
+    if (step) {
+        d->seed = d->seed * 1103515245u + 12345u;
+        if (d->blink < 0 && ++d->blink_wait > 30 && (d->seed >> 16) % 100 >= 97) d->blink = 0, d->blink_wait = 0;
+        else if (d->blink >= 0 && ++d->blink > 7) d->blink = -1;
+    }
+    if (d->blink >= 0) shut = tab[d->blink] / 2.0f;
+    if (src && src->mskp && src->exp1 && d == &dg[ACTOR_DOUBLE]) jaw = ((const MASK_WORK*)src->exp1)->param.jawang;   /* (degrees) */
+    if (getenv("RECVX_IMPORT_JAW")) jaw = (float)atof(getenv("RECVX_IMPORT_JAW"));   /* test aid: the jaw open this far (degrees) */
+    if (getenv("RECVX_IMPORT_POSE") && step && d == &dg[ACTOR_DOUBLE] && jaw != 0) host_log("import: double's jaw %.1f\n", jaw);   /* (test aid) */
+    jaw *= 3.14159265f / 180.0f;
+    for (k = 0; k < 2; k++) {   /* the upper lid down onto the lower one along the head's up axis (the lower one a little up) */
+        int up = d->fbone[2 * k], lo = d->fbone[2 * k + 1], c;
+        if (up < 0 || lo < 0 || shut <= 0) continue;
+        float gap = o[up].pos[1] - o[lo].pos[1];
+        for (c = 0; c < 3; c++) {
+            ow[up].mtx[12 + c] -= 1.7f * shut * gap * ow[up].mtx[4 + c];
+            ow[lo].mtx[12 + c] += 0.3f * shut * gap * ow[lo].mtx[4 + c];
+        }
+    }
+    if (d->fbone[4] >= 0 && jaw != 0) {   /* the jaw turned about the head's x axis at its pivot (the chin down and back) */
+        float* m = ow[(int)d->fbone[4]].mtx, r[3][3], cs = cosf(jaw), sn = sinf(jaw);
+        int c;
+        for (c = 0; c < 3; c++) {   /* rows: x stays, y and z turn (row vectors: Rx(-jaw) x the head's rotation) */
+            r[0][c] = m[c];
+            r[1][c] = cs * m[4 + c] - sn * m[8 + c];
+            r[2][c] = sn * m[4 + c] + cs * m[8 + c];
+        }
+        for (c = 0; c < 3; c++) { m[c] = r[0][c]; m[4 + c] = r[1][c]; m[8 + c] = r[2][c]; }
+    }
 }
 
 /* An imported model's vertices for this pose: linear blend skinning from the node matrices (each
@@ -1487,6 +1538,7 @@ void actor_pose(int who, BH_PWORK* src)
                     if (d->rig.map[k] >= 0 && sr.map[k] >= 0) memcpy(&src->mlwP->owP[(int)sr.map[k]].mtx[12], &m->owP[(int)d->rig.map[k]].mtx[12], 12);
             }
             head_pose(d, who == ACTOR_DOUBLE ? dbl_tick == 1 : !redraw);   /* (one head part, one swing per tick) */
+            if (d->skin) imp_face(d, src, who == ACTOR_DOUBLE ? dbl_tick == 1 : !redraw);
             imp_skin(d);
             return;
         }

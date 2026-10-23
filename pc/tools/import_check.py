@@ -147,7 +147,8 @@ def check_glb(path, out):
 def check_cvxm(path, out, clamp_u=True):
     d = open(path, 'rb').read()
     magic, ver, moff, toff, soff, nv, nn = struct.unpack_from('<4sIIIIII', d, 0)
-    assert magic == b'RXIM' and ver == 1 and moff == 60
+    assert magic == b'RXIM' and ver in (1, 2) and moff == 60
+    face = list(d[28:33]) if ver >= 2 else []   # the face bones' objects (lids, jaw), 255 none
     mlb = 64
     hs, on = struct.unpack_from('<HH', d, mlb + 4); to, oo = struct.unpack_from('<ii', d, mlb + 8)
     base = mlb + hs
@@ -209,7 +210,7 @@ def check_cvxm(path, out, clamp_u=True):
                 tris.append((P[ix], uv[k:k + 3], tex))
             nstrips += 1
         p += 4 + 2 * sz
-    print(f'{path}: {on} nodes, {n} vertices, {len(texs)} textures, {nstrips} strips, {len(tris)} triangles')
+    print(f'{path}: {on} nodes, {n} vertices, {len(texs)} textures, {nstrips} strips, {len(tris)} triangles, face bones {face}')
     # the game faces -z: view from -z to see the front
     a = render(tris, (300, 520), np.pi); b = render(tris, (300, 520), 0)
     im = Image.new('RGB', (600, 520)); im.paste(a, (0, 0)); im.paste(b, (300, 0)); im.save(out)
