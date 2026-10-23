@@ -178,6 +178,11 @@ static int read_ahi(Rd* r, uint32_t o, ImpModel* m, int* meshnode)
         n->keep = (int)u32(r, b + 68);   /* (the group for now: decided by the caller) */
         if (u32(r, p + 8) < 12 + 72) return 0;
     }
+    for (int i = 0; i < m->nn; i++) {   /* no cycles: every chain of parents ends at a root */
+        int a = i, k = 0;
+        while (a >= 0 && k++ <= m->nn) a = m->node[a].parent;
+        if (a >= 0) return 0;
+    }
     return !r->bad;
 }
 
@@ -345,17 +350,7 @@ static int read_nbd(const unsigned char* d, uint32_t n, ImpModel* m, char* err, 
     if (!read_ahi(&r, ahi, m, meshnode)) { snprintf(err, en, "bad node hierarchy"); imp_free(m); return 0; }
     if (!read_amo(&r, amo, &a)) { snprintf(err, en, "bad model data"); imp_free(m); return 0; }
     if (!(W = calloc(m->nn, sizeof(*W)))) { imp_free(m); return 0; }
-    for (int i = 0; i < m->nn; i++) {   /* world rest matrices (parents first: Outbreak lists them so) */
-        const ImpNode* nd = &m->node[i];
-        float x = nd->q[0], y = nd->q[1], z = nd->q[2], w = nd->q[3];
-        float l[16] = { 1 - 2 * (y * y + z * z), 2 * (x * y + z * w), 2 * (x * z - y * w), 0, 2 * (x * y - z * w), 1 - 2 * (x * x + z * z), 2 * (y * z + x * w), 0,
-                        2 * (x * z + y * w), 2 * (y * z - x * w), 1 - 2 * (x * x + y * y), 0, nd->t[0], nd->t[1], nd->t[2], 1 };
-        if (nd->parent >= 0 && nd->parent < i) {
-            const float* pw = W[nd->parent];
-            for (int c = 0; c < 4; c++)
-                for (int rr = 0; rr < 4; rr++) W[i][c * 4 + rr] = pw[rr] * l[c * 4] + pw[4 + rr] * l[c * 4 + 1] + pw[8 + rr] * l[c * 4 + 2] + pw[12 + rr] * l[c * 4 + 3];
-        } else memcpy(W[i], l, sizeof(l));
-    }
+    imp_world(m, W);
     int meshes = 0;
     for (int i = 0; i < a.nmesh; i++) meshes += read_mesh(&r, &a.mesh[i], &a, i, meshnode, m, W);
     free(W);

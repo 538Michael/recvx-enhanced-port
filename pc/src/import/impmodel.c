@@ -187,15 +187,22 @@ static void mul(const float* a, const float* b, float* o)   /* o = a * b (column
         for (int r = 0; r < 4; r++) t[c * 4 + r] = a[r] * b[c * 4] + a[4 + r] * b[c * 4 + 1] + a[8 + r] * b[c * 4 + 2] + a[12 + r] * b[c * 4 + 3];
     memcpy(o, t, sizeof(t));
 }
-static void world(const ImpModel* m, float (*W)[16])
+void imp_world(const ImpModel* m, float (*W)[16])
 {
-    for (int i = 0; i < m->nn; i++) {   /* (parents come first: the sources list nodes in tree order or fix them up) */
-        float l[16];
-        mat_from(&m->node[i], l);
-        if (m->node[i].parent >= 0 && m->node[i].parent < i) mul(W[m->node[i].parent], l, W[i]);
-        else memcpy(W[i], l, sizeof(l));
-    }
+    char done[IMP_NODES] = { 0 };
+    for (int pass = 0, left = m->nn; left && pass <= m->nn; pass++)   /* (a parent may come after its child) */
+        for (int i = 0; i < m->nn; i++) {
+            int p = m->node[i].parent;
+            float l[16];
+            if (done[i] || (p >= 0 && !done[p] && pass < m->nn)) continue;
+            mat_from(&m->node[i], l);
+            if (p >= 0 && done[p]) mul(W[p], l, W[i]);
+            else memcpy(W[i], l, sizeof(l));
+            done[i] = 1;
+            left--;
+        }
 }
+#define world imp_world
 
 /* ---------------------------------------------------------------- glTF */
 typedef struct Tri { Buf* idx[IMP_TEX + 1]; } Tri;

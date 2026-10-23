@@ -31,6 +31,7 @@ typedef struct ImpModel {
 
 void imp_free(ImpModel* m);
 int  imp_tris(const ImpModel* m);   /* triangles the strips make (degenerate ones left out) */
+void imp_world(const ImpModel* m, float (*W)[16]);   /* world rest matrices (column-major) */
 /* a TIM2 picture as RGBA8 (malloc'd; 4/8-bit indexed with a 32-bit CLUT, 16/24/32-bit direct); 0 = unsupported */
 int  imp_tim2_rgba(const unsigned char* t, int len, int* w, int* h, unsigned char** rgba);
 /* texture slot k as a PNG file */
