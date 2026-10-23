@@ -19,7 +19,7 @@ lists what was extracted; it is built so other games can be added as further sou
 | 4. F4 window | done: disc image, what to extract, progress, results table from the manifest (also after a restart) |
 | 5. Notes for later (voices, ad-libs, animations) | first findings ("Notes for later") |
 | 6. Verification | headless extraction, glTF/`.cvxm` checks and previews, in-game shots, ctest (`import`, `appear`), Linux and Windows builds, layout check |
-| 7. Posture (round 2) | fixed: the retargeting's rest correction bent the imported meshes (hunched shoulders, head down); imported models now take the source's rotations as they are ("Posture") |
+| 7. Posture (round 2) | fixed: the retargeting's rest correction bent the imported meshes (hunched shoulders, head down); imported models now take the source's rotations as they are; the left arm's two-handed grip scaled to the model's shoulders, the palm onto the gun ("Posture") |
 | 8. Faces (round 2) | blinking (lids, the player characters' timing) and the jaw from the cutscene double's lip sync ("Faces"); the jaw path is checked with a forced angle, not yet in a talking cutscene |
 
 Resume notes: build with `cmake --build build`; headless run:
@@ -212,6 +212,22 @@ head went forward. The skinned mesh follows these rotations even at rest. Fix: a
 positions still come from its own bone offsets, the root height and feet adjustment and the
 two-hand IK as before. Checked for all 30 models in idle, walk, run, aim and fire, front and side
 (offline renders of the dumped poses), and in game.
+
+**The left arm** (second report: broken and clipping in every motion set; in the two-handed aim
+the left hand reached past the gun to the right). Cause: the two-handed grip (`retarget`,
+`arm_ik`) solves the left arm to "the model's right hand + the source's left-to-right hand
+offset", weighted fully below 3 units apart and faded out at 6. The source's hands hang 3.5 apart
+with the arms down, so the solve also runs in idle and walk; Outbreak's shoulders are about a
+quarter wider than Claire's/Chris's (shoulder joints 3.5 apart against 2.8), so the unscaled offset
+pulled only the left hand in across the hips. In the aim the left wrist was put on the right
+wrist, and Outbreak's hand has straight fingers (Code: Veronica's grip pieces from the weapon file
+curl around the gun), so the left fingers stuck out past the gun. Fix (imported models only): the
+offset is scaled by the ratio of the two shoulder spans, and in a grip (hands up to 2 apart, fading
+out at 4) the left wrist goes back along its forearm by half the model's hand length (measured at
+load from the hand's vertices), which puts the palm under the right hand. Idle and walking now hang
+both arms alike; the two-handed aim cups the right hand. The right hand and the gun are unchanged
+(the shot still comes from the game's own skeleton). Dual weapons hold the hands further apart and
+keep the scaled offset only.
 
 ### Faces
 
