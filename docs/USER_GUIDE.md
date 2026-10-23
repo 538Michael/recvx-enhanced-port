@@ -88,8 +88,8 @@ heading reads "Load Game" or "Save Game" instead of "MEMORY CARD slot 1":
 
 During a game, the OPTION screen (Select) has **RETURN TO TITLE** on DEFAULT's row, above ENHANCED
 SETTINGS: select DEFAULT and press right, or click it. It asks "Return to the title screen?" with
-NO selected, so a stray press does nothing; choose YES (left/right, then confirm) to go back to the
-title menu, as after a game over. Anything not saved is lost; changed options are kept. Cancel or a
+NO selected, so a stray press does nothing; choose YES (left/right, then confirm, Z or Enter) to go
+back to the title menu, as after a game over. Anything not saved is lost; changed options are kept. Cancel or a
 right click answers NO. It works in the Battle Game too. In co-op, leaving ends the session: the
 partner plays on alone. The OPTION screen of the title menu does not have it.
 
@@ -320,7 +320,9 @@ Menus, messages, the inventory's screens and events use the game's buttons with 
 (confirm A / Cross (Z), cancel B / Circle (X), L1 / R1 (Q / W) for the map's zoom and the pages of
 ENHANCED SETTINGS); with the keyboard in third person the third-person keys (W/A/S/D, E, Q, Tab,
 M) also work in the inventory, map, item box and messages, while the title menus and OPTION take
-the game's keys only. The co-op guest plays with the same controls as in single player.
+the game's keys only. In OPTION the keyboard's Start key (Enter) confirms too: every row, ENHANCED
+SETTINGS and RETURN TO TITLE's question; a rebound Start key takes this over (the gamepad's Start
+keeps its PS2 roles). The co-op guest plays with the same controls as in single player.
 
 ### Third person with a gamepad
 

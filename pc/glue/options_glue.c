@@ -177,7 +177,9 @@ void pc_options_rows0(void)
 }
 
 /* DisplayOptionPlateLevel0 before it reads the pad: hovering a row selects it, a click confirms
-   it (on STEREO/MONO, ON/OFF: picks that value), a right click leaves the option screen */
+   it (on STEREO/MONO, ON/OFF: picks that value), a right click leaves the option screen. Start's
+   key on the keyboard (Enter) confirms as well, as in RETURN TO TITLE's question and ENHANCED
+   SETTINGS (the gamepad's Start does nothing here, as on the PS2) */
 static int opt_held = 1;   /* the Modern gamepad's options button (below) was down last frame; 1 when OPTION opens */
 void pc_options_mouse0(int port)
 {
@@ -187,6 +189,7 @@ void pc_options_mouse0(int port)
        leaves it, as View / Back opens and leaves it with the game's buttons */
     if (opt && !opt_held && g_tps.on && g_tps.pad_modern && pc_in_game()) Pad[port].press |= P_SELECT;
     opt_held = opt;
+    if ((Pad[port].press & P_START) && pad_kb_start()) Pad[port].press |= ok_button();
     menu_mouse_take(&mt);
     if (mt.x >= 32 && mt.x < 608 && mt.y >= 160 && mt.y < 384) {   /* rows 32 px apart, their values on the right */
         hit = (int)(mt.y - 160) / 32;

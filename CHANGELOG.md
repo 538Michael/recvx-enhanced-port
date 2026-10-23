@@ -7,6 +7,11 @@
 - **More enemies per room**: a room now holds about twice as many enemies as before, so the enemy
   spawner, extra enemies and the randomizer can fill rooms with much bigger crowds, in co-op too.
 
+### Controls
+
+- **Enter in OPTION**: on the keyboard, Enter now selects every OPTION entry, including ENHANCED
+  SETTINGS and RETURN TO TITLE with its yes/no question, without opening anything else afterwards.
+
 ### Co-op
 
 - **Brighter lobby models**: the characters in the lobby are now lit like in a photo studio, so

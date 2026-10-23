@@ -133,6 +133,10 @@ static void set_move_dir(uint32_t b, Sint16 sx, Sint16 sy)
     if (move_x != 0 && move_y != 0) { move_x *= 0.70710678f; move_y *= 0.70710678f; }
 }
 
+/* Start's keyboard binding (Enter) is down in this report (OPTION takes it as confirm too, options_glue.c) */
+static int kb_start;
+int pad_kb_start(void) { return kb_start; }
+
 static void build_report(unsigned char* r)
 {
     uint32_t b = 0, qbits = 0;
@@ -141,6 +145,7 @@ static void build_report(unsigned char* r)
     const bool* k;
 
     ensure_gamepad();
+    kb_start = 0;
     k = bind_latch_frame(pc_menu_smooth(), bind_keys());   /* quick presses in menus (bindings.c) */
     bind_combo_frame(input_enabled && !g_lobby_io.text_on, k, tps_mouse_buttons());   /* the reload combination first: it takes its presses from the rows */
     if (input_enabled) {
@@ -153,6 +158,7 @@ static void build_report(unsigned char* r)
         if (g_lobby_io.text_on) k = none;
         for (int i = 0; i < 16; i++)
             if (bind_held(i, BIND_KB, k, mouse) || (gamepad && bind_held(i, BIND_PAD, k, 0))) b |= 1u << i;
+        kb_start = bind_held(B_START, BIND_KB, k, mouse);
         qt = bind_quickturn(0, bind_held(B_QUICKTURN, BIND_KB, k, mouse) || (gamepad && bind_held(B_QUICKTURN, BIND_PAD, k, 0)));
         if (qt) qbits = PAD_DOWN | (qt > 1 ? run_bits() : 0);
         if (gamepad) {
