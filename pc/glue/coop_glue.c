@@ -2165,6 +2165,33 @@ void coop_own_from_save(const void* save)
     if (!save) { own_fixed = 1; own_valid = 0; }
 }
 
+/* Co-op rule "Quick start" (OPT_QUICK_START, protocol 23, docs/COOP.md "Quick start"): a new-game inventory as if
+   the player had read the manual and taken the knife in the first room (0/0). Reading the manual (item 145, FILE
+   entry 0, which the new game already lists) takes it out of the bag and sets ic_flg[15] bit 31 (fileview.c); the
+   Combat Knife on 0/0's table is item trigger 7 with it_flg bit 120 (its scd1 ItmCk; scd0's ItmSetCk leaves the spot
+   empty), taken as bhItmCk takes it. The knife goes where the manual was; a bag without the manual is no new game's.
+   With "important items for both" the spot is an important one (coop_item_taken): ours taken, a partner whose items
+   came from elsewhere still finds its own knife there. */
+#define QS_MANUAL 0x910001u             /* item 145, one: as AllItemInit hands it out */
+#define QS_KNIFE 0x80001u               /* item 8, one */
+#define QS_KNIFE_BIT 120
+static void quick_start(void)
+{
+    unsigned int* inv = &sys->itm[(sys->ply_id & 3) * 16], m = 0x80000000u >> (QS_KNIFE_BIT & 31);
+    int i, w = QS_KNIFE_BIT >> 5;
+    for (i = 2; i < 10 && inv[i] != QS_MANUAL; i++);   /* the bag: inv[2..9] */
+    if (i == 10) return;
+    inv[i] = QS_KNIFE;
+    sys->ic_flg[15] |= 0x80000000u;
+    sys->it_flg[w] |= m;
+    sys->ic_flg[w] &= ~m;
+    if (own_copies()) { sys->itm[IMP_SPOTS + w] |= m; sys->itm[IMP_TAKEN + w] |= m; }
+    host_log("coop: quick start: the manual read, the knife in the bag (its spot in 0/0 taken)\n");
+}
+
+/* system.c bhSysCallMonitor: the host's new game has its items (AllItemInit); the guest's: own_restore */
+void pc_quick_start(void) { if (coop_on && is_host && rule(OPT_QUICK_START)) quick_start(); }
+
 /* after bhPopGameData put the host's state in place (the game reads it at the restart) */
 static void own_restore(void)
 {
@@ -2186,6 +2213,7 @@ static void own_restore(void)
     } else {
         AllItemInit();
         sys->ic_flg[15] = ic;   /* AllItemInit clears one "examined" bit */
+        if (rule(OPT_QUICK_START)) quick_start();
         for (i = 0; i < 4; i++) {   /* as a new game (system.c) */
             sys->ply_hp[i] = sys->gm_mode == 2 ? 320 : 160;
             sys->ply_stflg[i] = 0x40000000;
@@ -2622,13 +2650,14 @@ static int item_word(int w) { return w >= IT_FLG && w < IT_FLG + 32; }
 static int rule(int opt)
 {
     if (is_host) return opt == OPT_IMPORTANT ? g_coop.important : opt == OPT_SKIP_SYNC ? g_coop.skip_sync : opt == OPT_GAMEOVER_BOTH ? g_coop.gameover_both :
-                        opt == OPT_SKIP_DETECTOR && g_coop.skip_detector;
+                        opt == OPT_SKIP_DETECTOR ? g_coop.skip_detector : opt == OPT_QUICK_START && g_coop.quick_start;
     return peer_opts >= 0 && (peer_opts & opt);
 }
 
 /* the host's rule "Metal detector: Skipped" (OPT_SKIP_DETECTOR, protocol 22): pc/glue/detector_glue.c in a session, the
    guest's lobby (the host's value) */
 int coop_skip_detector(void) { return rule(OPT_SKIP_DETECTOR); }
+int coop_quick_start(void) { return rule(OPT_QUICK_START); }   /* "Quick start" (protocol 23): the guest's lobby */
 
 /* event.c bhPlItemCheck, ps2_McSaveFile.c mcWriteStartSaveFile: typewriters save without an ink ribbon and use none.
    The setting (single player, and the host); a guest plays by the host's rule once it knows it. */
@@ -5995,7 +6024,8 @@ void coop_frame(void)
     else tx_ext.rec = !g_coop.remember ? REC_OFF : !id_ok ? REC_UNKNOWN : rec_have(id_pid) ? REC_HAVE : REC_NONE;
     tx.opts = is_host ? (g_coop.loot ? OPT_INDIVIDUAL : 0) | (g_coop.trade_freeze ? OPT_TRADE_FREEZE : 0) | (g_coop.important ? OPT_IMPORTANT : 0) |
                         (pc_cfg_no_ink_ribbon() ? OPT_NO_RIBBON : 0) | (g_coop.skip_sync ? OPT_SKIP_SYNC : 0) |
-                        (g_coop.gameover_both ? OPT_GAMEOVER_BOTH : 0) | (g_coop.skip_detector ? OPT_SKIP_DETECTOR : 0) : 0;
+                        (g_coop.gameover_both ? OPT_GAMEOVER_BOTH : 0) | (g_coop.skip_detector ? OPT_SKIP_DETECTOR : 0) |
+                        (g_coop.quick_start ? OPT_QUICK_START : 0) : 0;
     tx.regroup = regroups;
     tx.seq = frame_no;
     if (echo_delay) {

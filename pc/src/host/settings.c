@@ -452,6 +452,8 @@ const Setting g_settings[] = {
       .help = "Each player: whoever dies retries alone. Both: one game over is both players' and the host answers Retry for both - Yes takes both back to the last continue point with the items each had there, No takes both to the title." },
     { SP_COOP, "Metal detector (host)", V(g_coop.skip_detector), 0, 1, 1, detectors,
       .help = "Skipped: the prison's metal detector lets you through with weapons and its security boxes stay shut (one holding your items still opens)." },
+    { SP_COOP, "Quick start (host)", V(g_coop.quick_start), 0, 1, 1,
+      .help = "A new game starts with the manual already read (it stays in FILE) and the combat knife in the bag instead of on the table, for both of you." },
     { SP_COOP, "Freeze enemies while trading (host)", V(g_coop.trade_freeze), 0, 1, 1, .help = "While both players are in the trade screen the room's enemies stand still (the host's setting counts)." },
     { SP_COOP, "Remember partner inventories (host)", V(g_coop.remember), 0, 1, 1, .flags = SET_F1,
       .help = "Keep each partner's items when it leaves, kept with your saves: it can join again with them (ITEMS: Saved with the host), and gets them back after its game crashed." },

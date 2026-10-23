@@ -1,4 +1,4 @@
-/* Online co-op wire format (protocol 22, docs/COOP.md "Protocol 22" and "Security") and
+/* Online co-op wire format (protocol 23, docs/COOP.md "Protocol 23" and "Security") and
    the checks every received packet passes before it may change anything. No game state here:
    pc/glue/coop_glue.c applies what passes; pc/tests/test_coop.c feeds malformed packets. */
 #ifndef RECVX_COOP_PROTO_H
@@ -11,7 +11,7 @@ extern "C" {
 #endif
 
 #define COOP_MAGIC 0x504F4F43u          /* "COOP" */
-#define COOP_VERSION 22                 /* 11: join code, datagrams <= 1200 bytes, checked events, EV_ATR; 12: EV_FX; 13: EV_GRANT;
+#define COOP_VERSION 23                 /* 11: join code, datagrams <= 1200 bytes, checked events, EV_ATR; 12: EV_FX; 13: EV_GRANT;
                                            14: EV_TSCREEN, BUSY_TRADE, OPT_TRADE_FREEZE; 15: EV_GONE;
                                            16: player id and rejoin tag in PoseExt, EV_OWN, saved inventories (EV_BLOB pad);
                                            17: TS_WANT, TS_DECLINE (trade screen item requests);
@@ -21,7 +21,8 @@ extern "C" {
                                            20: EV_EOPTS variety and event enemies (the randomizer's choices changed);
                                            21: COOP_HIT_PRECISE (third person "Precise hits");
                                            22: OPT_GAMEOVER_BOTH, PF_GAME_OVER, EV_BLOB pad 2 (a shared game over's continue),
-                                               EV_OWN tid (the last game state the guest loaded); OPT_SKIP_DETECTOR */
+                                               EV_OWN tid (the last game state the guest loaded); OPT_SKIP_DETECTOR;
+                                           23: OPT_QUICK_START (Pose.opts is full: a further rule needs a field of its own) */
 #define COOP_DGRAM_MAX 1200             /* bytes per datagram (below every internet path MTU) */
 #define COOP_EV_FRAME 16                /* events per frame (over the frame's datagrams) */
 #define COOP_SNAP_FRAME 48              /* enemy snapshots per frame */
@@ -41,7 +42,8 @@ enum { OPT_INDIVIDUAL = 1, OPT_TRADE_FREEZE = 2,   /* Pose.opts: the host's sess
        OPT_SKIP_SYNC = 16,              /* a cutscene both play is skipped once both pressed skip */
        OPT_GAMEOVER_BOTH = 32,          /* one player's game over is both players'; the host's CONTINUE / NO decides */
        OPT_SKIP_DETECTOR = 64,          /* the prison's metal detector (0/9) never goes off, its security boxes rest */
-       OPT_ALL = 127 };
+       OPT_QUICK_START = 128,           /* a new-game inventory starts with the manual read and the knife from the first room */
+       OPT_ALL = 255 };
 enum { BUSY_NONE, BUSY_EVENT, BUSY_MENU, BUSY_BOX, BUSY_TRADE };
 enum { MSET_OWN = -1, MSET_ROOM = -2, MSET_NONE = -3 };
 #define MNW_ROOM 0x7FFE

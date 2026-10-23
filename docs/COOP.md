@@ -5,7 +5,7 @@ over the internet or a LAN (UDP). Co-op is an optional addon: with it off the ga
 as without it (every hook is `#ifdef TARGET_PC` and `if (coop_on)`).
 
 Part 1 is for players: how to host, join and play. Part 2 is the reference: architecture,
-protocol 22, security and limits. Related: [SERVER.md](SERVER.md) (the optional co-op server),
+protocol 23, security and limits. Related: [SERVER.md](SERVER.md) (the optional co-op server),
 [USER_GUIDE.md](USER_GUIDE.md) (settings, controls), [ACTORS.md](ACTORS.md) (models and voices),
 [ENEMIES.md](ENEMIES.md) (enemy options), [ARCHITECTURE.md](ARCHITECTURE.md),
 [BUILDING.md](BUILDING.md).
@@ -75,7 +75,7 @@ of their own (an arrow after them; RANDOMIZER also shows On or Off):
 | Entry | Its page |
 |---|---|
 | **RANDOMIZER** | The enemy options: **RANDOMIZER**, **VARIETY** (Wild / Mild) and **EVENT ENEMIES** (both shown only with the randomizer on), **SEED**, **NEW RANDOM SEED**, then **EXTRA ENEMIES**, **REARRANGED**. |
-| **EXTRA EVENTS** | Rules for single events: **METAL DETECTOR** (Skipped / As original, see "Metal detector"). |
+| **EXTRA EVENTS** | Rules for single events: **QUICK START** (On / Off, see "Quick start"), **METAL DETECTOR** (Skipped / As original, see "Metal detector"). |
 
 Confirm or a click opens a page; BACK (or cancel, or a right click) returns to GAME RULES on its
 entry. The joiner sees the host's GAME OVER rule and both pages read-only (THE HOST'S RULES) once
@@ -447,6 +447,25 @@ An item that is the triggering player's alone: nothing goes on the partner's flo
 loot a partner who watched the event and got one too gives it back at once ("... from the partner's
 event is the partner's").
 
+### Quick start
+
+The host's rule **QUICK START** (lobby GAME RULES, EXTRA EVENTS; F1 / ENHANCED SETTINGS CO-OP "Quick start
+(host)"; ini `coop_quick_start`, 0 *Off* (default), 1 *On*) skips two chores at the start of a new game. With it
+on, a new co-op game starts for both of you with:
+
+* the **manual** already read: it is not in your bag, and it stays readable under FILE, as after reading it;
+* the **combat knife** in your bag, where the manual was;
+* the knife's table in the first room empty: its spot counts as taken.
+
+Each player gets their own knife. Who sees the table empty follows the loot mode as for any weapon: with
+"Important items for both" (the default) each player's own spot, otherwise the one spot taken for both.
+
+It applies to new-game inventories only: the host's new game (the lobby's START with a new game, or a new game
+while hosting), and a partner joining with a new inventory (ITEMS *New inventory*, or *Saved with the host* when
+the host keeps none for it). Loading a save, continuing and joining with saved items change nothing. The joiner
+sees the rule under THE HOST'S RULES. Default off: the game starts as the original does unless the host asks for it.
+Outside a session the rule plays no part.
+
 ### Metal detector
 
 The prison's metal detector room (where you have to put metal items in a security box before
@@ -629,6 +648,7 @@ only on the host; "locked" ones cannot change during a session.
 | Synchronized cutscene skip (host) | `coop_skip_sync` | 0/1 (1) |
 | Game over (host) | `coop_gameover` | 0 Each player, 1 Both (0); see "Game over" |
 | Metal detector (host) | `coop_skip_detector` | 0 As original, 1 Skipped (1); see "Metal detector" |
+| Quick start (host) | `coop_quick_start` | 0/1 (0); see "Quick start" |
 | Freeze enemies while trading (host) | `coop_trade_freeze` | 0/1 (1) |
 | Remember partner inventories (host) | `coop_remember` | 0/1 (1) |
 | Connection, locked | `coop_conn` | 0 Automatic, 1 Direct (P2P), 2 Via server (0) |
@@ -680,7 +700,8 @@ bhSysCallMonitor` before a character switch releases the player's textures (`coo
 also without co-op), and the title menu in
 `adv.c` / `system.c` (the MULTIPLAYER row and the lobby mode), `event.c bhControlEvent` before scd1
 (`pc_detector_scd1`) and `event.c bhPlItemCheck` (`pc_detector_skipped`) for the metal detector
-(`detector_glue.c`, see below). Not co-op only: `event.c
+(`detector_glue.c`, see below), `system.c bhSysCallMonitor` after a new game's `AllItemInit` (`pc_quick_start`,
+see "Quick start" below). Not co-op only: `event.c
 bhPlItemCheck` and `ps2_McSaveFile.c mcWriteStartSaveFile` ask `pc_no_ink_ribbon()` (the setting,
 in co-op the host's rule) whether a typewriter needs and uses an ink ribbon.
 
@@ -971,6 +992,24 @@ the reminder "Take the metal items you placed into the security box with you" (e
 
 No item is ever moved: what a box holds stays reachable through its own screen.
 
+### Quick start
+
+`OPT_QUICK_START` (the host's `coop_quick_start`; `coop_quick_start()` is the session's value), `coop_glue.c`
+`quick_start`. A new game's items come from `AllItemInit`: Claire's bag holds the manual (item 145, word
+`0x910001`) and `sys->itm[383]` already lists FILE entry 0, the manual. Reading it (`fileview.c`) takes the
+item out and sets `ic_flg[15]` bit 31. The combat knife on the table of 0/0 is item record 0 (item 8) with item
+trigger 7 and `it_flg` bit 120: the room's scd1 `ItmCk` picks it up, its scd0 `ItmSetCk` leaves the spot empty
+once the bit is set. `quick_start` puts the knife (`0x80001`) in the manual's bag slot, sets `ic_flg[15]` bit 31
+and `it_flg` bit 120 and clears `ic_flg` bit 120, as `bhItmCk` does; with `OPT_IMPORTANT` (shared loot) it marks
+bit 120 as an important spot (`IMP_SPOTS`) taken by us (`IMP_TAKEN`), as `coop_item_taken` would. A bag without
+the manual is no new game's and is left alone.
+
+* Host: `system.c bhSysCallMonitor` calls `pc_quick_start` right after `AllItemInit(0)`, the new-game step a
+  loaded game skips (`ss_flg` 0x200); in a session as host with the rule on.
+* Guest: `own_restore`, where a joiner without own items gets the new-game items (`AllItemInit`), before
+  `imp_restore`: its knife spot stays taken by it, and `last` is taken after it, so nothing of it goes out as a flag
+  change. Saved or kept items are not touched.
+
 ### Ping and name tag timing
 
 Each datagram's arrival time comes from the network: Linux `SO_TIMESTAMPNS`; Windows a small thread
@@ -979,10 +1018,10 @@ send time minus the echoed datagram's arrival. Sample = arrival - our clock - th
 smoothed (EWMA 0.1). The name tag's point goes with the recorded frame (`stream_point`) and is
 interpolated with the in-between frames; it snaps on camera cuts and in vanilla mode.
 
-## Protocol 22
+## Protocol 23
 
-`COOP_VERSION` is **22**; both players need builds with the same version (a mismatch is reported,
-e.g. "the host runs co-op protocol 21, we 22: both need the same build"). The co-op server does not
+`COOP_VERSION` is **23**; both players need builds with the same version (a mismatch is reported,
+e.g. "the host runs co-op protocol 22, we 23: both need the same build"). The co-op server does not
 look at the game protocol. Version history in short: 11 join code, 1200-byte datagrams, checked
 events, `EV_ATR`; 12 `EV_FX`; 13 `EV_GRANT`; 14 `EV_TSCREEN`; 15 `EV_GONE`; 16 player id and rejoin
 tag, `EV_OWN`; 17 trade requests; 18 voices; 19 the game rules `OPT_IMPORTANT`, `OPT_NO_RIBBON`,
@@ -993,7 +1032,8 @@ randomizer's variety and event-enemy setting (the randomizer's choices changed, 
 make other enemies from the same seed); 21 `COOP_HIT_PRECISE` in `EV_ENE_HIT` (third person
 "Precise hits", [THIRDPERSON.md](THIRDPERSON.md#precise-hits)); 22 the game rules `OPT_GAMEOVER_BOTH`
 and `OPT_SKIP_DETECTOR`, `PF_GAME_OVER`, `EV_BLOB` `pad` 2 and the `EV_OWN` `tid` (see "Game over",
-"Metal detector"). `Pose.pflg` and `Pose.flr` were added inside protocol 18,
+"Metal detector"); 23 the game rule `OPT_QUICK_START` (see "Quick start"; it takes the last free bit of
+`Pose.opts`, so a further rule needs a field of its own). `Pose.pflg` and `Pose.flr` were added inside protocol 18,
 `Pose.rcase` inside protocol 22 (0 means "not sent", and receivers fall back).
 
 All structures are little-endian, packed as the compiler lays them out on x86 (pinned by
@@ -1024,7 +1064,7 @@ over its datagrams.
 |---|---|
 | 0-15 | `magic` "COOP" (0x504F4F43), `version` u16, `type` u8, `flags` u8, `sid` (sender's session), `auth` (`coop_auth(join code, sid)`): all a relay needs |
 | 16-31 | `seq` (sender's frame counter; older poses dropped), `t_ms`, `echo_ms`, `echo_age` (ping) |
-| 32-39 | `chr`, `costume`, `stg`, `rom`, `pos` (room entry point), `opts` (host's game rules: `OPT_INDIVIDUAL` 1, `OPT_TRADE_FREEZE` 2, `OPT_IMPORTANT` 4, `OPT_NO_RIBBON` 8, `OPT_SKIP_SYNC` 16, `OPT_GAMEOVER_BOTH` 32, `OPT_SKIP_DETECTOR` 64), `regroup` (host counter), `mfile` (sender's own part file - 10) |
+| 32-39 | `chr`, `costume`, `stg`, `rom`, `pos` (room entry point), `opts` (host's game rules: `OPT_INDIVIDUAL` 1, `OPT_TRADE_FREEZE` 2, `OPT_IMPORTANT` 4, `OPT_NO_RIBBON` 8, `OPT_SKIP_SYNC` 16, `OPT_GAMEOVER_BOTH` 32, `OPT_SKIP_DETECTOR` 64, `OPT_QUICK_START` 128), `regroup` (host counter), `mfile` (sender's own part file - 10) |
 | 40-91 | position (3 floats), angles (3 ints), `mtn_no`, `frm_no` (the frame shown, before the step's advance: `actor_frame`), `mtn_md`, `hokan_count`, `hokan_rate`, `wpnr_no`, `hp`, `mode0`, `mode1`, `nev`, `nene` |
 | 92-107 | `stflg`, `ev_ack` (highest event id applied from the peer), `mset` (`MSET_OWN` -1, `MSET_ROOM` -2, `MSET_NONE` -3, or an enemy slot), `busy` (`BUSY_NONE/EVENT/MENU/BOX/TRADE`), `reject` (`PKT_BYE`, `PKT_REJECT`) or, in `PKT_POSE`, `rcase` (the room case of the room the sender is in + 1, 0 not sent; same room means the same case too, and the follow loads it), `voice_n`, `voice`, `pflg` (`flg & 6`: hit / held), `flr` (`flr_no + 3`, 0 not sent) |
 
@@ -1267,7 +1307,7 @@ General test aids used with these (`RECVX_TELEPORT`, `RECVX_WARP`, `RECVX_EQUIP`
 
 ctest `coop` (`pc/tests/test_coop.c`) checks every event type from the side that sends it and
 refused from the other, malformed variants of each (`EV_SKIP`: its op, its room, from the joiner), pose
-flags and game rules this protocol does not have, datagram headers and proofs, transfers, the event
+fields out of range and every pose flag and game rule (all eight bits of each are in use), datagram headers and proofs, transfers, the event
 ring, join address parsing, world event actions, record merging, the target rule and the loop guard, then fuzzes
 200000 random and mutated datagrams. ctest `net` covers the socket (busy port, oversized datagrams,
 receive timestamps) and port mapping start/stop cycles.

@@ -71,6 +71,7 @@ static const struct { const char* key; int* val; int lo, hi; } keys[] = {
     { "coop_skip_sync", &g_coop.skip_sync, 0, 1 },        /* host: a cutscene is skipped when both press skip */
     { "coop_gameover", &g_coop.gameover_both, 0, 1 },     /* host: 0 each player, 1 both (one game over is both players') */
     { "coop_skip_detector", &g_coop.skip_detector, 0, 1 }, /* host: no metal detector in the prison (0/9) */
+    { "coop_quick_start", &g_coop.quick_start, 0, 1 },    /* host: a new game starts with the manual read and the knife */
     { "hide_ip", &g_coop.hide_ip, 0, 1 },                /* Hide IP addresses: on screen masked (coop_shown) */
     { "coop_start", &g_coop.start, 0, 1000002 },
     { "menu_mouse", (int*)&g_menu_mouse.on, 0, 1 },
