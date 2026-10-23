@@ -15,6 +15,12 @@
   Easy, as in the European and Japanese versions; the menu was still hidden on the US disc (thanks to
   Piccio23 for pointing the way). Off: always Normal, as before.
 
+### Controls
+
+- **Vibration**: gamepads with rumble now vibrate as the original controller did, when you shoot,
+  get grabbed or hit, and in big moments. OPTION's VIBRATION can now be chosen when such a gamepad
+  is connected, and a new Vibration strength setting (CONTROLS) makes it softer.
+
 ### Co-op
 
 - **Quick start** (lobby GAME RULES, EXTRA EVENTS; off by default): a new co-op game starts with the manual

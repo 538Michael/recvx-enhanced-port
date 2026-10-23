@@ -80,6 +80,15 @@ static void ensure_gamepad(void)
     bind_set_gamepad(gamepad);
 }
 
+/* rumble: whether the open gamepad has motors (the game then finds a DualShock's actuators:
+   OPTION's VIBRATION can be chosen); off at exit (SDL stops a rumble only while it pumps events) */
+static int pad_can_rumble(void)
+{
+    ensure_gamepad();
+    return gamepad && SDL_GetBooleanProperty(SDL_GetGamepadProperties(gamepad), SDL_PROP_GAMEPAD_CAP_RUMBLE_BOOLEAN, false);
+}
+static void rumble_off(void) { if (gamepad) SDL_RumbleGamepad(gamepad, 0, 0, 0); }
+
 int tps_mouse_buttons(void);
 
 /* the DS2 bits of the run button under the game's key type (quick turn) */
@@ -240,7 +249,7 @@ int scePadInfoMode(int port, int slot, int term, int offs)
     (void)port; (void)slot; (void)offs;
     switch (term) {
     case 1: return 7;   /* InfoModeCurID: DualShock */
-    case 2: return 0;
+    case 2: return pad_can_rumble() ? 7 : 0;   /* InfoModeCurExID: DualShock with motors (ps2_sg_pdvib.c pdVibMxIsReady), else none */
     case 3: return 0;
     case 4: return offs == -1 ? 2 : (offs == 0 ? 4 : 7);
     }
@@ -251,12 +260,31 @@ int scePadInfoPressMode(int port, int slot) { (void)port; (void)slot; return 1; 
 int scePadEnterPressMode(int port, int slot) { (void)port; (void)slot; return 1; }
 int scePadSetActAlign(int port, int slot, const unsigned char* data) { (void)port; (void)slot; (void)data; return 1; }
 
+/* Ps2_pad_actuater, every game frame: the small motor (on/off) on the gamepad's high-frequency one,
+   the large (0-255) on the low-frequency one, at Vibration strength; none while the window has no
+   focus (unless Gamepad only, which plays in the background). Each refresh lasts 100 ms, so a
+   rumble ends by itself when the game stops sending. RECVX_RUMBLE_TRACE=1 logs each change. */
 int scePadSetActDirect(int port, int slot, const unsigned char* data)
 {
+    extern SDL_Window* g_window;
+    static int trace = -1, atexit_set;
+    static Uint64 last = 1;
+    Uint16 lo = 0, hi = 0;
     (void)slot;
-    if (port == 0 && gamepad) {
-        Uint16 small = data[0] ? 0xC000 : 0, large = (Uint16)(data[1] * 257);
-        SDL_RumbleGamepad(gamepad, large, small, 200);
+    if (port != 0) return 1;
+    if (gamepad && (g_input_source == INPUT_PAD || (SDL_GetWindowFlags(g_window) & SDL_WINDOW_INPUT_FOCUS))) {
+        lo = (Uint16)(data[1] * 257 * g_config.rumble / 100);
+        hi = (Uint16)(data[0] ? 0xC000 * g_config.rumble / 100 : 0);
+    }
+    if (trace < 0) trace = SDL_getenv("RECVX_RUMBLE_TRACE") != NULL;
+    if (trace && ((Uint64)data[0] << 48 | (Uint64)data[1] << 32 | (Uint64)lo << 16 | hi) != last) {
+        last = (Uint64)data[0] << 48 | (Uint64)data[1] << 32 | (Uint64)lo << 16 | hi;
+        host_log("rumble: frame %llu motors small %d large %d -> %s low %u high %u\n", (unsigned long long)gs_frame_count(),
+                 data[0], data[1], gamepad ? "gamepad" : "no gamepad", lo, hi);
+    }
+    if (gamepad) {
+        if (!atexit_set++) atexit(rumble_off);
+        SDL_RumbleGamepad(gamepad, lo, hi, 100);
     }
     return 1;
 }

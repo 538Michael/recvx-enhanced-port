@@ -29,6 +29,7 @@ static const struct { const char* key; int* val; int lo, hi; } keys[] = {
     { "show_ping", &g_config.show_ping, 0, 1 },
     { "music_volume", &g_config.music_volume, 0, 100 },
     { "sfx_volume", &g_config.sfx_volume, 0, 100 },
+    { "rumble_strength", &g_config.rumble, 0, 100 },
     { "screen_filter", &g_config.screen_filter, 0, 2 },
     { "cinema_bars", &g_config.cinema_bars, 0, 2 },
     { "screen_effects", &g_config.screen_effects, 0, 2 },

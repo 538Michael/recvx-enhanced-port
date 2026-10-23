@@ -400,6 +400,8 @@ const Setting g_settings[] = {
     { SP_CONTROLS, "Gamepad", V(g_input_pad), 0, 4, 1, .name = bind_pad_choice,
       .help = "Any: the first one connected. 1-4: the gamepad the system numbers so (Xbox: its slot / light, PlayStation and "
               "Switch pads show it on their player lights); give each window its own number for local co-op." },
+    { SP_CONTROLS, "Vibration strength", V(g_config.rumble), 0, 100, 10, .fmt = "%d%%",
+      .help = "How strongly the gamepad rumbles. Turn vibration on or off in the game's OPTION menu (VIBRATION), which a gamepad with rumble makes available." },
     { SP_CONTROLS, "Mouse in menus", V(g_menu_mouse.on), 0, 1, 1, .help = "Inventory, item box, map, files and these menus: point, left click selects, right click goes back." },
     { SP_CONTROLS, "Fixed camera controls", V(g_modern_on), 0, 1, 1, fixed_cam_names,
       .help = "Modern: the left stick or the d-pad (arrow keys) walks where it points on screen, pushed far or with run it runs; "

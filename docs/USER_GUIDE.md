@@ -187,7 +187,8 @@ visible, and Contrast until the right square on the white strip is barely visibl
 
 ### Controls
 
-Input source and Gamepad (see [Input source](#input-source-per-window)), **Mouse in menus**
+Input source and Gamepad (see [Input source](#input-source-per-window)), **Vibration strength**
+(`rumble_strength`, 0-100 %, **100**; see [Vibration](#vibration)), **Mouse in menus**
 (`menu_mouse`, **on**: point and click in the inventory, item box, map, files, OPTION and these
 menus, the typewriter's save screen and LOAD GAME (with either save system: pointing at a save
 selects it, a click picks it, the wheel or a click on the arrows scrolls, YES / NO and the memory
@@ -273,6 +274,17 @@ Triangle, shoulders L1/R1, left trigger L2, right stick click R3). The right tri
 quick knife and the left stick click the trade request, since those buttons have no game action.
 Aim (R1 / RB) + Triangle (Y) reloads ([Reload](#reload)).
 The game's own key types (OPTION -> KEY CONFIG) still decide what each PS2 button does.
+
+### Vibration
+
+A gamepad with rumble vibrates as the DualShock 2 did: when you fire, when enemies grab, bite or
+hit you, at heavy footsteps and impacts, and in scripted moments such as explosions. Turn it on or
+off with the game's own **OPTION -> VIBRATION** (saved with the game's options); with a rumble
+gamepad connected at the first start it is on. Without one (keyboard and mouse only, or a pad
+without motors) VIBRATION is greyed out and set to off, as on a PS2 pad without motors: connect the
+gamepad and turn it on again there. **Vibration strength** (CONTROLS) scales it. The rumble stops
+while the window has no focus (unless the input source is Gamepad only), and each window rumbles
+only its own gamepad. In co-op only your own character's hits and shots rumble your pad.
 
 Third person (keyboard and mouse): W/S/A/D move and turn, Shift run, E action, Q cancel,
 Tab inventory, M map, right mouse aim, left mouse fire, R reload ([Reload](#reload)). The sniper
