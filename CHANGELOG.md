@@ -4,16 +4,13 @@
 
 ### Gameplay
 
-- **More enemies per room**: a room now holds about twice as many enemies (with their limbs and
-  helpers) as before, so the enemy spawner, extra enemies and the randomizer can fill rooms with
-  much bigger crowds before they run out of room.
+- **More enemies per room**: a room now holds about twice as many enemies as before, so the enemy
+  spawner, extra enemies and the randomizer can fill rooms with much bigger crowds, in co-op too.
 
 ### Co-op
 
 - **Brighter lobby models**: the characters in the lobby are now lit like in a photo studio, so
   faces and clothes are clearly visible instead of almost black.
-- **Big crowds in co-op**: rooms with that many enemies play in co-op too: your partner sees every
-  one of them, and shots and grabs work on all of them on both sides.
 
 ### Fixes
 
