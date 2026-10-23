@@ -612,18 +612,25 @@ static uint64_t gpos(const Frame* f, const Group* g, uint32_t v)
 /* Pair the groups of instance b (frame c) with those of instance a (frame p) by strip and
    order within the strip; strips culled in one of the frames are simply unpaired. Returns
    a score (mean screen movement of the paired vertices in 1/16 px, outliers capped), or -1 if
-   fewer than half of b's vertices could be paired or moved less than JUMP. TEX0 is not compared: the game streams textures into
+   none could be paired or fewer than half of the paired ones moved less than JUMP (for other
+   than native strips: fewer than half of all of b's vertices paired and moved so). A mesh
+   coming into view has most of its strips only in the newer frame (a wall beside the
+   third-person camera: one strip of five drawn before); requiring half of its vertices paired
+   left the whole mesh unblended, so it jumped against its neighbours and opened cracks along
+   their edges for one image. TEX0 is not compared: the game streams textures into
    rotating GS memory, so a mesh's texture address changes between frames; the tags
    identify the geometry. */
 static int32_t* pair; static size_t cap_pair;
 static long inst_pair(const Frame* p, const Inst* a, const Frame* c, const Inst* b)
 {
-    int64_t sum = 0, n = 0, total = 0, near = 0;
+    int64_t sum = 0, n = 0, total = 0, near = 0, paired = 0;
     uint32_t j = 0;
+    int native = 1;   /* all its groups native strips */
     for (uint32_t k = 0; k < b->ng; k++) {
         const Group* g = &c->g[b->g0 + k];
         pair[k] = -1;
         total += g->nv;
+        native &= !!(g->key0 & NATIVE_KEY);
         for (uint32_t jj = j; jj < a->ng && jj < j + 64; jj++) {
             const Group* h = &p->g[a->g0 + jj];
             if (h->strip != g->strip || h->ord != g->ord) continue;
@@ -638,12 +645,16 @@ static long inst_pair(const Frame* p, const Inst* a, const Frame* c, const Inst*
                     near += d <= (MENU_TAG(b->mesh) ? MENU_JUMP : (g->key0 & NATIVE_KEY) && !(b->mesh & 1) ? NATIVE_JUMP : JUMP);   /* effects: JUMP (a slot reused within a frame) */
                 }
                 n += g->nv;
+                paired += g->nv;
             }
             j = jj + 1;
             break;
         }
     }
-    return n * 2 >= total && near * 2 >= total && n ? (long)(sum / n) : -1;
+    if (!paired) return -1;
+    if (!native || MENU_TAG(b->mesh)) return n * 2 >= total && near * 2 >= total && n ? (long)(sum / n) : -1;   /* GS path, menus: half of all */
+    if (!n) return 2 * JUMP;   /* no vertex in front of both cameras to judge it by: paired by its tags alone, last choice */
+    return near * 2 >= n ? (long)(sum / n) : -1;
 }
 
 /* how far instance b (frame c) lies from instance a (frame p): the first vertex of each, d[0] x,
@@ -708,10 +719,11 @@ static int view_cut(const Frame* p, const Frame* c)
    mesh moves with the camera: its view-space position in the new frame, put back into the
    previous frame's view (as if it stood still in the world), is its previous position
    (cam_move, nv_camera); its own motion in that one game frame is not blended. Not for effects
-   (their first frame, mostly at something moving: a muzzle flash), single strips missing from a
-   matched mesh (parts of the player turning with the third-person camera) or a mesh whose
-   instances all moved too far to pair (the player when the third-person camera swings past her
-   at a wall): those stay as in the new frame. NAT_CAMERA in nat_prev. */
+   (their first frame, mostly at something moving: a muzzle flash) or a mesh whose instances all
+   moved too far to pair (the player when the third-person camera swings past her at a wall):
+   those stay as in the new frame. Strips new in a matched mesh move with the camera only if the
+   mesh stands still (inst_still; not parts of the player turning with the third-person camera).
+   NAT_CAMERA in nat_prev. */
 #define NAT_CAMERA (-2)
 static float cam_a[9], cam_b[3];      /* view_prev = view_cur * A + b (row vectors) */
 static const float *cam_cur, *cam_prev;
@@ -759,6 +771,35 @@ static size_t mark_camera(const Frame* c, const Group* g)
         if (v[k].w == 1.0f) return 0;
     nat_prev[g->v0] = NAT_CAMERA;
     return g->nv;
+}
+
+/* Does matched instance b (frame c, its strips paired in pair[]) stand still in the world, so that
+   only the camera moved it? Its paired native vertices in front of both cameras, moved with the
+   camera, land within a pixel of where they were. Then a strip of it that has no pair (culled in
+   the previous frame: a wall strip coming into view) moves with the camera too; drawn as in the
+   new frame it opened a crack along the edge it shares with the blended strips beside it. */
+static int inst_still(const Frame* p, const Frame* c, const Inst* b)
+{
+    int n = 0;
+    for (uint32_t k = 0; k < b->ng; k++) {
+        const Group* g = &c->g[b->g0 + k];
+        const NativeVertex *pv, *cv;
+        if (pair[k] < 0 || !(g->key0 & NATIVE_KEY)) continue;
+        pv = native_verts(p, p->g[pair[k]].v0);
+        cv = native_verts(c, g->v0);
+        for (uint32_t v = 0; v < g->nv && v < 64; v++) {
+            NativeVertex e;
+            float dx, dy;
+            if (cv[v].near_d < 0.0f || pv[v].near_d < 0.0f) continue;
+            e = nv_camera(&cv[v]);
+            if (e.near_d < 0.0f) return 0;
+            dx = e.x / e.w - pv[v].x / pv[v].w;
+            dy = e.y / e.w - pv[v].y / pv[v].w;
+            if (dx * dx + dy * dy > 1.0f) return 0;
+            n++;
+        }
+    }
+    return n >= 3;
 }
 
 /* match frame c against p; 1 if in-between frames make sense */
@@ -846,9 +887,10 @@ int stream_match(const Frame* p, const Frame* c)
         used[best] = 1;
         inst_pair(p, &p->in[order[best]], c, b);   /* the pairs of the chosen instance */
         {
+            int lone = 0;   /* native strips without a pair */
             for (uint32_t k = 0; k < b->ng; k++) {
                 const Group *g = &c->g[b->g0 + k], *h;
-                if (pair[k] < 0) { unpaired += g->nv; continue; }
+                if (pair[k] < 0) { unpaired += g->nv; lone += !!(g->key0 & NATIVE_KEY); continue; }
                 h = &p->g[pair[k]];
                 if (g->key0 & RAW_KEY) {   /* a menu's sprites: blended in replay unless they stand still */
                     const NativeRawVertex *ra = raw_verts(p, h->v0), *rb = raw_verts(c, g->v0);
@@ -868,6 +910,9 @@ int stream_match(const Frame* p, const Frame* c)
                 }
                 matched[fx] += g->nv;
             }
+            if (lone && moving && !fx && inst_still(p, c, b))   /* its strips new in this frame go with it */
+                for (uint32_t k = 0; k < b->ng; k++)
+                    if (pair[k] < 0) with_cam += mark_camera(c, &c->g[b->g0 + k]);
         }
     }
     {
