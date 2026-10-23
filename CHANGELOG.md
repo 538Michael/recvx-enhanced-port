@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Co-op
+
+- **Brighter lobby models**: the characters in the lobby are now lit like in a photo studio, so
+  faces and clothes are clearly visible instead of almost black.
+
 ### Fixes
 
 - **Reload with the side pack**: once you have the side pack, ammo in the bag's last two slots now
