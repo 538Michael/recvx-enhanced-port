@@ -479,15 +479,37 @@ int imp_write_cvxm(const ImpModel* m, const char* path, float scale, unsigned gi
     }
     size_t pl = mlb.n;
     /* polygons: per texture a material (diffuse, ambient grey as the game's player), the texture and
-       its strips (CsUvh: index, u, v; 1023 = 1.0; both sides drawn); strips of other textures follow */
+       its strips (CsUvh: index, u, v; 1023 = 1.0; both sides drawn). Strips that show see-through
+       texels (hair strands, lashes) come last, alpha-blended, after all opaque ones: drawn first they
+       would hide what lies behind them (the face under the fringe). */
+    unsigned char* see = calloc(m->ns ? m->ns : 1, 1);
     for (int k = 0; k < ntex; k++) {
         Buf tmp = { 0 };
+        int w, h;
+        unsigned char* px;
         texok[k] = cv_tex(&tmp, m->tim2[k], m->tim2_len[k], gindex + k, &alpha[k]);
         free(tmp.p);
+        if (!alpha[k] || !see || !imp_tim2_rgba(m->tim2[k], m->tim2_len[k], &w, &h, &px)) continue;
+        for (int s = 0; s < m->ns; s++) {   /* the texels under the strip's UV box, in its tile */
+            const ImpStrip* st = &m->strip[s];
+            if (st->tex != k) continue;
+            float u0 = 1e30f, v0 = 1e30f, u1 = -1e30f, v1 = -1e30f;
+            for (int i = 0; i < st->n; i++) {
+                const float* t = m->uv[m->idx[st->first + i]];
+                u0 = fminf(u0, t[0]); u1 = fmaxf(u1, t[0]); v0 = fminf(v0, t[1]); v1 = fmaxf(v1, t[1]);
+            }
+            int x0 = (int)floorf(u0 * w), x1 = (int)ceilf(u1 * w), y0 = (int)floorf(v0 * h), y1 = (int)ceilf(v1 * h);
+            if (x1 - x0 > w) x1 = x0 + w;
+            if (y1 - y0 > h) y1 = y0 + h;
+            for (int y = y0; y < y1 && !see[s]; y++)
+                for (int x = x0; x < x1 && !see[s]; x++) see[s] = px[4 * (((y % h + h) % h) * w + (x % w + w) % w) + 3] < 255;
+        }
+        free(px);
     }
+    for (int pass = 0; pass < 2; pass++)
     for (int k = -1; k < ntex; k++) {
         int nstrip = 0;
-        for (int s = 0; s < m->ns; s++) nstrip += m->strip[s].tex == k && m->strip[s].n >= 3;
+        for (int s = 0; s < m->ns; s++) nstrip += m->strip[s].tex == k && m->strip[s].n >= 3 && (see && see[s]) == pass;
         if (!nstrip) continue;
         static const unsigned char mat[12] = { 0x13, 0x25, 4, 0, 0x7f, 0x7f, 0x7f, 0xff, 0x7f, 0x7f, 0x7f, 0xff };
         put(&plist, mat, sizeof(mat));
@@ -499,7 +521,7 @@ int imp_write_cvxm(const ImpModel* m, const char* path, float scale, unsigned gi
             put(&plist, NULL, 6);
             for (; s < m->ns && plist.n - head < 120000 && cnt < 0x3FFF; s++) {
                 const ImpStrip* st = &m->strip[s];
-                if (st->tex != k || st->n < 3 || st->n > 32767) continue;
+                if (st->tex != k || st->n < 3 || st->n > 32767 || (see && see[s]) != pass) continue;
                 float fu = 1e30f, fv = 1e30f;
                 for (int i = 0; i < st->n; i++) { fu = fminf(fu, m->uv[m->idx[st->first + i]][0]); fv = fminf(fv, m->uv[m->idx[st->first + i]][1]); }
                 fu = floorf(fu); fv = floorf(fv);   /* the strip moved by whole tiles (the textures repeat) */
@@ -516,11 +538,12 @@ int imp_write_cvxm(const ImpModel* m, const char* path, float scale, unsigned gi
             if (!cnt) { plist.n = head; continue; }
             uint16_t words = (uint16_t)((plist.n - head - 4) / 2);
             plist.p[head] = 0x42;   /* NJD_CS_UVH */
-            plist.p[head + 1] = 0x12 | (k >= 0 && alpha[k] ? 0x08 : 0);   /* ignore specular, double side (+ use alpha) */
+            plist.p[head + 1] = 0x12 | (pass ? 0x08 : 0);   /* ignore specular, double side (+ use alpha) */
             memcpy(plist.p + head + 2, &words, 2);
             memcpy(plist.p + head + 4, &cnt, 2);
         }
     }
+    free(see);
     put(&plist, "\xFF\0\0\0", 4);
     put(&mlb, plist.p, plist.n);
     free(plist.p);
