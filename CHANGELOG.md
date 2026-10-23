@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Co-op
+
+- **Brighter lobby models**: the characters in the lobby are now lit like in a photo studio, so
+  faces and clothes are clearly visible instead of almost black.
+
 ## 0.6.8 (2026-10-23)
 
 ### Display

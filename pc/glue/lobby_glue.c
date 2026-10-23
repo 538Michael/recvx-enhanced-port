@@ -415,8 +415,8 @@ static NJS_POINT2 pv_head(int k)
     return s;
 }
 
-/* the scene: the camera looks along -z at models standing at the origin's height, lit by an
-   ambient and one directional light; cam.mtx is the view while it is drawn */
+/* the scene: the camera looks along -z at models standing at the origin's height, lit as in a
+   studio (studio_light); cam.mtx is the view while it is drawn */
 /* the camera stands back for a tall model: the taller one of both spans y 110..370 */
 static float cam_z = 34.0f;
 #define CAM_Y (cam_z * 0.26f)
@@ -425,6 +425,37 @@ static NJS_MATRIX view;
 static float (*cam_keep)[16];           /* the game's view (none before a game ran) */
 
 static float screen_to_world_x(float sx) { return (sx - 320.0f) * CAM_Z / 500.0f / 1.174f; }
+
+/* a studio light: an ambient, a warm key from the upper left front, a cool fill from the right and a
+   rim from behind above, as point lights far off (no falloff). The light count is set: the boot
+   value (6) is more than the chunk lighting masks (ps2_NinjaCnk.c njCnkCvVnPs2: mask[0..4]), which
+   left the models lit by the ambient alone (the game sets its count in each room: light.c). No fog:
+   the title has none (adv.c) */
+static void studio_light(void)
+{
+    static const float pos[3][3] = { { -200, 250, 250 }, { 250, 60, 200 }, { 60, 250, -300 } };
+    static const float c[3][3] = { { 0.85f, 0.82f, 0.76f }, { 0.28f, 0.31f, 0.38f }, { 0.35f, 0.35f, 0.38f } }, amb = 0.3f;
+    int i;
+    njCnkSetEasyMultiLight(3);
+    njCnkSetSimpleMultiLight(3);
+    njCnkSetEasyMultiAmbient(amb, amb, amb * 1.05f);
+    njCnkSetSimpleMultiAmbient(amb, amb, amb * 1.05f);
+    for (i = 0; i < 3; i++) {
+        njCnkSetEasyMultiLightPoint(i + 1, pos[i][0], pos[i][1], pos[i][2]);
+        njCnkSetEasyMultiLightRange(i + 1, 4000.0f, 4000.0f);
+        njCnkSetEasyMultiLightColor(i + 1, c[i][0], c[i][1], c[i][2]);
+        njCnkSetSimpleMultiLightPoint(i + 1, pos[i][0], pos[i][1], pos[i][2]);
+        njCnkSetSimpleMultiLightRange(i + 1, 4000.0f, 4000.0f);
+        njCnkSetSimpleMultiLightColor(i + 1, c[i][0], c[i][1], c[i][2]);
+    }
+    /* the single light models (draw_tp 2, 3): the key */
+    njCnkSetEasyLightColor(c[0][0], c[0][1], c[0][2]);
+    njCnkSetEasyLightIntensity(1.0f, amb);
+    njCnkSetEasyLight(0.5f, -0.6f, -0.62f);
+    njCnkSetSimpleLightColor(c[0][0], c[0][1], c[0][2]);
+    njCnkSetSimpleLightIntensity(1.0f, amb);
+    njCnkSetSimpleLight(0.5f, -0.6f, -0.62f);
+}
 
 static void scene_begin(void)
 {
@@ -437,22 +468,7 @@ static void scene_begin(void)
     njTranslate(NULL, 0, -CAM_Y, -CAM_Z);
     njGetMatrix(cam.mtx);
     njControl3D(0);
-    njCnkSetEasyMultiAmbient(0.42f, 0.42f, 0.45f);
-    njCnkSetSimpleMultiAmbient(0.42f, 0.42f, 0.45f);
-    njCnkSetEasyMultiLightSwitch(0, 0);
-    njCnkSetSimpleMultiLightSwitch(0, 0);
-    njCnkSetEasyMultiLightColor(1, 0.95f, 0.9f, 0.85f);
-    njCnkSetEasyMultiLightVector(-0.4f, -0.5f, -0.75f);
-    njCnkSetEasyMultiLightSwitch(1, 1);
-    njCnkSetSimpleMultiLightColor(1, 0.95f, 0.9f, 0.85f);
-    njCnkSetSimpleMultiLightVector(-0.4f, -0.5f, -0.75f);
-    njCnkSetSimpleMultiLightSwitch(1, 1);
-    njCnkSetEasyLightColor(0.95f, 0.9f, 0.85f);
-    njCnkSetEasyLightIntensity(1.0f, 0.42f);
-    njCnkSetEasyLight(-0.4f, -0.5f, -0.75f);
-    njCnkSetSimpleLightColor(0.95f, 0.9f, 0.85f);
-    njCnkSetSimpleLightIntensity(1.0f, 0.42f);
-    njCnkSetSimpleLight(-0.4f, -0.5f, -0.75f);
+    studio_light();
     njSetMatrix(NULL, cam.mtx);
     njCnkSetEasyMultiLightMatrices();
     njCnkSetSimpleMultiLightMatrices();
