@@ -38,6 +38,7 @@ int ikou3(BH_PWORK* epw, NJS_POINT3* pos, int add_dir);   /* zonzon.c (its heade
 #include "../src/host/enemies.h"
 #include "../src/net/net.h"
 #include "../src/net/coop_proto.h"
+#include "pc_rules.h"
 #include "../src/net/rendezvous.h"
 #include "../src/net/rdv_proto.h"
 #include "../src/gs/stream.h"
@@ -2177,7 +2178,7 @@ void coop_own_from_save(const void* save)
    With "important items for both" the spot is an important one (coop_item_taken): ours taken, a partner whose items
    came from elsewhere still finds its own knife there. */
 #define QS_MANUAL 0x910001u             /* item 145, one: as AllItemInit hands it out */
-#define QS_KNIFE 0x80001u               /* item 8, one */
+#define QS_KNIFE 0x80000u               /* item 8, count 0: as GetItem hands it out (getbulletmax) */
 #define QS_KNIFE_BIT 120
 static void quick_start(void)
 {
@@ -3789,78 +3790,11 @@ static void count_keys(unsigned char* keys)
     }
 }
 
-/* Inventory blocks as the game keeps them (sys->itm[ply_id * 16]): word 0 the equipped word's index
-   (0 none, 1 the lighter), word 1 the lighter's slot, words 2.. the grid (8 cells, 10 with the side
-   pack). A two-slot item (itemdata type 0x100: rocket launcher, rifles, Lugers, sub machine guns) is
-   one word over two cells; the game keeps them first (sub1.c ItemSort), one per row. These work on
-   any block: ours, or a copy to try something on. */
-static int is_two(unsigned int w) { return (itemdata[(w >> 16) & 0xFF].type & 0x100) != 0; }
-
-static int blk_room(const unsigned int* b, int max)   /* free cells */
-{
-    int i, room = max;
-    for (i = 2; i < 2 + max; i++) room -= (b[i] >> 16) & 0xFF ? (is_two(b[i]) ? 2 : 1) : 0;
-    return room;
-}
-
-/* sub1.c ItemSort: two-slot items first, the rest in order; the equipped index follows its word */
-static void blk_sort(unsigned int* b)
-{
-    unsigned int out[10];
-    int n = 0, eq = -1, i, pass;
-    for (pass = 0; pass < 2; pass++)
-        for (i = 2; i < 12; i++)
-            if ((b[i] >> 16) & 0xFF && is_two(b[i]) == !pass) {
-                if ((int)b[0] == i) eq = 2 + n;
-                out[n++] = b[i];
-            }
-    for (i = 0; i < 10; i++) b[2 + i] = i < n ? out[i] : 0;
-    if (b[0] >= 2) b[0] = eq >= 0 ? eq : 0;
-}
-
-/* an inventory word (id << 16 | count, flags kept) in as a pickup puts it: onto stacks of the same
-   stackable item (up to 999), the rest into the first free word (a two-slot item needs two free
-   cells, as GetItem asks, and goes to the front as ItemSort puts it); all or none */
-static int blk_add(unsigned int* b, int max, unsigned int entry)
-{
-    int id = (entry >> 16) & 0xFF, left = entry & 0xFFFF, fr = -1, space = 0, i;
-    if (id <= 0 || id >= 156) return 0;
-    for (i = 2; i < 2 + max; i++) {
-        if (!((b[i] >> 16) & 0xFF) && fr < 0) fr = i;
-        if ((itemdata[id].type & 0x200) && b[i] >> 16 == entry >> 16) space += 999 - (int)(b[i] & 0xFFFF);
-    }
-    if (left > space && (blk_room(b, max) < (is_two(entry) ? 2 : 1) || fr < 0)) return 0;
-    for (i = 2; i < 2 + max && left && (itemdata[id].type & 0x200); i++)
-        if (b[i] >> 16 == entry >> 16) {
-            int c = b[i] & 0xFFFF, put = 999 - c < left ? 999 - c : left;
-            b[i] += put;
-            left -= put;
-        }
-    if (left) b[fr] = (entry & 0xFFFF0000) | left;
-    if (left && is_two(entry)) blk_sort(b);
-    return 1;
-}
-
-/* `count` (0: all) of the item in word s out; returns its word, 0 if not allowed (empty, equipped,
-   a two-slot item unless `two`) */
-static unsigned int blk_take(unsigned int* b, int max, int s, int count, int two)
-{
-    unsigned int e;
-    int id, have, i;
-    if (s < 2 || s >= 2 + max) return 0;
-    e = b[s];
-    id = (e >> 16) & 0xFF;
-    have = e & 0xFFFF;
-    if (!id || id >= 156 || s == (int)b[0] || (is_two(e) && !two)) return 0;
-    if ((itemdata[id].type & 0x200) && count > 0 && count < have) {
-        b[s] = (e & 0xFFFF0000) | (have - count);
-        return (e & 0xFFFF0000) | count;
-    }
-    for (i = s; i < 1 + max; i++) b[i] = b[i + 1];   /* the words stay packed, as bhPlItemLost leaves them */
-    b[1 + max] = 0;
-    if (b[0] > (unsigned int)s) b[0]--;
-    return e;
-}
+/* Inventory blocks (pc_rules.h pc_inv_*): ours, or a copy to try something on. A two-slot item (itemdata
+   type 0x100: rocket launcher, rifles, Lugers, sub machine guns) is one word over two cells. */
+static int is_two(unsigned int w) { return pc_inv_two(itemdata, w); }
+static int blk_add(unsigned int* b, int max, unsigned int entry) { return pc_inv_add(b, max, entry, itemdata); }
+static unsigned int blk_take(unsigned int* b, int max, int s, int count, int two) { return pc_inv_take(b, max, s, count, two, itemdata); }
 
 static int inv_add(unsigned int entry) { return blk_add(my_inv(), inv_slots(), entry); }
 static unsigned int inv_take(int s, int count) { return blk_take(my_inv(), inv_slots(), s, count, 0); }   /* F3: no two-slot items */

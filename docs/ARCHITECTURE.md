@@ -243,7 +243,10 @@ shows in-between images at the display rate:
   perspective). For a display rate n times the game's (60/120/240 Hz) t = k/n; otherwise
   t = time since arrival / frame period. Untagged output (2D, screen filters) is shown as is. A
   mesh is blended if at least half its vertices moved less than 128 px; single vertices moving
-  more than 512 px are not.
+  more than 512 px are not. A native 3D mesh needs only some of its strips in both frames (half
+  of those paired within 1024 px): one coming into view beside the third-person camera has most of
+  its strips only in the newer frame, and left unblended it jumped against its neighbours and
+  opened a crack along their shared edges for one image (the elevator door of 9/10).
 - **Cuts**: a frame that changed scene or camera is shown at once, without in-between images
   (the previous frame's images end at that frame itself), so no image mixes two cameras. The
   frame's scene is taken when its first mesh is drawn (`view_glue.c pc_frame_view`), because
@@ -270,8 +273,10 @@ shows in-between images at the display rate:
   around it moved, so with a moving camera it jumped against the scene and sank into the wall or
   floor it lies on. Enemies that animate by switching models are such meshes in every switch
   frame: the bugs of 9/17 cycle four models (`en10.c`, `en71.c`) and all switch every third game
-  frame. Effects, strips missing from a matched mesh and meshes whose instances all moved too far
-  to pair stay as in the new frame; so does everything when the camera did not change.
+  frame. Strips new in a matched mesh move with the camera too when the rest of the mesh did
+  (`inst_still`: within a pixel), so a wall's strips coming into view stay joined to it. Effects,
+  new strips of moving meshes and meshes whose instances all moved too far to pair stay as in the
+  new frame; so does everything when the camera did not change.
 - **Menus** ("Smooth menus", `smooth_menus`; `view_glue.c pc_menu_smooth`: on, display-rate
   frames on, and the Firstmovie (title menu), Title, Itemselect (status screen, files, item box),
   Map, Typewriter or Option task running, no movie open): the menus are 2D, which was never tagged,

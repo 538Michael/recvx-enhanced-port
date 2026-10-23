@@ -232,7 +232,8 @@ target_link_libraries(test_modern PRIVATE m)
 add_test(NAME modern COMMAND test_modern)
 
 # pure rules of the PC hooks (pc/include/pc_rules.h, src/gs/native.h): added enemies' helper code and holders,
-# dual weapons' second target, hor+ margin meshes and clipping, warp music, "Unlock all"; with the game's flags and types
+# dual weapons' second target, hor+ margin meshes and clipping, warp music, "Unlock all", co-op inventory blocks;
+# with the game's flags and types
 add_executable(test_rules tests/test_rules.c)
 target_include_directories(test_rules PRIVATE $<TARGET_PROPERTY:recvx_game,INCLUDE_DIRECTORIES>)
 target_compile_options(test_rules PRIVATE $<TARGET_PROPERTY:recvx_game,COMPILE_OPTIONS>)
