@@ -706,6 +706,9 @@ ITEMS choice, `RECVX_TEST_SAVE`, the host's partner records (`coop-partners-nn.b
 - `ps2_sg_sd.c Volume_Control`: retail's MIDI fade up writes the current volume into the fade's
   target and returns a stale register; the PC returns the current volume and leaves the target
   alone (otherwise a MIDI fade up ended silent).
+- `sub1.c bhSearchBullet` (the ammo search of the game's reload and the Reload button, not byte-matched) read the bag size
+  from `st_flg` (the typewriter's bit) where the retail ELF reads `gm_flg` (the side pack); the PC
+  reads `gm_flg`, so ammo in the side pack's two slots reloads as on the PS2.
 - `player.c bhCPM0_damage`: a damage level above 2 (possible when another enemy's hit takes over
   a grab) is clamped to 2; there are three levels.
 - The Windows build gives the game glibc's `rand()` (`pc/src/ps2/stubs.c`): the game assumes
