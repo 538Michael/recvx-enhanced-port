@@ -501,7 +501,8 @@ Free aim now sets them every tick (`dual_aim`, after `aim_at_crosshair`; not whi
   identical to that build). The fixed cameras run none of this: dual-weapon runs with one and two
   zombies are frame- and health-identical to v0.6.0.
 * Co-op: each arm's hits reach the partner as any hit (`EV_ENE_HIT` per enemy hit, with the aim
-  height). The partner draws our motions only, without the arms' turn, as it shows no aim pitch.
+  height). The partner draws our motions and our aim pitch (the bend, [COOP.md](COOP.md#pose-and-the-partners-model)),
+  without the arms' turn.
 
 ## Precise hits
 

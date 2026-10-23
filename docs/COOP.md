@@ -734,9 +734,15 @@ rule lockstep out):
 
 Every datagram starts with the sender's pose: room, position, angles, motion, frame, blend, weapon,
 hp, modes, motion set (own, room, or an enemy's while grabbed), busy state, voice counter, hit/held
-flags and floor. The receiver plays the motion on the partner's model with `bhSetMotion` (add 0)
+flags, aim pitch and floor. The receiver plays the motion on the partner's model with `bhSetMotion` (add 0)
 and `bhCalcModel` and draws it with `bhPutModel` when both are in game in the same stage/room and room case, both
-players are visible and no door transition or event runs. Hair (Claire) and Wesker's piece get
+players are visible and no door transition or event runs. **Aim pitch**: the fixed cameras' aim up/down
+is a motion of its own and arrives with the motion number; third-person free aim keeps the straight
+motion and bends spine and chest (`tps_calc_model`, [THIRDPERSON.md](THIRDPERSON.md#free-aim-pose)), so
+the sender puts that bend's pitch (`tps_aim_pitch`) into `Pose.pflg`'s spare bits (6 bits, about 2
+degrees a step) and the receiver eases towards it (half the way per frame) and bends the partner's model
+the same way (`tps_bend` after its `bhCalcModel`, and on its gender-matched copy and "You appear as"
+model through `actor_source`): arms, head, both weapons and the muzzle flash follow. Hair (Claire) and Wesker's piece get
 private object work. The partner's lighter gets the arm IK, its own flame and room light slot 3 (a
 slot no game code uses), so both can hold one. Footsteps and shots play from flags in the pose; the
 partner's weapon's arms sound bank is loaded beside ours (programs `0x40 + n`).
@@ -1034,7 +1040,8 @@ make other enemies from the same seed); 21 `COOP_HIT_PRECISE` in `EV_ENE_HIT` (t
 and `OPT_SKIP_DETECTOR`, `PF_GAME_OVER`, `EV_BLOB` `pad` 2 and the `EV_OWN` `tid` (see "Game over",
 "Metal detector"); 23 the game rule `OPT_QUICK_START` (see "Quick start"; it takes the last free bit of
 `Pose.opts`, so a further rule needs a field of its own). `Pose.pflg` and `Pose.flr` were added inside protocol 18,
-`Pose.rcase` inside protocol 22 (0 means "not sent", and receivers fall back).
+`Pose.rcase` inside protocol 22, the aim pitch in `Pose.pflg`'s spare bits inside protocol 23 (0 means "not
+sent", and receivers fall back; a receiver before the pitch reads `pflg & 6` only and keeps the straight pose).
 
 All structures are little-endian, packed as the compiler lays them out on x86 (pinned by
 `_Static_assert`s; a 64-bit build would be a different wire format).
@@ -1066,7 +1073,7 @@ over its datagrams.
 | 16-31 | `seq` (sender's frame counter; older poses dropped), `t_ms`, `echo_ms`, `echo_age` (ping) |
 | 32-39 | `chr`, `costume`, `stg`, `rom`, `pos` (room entry point), `opts` (host's game rules: `OPT_INDIVIDUAL` 1, `OPT_TRADE_FREEZE` 2, `OPT_IMPORTANT` 4, `OPT_NO_RIBBON` 8, `OPT_SKIP_SYNC` 16, `OPT_GAMEOVER_BOTH` 32, `OPT_SKIP_DETECTOR` 64, `OPT_QUICK_START` 128), `regroup` (host counter), `mfile` (sender's own part file - 10) |
 | 40-91 | position (3 floats), angles (3 ints), `mtn_no`, `frm_no` (the frame shown, before the step's advance: `actor_frame`), `mtn_md`, `hokan_count`, `hokan_rate`, `wpnr_no`, `hp`, `mode0`, `mode1`, `nev`, `nene` |
-| 92-107 | `stflg`, `ev_ack` (highest event id applied from the peer), `mset` (`MSET_OWN` -1, `MSET_ROOM` -2, `MSET_NONE` -3, or an enemy slot), `busy` (`BUSY_NONE/EVENT/MENU/BOX/TRADE`), `reject` (`PKT_BYE`, `PKT_REJECT`) or, in `PKT_POSE`, `rcase` (the room case of the room the sender is in + 1, 0 not sent; same room means the same case too, and the follow loads it), `voice_n`, `voice`, `pflg` (`flg & 6`: hit / held), `flr` (`flr_no + 3`, 0 not sent) |
+| 92-107 | `stflg`, `ev_ack` (highest event id applied from the peer), `mset` (`MSET_OWN` -1, `MSET_ROOM` -2, `MSET_NONE` -3, or an enemy slot), `busy` (`BUSY_NONE/EVENT/MENU/BOX/TRADE`), `reject` (`PKT_BYE`, `PKT_REJECT`) or, in `PKT_POSE`, `rcase` (the room case of the room the sender is in + 1, 0 not sent; same room means the same case too, and the follow loads it), `voice_n`, `voice`, `pflg` (`flg & 6`: hit / held; bits 0 and 3-7 the aim pitch, -31..31 steps of 60/31 degrees, 0 straight or not sent: `coop_pitch_get`), `flr` (`flr_no + 3`, 0 not sent) |
 
 `flags`: `PF_IN_GAME` 1, `PF_VISIBLE` 2, `PF_ROOM_MTN` 4, `PF_WANT_BLOB` 8 (joiner asks for the
 game state), `PF_EXT` 16 (a `PoseExt` follows), `PF_CINE` 32 (in a cutscene its skip button could

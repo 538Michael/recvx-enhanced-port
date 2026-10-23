@@ -6,6 +6,8 @@
 
 - **Quick start** (lobby GAME RULES, EXTRA EVENTS; off by default): a new co-op game starts with the manual
   already read and the combat knife in your bag instead of on the table, for both players.
+- **Your partner aims up and down**: in third person your partner's arms and upper body now tilt up
+  and down to where they aim, not only left and right.
 
 ### Fixes
 
