@@ -30,6 +30,7 @@ typedef struct {
     int  show_ping;                 /* co-op: the ping next to the frame rate while connected (ini show_ping) */
     int  music_volume;       /* 0-100 */
     int  sfx_volume;         /* 0-100 */
+    int  rumble;             /* gamepad vibration strength 0-100 % (input/pad.c scePadSetActDirect) */
     int  interpolate;        /* enhanced mode: display-rate in-between frames of the 30 FPS game */
     int  menu_smooth;        /* menus' 2D tagged for in-between frames too (view_glue.c pc_menu_tag) */
     int  frame_blend;        /* PS2_swap's 25% previous-frame blend (motion trail): 1 on, 0 off, -1 auto (off in enhanced) */

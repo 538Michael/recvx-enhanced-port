@@ -471,6 +471,19 @@ village, collision. The render thread (GS emulation, replays: `r_exec`, `r_inter
 
 - `input/pad.c` emulates a DualShock 2 in pressure-sensitive mode on port 0, fed by the
   keyboard, mouse buttons and an SDL gamepad, with rumble through SDL.
+- **Rumble**: the game finds a DualShock's motors (`ps2_sg_pdvib.c pdVibMxIsReady`: the pad's
+  `InfoModeCurExID` is 7) only while the open gamepad has rumble (`SDL_PROP_GAMEPAD_CAP_RUMBLE_BOOLEAN`);
+  then OPTION's VIBRATION can be chosen, else the game greys it out and turns it off, as a PS2 pad
+  without motors. `vibman.c` starts nothing while VIBRATION is off. Every pad read the game's
+  `Ps2_pad_actuater` sends both motors (`scePadSetActDirect`: small on/off, large 0-255; this game only
+  drives the large one, 170-255 for 4-9 frames); `pad.c` passes them to `SDL_RumbleGamepad` (large ->
+  low frequency, small -> high frequency) at "Vibration strength" (`rumble_strength`), each for 100 ms,
+  so a stalled or closed game stops by itself; zero without window focus (unless Gamepad only) and at
+  exit. Game logic that reads it back: the OPTION row, the saved option, and the room load's wait for
+  a running rumble to end (`system.c`, `Pad_act`), as on the PS2 with a DualShock. Without a gamepad
+  with rumble (headless runs) nothing changes. Co-op: an enemy's step on the partner (host) undoes
+  the rumbles it started (`coop_glue.c`, `vib_save`), and a hit from the host's enemy starts the
+  enemies' hit rumble in the joiner's game.
 - **Bindings** (`input/bindings.c`) work at the layer that builds the DS2 pad report: a
   binding row is a **DS2 button**, and the game's own key type (OPTION -> KEY CONFIG) turns
   buttons into actions in `bhSetPad` as before, so nothing in the game is patched per action.
@@ -864,6 +877,7 @@ and game frames for game-state aids, as noted. Co-op test aids (`RECVX_COOP_*`,
 | `RECVX_TRACE_SND=1` | sound driver commands, key-ons, dropped requests (bank not loaded, no such program or block), stolen voices and notes released before they sounded (key-ons print from the audio thread) |
 | `RECVX_TRACE_MC=1` | memory card commands and results |
 | `RECVX_PAD_TRACE=1` | DS2 buttons of the pad report when they change |
+| `RECVX_RUMBLE_TRACE=1` | the game's motor values and what goes to the gamepad (`rumble: frame N motors small S large L -> gamepad low X high Y`) when they change; `RECVX_VPAD`'s virtual gamepad has motors and logs what SDL sends them |
 | `RECVX_MODERN_TRACE=1` | modern controls: each frame a direction is translated, the direction, cut (and whether the previous cut is held), target and facing angle, the player's place on screen and the camera |
 | `RECVX_MENU_TRACE=1` | menu clicks with the menu state |
 | `RECVX_MOUSE_TRACE=1` | who has the mouse, on each change: captured (third person), OS cursor shown, a menu screen up, the player in control, overlay, focus |

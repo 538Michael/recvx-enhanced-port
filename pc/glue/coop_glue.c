@@ -28,6 +28,7 @@ int ikou3(BH_PWORK* epw, NJS_POINT3* pos, int add_dir);   /* zonzon.c (its heade
 #include "../../decomp/include/ps2/veronica/prog/playpch.h"
 #include "../../decomp/include/ps2/veronica/prog/effsub3.h"
 #include "../../decomp/include/ps2/veronica/prog/pwksub.h"
+#include "../../decomp/include/ps2/veronica/prog/ps2_sg_pdvib.h"
 #include "../src/host/coop.h"
 #include "../src/host/menu_mouse.h"
 #include "../src/host/lobby.h"
@@ -801,6 +802,7 @@ static unsigned int enemy_frame;
 static BH_PWORK* swap_plp;
 static BH_PWORK ply2_save;
 static unsigned char exp_save[256];
+static PAD_ACT vib_save[20];            /* the rumbles before a step on the partner: what it starts is undone (yours only) */
 static int swap_pid = -1;
 
 /* Voices (sdfunc.c CallPlayerVoice, docs/ACTORS.md "Voices"): a player vocal sound (SE bank 4,
@@ -1387,6 +1389,7 @@ static int enemy_begin(BH_PWORK* ep)
         if (tgt[i]) {
             swap_plp = plp;
             ply2_save = ply2;
+            memcpy(vib_save, Pad_act, sizeof(vib_save));
             memcpy(exp_save, p2.plexw, 128);
             memcpy(exp_save + 128, p2.plhdw, 128);
             plp = &ply2;
@@ -1443,6 +1446,7 @@ void coop_enemy_end(BH_PWORK* ep)
         /* everything else (grabs, being moved, motions) is undone: the partner's own game
            decides what its player does */
         ply2 = ply2_save;
+        memcpy(Pad_act, vib_save, sizeof(vib_save));
         memcpy(p2.plexw, exp_save, 128);
         memcpy(p2.plhdw, exp_save + 128, 128);
         plp = swap_plp;
@@ -5294,6 +5298,7 @@ static int apply_event(const Event* e)
             plp->stflg &= ~0x50000;
             plp->at_flg = 0;
             plp->mnwP = plp->mnwPb;
+            StartVibrationEx(1, 11);   /* the rumble of an enemy's hit, which here ran in the host's game (OPTION VIBRATION) */
         }
     }
     return 1;

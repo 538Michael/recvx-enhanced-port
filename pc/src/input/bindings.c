@@ -824,6 +824,14 @@ static void keys_frame(uint64_t now)
     }
 }
 
+/* the virtual gamepad has motors (the game's VIBRATION can be chosen): what SDL sends them is logged */
+static bool SDLCALL vpad_rumble(void* ud, Uint16 lo, Uint16 hi)
+{
+    (void)ud;
+    host_log("test: virtual gamepad rumble low %u high %u\n", lo, hi);
+    return true;
+}
+
 static void vpad_frame(uint64_t now)
 {
     static const char* p; static int chk;
@@ -841,6 +849,7 @@ static void vpad_frame(uint64_t now)
         d.nbuttons = SDL_GAMEPAD_BUTTON_MISC1;   /* the standard ones */
         d.button_mask = (1u << SDL_GAMEPAD_BUTTON_MISC1) - 1;
         d.axis_mask = (1u << SDL_GAMEPAD_AXIS_COUNT) - 1;
+        d.Rumble = vpad_rumble;
         if (t && !strcmp(t, "ps5")) { d.vendor_id = 0x054c; d.product_id = 0x0ce6; d.name = "Virtual DualSense"; }
         else if (t && !strcmp(t, "generic")) d.name = "Virtual gamepad";
         else { d.vendor_id = 0x045e; d.product_id = 0x02ea; d.name = "Virtual Xbox One"; }
