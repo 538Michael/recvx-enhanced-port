@@ -230,15 +230,19 @@ models are added to "You appear as" at once.
 
 ## Verification (this round)
 
-* Headless extraction of all player models from the real disc: 30 of 30, 30 player models.
-* `pc/tools/import_check.py`: every checked `.glb` loads (GLB header, accessors within their views,
-  joints in range, weights sum to 1, bind matrices invert the node tree within 1e-4); previews of
-  the rest pose and a skinned test pose (arms lowered) look right; the `.cvxm` read the way the
-  game reads it renders the same.
-* In game: Kevin, Alyssa and others as "You appear as" (screenshots in the job directory, not
-  committed).
-* ctest (`import` new; `appear` extended), Linux and Windows builds, `layout_check.sh` main vs
-  this branch (default play unchanged).
+* Headless extraction from the real disc: all 30 player models (30 converted), and with
+  `RECVX_IMPORT_WHAT=6` 285 NPC and enemy models, none failed (a few seconds each run).
+* `pc/tools/import_check.py` over all 315 `.glb`: GLB header, accessors within their views, joints
+  in range, weights summing to 1, inverse bind matrices against the node tree; previews of the rest
+  pose and a skinned test pose (arms lowered) look right; the `.cvxm` read the way the game reads
+  it renders the same.
+* In game (headless, frame dumps): Kevin, Jim and Alyssa as "You appear as": walking, the
+  handgun aimed, zombie grabs, third person from behind and (orbit) the front; the cutscene double
+  loads the same model (textures shared). F4: the "Extract characters" button clicked in a run
+  with an empty mods folder (progress, then the table); F3 shows the imported model chosen in
+  recvx.ini. Screenshots stay in the job directory (game content, not committed).
+* ctest 21/21 (`import` new, `appear` extended), Linux and Windows (mingw) builds,
+  `layout_check.sh` main (339a4ca) vs this branch: frames identical (vanilla and enhanced).
 
 ## Unreleased (outbreak-import branch)
 
