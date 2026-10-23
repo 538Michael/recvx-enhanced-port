@@ -438,7 +438,11 @@ static void retarget(Disguise* d, BH_PWORK* src, const Rig* sr)
         if (k >= 0) {   /* source world rotation, after the rest correction */
             const float* s = sow[(int)sr->map[k]].mtx;
             float a[9] = { 1, 0, 0, 0, 1, 0, 0, 0, 1 }, sw[9];
-            if (k > 0) {   /* the bone towards the chain's next node; a chain end takes its parent bone's */
+            /* An imported model (d->skin) is skinned to its own T-pose, the same pose as the source's
+               rest: it takes the source's rotations unchanged. A correction would turn its rest mesh
+               (Claire's clavicles point up to the shoulders, Outbreak's start at them: the shoulders
+               went up 60 degrees, the head forward: hunched). */
+            if (k > 0 && !d->skin) {   /* the bone towards the chain's next node; a chain end takes its parent bone's */
                 int kk = dir_child[k] >= 0 ? k : k - 1, dk = dir_child[kk];
                 if (dk >= 0 && tr->map[dk] >= 0 && sr->map[dk] >= 0 && tr->map[kk] >= 0 && sr->map[kk] >= 0) {
                     float u[3], v[3];
@@ -1005,6 +1009,26 @@ static void imp_skin(Disguise* d)
         for (c = 0; c < 3; c++) {   /* times the pelvis's rotation transposed (orthonormal: its inverse) */
             o[c] = l[0] * m1[c * 4] + l[1] * m1[c * 4 + 1] + l[2] * m1[c * 4 + 2];
             o[4 + c] = q[0] * m1[c * 4] + q[1] * m1[c * 4 + 1] + q[2] * m1[c * 4 + 2];
+        }
+    }
+    if (getenv("RECVX_IMPORT_POSE") && d == &dg[0]) {   /* test aid: per pose (the last of a game frame counts) the node matrices
+        in the frame of the actor's base matrix (pc/tools/import_check.py --pose renders the model in them) */
+        static FILE* f;
+        const float* b = (const float*)d->w.mtxbuf;
+        if (!f) f = fopen(getenv("RECVX_IMPORT_POSE"), "w");
+        if (f) {
+            fprintf(f, "%d %d %d %d", (int)sys->gfrm_ct, (int)plp->mtn_no, (int)(plp->frm_no >> 16), n);
+            for (i = 0; i < n; i++) {
+                const float* m = ow[i].mtx;
+                for (j = 0; j < 4; j++)   /* rows: x, y, z axes and the position, each in the base's axes */
+                    for (c = 0; c < 3; c++) {
+                        float v[3] = { m[j * 4], m[j * 4 + 1], m[j * 4 + 2] };
+                        if (j == 3) for (int k = 0; k < 3; k++) v[k] -= b[12 + k];
+                        fprintf(f, " %.4f", v[0] * b[c * 4] + v[1] * b[c * 4 + 1] + v[2] * b[c * 4 + 2]);
+                    }
+            }
+            fputc('\n', f);
+            fflush(f);
         }
     }
 }
