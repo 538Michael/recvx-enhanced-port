@@ -592,8 +592,8 @@ static void font_release(void)
 /* ---------------------------------------------------------------- the lobby */
 /* In steps (docs/COOP.md "Lobby"): 1 how to connect (Direct / Via server) and Host or Join,
    2 only that choice's rows plus the player and game rows, 3 the game rules (host: edits them,
-   guest: the host's, read-only), with their pages 4 enemies and 5 extra events. BACK goes one step
-   back (from a page: to its GAME RULES entry); from step 1 it leaves the lobby.
+   guest: the host's, read-only), with their pages 4 enemies and 5 extra events, and step 2's page 6
+   the model list. BACK goes one step back (from a page: to its entry); from step 1 it leaves the lobby.
    The rows in display order; a gap where the group changes. */
 enum { R_MODE, R_HOSTSTEP, R_JOINSTEP,
        R_SERVER, R_PORT, R_ADDR, R_PW, R_RELAY,
@@ -608,7 +608,8 @@ enum { F_NONE, F_NAME, F_ADDR, F_PORT, F_SEED, F_SERVER, F_PW };
 
 static struct {
     int open, row, role;                /* role 0 host, 1 join */
-    int step;                           /* 1 connection and role, 2 its options, 3 game rules, 4 / 5 its pages */
+    int step;                           /* 1 connection and role, 2 its options, 3 game rules, 4 / 5 its pages, 6 the models */
+    int pick, top;                      /* the model page: the cursor's and the first shown list position (appear_at) */
     int mode;                           /* 0 direct (P2P), 1 via a co-op server (g_coop.conn Automatic or Via server) */
     int edit;                           /* F_* being edited */
     char buf[128];
@@ -631,6 +632,7 @@ static int row_visible(int r)
 {
     int host = lb.role == 0, srv = lb.mode;
     if (r == R_BACK) return 1;
+    if (lb.step == 6) return 0;   /* the model page draws its list itself (draw_models) */
     if (lb.step == 1) return r == R_MODE || r == R_HOSTSTEP || r == R_JOINSTEP;
     if (r == R_VARIETY || r == R_EVENTS) return lb.step == 4 && shown_eo()->rand;   /* only the randomizer has them */
     if (lb.step == 3) return r == R_GOVER || r == R_ENEMYPG || r == R_EVENTPG || ((r == R_LOOT || r == R_TFREEZE || r == R_SKIPS || r == R_RIBBON) && host) ||
@@ -795,7 +797,6 @@ static void change(int r, int dir)
     switch (r) {
     case R_MODE: lb.mode ^= 1; g_coop.conn = lb.mode ? COOP_CONN_AUTO : COOP_CONN_DIRECT; break;   /* the server's default: direct first */
     case R_RELAY: g_coop.conn = g_coop.conn == COOP_CONN_SERVER ? COOP_CONN_AUTO : COOP_CONN_SERVER; break;
-    case R_CHAR: g_coop.chr = appear_step(g_coop.chr, dir); break;   /* the list without event doubles (actors.c) */
     case R_LOOT: g_coop.loot ^= 1; break;
     case R_TFREEZE: g_coop.trade_freeze ^= 1; break;
     case R_IMP: g_coop.important ^= 1; break;
@@ -820,7 +821,7 @@ static void change(int r, int dir)
 
 static int has_value(int r)
 {
-    return r == R_MODE || r == R_RELAY || r == R_CHAR || r == R_LOOT || r == R_IMP || r == R_TFREEZE || r == R_SKIPS || r == R_RIBBON || r == R_GOVER || r == R_QUICK || r == R_DETECTOR || r == R_START || r == R_ITEMS || r == R_FOLLOW ||
+    return r == R_MODE || r == R_RELAY || r == R_LOOT || r == R_IMP || r == R_TFREEZE || r == R_SKIPS || r == R_RIBBON || r == R_GOVER || r == R_QUICK || r == R_DETECTOR || r == R_START || r == R_ITEMS || r == R_FOLLOW ||
            r == R_EXTRA || r == R_PLACE || r == R_RAND || r == R_VARIETY || r == R_EVENTS;
 }
 
@@ -856,7 +857,8 @@ static int back(void)
 {
     CallSystemSe(0, 0);
     if (lb.step <= 1) return 1;
-    if (lb.step > 3) { lb.row = lb.step == 4 ? R_ENEMYPG : R_EVENTPG; lb.step = 3; }
+    if (lb.step == 6) { lb.step = 2; lb.row = R_CHAR; }
+    else if (lb.step > 3) { lb.row = lb.step == 4 ? R_ENEMYPG : R_EVENTPG; lb.step = 3; }
     else { lb.step--; lb.row = lb.step == 2 ? R_RULES : lb.role ? R_JOINSTEP : R_HOSTSTEP; }
     if (!row_selectable(lb.row)) lb.row = first_row();
     host_log("lobby: back to step %d\n", lb.step);
@@ -873,6 +875,8 @@ static int need_server(void)
     return 1;
 }
 
+static void pick_open(void);   /* the model page (below) */
+
 /* 0 stay, 1 back to the menu, 2 new game, 3 the chosen save */
 static int activate(int r)
 {
@@ -882,6 +886,7 @@ static int activate(int r)
     case R_RULES: step_to(3); return 0;
     case R_ENEMYPG: step_to(4); return 0;
     case R_EVENTPG: step_to(5); return 0;
+    case R_CHAR: pick_open(); return 0;
     case R_NAME: edit_begin(F_NAME); return 0;
     case R_PORT: edit_begin(F_PORT); return 0;
     case R_SEED: edit_begin(F_SEED); return 0;
@@ -999,6 +1004,7 @@ static const char* heading(void)
     static char h[64];
     if (lb.step == 1) return "HOW DO YOU WANT TO PLAY?";
     if (lb.step == 3) return lb.role ? "THE HOST'S GAME RULES" : "GAME RULES";
+    if (lb.step == 6) return "MODEL - YOU APPEAR AS";
     if (lb.step > 3) return lb.step == 4 ? (lb.role ? "THE HOST'S RULES - RANDOMIZER" : "GAME RULES - RANDOMIZER")
                                          : (lb.role ? "THE HOST'S RULES - EXTRA EVENTS" : "GAME RULES - EXTRA EVENTS");
     snprintf(h, sizeof(h), "%s - %s", lb.role ? "JOIN A GAME" : "HOST A GAME", lb.mode ? "VIA SERVER" : "DIRECT (P2P)");
@@ -1078,7 +1084,10 @@ static const char* row_help(int r)
     case R_PW: return host ? "Optional room password: your partner has to type the same one. Not saved." : "The room's password, if the host set one; otherwise leave it empty.";
     case R_RELAY: return "Only if needed: a direct connection first (about 2 s), then the server's relay. Always: everything goes through the relay (slower, predictable).";
     case R_NAME: return "What your partner sees above your head and in the lobby. Type it, or change the letter at the caret with up/down.";
-    case R_CHAR: return "The model you appear as: your partner sees it, and so do you.";
+    case R_CHAR:
+        if (lb.step == 6 && lb.pick >= appear_count()) return "Back to the lobby; your model stays as it is.";
+        return lb.step == 6 ? "Confirm: you appear as this model; your partner sees it, and so do you. Up/down, L1/R1 or Page Up/Down and the wheel scroll; BACK keeps the one you had."
+                            : "The model you appear as: your partner sees it, and so do you. Opens the list of models.";
     case R_START: return "What the game starts from: a new game (normal, easy, very easy) or one of your saves.";
     case R_ITEMS: return "The inventory you join with: the one the host kept for you from your last visit, a new inventory, or that of one of your saves.";
     case R_FOLLOW: return eset(&g_coop.follow)->help;
@@ -1117,6 +1126,128 @@ static const char* row_help(int r)
     }
 }
 
+/* ---------------------------------------------------------------- the model page (step 6)
+   "You appear as" as a list (docs/COOP.md "Lobby"): the menus' entries (actors.c appear_at, any
+   count) PICK_ROWS at a time, then BACK (position appear_count()). The preview shows the entry under
+   the cursor; confirm takes it into g_coop.chr (ini coop_char, sent to the partner as before). */
+enum { BTN_L1 = 0x4, BTN_R1 = 0x8 };   /* Pad[] bits */
+#define PICK_H 22.0f
+#define PICK_ROWS 11
+#define PICK_BACK_Y (ROW_Y0 + PICK_ROWS * PICK_H + GAP)
+#define PICK_BAR_X 627.0f               /* the scroll bar, right of the names */
+
+static int pick_max_top(void) { int n = appear_count(); return n > PICK_ROWS ? n - PICK_ROWS : 0; }
+
+/* the first shown position moved by d (clamped), the cursor kept on the page */
+static void pick_scroll(int d)
+{
+    int n = appear_count(), was = lb.pick;
+    lb.top += d;
+    if (lb.top > pick_max_top()) lb.top = pick_max_top();
+    if (lb.top < 0) lb.top = 0;
+    if (lb.pick < n) lb.pick = lb.pick < lb.top ? lb.top : lb.pick >= lb.top + PICK_ROWS ? lb.top + PICK_ROWS - 1 : lb.pick;
+    if (lb.pick != was) CallSystemSe(0, 2);
+}
+
+/* the cursor to position i (clamped to the list, or wrapping through BACK); the page follows it */
+static void pick_to(int i, int wrap)
+{
+    int n = appear_count();
+    if (wrap) i = (i + n + 1) % (n + 1);
+    else i = i < 0 ? 0 : i >= n ? n - 1 : i;
+    if (i != lb.pick) CallSystemSe(0, 2);
+    lb.pick = i;
+    if (i < n && i < lb.top) lb.top = i;
+    if (i < n && i >= lb.top + PICK_ROWS) lb.top = i - PICK_ROWS + 1;
+    pick_scroll(0);
+}
+
+static void pick_open(void)
+{
+    lb.step = 6;
+    lb.pick = appear_pos(g_coop.chr);   /* the current model, in the middle of the page */
+    lb.top = lb.pick - PICK_ROWS / 2;
+    pick_scroll(0);
+    host_log("lobby: model page (%d models)\n", appear_count());
+    CallSystemSe(0, 3);
+}
+
+/* confirm: the entry under the cursor (or BACK) */
+static void pick_take(void)
+{
+    if (lb.pick >= appear_count()) { back(); return; }
+    g_coop.chr = appear_at(lb.pick);
+    lobby_settings_changed();
+    host_log("lobby: model %s\n", appear_name(g_coop.chr));
+    lb.step = 2;
+    lb.row = R_CHAR;
+    CallSystemSe(0, 3);
+}
+
+/* the position under the pointer (appear_count(): BACK), -1 none */
+static int pick_at(float x, float y)
+{
+    int n = appear_count(), i;
+    if (x < ROW_X - 8 || x > 636) return -1;
+    if (y >= PICK_BACK_Y - 3 && y < PICK_BACK_Y + PICK_H - 3) return n;
+    if (y < ROW_Y0 - 3) return -1;
+    i = (int)((y - ROW_Y0 + 3) / PICK_H);
+    return i < PICK_ROWS && lb.top + i < n ? lb.top + i : -1;
+}
+
+static void pick_input(unsigned int press, unsigned int rept, unsigned int ok, unsigned int cancel)
+{
+    int n = appear_count(), page = PICK_ROWS - 1, hit;
+    while (g_lobby_io.tail != __atomic_load_n(&g_lobby_io.head, __ATOMIC_ACQUIRE)) {   /* lobby_io.c: list_on */
+        int k = g_lobby_io.keys[g_lobby_io.tail & 63];
+        g_lobby_io.tail++;
+        if (k == LK_PGUP) pick_to(lb.pick - page, 0);
+        else if (k == LK_PGDN) pick_to(lb.pick + page, 0);
+        else if (k == LK_HOME) pick_to(0, 0);
+        else if (k == LK_END) pick_to(n - 1, 0);
+    }
+    if (mt.wheel) pick_scroll(-3 * mt.wheel);   /* > 0: away from the player, up the list */
+    hit = pick_at(mt.x, mt.y);
+    if (hit >= 0 && (mt.moved || mt.left || mt.wheel) && hit != lb.pick) { lb.pick = hit; CallSystemSe(0, 2); }
+    if (mt.left && hit >= 0) { pick_take(); return; }
+    if (mt.right) { back(); return; }
+    if (rept & BTN_UP) pick_to(lb.pick - 1, 1);
+    else if (rept & BTN_DOWN) pick_to(lb.pick + 1, 1);
+    else if (rept & (BTN_L1 | BTN_LEFT)) pick_to(lb.pick - page, 0);
+    else if (rept & (BTN_R1 | BTN_RIGHT)) pick_to(lb.pick + page, 0);
+    else if (press & ok) pick_take();
+    else if (press & cancel) back();
+}
+
+static void draw_models(void)
+{
+    int n = appear_count(), cur = appear_pos(g_coop.chr), i;
+    float right = n > PICK_ROWS ? PICK_BAR_X - 6 : 634;   /* the names stop before the scroll bar */
+    char pos[24];
+    text(ROW_X - 4, HEAD_Y, heading(), 0.5f, 0xFFFFE080);
+    snprintf(pos, sizeof(pos), "%d / %d", (lb.pick < n ? lb.pick : cur) + 1, n);
+    text(634 - text_w(pos, 0.45f), HEAD_Y + 2, pos, 0.45f, 0xFFA0A0A0);
+    for (i = lb.top; i < n && i < lb.top + PICK_ROWS; i++) {
+        float y = ROW_Y0 + (i - lb.top) * PICK_H, w, sc;
+        const char* nm = appear_name(appear_at(i));
+        unsigned int col = i == cur ? 0xFFFFE080 : i == lb.pick ? 0xFFFFFFFF : 0xFFB0B0B0;   /* the current one: gold, with an arrow */
+        if (i == lb.pick) rect(ROW_X - 8, y - 2, right, y + PICK_H - 3, 0x50FFFFFF, Z_FRONT);
+        if (i == cur) arrow(ROW_X + 4, y + 9, 1, col);
+        w = text_w(nm, ROW_SC);
+        sc = w > right - ROW_X - 18 ? ROW_SC * (right - ROW_X - 18) / w : ROW_SC;   /* a long name: narrower */
+        text(ROW_X + 12, y + (ROW_SC - sc) * 14, nm, sc, col);
+    }
+    if (n > PICK_ROWS) {   /* the scroll bar: the page's share of the list, where it is */
+        float y0 = ROW_Y0 - 2, h = PICK_ROWS * PICK_H - 1, th = h * PICK_ROWS / n, ty;
+        if (th < 12) th = 12;
+        ty = y0 + (h - th) * lb.top / pick_max_top();
+        rect(PICK_BAR_X, y0, PICK_BAR_X + 5, y0 + h, 0x40FFFFFF, Z_FRONT);
+        rect(PICK_BAR_X, ty, PICK_BAR_X + 5, ty + th, 0xC0FFFFFF, Z_FRONT + 0.001f);
+    }
+    if (lb.pick >= n) rect(ROW_X - 8, PICK_BACK_Y - 2, 634, PICK_BACK_Y + PICK_H - 3, 0x50FFFFFF, Z_FRONT);
+    text(ROW_X, PICK_BACK_Y, "BACK", ROW_SC, lb.pick >= n ? 0xFFFFFFFF : 0xFFB0B0B0);
+}
+
 /* 0 stay, else activate()'s result */
 static int lobby_input(void)
 {
@@ -1132,6 +1263,7 @@ static int lobby_input(void)
         else edit_input(press, rept, ok, cancel);
         return 0;
     }
+    if (lb.step == 6) { pick_input(press, rept, ok, cancel); return 0; }
     g_lobby_io.tail = g_lobby_io.head;
     if (!row_selectable(lb.row)) {   /* the row went (hosting started or stopped): its successor */
         lb.row = lb.row == R_HOST || lb.row == R_KICK ? R_GO : lb.row == R_GO || lb.row == R_STOP || lb.row == R_COPY || lb.row == R_RCOPY ? R_HOST : lb.row;
@@ -1183,7 +1315,7 @@ static void draw_rows(void)
             if (!locked) { arrow(VAL_X, y + 9, -1, col); arrow(VAL_X + 14 + w + 12, y + 9, 1, col); }
             text(VAL_X + 12, y + (ROW_SC - sc) * 14, val, sc, col);
         } else if (val[0] || lb.edit) {
-            int page = r == R_ENEMYPG || r == R_EVENTPG;   /* opens a page: an arrow after it */
+            int page = r == R_ENEMYPG || r == R_EVENTPG || r == R_CHAR;   /* opens a page: an arrow after it */
             float lim = page ? 196.0f : 220.0f, w = text_w(val, ROW_SC), sc = w > lim ? ROW_SC * lim / w : ROW_SC;   /* a long address: narrower */
             text(VAL_X, y + (ROW_SC - sc) * 14, val, sc, col);
             if (page) arrow(VAL_X + (sc < ROW_SC ? lim : w) + 16, y + 9, 1, col);
@@ -1230,8 +1362,10 @@ static void draw_previews(void)
     int partner = g_coop.state == COOP_CONNECTED && !g_coop.peer_in_game, k;
     float sx[2] = { partner ? 92.0f : 120.0f, 222.0f };
     int played = g_coop.start >= 3 && lb.role == 0 && start_valid(g_coop.start) ? saves[g_coop.start - 3].ply_id : 0;
-    /* the chosen model loads once it has stayed for a few frames (cycling through the list) */
-    if (g_coop.chr != lb.want_chr) { lb.want_chr = g_coop.chr; lb.chr_stable = 0; }
+    /* the chosen model (on the model page the one under the cursor) loads once it has stayed for a
+       few frames (scrolling through the list) */
+    int chr = lb.step == 6 && lb.pick < appear_count() ? appear_at(lb.pick) : g_coop.chr;
+    if (chr != lb.want_chr) { lb.want_chr = chr; lb.chr_stable = 0; }
     if (++lb.chr_stable >= 8 || pv[0].chr < 0) pv_set(0, lb.want_chr, played);
     pv_set(1, partner && g_coop.peer_lchr >= 0 && g_coop.peer_lchr <= COOP_CHR_MAX ? g_coop.peer_lchr : -1, 0);
     lb.spin += 1;
@@ -1296,6 +1430,7 @@ static void lobby_close(int keep)
     for (k = 0; k < 2; k++) pv_release(&pv[k], k);
     font_release();
     lb.open = 0;
+    g_lobby_io.list_on = 0;
     g_coop.lobby = 0;
     g_coop.note[0] = 0;
     host_log("lobby: closed\n");
@@ -1312,6 +1447,7 @@ int pc_lobby(void)
     if (session_on()) lb.role = !g_coop.host;   /* F3 may host or join meanwhile */
     font_ok = font_ready();
     r = lobby_input();
+    g_lobby_io.list_on = lb.step == 6;
     /* what we chose, for the partner's screen; the joining items as they change */
     if (lb.role == 0) { start_label(note, sizeof(note), g_coop.start); snprintf(g_coop.note, sizeof(g_coop.note), "Starts: %.*s", (int)sizeof(g_coop.note) - 9, note); }
     else if (g_coop.items == COOP_ITEMS_HOST) snprintf(g_coop.note, sizeof(g_coop.note), "Items saved with you");
@@ -1325,7 +1461,7 @@ int pc_lobby(void)
     rect(304, 64, 640, 384, 0x70000000, Z_DIM + 0.0005f);
     mp_word(320.0f, 16.0f, 0xFFFFFFFF, 192, 1.0f);
     draw_previews();
-    draw_rows();
+    if (lb.step == 6) draw_models(); else draw_rows();
     draw_info();
     AdvEasySetTextureList(0);   /* the title's texture list again (the font and the models set theirs) */
     if (r) lobby_close(r != 1);

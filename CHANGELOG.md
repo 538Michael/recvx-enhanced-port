@@ -2,10 +2,18 @@
 
 ## Unreleased
 
+### Gameplay
+
+- **More enemies per room**: a room now holds about twice as many enemies as before, so the enemy
+  spawner, extra enemies and the randomizer can fill rooms with much bigger crowds, in co-op too.
+
 ### Co-op
 
 - **Brighter lobby models**: the characters in the lobby are now lit like in a photo studio, so
   faces and clothes are clearly visible instead of almost black.
+- **Model list in the lobby**: MODEL now opens a scrollable list of all models (also with the mouse
+  wheel) that shows each one in the preview as you move through it, so finding the one you want is
+  quicker.
 
 ### Fixes
 

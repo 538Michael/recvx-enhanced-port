@@ -107,7 +107,7 @@ int spawn_slots_needed(int id)
 static NJS_TEXLIST tl[TEX_LISTS];
 static NJS_TEXNAME tn[TEX_NAMES];
 static int tl_n, tn_n;
-static int spawned[128];                /* slots we spawned into (id + 1), for the trace */
+static int spawned[PC_ENE_SLOTS];                /* slots we spawned into (id + 1), for the trace */
 static int room_key = -1;              /* the room the textures belong to */
 
 static void release_textures(void)
@@ -305,16 +305,16 @@ const char* spawn_at(const ActorModel* am, const SpawnNote* n, int want, int mod
     ActorData a;
     ETTY_WORK rec;
     BH_PWORK* ep;
-    unsigned char *mdl, *p, textured[16] = { 0 }, marked[128];
+    unsigned char *mdl, *p, textured[16] = { 0 }, marked[PC_ENE_SLOTS];
     int k, slot = -1, free_n = 0, j, t, texn = 0, lists, dt, need, tex_free, heap_free, nm = 0, pool0 = pool_n;
     const char* how;
 
     if (!loading && !ready()) return "not in a room now (door, event or menu)";
     if (spawn_refused(am->id)) return spawn_refused(am->id);
-    for (k = 0; k < 128; k++)   /* (helper code: each type's parts run its own, eneset.c pc_call_enemy) */
+    for (k = 0; k < PC_ENE_SLOTS; k++)   /* (helper code: each type's parts run its own, eneset.c pc_call_enemy) */
         if (!(ene[k].flg & 0x1)) { free_n++; if (slot < 0) slot = k; }
     if (want >= 0) {
-        if (want >= 128 || (ene[want].flg & 0x1)) { snprintf(msg, sizeof(msg), "refused: slot %d is taken", want); return msg; }
+        if (want >= PC_ENE_SLOTS || (ene[want].flg & 0x1)) { snprintf(msg, sizeof(msg), "refused: slot %d is taken", want); return msg; }
         slot = want;
     }
     if (free_n < spawn_slots_needed(am->id) + SPAWN_SLOTS_FREE) {
@@ -433,8 +433,8 @@ static void note_apply(int slot, const SpawnNote* n, int stg, int rom_no)
     const char* r;
     int first;
     if (stg != sys->stg_no || rom_no != sys->rom_no) return;   /* another room's: it went with that room */
-    if (slot < 128 && (ene[slot].flg & 0x1) && ene[slot].id == n->id) return;   /* already here (a replay) */
-    for (first = 0; first < 128 && (ene[first].flg & 0x1); first++);
+    if (slot < PC_ENE_SLOTS && (ene[slot].flg & 0x1) && ene[slot].id == n->id) return;   /* already here (a replay) */
+    for (first = 0; first < PC_ENE_SLOTS && (ene[first].flg & 0x1); first++);
     r = spawn_at(&am, n, slot, SPAWN_DICTATED, NULL);
     host_log("spawn: partner's enemy type %d model %d into slot %d (first free here: %d): %s\n", n->id, n->mdlver, slot, first, r ? r : "done");
 }
@@ -597,7 +597,7 @@ static void survey(void)
 void spawn_frame(int clock)
 {
     static const char* env = (const char*)-1;
-    static int trace, last_trace, last_hp, ene_hp[128], trace_room = -1;
+    static int trace, last_trace, last_hp, ene_hp[PC_ENE_SLOTS], trace_room = -1;
     int f, id, ver = -1, n = 0, k, slot_new = -1, vid = 0;
     float dist = 30.0f;
     if (env == (const char*)-1) trace = (env = getenv("RECVX_SPAWN")) != NULL;
@@ -628,7 +628,7 @@ void spawn_frame(int clock)
     }
     if (plp->hp < last_hp && last_hp - plp->hp < 400) printf("test: game frame %d player hit, hp %d -> %d\n", clock, last_hp, plp->hp);
     last_hp = plp->hp;
-    for (k = 0; k < 128; k++) {
+    for (k = 0; k < PC_ENE_SLOTS; k++) {
         BH_PWORK* ep = &ene[k];
         float dx, dz;
         if (!spawned[k] || !(ep->flg & 0x1) || ep->id != spawned[k] - 1) continue;
@@ -642,7 +642,7 @@ void spawn_frame(int clock)
     if (clock - last_trace >= 30) {
         if (clock / 30 % 3 == 0) {   /* every 90 game frames: all active slots (id, mode0), e.g. to compare co-op instances */
             printf("test: game frame %d room %d/%d slots:", clock, sys->stg_no, sys->rom_no);
-            for (k = 0; k < (int)sys->ewk_n && k < 128; k++)
+            for (k = 0; k < (int)sys->ewk_n && k < PC_ENE_SLOTS; k++)
                 if (ene[k].flg & 0x1) printf(" %d:%d/%d", k, ene[k].id, ene[k].mode0);
             printf("\n");
         }

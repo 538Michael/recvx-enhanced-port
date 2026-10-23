@@ -19,8 +19,8 @@ Paths are relative to `decomp/src/ps2/veronica/prog/` unless noted. Room counts 
 * A type's model, motions and textures exist **only in room files**. Room variants are separate
   files (`RM_SRRC`, C = case, picked by op 55 `RoomCaseNo`). Difficulty never changes placements.
   111 hostile records have no kill bit and come back on every visit.
-* The PC lifts the PS2's texture and helper-code budgets; the binding budget is the **128 enemy
-  slots** ("Budgets on the PC").
+* The PC lifts the PS2's texture, helper-code and enemy-slot budgets (**255 slots**, 128 on the
+  PS2); the slots are still what runs out first ("Budgets on the PC").
 
 ## Where a room's enemies come from
 
@@ -28,7 +28,8 @@ Paths are relative to `decomp/src/ps2/veronica/prog/` unless noted. Room counts 
 
 `system.c bhSysCallMonitor` mode 4 reads the room file; `room.c bhSetRoom` walks the enemy
 records: every record with `flg & 1` goes through `room.c bhSetEneMdl` -> `eneset.c bhSetEnemy`,
-which takes the **first free slot** of `ene[128]` (at load: slot `k` for record `k`).
+which takes the **first free slot** of `ene[]` (128 slots on the PS2, 255 on the PC; at load: slot `k`
+for record `k`).
 `bhFinishRoom` assumes slot `k` = record `k` for motion sets and matrices, and every script op
 addresses a record as `ene[rom->enep[k].wrk_no]`. Record order and count are therefore
 load-bearing.
@@ -77,7 +78,7 @@ branch on the character played (`CmpB ply_id`); none on `gm_mode`.
 | Monster Steve (17) | arms (31, 32) | `en17.c` |
 | tentacle (29) | a damage dummy | `en29.c` |
 
-`bhSetEnemy` returns NULL when the 128 slots are full, and none of these callers checks it.
+`bhSetEnemy` returns NULL when the slots are full, and none of these callers checks it.
 
 ## Data an enemy type needs
 
@@ -108,7 +109,7 @@ a room effect texture ("Effect textures of added types").
 
 | Resource | PS2 | PC | Notes |
 |---|---|---|---|
-| Enemy slots | 128 (`ene[]`) | unchanged | retail uses up to 76 records (RM_9170, ants); a zombie takes 8. Slots are byte-sized in the decomp and in the co-op packets, so raising them is a protocol change |
+| Enemy slots | 128 (`ene[]`) | **255** (`PC_ENE_SLOTS`, `pc_prelude.h`) | retail uses up to 76 records (RM_9170, ants); a zombie takes 8. First free slot, so vanilla rooms use the same slots. 255 is the most a byte holds with 255 as "none" (`ETTY_WORK.wrk_no`, `ATR_WORK.prm3`, the co-op packets); an effect's sound requests moved from enemy 127 to 255 |
 | Room arena | 12.25 MB incl. ~1.8 MB player data | **+64 MB** (`PC_ARENA_EXTRA`) | allocators never check `sys->endp`; the map/file/option screens copy the room's textures above `sys->memp` (2.2..6.1 MB), which must stay free |
 | Texture heap | 10 MB (`Ps2_tex_buff`) | **64 MB** (`PC_TEX_HEAP_SIZE`, `pc_prelude.h`) | full = `exit(0)`; retail rooms use up to 7.6 MB |
 | Texture entries | 256 (`tbuf`) | **1024** (`PC_TEX_ENTRIES`) | first-free and bump allocation, so vanilla rooms use the same entries as on the PS2 |
@@ -118,8 +119,19 @@ a room effect texture ("Effect textures of added types").
 | Enemy sound bank | one SE bank 3 per room | **31 extra banks**, one per source room, released with the room | "Sounds of added types" |
 | Helper code | `bhJumpEnemy[31..38]`, global, shared | **per creator type** (`eneset.c pc_call_enemy`) in rooms with added enemies; children made before the room got them keep the shared function as it was then (`pc_snap`: RM_6030's zombie parts run the moths' code) | users: zombie 31..38, Monster Steve 31/32, Gulp Worm, Black Widow, Hunter, moth, Alexia 2, Giant Black Widow 31. A part runs its creator's function; retail rooms keep the shared table |
 
-With these budgets 25..30 foreign types fit in one room before the slots run out
-(`RECVX_SPAWN_SURVEY`). Added for mixed rooms (none of it occurs in retail rooms):
+With these budgets 43 of the spawner's 58 entries fit in one room (RM_0060, `RECVX_SPAWN_SURVEY_ALL`;
+26 with 128 slots) before the slots run out, with 702 texture entries, 52 MB heap and 25 MB spawn
+memory still free; 30 added zombies, a Hunter, a Bandersnatch and a Cerberus take 249 slots there
+(with the room's own 30). What still limits:
+
+* The slots: records stay within 128 (the room tools, the enemy options' tables), a slot within a
+  byte. More slots would need wider fields in the room format and a co-op protocol change.
+* Time: 249 active slots cost ~3.5 ms of game logic per frame (0.7 ms empty, budget 33 ms).
+* Co-op: each frame carries 48 snapshots (`COOP_SNAP_FRAME`), so with 249 active slots each
+  enemy's state arrives every ~5 frames ("Co-op").
+* The dual-gun lock-on (`playpch.c`) lists at most 64 enemies in front; the rest are skipped.
+
+Added for mixed rooms (none of it occurs in retail rooms):
 
 * Slot counts come from the types' Inits, plus 6 kept free (a Gulp Worm takes 19).
 * An added albinoid adult's light (`en22.c` links it by slot) uses the slot beyond the room's
@@ -156,7 +168,7 @@ Mixing types the PS2 never mixed can still show odd behaviour (a Hunter may leap
 
 ## Runtime
 
-* `ene[128]` (`BH_PWORK`, 0x580 bytes); `sys->ewk_n` = highest used slot + 1; free =
+* `ene[]` (`BH_PWORK`, 0x580 bytes; 128, the PC 255); `sys->ewk_n` = highest used slot + 1; free =
   `!(flg & 1)`. `eneset.c bhControlEnemy` runs `bhJumpEnemy[id](ep)` then `bhEne_InitDamage` for
   every used slot not hidden/frozen (`stflg & 0x41000000`) or linked to a hidden parent; co-op
   hooks wrap the call. `bhDrawEnemy` draws the same set.
@@ -181,8 +193,10 @@ Mixing types the PS2 never mixed can still show odd behaviour (a Hunter may leap
 Details in [COOP.md](COOP.md); what matters for enemies:
 
 * The host runs the AI; the guest's enemies are puppets updated from per-slot snapshots (no type
-  or model), so both sides must hold the same enemy in the same slot. A packet carries at most 48
-  snapshots (`COOP_SNAP_FRAME`); with more active slots each packet sends the next 48.
+  or model), so both sides must hold the same enemy in the same slot. A frame carries at most 48
+  snapshots (`COOP_SNAP_FRAME`, 10 per 1200-byte datagram); with more active slots each frame sends
+  the next 48. Measured with 249 active slots: 5 datagrams and ~5.5 KB per frame (~1.3 Mbit/s at
+  30 fps), each slot every ~5 frames; puppets keep animating in between.
 * **Added enemies** (F2 spawner, extra enemies) are announced with one reliable `EV_SPAWN`
   {slot; source room file and record; type, model version, variant; position, angle, floor}. The
   guest realizes it with the spawner's code into the same slot (`spawn_glue.c spawn_note_apply`
@@ -255,7 +269,7 @@ damage, the magnum's near hit on joints 1 and 8..10 and the shotgun aimed up no 
    rooms' scripts wait for their death or events; replacing them can softlock the room.
 5. Types that cannot die normally (29, 53, 25, 0) must not replace a record that a `DieEventCk`
    or a door condition counts.
-6. **Slots**: children within 128. Water types (8, 21, 22) need water, fliers (6, 7) head room.
+6. **Slots**: children within the slots (128; 255 on the PC). Water types (8, 21, 22) need water, fliers (6, 7) head room.
 7. **Variant** in range (zombie 0..15, Tyrant 0..2, others mostly 0..3); waiting variants need the
    room's floor areas.
 8. **Grab motions** come with the type's motion set; Wesker (`ply_id` 3) overruns some 3-row
@@ -309,7 +323,7 @@ A spawned enemy has no record: no kill bit, scripts never see it, gone after a r
 ### Sounds of added types
 
 Enemy code requests a sound id (`RequestEnemySe`, `bhEne_CallSE`; effects through
-`bhEne_CallEffectSE` as enemy 127): bits 0..7 list (program), 8..11 SE bank, 12..15 how many may
+`bhEne_CallEffectSE` as enemy 127, on the PC 255): bits 0..7 list (program), 8..11 SE bank, 12..15 how many may
 play at once, 16..19 priority. Every enemy sound is in **bank 3**, played on one of 6 enemy SE
 handles from SE port 3. A room's sound pack `RM_SRRC.SPQ` (key `stage*1000 + room*10 + case` in
 `MULTSPQ1.IDX` for stages 0..5, `MULTSPQ2.IDX` for 6..9) loads bank 2 (room sounds) and, in rooms

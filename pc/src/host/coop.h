@@ -168,7 +168,7 @@ typedef struct CoopTest {
     int req;                            /* in/out: COOP_REQ_* of this frame */
     int host, on, echo, in_game, proxy_ok, frozen;
     unsigned int clock, frame;          /* the host's frame (test_clock), ours (frame_no) */
-    const unsigned char* owned;         /* [128]: the partner's game runs that enemy (a grab) */
+    const unsigned char* owned;         /* [PC_ENE_SLOTS]: the partner's game runs that enemy (a grab) */
     const struct BH_PWORK* partner;     /* the partner's stand-in (ply2) */
     void (*move)(float x, float z);     /* our player to x/z, its collision points along */
     unsigned int pad;                   /* out: game pad bits pressed at the next pad read (RECVX_COOP_PAD) */

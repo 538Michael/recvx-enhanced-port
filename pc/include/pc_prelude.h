@@ -187,6 +187,11 @@ void  actor_hands_back(void);                 /* game.c, before bhControlPlayer:
    first entries and bytes as before; only what used to exit(0) now fits. */
 #define PC_TEX_HEAP_SIZE (64 << 20)
 #define PC_TEX_ENTRIES 1024
+/* Enemy slots (ene[], 128 on the PS2; docs/ENEMIES.md "Budgets on the PC"): slots 0..254, so a slot
+   still fits the byte-sized fields that keep one (ETTY_WORK.wrk_no, ATR_WORK.prm3, the co-op packets),
+   255 being "none". bhSetEnemy takes the first free one, so vanilla rooms use the same slots. Enemy
+   sound requests of an effect (zonzon1.c, 127 on the PS2) use index PC_ENE_SLOTS. */
+#define PC_ENE_SLOTS 255
 /* The room arena (freemem: persistent player data, then the room file and what it allocates;
    12.25 MB block on the PS2, ~11.7 MB of it arena) grows by this much (docs/modding/ROOM_FORMAT.md "Limits and budgets"). The
    buffers above it (njplus, vertex buffers) keep their sizes and move up; allocations from the

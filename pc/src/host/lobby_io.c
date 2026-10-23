@@ -32,7 +32,16 @@ static void push_text(const char* s)
 void lobby_io_event(const void* e)
 {
     const SDL_Event* ev = (const SDL_Event*)e;
-    if (!g_lobby_io.text_on) return;
+    if (!g_lobby_io.text_on) {
+        if (g_lobby_io.list_on && ev->type == SDL_EVENT_KEY_DOWN)
+            switch (ev->key.key) {
+            case SDLK_PAGEUP: push(LK_PGUP); break;
+            case SDLK_PAGEDOWN: push(LK_PGDN); break;
+            case SDLK_HOME: push(LK_HOME); break;
+            case SDLK_END: push(LK_END); break;
+            }
+        return;
+    }
     if (ev->type == SDL_EVENT_TEXT_INPUT) push_text(ev->text.text);
     else if (ev->type == SDL_EVENT_KEY_DOWN) {
         switch (ev->key.key) {

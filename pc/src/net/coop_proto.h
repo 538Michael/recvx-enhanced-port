@@ -1,4 +1,4 @@
-/* Online co-op wire format (protocol 23, docs/COOP.md "Protocol 23" and "Security") and
+/* Online co-op wire format (protocol 24, docs/COOP.md "Protocol 24" and "Security") and
    the checks every received packet passes before it may change anything. No game state here:
    pc/glue/coop_glue.c applies what passes; pc/tests/test_coop.c feeds malformed packets. */
 #ifndef RECVX_COOP_PROTO_H
@@ -11,7 +11,7 @@ extern "C" {
 #endif
 
 #define COOP_MAGIC 0x504F4F43u          /* "COOP" */
-#define COOP_VERSION 23                 /* 11: join code, datagrams <= 1200 bytes, checked events, EV_ATR; 12: EV_FX; 13: EV_GRANT;
+#define COOP_VERSION 24                 /* 11: join code, datagrams <= 1200 bytes, checked events, EV_ATR; 12: EV_FX; 13: EV_GRANT;
                                            14: EV_TSCREEN, BUSY_TRADE, OPT_TRADE_FREEZE; 15: EV_GONE;
                                            16: player id and rejoin tag in PoseExt, EV_OWN, saved inventories (EV_BLOB pad);
                                            17: TS_WANT, TS_DECLINE (trade screen item requests);
@@ -22,11 +22,13 @@ extern "C" {
                                            21: COOP_HIT_PRECISE (third person "Precise hits");
                                            22: OPT_GAMEOVER_BOTH, PF_GAME_OVER, EV_BLOB pad 2 (a shared game over's continue),
                                                EV_OWN tid (the last game state the guest loaded); OPT_SKIP_DETECTOR;
-                                           23: OPT_QUICK_START (Pose.opts is full: a further rule needs a field of its own) */
+                                           23: OPT_QUICK_START (Pose.opts is full: a further rule needs a field of its own);
+                                           24: enemy slots 0..254 (COOP_ENE_SLOTS), EV_FX's FX_* references marked in `refs` */
 #define COOP_DGRAM_MAX 1200             /* bytes per datagram (below every internet path MTU) */
 #define COOP_EV_FRAME 16                /* events per frame (over the frame's datagrams) */
 #define COOP_SNAP_FRAME 48              /* enemy snapshots per frame */
 #define COOP_GONE_MAX 26                /* EV_GONE: enemy slots per event */
+#define COOP_ENE_SLOTS 255              /* enemy slots 0..254 (pc_prelude.h PC_ENE_SLOTS); 255 in a slot byte: none */
 #define COOP_TRIG_OPS 48                /* actions of one world event block (retail: at most 33) */
 #define COOP_CODE_LEN 8                 /* join code: 8 of the 32 characters below (40 bits) */
 
@@ -122,9 +124,16 @@ enum { TS_REQ = 1, TS_CANCEL, TS_OPEN, TS_CLOSE, TS_STATE, TS_SWAP, TS_DONE, TS_
 #define TSC_NONE 255                     /* no cell / nothing equipped */
 #define TS_WHY_MAX 16                   /* refusal reasons (coop_glue.c trade_why) */
 enum { ATR_WAL, ATR_ETC, ATR_FLR, ATR_OBJ };   /* EV_ATR kinds: room records, objects */
-/* EV_FX: who an effect follows or whose model it takes its texture from - an enemy slot (0..127),
-   the sender's player, the receiver's own player (the sender's proxy of it), or none */
-enum { FX_RECEIVER = 253, FX_SENDER = 254, FX_NONE = 255 };
+/* EV_FX: who an effect follows or whose model it takes its texture from - an enemy slot (0..254),
+   the receiver's own player (the sender's proxy of it), the sender's player, or none. A byte on the
+   wire: a slot, or with its bit (FXR_*) set in the event's `refs` one of these, as FX_* - FX_RECEIVER */
+enum { FX_RECEIVER = 0x100, FX_SENDER, FX_NONE };
+enum { FXR_IDX = 1, FXR_OWNER = 2, FXR_EXP0 = 4 };
+static inline void coop_fx_put(uint8_t* b, uint8_t* refs, int bit, int r)
+{
+    if (r >= FX_RECEIVER) { *b = (uint8_t)(r - FX_RECEIVER); *refs |= bit; } else *b = (uint8_t)r;
+}
+static inline int coop_fx_get(uint8_t b, uint8_t refs, int bit) { return refs & bit ? FX_RECEIVER + b : b; }
 #define FX_BURST 308                    /* a particle burst (sparks): EV_FX carries its parameter words */
 #define FX_PARTICLE 302                 /* blood and debris particles: EV_FX carries the bhSetEffParticle call */
 #define FX_PTCL_TYPES 19                /* its table (effsub3.c PtclTbl) */
@@ -226,7 +235,8 @@ typedef struct Event {
             uint8_t lkono, owner;       /* the node it follows (< 64); the model txp/mlw take parts of: FX_* or an enemy slot */
             uint8_t mode[4];
             int8_t txp, mlw;            /* txp[0], mlwP: owner's mdl[k] (-1: none / the effect's own model) */
-            uint8_t exp0, pad;          /* exp0: FX_* or an enemy slot */
+            uint8_t exp0;               /* exp0: FX_* or an enemy slot */
+            uint8_t refs;               /* FXR_*: Event.idx, owner, exp0 hold an FX_* */
             int16_t ang[3];
             int16_t ct[4];
             int16_t s[3];               /* scale, 1/256 */
@@ -239,11 +249,12 @@ typedef struct Event {
         struct {                        /* EV_FX of FX_PARTICLE: bhSetEffParticle(Mk2)(follows, node, off, dir, colours, type);
                                            Event.idx: the work it follows (FX_NONE: off is a position) */
             uint16_t id, typ;           /* FX_PARTICLE, the table entry */
-            uint8_t mk2, lnk, pad[2];   /* Mk2 (start and end colour); the node */
+            uint8_t mk2, lnk;           /* Mk2 (start and end colour); the node */
+            uint8_t refs, pad;          /* FXR_IDX: Event.idx holds an FX_* */
             uint32_t col, dst;
             float off[3], dir[3];
         } fxp;
-        struct {                        /* EV_FX of FX_ARM; Event.idx: the enemy slot */
+        struct {                        /* EV_FX of FX_ARM; Event.idx: the enemy slot (no refs) */
             uint16_t id, pad;
             float len[4];               /* x offsets of the arm's nodes 7..10 */
         } fxa;

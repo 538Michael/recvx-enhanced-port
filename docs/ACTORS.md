@@ -10,7 +10,7 @@ unless noted; types are in `decomp/include/ps2/veronica/prog/types.h`. Related:
 ## Summary
 
 * All characters and enemies are `BH_PWORK` (0x580 bytes): the player is `ply` (`plp`), enemies
-  `ene[128]`. A model is an `ML_WORK`: a flat array of `NJS_CNK_OBJECT` nodes in depth-first
+  `ene[]` (128; 255 on the PC). A model is an `ML_WORK`: a flat array of `NJS_CNK_OBJECT` nodes in depth-first
   order plus one `O_WORK` (matrix) per node. Motions (`MN_WORK`) are per-frame keys, one track
   per node, bound to the skeleton **purely by node index**.
 * The four player files (Claire, Chris, Steve, Wesker; Claire's second costume) share **the same
@@ -347,7 +347,7 @@ loader ([ENEMIES.md](ENEMIES.md) "Enemy spawner (F2)").
 
 ## You appear as
 
-"You appear as" (F3 window, the lobby's MODEL row, F1 and ENHANCED SETTINGS -> APPEARANCE; ini `coop_char`) shows
+"You appear as" (F3 window, the lobby's MODEL page, F1 and ENHANCED SETTINGS -> APPEARANCE; ini `coop_char`) shows
 our player as one of the player files or one of 62 models found in the room files: the story
 cast, the creatures, the zombie variants (`pc/src/host/actors.c`). It applies in single player and
 co-op (the partner sees it too) and in cutscenes to the event double of the character played

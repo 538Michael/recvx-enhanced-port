@@ -812,7 +812,7 @@ static int aimable(const BH_PWORK* e) { return (e->flg & 0x1) && (e->flg & 0x20)
 #define SHOTGUN_R0 0.3f       /* the shotgun's cone: this wider at the muzzle, */
 #define SHOTGUN_K 0.06f       /* plus this per unit of distance (3.4 degrees either side), */
 #define SHOTGUN_MAX 3.0f      /* at most this */
-unsigned char tps_hit_precise[128];   /* per enemy slot: its last gun hit was precise, as weapon + 1 (0: not; coop_glue.c) */
+unsigned char tps_hit_precise[PC_ENE_SLOTS];   /* per enemy slot: its last gun hit was precise, as weapon + 1 (0: not; coop_glue.c) */
 static float xr[7];                   /* the crosshair's ray (aim_at_crosshair): from, direction, length to its wall */
 static int dual_yaw;                  /* dual weapons, precise hits: the yaw of the gun turned to another enemy (dual_aim) */
 static int ticks, xr_tick = -1;      /* tps_player calls; the one in which it was cast (a shot in the mode handler before the next: the same) */
@@ -926,7 +926,7 @@ int pc_precise_hit(BH_PWORK* pp, int wpn, const float* c1, const float* c2, floa
 void pc_precise_dam(BH_PWORK* pp, int jnt, int d0, int precise, int wpn)
 {
     int i = (int)(pp - ene);
-    if (i >= 0 && i < 128) tps_hit_precise[i] = precise ? wpn + 1 : 0;
+    if (i >= 0 && i < PC_ENE_SLOTS) tps_hit_precise[i] = precise ? wpn + 1 : 0;
     if (precise && jnt == head_joint(pp->id)) pp->dam[jnt] = d0 + (pp->dam[jnt] - d0) * HEAD_DAMAGE / 100;
     if (trace) printf("tps: HIT wpn %d enemy %d (type %d, hp %d) joint %d damage %d%s, its state %d modes %d/%d, %.1f above its feet\n", wpn, i, pp->id,
                       pp->hp, jnt, pp->dam[jnt] - d0, !precise ? " (game's test)" : jnt == head_joint(pp->id) ? " (precise, head)" : " (precise)",
@@ -937,7 +937,7 @@ void pc_precise_dam(BH_PWORK* pp, int jnt, int d0, int precise, int wpn)
 int pc_precise_head(BH_PWORK* pp)
 {
     int i = (int)(pp - ene);
-    return i >= 0 && i < 128 && tps_hit_precise[i] && tps_hit_precise[i] == pp->wpnr_no + 1;
+    return i >= 0 && i < PC_ENE_SLOTS && tps_hit_precise[i] && tps_hit_precise[i] == pp->wpnr_no + 1;
 }
 
 /* the enemy whose middle is nearest the crosshair by angle: its offset (target minus crosshair,
@@ -1366,8 +1366,8 @@ void tps_player(void)
     ticks++;   /* (pc_precise_hit: the crosshair's ray is this tick's only if aim_at_crosshair casts it below) */
     if (trace && tps_cam_active && plp->mode1 == 1) trace_shot();
     if (trace) {   /* a zombie's head burst (en01.c: exp0 + 0x78 set to -1) */
-        static int head[128];
-        for (int i = 0; i < sys->ewk_n && i < 128; i++) {
+        static int head[PC_ENE_SLOTS];
+        for (int i = 0; i < sys->ewk_n && i < PC_ENE_SLOTS; i++) {
             int h = ene[i].id == 1 && (ene[i].flg & 1) && ene[i].exp0 ? *(int*)(ene[i].exp0 + 0x78) : 0;
             if (h == -1 && head[i] != -1) printf("tps: HEAD BURST enemy %d (last hit joint %d, weapon %d)\n", i, ene[i].djnt_no, ene[i].wpnr_no);
             head[i] = h;

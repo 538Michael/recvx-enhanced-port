@@ -177,7 +177,7 @@ overruns the arena silently). `rdxbuild.py` holds them in `BUDGETS`; `RECORD_LIM
 | Triggers, floors | 256 | same | byte compares in scripts |
 | Entry positions / routes | 128 / 255 | same | |
 | Lights / event lights / effects | 256 / 128 / 256 | same | |
-| Enemies / objects / items | 128 / 32 / 32 | same | runtime slots |
+| Enemies / objects / items | 128 / 32 / 32 | same | runtime slots (the PC has 255 enemy slots incl. children) |
 | Player stands on slopes | no | yes (`ROM_WORK.flg` 0x100) | |
 
 The retail budget's limits are deliberately below the PS2's real limits. Persistent player

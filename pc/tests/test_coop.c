@@ -40,7 +40,8 @@ static Event ev(int type)
     case EV_OWN: e.u.blob.total = COOP_OWN_SIZE; e.u.blob.off = 1536; e.u.blob.len = 28; e.u.blob.pad = 1; break;
     case EV_GONE: e.u.gn.n = 2; e.u.gn.slot[0] = 3; e.u.gn.id[0] = 1; e.u.gn.slot[1] = 30; e.u.gn.id[1] = 1; break;
     case EV_SKIP: e.stg = 0; e.rom = 2; e.u.sk.op = SKIP_GO; break;
-    case EV_FX: e.idx = FX_NONE; e.u.fx.id = 350; e.u.fx.owner = 4; e.u.fx.txp = 0; e.u.fx.mlw = -1; e.u.fx.exp0 = FX_NONE; e.u.fx.s[0] = 896; break;
+    case EV_FX: coop_fx_put(&e.idx, &e.u.fx.refs, FXR_IDX, FX_NONE); e.u.fx.id = 350; e.u.fx.owner = 4; e.u.fx.txp = 0; e.u.fx.mlw = -1;
+        coop_fx_put(&e.u.fx.exp0, &e.u.fx.refs, FXR_EXP0, FX_NONE); e.u.fx.s[0] = 896; break;
     }
     return e;
 }
@@ -78,7 +79,8 @@ static void test_events(void)
     BAD(EV_ENE_HIT, 0, e->u.eh.comb_flg = 0x81);
     BAD(EV_ENE_HIT, 0, e->u.eh.wpnr_no = 23);
     BAD(EV_ENE_HIT, 0, e->u.eh.djnt_no = 64);
-    BAD(EV_ENE_HIT, 0, e->idx = 128);
+    BAD(EV_ENE_HIT, 0, e->idx = 255);                    /* slots 0..254 (protocol 24) */
+    { Event e = ev(EV_ENE_HIT); e.idx = 254; CHECK(coop_check_event(&e, 0) == COOP_OK); }
     BAD(EV_ENE_HIT, 0, e->u.eh.dv[1] = NAN);
     BAD(EV_ENE_HIT, 0, e->u.eh.dp[0] = INFINITY);
     BAD(EV_PLY_HIT, 1, e->u.ph.hp_delta = -1);
@@ -109,8 +111,8 @@ static void test_events(void)
     BAD(EV_LOST, 0, e->u.lost.item = 0);
     BAD(EV_LOST, 0, e->u.lost.item = 200);
     /* B3: grabs */
-    BAD(EV_GRAB, 1, e->idx = 128);
-    BAD(EV_GRAB, 1, e->u.gr.child = 200);
+    BAD(EV_GRAB, 1, e->idx = 255);
+    { Event e = ev(EV_GRAB); e.idx = 254; e.u.gr.child = 200; CHECK(coop_check_event(&e, 1) == COOP_OK); }   /* any child byte: a slot or 255 none */
     BAD(EV_GRAB, 1, e->u.gr.mdl = 16);
     BAD(EV_GRAB, 1, e->u.gr.cmdl = -2);
     BAD(EV_GRAB, 1, e->u.gr.mnw = 512);
@@ -155,10 +157,11 @@ static void test_events(void)
     BAD(EV_SKIP, 1, e->stg = 10);
     BAD(EV_SKIP, 1, e->rom = 100);
     BAD(EV_SKIP, 0, (void)0);                            /* the guest never decides */
-    /* EV_GONE: 1..COOP_GONE_MAX enemy slots below 128, a room case */
+    /* EV_GONE: 1..COOP_GONE_MAX enemy slots below COOP_ENE_SLOTS, a room case */
     BAD(EV_GONE, 0, e->u.gn.n = 0);
     BAD(EV_GONE, 0, e->u.gn.n = COOP_GONE_MAX + 1);
-    BAD(EV_GONE, 0, e->u.gn.slot[1] = 128);
+    BAD(EV_GONE, 0, e->u.gn.slot[1] = 255);
+    { Event e = ev(EV_GONE); e.u.gn.slot[0] = 254; CHECK(coop_check_event(&e, 0) == COOP_OK); }
     BAD(EV_GONE, 0, e->idx = 10);
     /* EV_TSCREEN: ops, cells 0..9, grid sizes 8/10, item words; the host commits (SWAP, QUERY), the guest answers (DONE) */
     BAD(EV_TSCREEN, 0, e->u.ts.op = 0);
@@ -199,7 +202,7 @@ static void test_events(void)
     BAD(EV_BOX, 0, e->u.bx.w[0] = 0);
     BAD(EV_BOX, 0, e->u.bx.w[1] = 0xFF0001);
     BAD(EV_BOX, 1, e->u.bx.w[0] = 5 << 16 | 0xFFFF);
-    BAD(EV_SPAWN, 1, e->idx = 128);
+    BAD(EV_SPAWN, 1, e->idx = 255);
     BAD(EV_SPAWN, 1, e->u.sp.pz = NAN);
     BAD(EV_EOPTS, 1, e->u.eo.extra = 4);
     BAD(EV_EOPTS, 1, e->u.eo.seed = -1);
@@ -219,9 +222,24 @@ static void test_events(void)
     BAD(EV_GRANT, 0, e->u.gt.p[2] = 321);
     BAD(EV_GRANT, 0, e->u.gt.p[0] = -400);
     BAD(EV_FX, 0, e->u.fx.id = 400);
-    BAD(EV_FX, 1, e->idx = 128);
-    BAD(EV_FX, 1, e->u.fx.owner = 252);
+    BAD(EV_FX, 1, e->u.fx.refs &= ~FXR_IDX; e->idx = 255);   /* a slot byte (no FXR bit): 0..254 */
+    BAD(EV_FX, 1, e->u.fx.owner = 255);
+    BAD(EV_FX, 1, e->u.fx.refs |= FXR_OWNER; e->u.fx.owner = 3);   /* an FX_* byte: 0..2 */
     BAD(EV_FX, 1, e->u.fx.exp0 = 200);
+    BAD(EV_FX, 1, e->u.fx.refs |= 8);
+    {   /* references round trip: slots 0..254 and FX_* */
+        Event e = ev(EV_FX);
+        int r[] = { 0, 127, 128, 253, 254, FX_RECEIVER, FX_SENDER, FX_NONE }, k;
+        for (k = 0; k < 8; k++) {
+            e.u.fx.refs = 0;
+            coop_fx_put(&e.idx, &e.u.fx.refs, FXR_IDX, r[k]);
+            coop_fx_put(&e.u.fx.owner, &e.u.fx.refs, FXR_OWNER, r[7 - k]);
+            coop_fx_put(&e.u.fx.exp0, &e.u.fx.refs, FXR_EXP0, r[k]);
+            CHECK(coop_fx_get(e.idx, e.u.fx.refs, FXR_IDX) == r[k] && coop_fx_get(e.u.fx.owner, e.u.fx.refs, FXR_OWNER) == r[7 - k] &&
+                  coop_fx_get(e.u.fx.exp0, e.u.fx.refs, FXR_EXP0) == r[k]);
+            CHECK(coop_check_event(&e, 1) == COOP_OK);
+        }
+    }
     BAD(EV_FX, 0, e->u.fx.lkono = 64);
     BAD(EV_FX, 0, e->u.fx.txp = 16);
     BAD(EV_FX, 0, e->u.fx.mlw = -2);
@@ -237,7 +255,7 @@ static void test_events(void)
         e.u.fxr.w[0] = 33; CHECK(coop_check_event(&e, 0) != COOP_OK); e.u.fxr.w[0] = 12;
         e.u.fxr.w[4] = 0xFFFFFFFF; CHECK(coop_check_event(&e, 0) != COOP_OK); e.u.fxr.w[4] = 9;
         e.u.fxr.nw = 17; CHECK(coop_check_event(&e, 0) != COOP_OK); e.u.fxr.nw = FX_RAW_WORDS;
-        e.idx = 200; CHECK(coop_check_event(&e, 0) != COOP_OK); e.idx = FX_NONE;
+        e.idx = 200; CHECK(coop_check_event(&e, 0) == COOP_OK); e.idx = 0;   /* a burst follows nothing: idx is not read */
         { float f = NAN; memcpy(&e.u.fxr.w[13], &f, 4); } CHECK(coop_check_event(&e, 0) != COOP_OK);
     }
     {   /* a Bandersnatch's arm */
@@ -245,7 +263,8 @@ static void test_events(void)
         memset(&e.u, 0, sizeof(e.u));
         e.idx = 3; e.u.fxa.id = FX_ARM; e.u.fxa.len[3] = 12.5f;
         CHECK(coop_check_event(&e, 1) == COOP_OK);
-        e.idx = FX_NONE; CHECK(coop_check_event(&e, 1) != COOP_OK); e.idx = 3;
+        e.idx = 255; CHECK(coop_check_event(&e, 1) != COOP_OK); e.idx = 254;
+        CHECK(coop_check_event(&e, 1) == COOP_OK);
         e.u.fxa.len[1] = NAN; CHECK(coop_check_event(&e, 1) != COOP_OK);
     }
     {   /* a particle call */
@@ -256,6 +275,11 @@ static void test_events(void)
         e.u.fxp.typ = FX_PTCL_TYPES; CHECK(coop_check_event(&e, 1) != COOP_OK); e.u.fxp.typ = 5;
         e.u.fxp.lnk = 64; CHECK(coop_check_event(&e, 1) != COOP_OK); e.u.fxp.lnk = 9;
         e.u.fxp.mk2 = 2; CHECK(coop_check_event(&e, 1) != COOP_OK); e.u.fxp.mk2 = 1;
+        e.idx = 254; CHECK(coop_check_event(&e, 1) == COOP_OK);
+        e.idx = 255; CHECK(coop_check_event(&e, 1) != COOP_OK);
+        e.u.fxp.refs = FXR_IDX; e.idx = FX_NONE - FX_RECEIVER; CHECK(coop_check_event(&e, 1) == COOP_OK);
+        e.idx = 3; CHECK(coop_check_event(&e, 1) != COOP_OK);
+        e.u.fxp.refs = FXR_OWNER; e.idx = 3; CHECK(coop_check_event(&e, 1) != COOP_OK); e.u.fxp.refs = 0;
         e.u.fxp.dir[0] = NAN; CHECK(coop_check_event(&e, 1) != COOP_OK);
     }
     BAD(EV_ATR, 0, e->u.at.kind = 4);
@@ -282,7 +306,8 @@ static void test_snaps(void)
     s.mnw = MNW_ROOM; CHECK(coop_check_snap(&s) == COOP_OK);
     s.mnw = MNW_KEEP; s.mdl = -1; CHECK(coop_check_snap(&s) == COOP_OK);
 #define BADS(stmt) do { EneSnap t = s; stmt; CHECK(coop_check_snap(&t) != COOP_OK); } while (0)
-    BADS(t.idx = 128);
+    BADS(t.idx = 255);
+    { EneSnap t = s; t.idx = 254; CHECK(coop_check_snap(&t) == COOP_OK); }
     BADS(t.mdl = 16);          /* B4: the model index into mdl[16] */
     BADS(t.mdl = -2);
     BADS(t.mdl = 127);
@@ -331,12 +356,13 @@ static void test_dgrams(void)
     BADP(q.type = 9, COOP_BAD_TYPE);
     BADP(q.sid = 78, COOP_BAD_AUTH);              /* the proof belongs to its session */
     BADP(q.nev = 17, COOP_BAD_COUNT);             /* oversized counts */
-    BADP(q.nene = 49, COOP_BAD_COUNT);
+    BADP(q.nene = COOP_SNAP_FRAME + 1, COOP_BAD_COUNT);
     BADP(q.nev = 255, COOP_BAD_COUNT);
     BADP(q.nev = 2, COOP_BAD_SIZE);               /* counts that do not match the size */
     BADP(q.flags = 0, COOP_BAD_SIZE);             /* no PoseExt flagged, one there */
     BADP(q.px = NAN, COOP_BAD_FLOAT);
     BADP(q.mset = 300, COOP_BAD_FIELD);
+    BADP(q.mset = 255, COOP_BAD_FIELD);
     BADP(q.busy = 7, COOP_BAD_FIELD);
     BADP(q.flr = 33, COOP_BAD_FIELD);             /* flr_no 30: past rom->grand[32] */
     BADP(q.flr = 255, COOP_BAD_FIELD);
@@ -576,7 +602,11 @@ static int sane(const Event* e)
         for (k = 0; k < 10; k++) if (e->u.ts.inv[k] && (((e->u.ts.inv[k] >> 16) & 0xFF) > 155 || (e->u.ts.inv[k] & 0xFFFF) > 999)) return 0;
         if (e->u.ts.give && (((e->u.ts.give >> 16) & 0xFF) == 0 || (e->u.ts.give & 0xFFFF) > 999)) return 0;
     }
-    if (e->type == EV_FX && ((e->idx >= 128 && e->idx < FX_RECEIVER) || e->u.fx.id >= 400 || (e->u.fx.id != FX_BURST && e->u.fx.lkono >= 64))) return 0;
+    if (e->type == EV_FX && e->u.fx.id != FX_BURST) {   /* what it follows: a slot 0..254 or FX_* */
+        int r = coop_fx_get(e->idx, e->u.fx.id == FX_PARTICLE ? e->u.fxp.refs : e->u.fx.id == FX_ARM ? 0 : e->u.fx.refs, FXR_IDX);
+        if (r == 255 || r > FX_NONE) return 0;
+    }
+    if (e->type == EV_FX && (e->u.fx.id >= 400 || (e->u.fx.id != FX_BURST && e->u.fx.lkono >= 64))) return 0;
     if (e->type == EV_FX && e->u.fx.id == FX_BURST && (e->u.fxr.w[0] > 32 || e->u.fxr.w[4] > 600)) return 0;
     if (e->type == EV_FX && e->u.fx.id == FX_PARTICLE && (e->u.fxp.typ >= FX_PTCL_TYPES || e->u.fxp.lnk >= 64)) return 0;
     return 1;
