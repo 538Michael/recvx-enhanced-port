@@ -41,6 +41,9 @@
   walls and floor of the ant hall jittered against the walls and flickered in and out of them
   while the camera moved, most of all in over-the-shoulder view. They now move smoothly with the
   rest of the picture.
+- **Co-op: items lost in a trade**: trading the combat knife, an empty gun or the Gold Lugers to
+  your partner could make the item disappear from both inventories. It now arrives like any other
+  item, and if your partner has no room for it, you keep it.
 
 ## 0.6.7 (2026-10-22)
 
