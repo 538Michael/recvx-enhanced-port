@@ -18,6 +18,7 @@ typedef struct ImpStrip { int first, n, tex; } ImpStrip;   /* idx[first .. first
 
 typedef struct ImpModel {
     int nmesh;              /* meshes of the source model (information) */
+    int eyes_left_out;      /* eyeball overlay meshes not converted (ob2.c read_mesh) */
     int nn;
     ImpNode node[IMP_NODES];
     int nv;                 /* vertices in model space (the bind pose), weights per node */
@@ -42,11 +43,21 @@ int  imp_write_png(const ImpModel* m, int k, const char* path);
 /* glTF 2.0 binary: the skeleton, one skinned mesh (a primitive per texture), embedded PNGs;
    `scale` turns the model's units into metres */
 int  imp_write_glb(const ImpModel* m, const char* path, const char* name, float scale, char* err, int en);
+/* Adjustments made while converting (a fit to Code: Veronica's proportions; ob2.c ob2_fit, a table per
+   model): each move shifts a source node and everything below it by d (game units, after the turn), and
+   with them the vertices by their weights (a vertex half on the moved node moves half way), so a part of
+   the mesh follows its bones smoothly (shoulders in and down with the arms, a collar with them). */
+#define IMP_MOVES 8
+typedef struct ImpFit {
+    int n;
+    struct { int node; float d[3]; } move[IMP_MOVES];
+} ImpFit;
+
 /* the port's player-model format: the kept nodes as a Ninja chunk skeleton (all bind angles 0),
    one mesh on node 1 (the pelvis) that pc/glue/actor_glue.c skins every frame from the weights,
    the textures as the game's TIM2 chunks with global indices gindex + k. `scale`: model units to
    the game's; turned 180 degrees about y (Outbreak faces +z, Code: Veronica -z). */
-int  imp_write_cvxm(const ImpModel* m, const char* path, float scale, unsigned gindex, char* err, int en);
+int  imp_write_cvxm(const ImpModel* m, const char* path, float scale, unsigned gindex, const ImpFit* fit, char* err, int en);
 
 /* .cvxm layout (little endian), read by pc/glue/actor_glue.c:
      0  "RXIM", u32 version (2), u32 model chunk list offset (60: its u32 size word, the MLB at 64),

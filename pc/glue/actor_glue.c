@@ -83,9 +83,10 @@ typedef struct Disguise {
     const CvxmSkin* skin;               /* an imported model (.cvxm): its vertices skinned every pose (imp_skin) */
     float* vtx;                         /* its vertex chunk's data (position, normal per vertex) */
     int nv;
-    float hand_len;                     /* its left hand: wrist to fingertips (the two-handed grip) */
+    float hand_dir[3];                  /* its left hand: wrist to fingertips at rest (the two-handed grip) */
     signed char fbone[IMP_FACES - 1];   /* its face bones (IMP_FACE_* - 1: lids, jaw), -1 none */
     int blink, blink_wait;              /* the blink: step 0..7 of it (-1 none), ticks since the last */
+    float talk;                         /* the jaw (degrees) from the player's voice, imp_face */
     unsigned int seed;                  /* (its own random numbers: the game's rand() stays the game's) */
     struct {   /* the player characters' cutscene models: the head part the scripts link to them (Claire's
                   ponytail, Wesker's sunglasses), from the character's part file (load_head) */
@@ -501,20 +502,43 @@ static void retarget(Disguise* d, BH_PWORK* src, const Rig* sr)
                 if (d->skin && tr->map[7] >= 0 && sr->map[7] >= 0 && sr->map[11] >= 0) {
                     /* An imported model: the hands' offset in proportion to its shoulders (Outbreak's are a
                        quarter wider than Claire's: unscaled, the left hand was pulled in across the body even
-                       with the arms down, which the source holds 3.5 apart); and in a grip the left hand's
-                       palm, not its wrist, onto the gun: the wrist back along its forearm by half the hand
-                       (its fingers are straight, Code: Veronica's grip pieces curl around the weapon; else
-                       they reached past the gun to the right) */
-                    float ms = rig_dist(tr, tr->map[7], u), ss = rig_dist(sr, sr->map[7], sr->map[11]), fd[3], fl = 0, k = 1, pull;
+                       with the arms down, which the source holds 3.5 apart) */
+                    float ms = rig_dist(tr, tr->map[7], u), ss = rig_dist(sr, sr->map[7], sr->map[11]), k = 1;
+                    float g = w * fminf(1.0f, fmaxf(0.0f, (4.0f - sqrtf(ds)) / 2.0f)), y[3], dn = 0, yl = 0, rd[3], rl = 0, hl = 0;
                     if (ms > 0.1f && ss > 0.1f) k = ms / ss;
-                    for (j = 0; j < 3; j++) { fd[j] = m->owP[h].mtx[12 + j] - m->owP[f].mtx[12 + j]; fl += fd[j] * fd[j]; }
-                    fl = sqrtf(fl);
-                    pull = fl > 1e-3f ? 0.5f * d->hand_len / fl : 0;
-                    pull *= fminf(1.0f, fmaxf(0.0f, (4.0f - sqrtf(ds)) / 2.0f));   /* (only for a grip: full up to 2 apart, none from 4) */
-                    for (j = 0; j < 3; j++) off[j] = off[j] * k - fd[j] * pull;
+                    for (j = 0; j < 3; j++) off[j] *= k;
+                    /* In a grip (hands up to 2 apart, fading out at 4) the palm under the gun: Code: Veronica's
+                       grip pieces reach in from the wrist and curl under the weapon, Outbreak's hand is open and
+                       straight (it went on along the left forearm, across and past the gun to the right, or with
+                       its wrist pulled back it hid behind the gun hand). So the wrist goes as far below the gun
+                       hand's as the source's and back along the gun (the right forearm) by a quarter of the
+                       hand; the fingers are turned along the gun below (the palm's centre under the grip). */
+                    if (g > 0 && tr->map[8] >= 0) {
+                        const float *rh = &m->owP[r].mtx[12], *re = &m->owP[(int)tr->map[8]].mtx[12];
+                        for (j = 0; j < 3; j++) { y[j] = dm[4 + j]; yl += y[j] * y[j]; rd[j] = rh[j] - re[j]; rl += rd[j] * rd[j]; hl += d->hand_dir[j] * d->hand_dir[j]; }
+                        if (yl > 1e-6f && rl > 1e-6f) {
+                            const float c = 0.25f;   /* (the wrist back by a quarter of the hand) */
+                            yl = sqrtf(yl); rl = sqrtf(rl); hl = sqrtf(hl);
+                            for (j = 0; j < 3; j++) dn += off[j] * y[j] / yl;
+                            for (j = 0; j < 3; j++) off[j] += g * (dn * y[j] / yl - c * hl * rd[j] / rl - off[j]);
+                        }
+                    }
                 }
                 for (j = 0; j < 3; j++) t[j] = m->owP[h].mtx[12 + j] + w * (m->owP[r].mtx[12 + j] + off[j] - m->owP[h].mtx[12 + j]);
                 arm_ik(m, rot, u, f, h, t);
+                if (d->skin && tr->map[8] >= 0) {
+                    /* and in a grip its left hand turned so the fingers point the way the right forearm does,
+                       under the gun (they went on along the left forearm, across and past the gun to the right) */
+                    float g = w * fminf(1.0f, fmaxf(0.0f, (4.0f - sqrtf(ds)) / 2.0f)), fdir[3], tdir[3], tl = 0, q[9];
+                    const float *rh = &m->owP[r].mtx[12], *re = &m->owP[(int)tr->map[8]].mtx[12];
+                    for (j = 0; j < 3; j++) { fdir[j] = d->hand_dir[0] * rot[h][j] + d->hand_dir[1] * rot[h][3 + j] + d->hand_dir[2] * rot[h][6 + j]; tdir[j] = rh[j] - re[j]; tl += tdir[j] * tdir[j]; }
+                    if (g > 0 && tl > 1e-4f) {
+                        tl = sqrtf(tl);
+                        for (j = 0; j < 3; j++) tdir[j] = fdir[j] * (1 - g) + tdir[j] / tl * g;
+                        rot_from_to(fdir, tdir, q);
+                        mul3(rot[h], q, rot[h]);
+                    }
+                }
                 for (i = 0; i < tr->n; i++) if (from[i] < 0 && tr->par[i] >= 0) follow(d, rot, i, tr->par[i]);
                 place(m, tr, rot, dm, root);
             }
@@ -1012,8 +1036,16 @@ static int load_import_model(Disguise* d, int k)
 
 /* An imported model's face (its face bones, which otherwise follow the head): it blinks as the
    player characters do (player.c: after 30 ticks a 3% chance per tick, then 8 ticks: lids half,
-   closed, half, open), and in cutscenes its jaw opens as far as the double's face mask's
-   (MASK_WORK param.jawang, set by the lip sync, bhControlMask) */
+   closed, half, open). Its jaw:
+   - standing in for a cutscene double: the double's face mask's (MASK_WORK param.jawang, set by
+     the lip sync, bhControlMask). The cast's masks talk mostly with muscles (lip shapes) and turn
+     the jaw only 0..5 degrees; the Outbreak face has the jaw alone, so what is above the resting
+     1.5 degrees is turned 2.5 times as far (4.9 -> 10 degrees).
+   - the player in the game: the game has no mouth motion there (the player files have no face
+     mask; their voice calls are sounds without lip data), so the jaw follows the loudness of the
+     player's voice (SE port 4, snd_synth_voice_level): opens at once, closes over a few ticks. */
+uint64_t gs_frame_count(void);   /* (test aid) */
+float snd_synth_voice_level(void);   /* (snd.h) */
 static void imp_face(Disguise* d, const BH_PWORK* src, int step)
 {
     static const unsigned char tab[8] = { 0, 0, 1, 1, 2, 2, 1, 0 };   /* PlyEyeTab: 0 open, 1 half, 2 closed */
@@ -1027,9 +1059,20 @@ static void imp_face(Disguise* d, const BH_PWORK* src, int step)
         else if (d->blink >= 0 && ++d->blink > 7) d->blink = -1;
     }
     if (d->blink >= 0) shut = tab[d->blink] / 2.0f;
-    if (src && src->mskp && src->exp1 && d == &dg[ACTOR_DOUBLE]) jaw = ((const MASK_WORK*)src->exp1)->param.jawang;   /* (degrees) */
+    if (src && src->mskp && src->exp1 && d == &dg[ACTOR_DOUBLE]) {
+        jaw = ((const MASK_WORK*)src->exp1)->param.jawang;   /* (degrees) */
+        if (jaw > 1.5f) jaw += 1.5f * (jaw - 1.5f);
+    } else if (d == &dg[0]) {
+        if (step) {   /* ponytail: the mean level of everything on port 4 (co-op: the partner's voice there too) */
+            float v = snd_synth_voice_level() * 90.0f;   /* (degrees: a scream peaks at ~0.18 -> the 14 degree cap, a grunt ~0.03 -> 3) */
+            d->talk = v > d->talk ? v : d->talk * 0.6f;
+            if (d->talk > 14.0f) d->talk = 14.0f;
+            if (getenv("RECVX_IMPORT_POSE") && d->talk > 0.05f) host_log("import: voice jaw %.1f (level %.4f) frame %d\n", d->talk, v / 90.0f, (int)gs_frame_count());   /* (test aid) */
+        }
+        jaw = d->talk;
+    }
     if (getenv("RECVX_IMPORT_JAW")) jaw = (float)atof(getenv("RECVX_IMPORT_JAW"));   /* test aid: the jaw open this far (degrees) */
-    if (getenv("RECVX_IMPORT_POSE") && step && d == &dg[ACTOR_DOUBLE] && jaw != 0) host_log("import: double's jaw %.1f\n", jaw);   /* (test aid) */
+    if (getenv("RECVX_IMPORT_POSE") && step && d == &dg[ACTOR_DOUBLE] && jaw != 0) host_log("import: double's jaw %.1f frame %d\n", jaw, (int)gs_frame_count());   /* (test aid) */
     jaw *= 3.14159265f / 180.0f;
     for (k = 0; k < 2; k++) {   /* the upper lid down onto the lower one along the head's up axis (the lower one a little up) */
         int up = d->fbone[2 * k], lo = d->fbone[2 * k + 1], c;
@@ -1120,14 +1163,15 @@ static int load(Disguise* d, int idx)
     d->w.mtn_add = 65536;
     anim = idx >= ACTOR_PART || actor_model(idx)->anim;
     if (anim) rig_build(&d->rig, d->w.mdl[0].objP, d->w.mdl[0].obj_num, 1);
-    d->hand_len = 0;
-    if (d->skin && d->rig.ok && d->rig.map[13] >= 0) {   /* an imported model's left hand: its farthest vertex from the wrist */
+    memset(d->hand_dir, 0, sizeof(d->hand_dir));
+    if (d->skin && d->rig.ok && d->rig.map[13] >= 0) {   /* an imported model's left hand: towards its farthest vertex from the wrist */
         int i, c, hn = d->rig.map[13];
+        float best = 0;
         for (i = 0; i < d->nv; i++) {
-            float e = 0;
+            float e = 0, v[3];
             if (d->skin[i].node[0] != hn || d->skin[i].w[0] < 0.5f) continue;
-            for (c = 0; c < 3; c++) e += (d->skin[i].pos[c] - d->rig.rest[hn][c]) * (d->skin[i].pos[c] - d->rig.rest[hn][c]);
-            if (e > d->hand_len * d->hand_len) d->hand_len = sqrtf(e);
+            for (c = 0; c < 3; c++) { v[c] = d->skin[i].pos[c] - d->rig.rest[hn][c]; e += v[c] * v[c]; }
+            if (e > best) { best = e; for (c = 0; c < 3; c++) d->hand_dir[c] = v[c]; }
         }
     }
     host_log("actor: %s loaded (%d sub-models, %d nodes, %d KB texture heap), %s; map", name, d->w.mdl_n,

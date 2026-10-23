@@ -5957,7 +5957,7 @@ void coop_frame(void)
     memset(&tx_ext, 0, sizeof(tx_ext));
     memcpy(tx_ext.name, g_coop.name, sizeof(tx_ext.name) - 1);
     memcpy(tx_ext.note, g_coop.note, sizeof(tx_ext.note) - 1);
-    tx_ext.lchr = g_coop.chr;
+    tx_ext.lchr = g_coop.chr <= COOP_CHR_MAX ? g_coop.chr : 0;   /* (int8_t; an import: the character played, as in tx.chr) */
     tx_ext.lobby = g_coop.lobby;
     if (!is_host) { memcpy(tx_ext.pid, g_coop.pid, 16); memcpy(tx_ext.tag, my_tag, 16); tx_ext.items = (uint8_t)items_wire(); }
     else tx_ext.rec = !g_coop.remember ? REC_OFF : !id_ok ? REC_UNKNOWN : rec_have(id_pid) ? REC_HAVE : REC_NONE;

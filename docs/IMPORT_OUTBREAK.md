@@ -14,37 +14,46 @@ lists what was extracted; it is built so other games can be added as further sou
 | Stage | State |
 |---|---|
 | 1. Format research | done: disc layout, archives, compression, model and texture format ("Disc format") |
-| 2. Extractor (C, `pc/src/import/`) | done: all 30 player models (8 characters, every costume) to glTF + PNG; NPCs and enemies optional (glTF) |
-| 3. Conversion to CVX player models | done for the playable characters: `.cvxm`, listed in "You appear as", skinned every frame, retargeted from the player's motions; checked in game (walk, aim, grabs, third person) |
-| 4. F4 window | done: disc image, what to extract, progress, results table from the manifest (also after a restart) |
+| 2. Extractor (C, `pc/src/import/`) | done: every character model on the disc (537: 30 playable, 40 cutscene / high detail, 276 NPCs, 191 enemies) to glTF + PNG |
+| 3. Conversion to CVX player models | done for every model on the human skeleton (355: all 30 playable, 39 of 40 cutscene / high detail, 267 of 276 NPCs, 19 enemies): `.cvxm`, listed in "You appear as", skinned every frame, retargeted from the player's motions; checked in game (walk, aim, grabs, third person, cutscenes) |
+| 4. F4 window | done: disc image, what to extract (four groups), progress, results grouped (playable, cutscene / high detail, NPCs, enemies) from the manifest (also after a restart) |
 | 5. Notes for later (voices, ad-libs, animations) | first findings ("Notes for later") |
 | 6. Verification | headless extraction, glTF/`.cvxm` checks and previews, in-game shots, ctest (`import`, `appear`), Linux and Windows builds, layout check |
 | 7. Posture (round 2) | fixed: the retargeting's rest correction bent the imported meshes (hunched shoulders, head down); imported models now take the source's rotations as they are; the left arm's two-handed grip scaled to the model's shoulders, the palm onto the gun ("Posture") |
-| 8. Faces (round 2) | blinking (lids, the player characters' timing) and the jaw from the cutscene double's lip sync ("Faces"); the jaw path is checked with a forced angle, not yet in a talking cutscene |
+| 8. Faces (round 2) | blinking (lids, the player characters' timing) and the jaw from the cutscene double's lip sync ("Faces") |
+| 9. Eyes (round 3) | fixed: white, "blind" eyes: the eyeball overlay mesh (white without Outbreak's UV scrolling) is left out, the face texture's painted irises show, in the `.glb` too ("Faces") |
+| 10. Mouth (round 3) | the jaw arrived but turned only 0..5 degrees (the cast's masks talk mostly with lip muscles): amplified, checked in the opening's talking scene; in gameplay the jaw follows the loudness of the player's voice ("Faces") |
+| 11. Shoulders (round 3) | narrowed towards Code: Veronica's proportions and lowered at conversion (a fit per model: the arms moved with their weighted vertices, "Adjusting parts") |
+| 12. Grip (round 3) | the support hand under the gun again: below the gun hand, fingers along the gun, compared with Claire's and Chris's grips ("Posture") |
 
 Resume notes: build with `cmake --build build`; headless run:
 `RECVX_MODS=<out> RECVX_IMPORT=outbreak2 RECVX_IMPORT_ISO=<image> build/pc/recvx --save-dir <tmp>`
-(`RECVX_IMPORT_WHAT` = 1 players, 2 NPCs, 4 enemies, summed; exit status 0 = no failures).
+(`RECVX_IMPORT_WHAT` = 1 playable, 2 cutscene / high detail, 4 NPCs, 8 enemies, summed (15: all);
+exit status 0 = no failures).
 Check the output with `pc/tools/import_check.py <model>.glb|.cvxm out.png`. In game:
 `RECVX_MODS=<out> RECVX_APPEAR=30:68` shows the first imported model (chr `COOP_CHR_IMPORT` = 68).
-Test aids: `RECVX_IMPORT_POSE=file` (per pose of slot 0 the node matrices in the base's frame;
-the double's jaw angle is logged), `RECVX_IMPORT_JAW=deg` (the jaw held open). Posture and face
+Test aids: `RECVX_IMPORT_POSE=file` (per pose of slot 0 the node matrices in the base's frame,
+`file.src` the source's joints; the double's jaw angle and the voice jaw are logged with the frame),
+`RECVX_IMPORT_JAW=deg` (the jaw held open). A talking scene headless: a new game (no teleport),
+cross at 1700 (the cell's message, the inventory opens), up, cross, cross (the lighter equipped),
+start at 1950: Rodrigo's scene in RM_0000, Claire talks around frames 3260..3340. A voice:
+`RECVX_TELEPORT=1:0:2:0 RECVX_SPAWN=300:1@6` (a zombie next to the player in RM_0020; it bites
+from frame ~660). Posture and face
 previews were rendered offline from such dumps (exploration scripts outside the repository).
 
 ### Next steps
 
-1. Faces: check the jaw in a talking cutscene (a room whose cutscene starts on entry with the
-   story flags set: `pc/tools/enemies.py room` lists the doubles' `FaceRep`/lip ops); eye
-   direction (Outbreak's eye mesh scrolls its UVs) and expressions are not done.
+1. Faces: eye direction (Outbreak's eyeball mesh with its UV scrolling, left out now) and
+   expressions are not done; the cutscene voice lines (ADX streams) do not move the jaw of a
+   player model that acts itself (only a double's lip sync and the player's voice sounds do).
 2. Fingers are merged into the hands (OB's fist / open-hand poses are lost); the weapon grip
    could close them.
-3. The high-detail models (`HP*.nbd`: 512x512 textures, a separate head model with face bones)
-   for cutscenes.
+3. The high-detail models (`HP*.nbd`: 512x512 textures) convert with the body model only; their
+   separate head model (the second AMO/AHI pair, more face bones) is not used yet.
 4. Co-op: the partner sees the played character instead of an imported model (the pose's `chr`
    has no room for it and the partner may not have the file); a "model hash" in the pose and a
    fallback would allow it.
-5. NPCs as player models: the 147 models with the human skeleton (P, EP, most N) convert the
-   same way; only the players are converted now (names of the NPCs are not known).
+5. NPC names and sexes are not known (listed as "NPC <file>", moving with a man's motions).
 6. Voices and ad-lib motions (below).
 
 ## Disc format
@@ -143,13 +152,25 @@ threads on NBD textures, and the [Outbreak decomp](https://github.com/GalaxyNost
 | `ob2.c` | Outbreak File #2: ISO 9660 root lookup, AFS, SLD, NBD reading into an `ImpModel` |
 | `impmodel.h`, `impmodel.c` | glTF 2.0 binary writer (skeleton, skin, PNG textures), TIM2 decoding, the `.cvxm` converter |
 
+What is read: all character models are in `romdata_usa.afs` (`ob2_group`): `P*` the playable
+characters (30), `EP*` their cutscene versions and `HP*` the high-detail ones (40, named after the
+cast: "Cutscene, costume n", "High detail"), `N*` / `HN*` NPCs (276, by file name), `E*` / `HE*`
+enemies (191). The scenario archives `rNNN.afs` hold rooms (`r*.nbd`), objects and effects only:
+no character models (checked: every `.nbd` in them is a room, an object or an effect).
+
 Output per model in `<dir>/outbreak2/<id>/`: `<id>.glb` (viewable in Blender: one skinned mesh, a
 primitive per texture, the full skeleton, scale 0.01 to metres, textures embedded),
-`<id>_tex<k>.png`, and for the playable characters `<id>.cvxm`. `<dir>/outbreak2/manifest.txt`
+`<id>_tex<k>.png`, and for every model on the human skeleton `<id>.cvxm`. `<dir>/outbreak2/manifest.txt`
 lists every model (counts, whether it is a player model, failures with their reason); F4 shows
 it, also after a restart, and the registry reads it at start. The disc is identified by
 `SYSTEM.CNF` (`SLUS_209.84`); another region's disc is refused. All 30 player models: 23 MB of
-output, a few seconds.
+output, a few seconds; everything (537 models): 490 MB, about a minute.
+
+Not converted (glTF only), with the reason in the manifest: 172 enemies that are not on the human
+skeleton (zombies of the 23-node skeleton, dogs, creatures: "glTF only: not the human skeleton (n
+nodes)") and 10 NPC / high-detail parts (`HN*_N`, `HP03_N`: 3..9 nodes, heads and props: "not a
+humanoid skeleton"). Enemies on the human skeleton (19: the high-detail zombies `HE01_*`, `E28`,
+`E45`) convert and move with a man's motions.
 
 Settings (recvx.ini): `import_outbreak2_iso` (the disc image), `import_dir` (default
 `<mods>/import`, `RECVX_MODS` respected). Environment: `RECVX_IMPORT=outbreak2` (headless, exits),
@@ -197,6 +218,22 @@ weights put the skirt on the legs); the feet sink up to ~0.5 units (5 cm) into t
 toe-off of the walk (the model has no toe bone; Claire's foot pitch is copied to its ankle); the
 co-op partner sees the played character.
 
+### Adjusting parts
+
+Not only bones: the converter writes every vertex, so parts can be adjusted while converting.
+`ImpFit` (impmodel.h) moves a source node and everything below it by an offset, and the vertices
+with it by their weights (a vertex half on the moved node moves half way: the seam to the body
+stays smooth). Other adjustments of the same kind (per-vertex offsets or scaling of a part, a
+re-weighting, a bone's length) fit at the same place; they are not needed so far.
+
+The shoulders: Outbreak's sit wider and higher than Code: Veronica's (Kevin's shoulder joints 1.76
+out at a head height of 15.5, Claire's 1.4 at 15.05; padded jackets and vests, short necks).
+`ob2.c ob2_fit` moves both arms (from the clavicles, nodes 12 / 16) in by a part of the difference
+to Claire's width-to-height proportion and down; the table `fits[]` holds the defaults (0.8 of the
+difference, 0.3 units = 3 cm down) and per model overrides (by file name prefix: Alyssa's padded
+jackets 0.9 / 0.35). Kevin's shoulder joints: 1.51 out (Chris 1.48 at his height), 0.68 below the
+neck (Chris 0.56).
+
 ### Posture
 
 The first version looked hunched: shoulders pulled up, the head bent forward and down, sleeves
@@ -222,19 +259,30 @@ quarter wider than Claire's/Chris's (shoulder joints 3.5 apart against 2.8), so 
 pulled only the left hand in across the hips. In the aim the left wrist was put on the right
 wrist, and Outbreak's hand has straight fingers (Code: Veronica's grip pieces from the weapon file
 curl around the gun), so the left fingers stuck out past the gun. Fix (imported models only): the
-offset is scaled by the ratio of the two shoulder spans, and in a grip (hands up to 2 apart, fading
-out at 4) the left wrist goes back along its forearm by half the model's hand length (measured at
-load from the hand's vertices), which puts the palm under the right hand. Idle and walking now hang
-both arms alike; the two-handed aim cups the right hand. The right hand and the gun are unchanged
-(the shot still comes from the game's own skeleton). Dual weapons hold the hands further apart and
-keep the scaled offset only.
+offset is scaled by the ratio of the two shoulder spans. Idle and walking now hang both arms alike.
+
+**The grip** (third report: the support hand no longer beneath the gun). Round 2 pulled the left
+wrist back along its forearm by half the hand; with the gun hand in front, the support hand ended
+up behind it, hidden by the gun hand. Compared frame by frame with Claire and Chris (side view,
+offline renders front / side / above): their grip pieces reach in from the left wrist and curl
+under the gun, Outbreak's open hand is straight. Now, in a grip (hands up to 2 apart, fading out at
+4): the left wrist goes as far below the gun hand's wrist as the source's (Claire's sideways offset
+is left out: the palm right under the gun), back along the gun (the right forearm) by a quarter of
+the hand (the hand's length and direction measured at load from its vertices), and the left hand
+is turned so its fingers point along the gun. The same for men (Chris's motions) and women
+(Claire's) and every arm length (offsets in the model's proportion). The right hand and the gun are
+unchanged (the shot still comes from the game's own skeleton). Dual weapons hold the hands further
+apart and keep the scaled offset only.
 
 ### Faces
 
 Outbreak's player models move their faces with five bones under the head (group 2): upper and
 lower lid per eye (23..26, a centimetre apart, the lid vertices weighted 25..100% to them) and
 the jaw (27, at the ear, the chin and lower lip weighted to it; the mouth has teeth and an
-inside). The eyes are a separate small mesh behind the lids. The converter keeps these five bones
+inside). The eyes: the face texture has the irises painted in, and a small eyeball mesh over them
+(12..18 vertices on the head only, textured with a white swatch; Outbreak scrolls its UVs to turn
+the eyes). Without that scrolling it covered the irises white ("blind"), so the extractor leaves
+it out (`ob2.c read_mesh`, for the `.glb` and the `.cvxm`; the manifest notes it). The converter keeps these five bones
 (roles found from the positions: the lowest is the jaw, per side the higher lid is the upper one)
 and lists them in the `.cvxm` header (version 2; version 1 files still load, without a face).
 
@@ -247,18 +295,37 @@ angle in degrees).
 `actor_glue.c imp_face`, before the skinning of every pose: the same blink (own random numbers:
 the game's `rand()` is left alone), the upper lids moved down along the head's up axis by 1.7 x
 the lid gap at the closed step (the partial weights need more than the gap), the lower lids up by
-0.3; and while the model stands in for a cutscene double, the jaw turned by the double's current
-`jawang` (the lip sync the game computes for the double anyway). In gameplay the player has no
-lip data (voice calls are short sounds), so the mouth stays closed there.
+0.3; and the jaw:
+
+* **Cutscenes**: while the model stands in for a cast double, the jaw turns by the double's
+  current `jawang` (the lip sync the game computes for the double anyway). Checked in the
+  opening's talking scene (Rodrigo and Claire, RM_0000): the angle arrives every tick, but the
+  cast's masks talk mostly with lip muscles and turn the jaw only 0..5 degrees (1.5 at rest), which
+  barely parted Outbreak's lips. What is above the resting 1.5 degrees is now turned 2.5 times as
+  far (peaks 10 degrees): the mouth opens and closes with the syllables.
+* **Gameplay**: Code: Veronica has no mouth motion for the player (the player part files have no
+  face mask; voice calls are sound effects without lip data). The jaw follows the player's voice
+  instead: `snd_synth.c` measures the mean level of SE port 4 (the player's vocal sounds, also from
+  an extra CORE bank) per mixed buffer, `snd_synth_voice_level`; the jaw opens with it at once
+  (a scream ~0.18 -> the 14 degree cap) and closes over a few ticks. Checked with a zombie bite.
+  Not covered: cutscene lines streamed as ADX while the player model itself acts (the speaker of
+  a stream is not known there).
+
+Do the Outbreak models support mouth movement? The playable and cutscene models have a jaw bone
+(teeth and the inside of the mouth are modelled) and the four lid bones; no lip shapes (no morph
+targets, no bones in the lips) and no mouth texture swaps were found. So the mouth can open and
+close; it cannot form vowels.
 
 ## F4 window
 
 `overlay.cpp import_window`, hotkey row "Import window" (F4, `B_IMPORT`; F4 was free). A section
 per source: the disc image (file selector, saved as `import_outbreak2_iso`), the output folder,
-checkboxes (characters, NPCs, enemies), "Extract characters" (a thread; progress bar with the
-model being read), then the manifest as a table (character, variant, file, meshes, vertices,
+checkboxes (playable characters, cutscene / high detail, NPCs, enemies), "Extract characters" (a
+thread; progress bar with the model being read), then the manifest per group (collapsible, with
+counts; the playable characters open) as a table (character, variant, file, meshes, vertices,
 triangles, textures, player model yes/no/failed, notes). After an extraction the new player
-models are added to "You appear as" at once.
+models are added to "You appear as" at once (up to 384 imports, `ACTOR_IMPORT_MAX`; an import is
+sent to the co-op partner as the played character, the lobby's model byte too).
 
 ## Notes for later
 
@@ -308,7 +375,27 @@ models are added to "You appear as" at once.
 * ctest 21/21 (`import` new, `appear` extended), Linux and Windows (mingw) builds,
   `layout_check.sh` main (339a4ca) vs this branch: frames identical (vanilla and enhanced).
 
+### Round 3
+
+* Eyes: P00_00, P05_00, P07_00 rendered offline before / after (`.cvxm` and `.glb`) and in the
+  lobby close-up: irises visible.
+* Mouth: the opening scene played headless (inputs above), Claire's double as Kevin: jaw log per
+  tick and close-ups (the mouth opens with the syllables); gameplay: a spawned zombie bites, the
+  voice jaw opens with the scream (third person close-up).
+* Shoulders: lobby front views of Claire, Chris and four imports before / after.
+* Grip: Claire, Chris and four imports aiming (third person side view) and offline renders of the
+  dumped aim pose (front, side, above).
+* All groups extracted (537 models, 0 failed, 355 player models); F4 with the four groups.
+* ctest 21/21 (`movies` skipped, as on main), Linux and Windows (mingw) builds, `layout_check.sh`
+  main (17a36c8) vs this branch: 156 vanilla and 311 enhanced frames identical.
+
 ## Unreleased (outbreak-import branch)
 
 - F4: import window. Resident Evil Outbreak File #2 (SLUS-20984) character models from your own
   disc image to glTF (with PNG textures) and as player models in "You appear as".
+- Every character model of the disc: playable characters, cutscene and high-detail versions,
+  NPCs, enemies; all on the human skeleton usable as player models (355), grouped in F4.
+- Imported faces: the eyes show their irises; the mouth moves with the cutscene lip sync and
+  with the player's voice.
+- Imported bodies: shoulders narrowed and lowered towards Code: Veronica's proportions; the
+  support hand sits under the gun in the two-handed aim.

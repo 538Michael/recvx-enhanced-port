@@ -725,13 +725,13 @@ static void SDLCALL import_picked(void* ud, const char* const* files, int filter
 
 static void import_window(void)
 {
-    static ImportItem items[IMPORT_SOURCES][512];
+    static ImportItem items[IMPORT_SOURCES][1024];
     static int n[IMPORT_SOURCES], loaded, was_running, what[IMPORT_SOURCES] = { IMPORT_PLAYERS };
     static char when[IMPORT_SOURCES][64];
     ImportProgress* pg = &g_import_progress;
     int running = __atomic_load_n(&pg->running, __ATOMIC_ACQUIRE);
     if (!loaded || (was_running && !running)) {   /* the manifests: at the first opening and after an extraction */
-        for (int s = 0; s < IMPORT_SOURCES; s++) n[s] = import_results(s, items[s], 512, when[s], sizeof(when[s]));
+        for (int s = 0; s < IMPORT_SOURCES; s++) n[s] = import_results(s, items[s], 1024, when[s], sizeof(when[s]));
         if (loaded) import_registry_load();   /* new player models for "You appear as" */
         loaded = 1;
     }
@@ -761,9 +761,10 @@ static void import_window(void)
         }
         import_source_dir(s, dir, sizeof(dir));
         ImGui::TextDisabled("Output: %s", dir);
-        ImGui::CheckboxFlags("Characters (player models)", &what[s], IMPORT_PLAYERS); ImGui::SameLine();
-        ImGui::CheckboxFlags("NPCs (glTF)", &what[s], IMPORT_NPCS); ImGui::SameLine();
-        ImGui::CheckboxFlags("Enemies (glTF)", &what[s], IMPORT_ENEMIES);
+        ImGui::CheckboxFlags("Playable characters", &what[s], IMPORT_PLAYERS); ImGui::SameLine();
+        ImGui::CheckboxFlags("Cutscene / high detail", &what[s], IMPORT_CUTSCENE); ImGui::SameLine();
+        ImGui::CheckboxFlags("NPCs", &what[s], IMPORT_NPCS); ImGui::SameLine();
+        ImGui::CheckboxFlags("Enemies", &what[s], IMPORT_ENEMIES);
         ImGui::BeginDisabled(!g_import.iso[s][0] || !what[s]);
         if (ImGui::Button("Extract characters")) import_start(s, what[s]);
         ImGui::EndDisabled();
@@ -779,32 +780,43 @@ static void import_window(void)
         if (!n[s]) ImGui::TextDisabled("Nothing extracted yet.");
         else {
             ImGui::Text("Extracted %s: %d models, %d usable as player models, %d failed", when[s], ok, players, failed);
-            if (ImGui::BeginTable("##items", 9, ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_BordersInnerV,
-                                  ImVec2(0, ImGui::GetTextLineHeightWithSpacing() * 15))) {
-                ImGui::TableSetupScrollFreeze(0, 1);
-                ImGui::TableSetupColumn("Character"); ImGui::TableSetupColumn("Variant"); ImGui::TableSetupColumn("File");
-                ImGui::TableSetupColumn("Meshes"); ImGui::TableSetupColumn("Vertices"); ImGui::TableSetupColumn("Triangles");
-                ImGui::TableSetupColumn("Textures"); ImGui::TableSetupColumn("Player model");
-                ImGui::TableSetupColumn("Notes", ImGuiTableColumnFlags_WidthStretch);
-                ImGui::TableHeadersRow();
-                for (int i = 0; i < n[s]; i++) {
-                    const ImportItem* x = &items[s][i];
-                    ImGui::TableNextRow();
-                    ImGui::TableNextColumn(); ImGui::TextUnformatted(x->name);
-                    ImGui::TableNextColumn(); ImGui::TextUnformatted(x->variant);
-                    ImGui::TableNextColumn(); ImGui::TextUnformatted(x->id);
-                    ImGui::TableNextColumn(); ImGui::Text("%d", x->meshes);
-                    ImGui::TableNextColumn(); ImGui::Text("%d", x->verts);
-                    ImGui::TableNextColumn(); ImGui::Text("%d", x->tris);
-                    ImGui::TableNextColumn(); ImGui::Text("%d", x->textures);
-                    ImGui::TableNextColumn();
-                    if (!x->ok) ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.3f, 1.0f), "failed");
-                    else if (x->player) ImGui::TextColored(ImVec4(0.5f, 1.0f, 0.5f, 1.0f), "yes");
-                    else ImGui::TextDisabled(x->female < 0 ? "glTF only" : "no");
-                    ImGui::TableNextColumn(); ImGui::TextUnformatted(x->note[0] ? x->note : x->ok ? "glTF + PNG" : "");
-                    if (x->note[0] && ImGui::IsItemHovered()) ImGui::SetTooltip("%s", x->note);
+            static const char* const gname[IMPORT_GROUPS] = { "Playable characters", "Cutscene and high-detail versions", "NPCs", "Enemies" };
+            for (int g = 0; g < IMPORT_GROUPS; g++) {
+                int gn = 0, gp = 0;
+                for (int i = 0; i < n[s]; i++) if (items[s][i].group == g) { gn++; gp += items[s][i].player != 0; }
+                if (!gn) continue;
+                char gl[96];
+                SDL_snprintf(gl, sizeof(gl), "%s: %d, %d player models###g%d", gname[g], gn, gp, g);
+                if (!ImGui::TreeNodeEx(gl, g == IMPORT_GROUP_PLAYERS ? ImGuiTreeNodeFlags_DefaultOpen : 0)) continue;
+                if (ImGui::BeginTable("##items", 9, ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_BordersInnerV,
+                                      ImVec2(0, ImGui::GetTextLineHeightWithSpacing() * 15))) {
+                    ImGui::TableSetupScrollFreeze(0, 1);
+                    ImGui::TableSetupColumn("Character"); ImGui::TableSetupColumn("Variant"); ImGui::TableSetupColumn("File");
+                    ImGui::TableSetupColumn("Meshes"); ImGui::TableSetupColumn("Vertices"); ImGui::TableSetupColumn("Triangles");
+                    ImGui::TableSetupColumn("Textures"); ImGui::TableSetupColumn("Player model");
+                    ImGui::TableSetupColumn("Notes", ImGuiTableColumnFlags_WidthStretch);
+                    ImGui::TableHeadersRow();
+                    for (int i = 0; i < n[s]; i++) {
+                        const ImportItem* x = &items[s][i];
+                        if (x->group != g) continue;
+                        ImGui::TableNextRow();
+                        ImGui::TableNextColumn(); ImGui::TextUnformatted(x->name);
+                        ImGui::TableNextColumn(); ImGui::TextUnformatted(x->variant);
+                        ImGui::TableNextColumn(); ImGui::TextUnformatted(x->id);
+                        ImGui::TableNextColumn(); ImGui::Text("%d", x->meshes);
+                        ImGui::TableNextColumn(); ImGui::Text("%d", x->verts);
+                        ImGui::TableNextColumn(); ImGui::Text("%d", x->tris);
+                        ImGui::TableNextColumn(); ImGui::Text("%d", x->textures);
+                        ImGui::TableNextColumn();
+                        if (!x->ok) ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.3f, 1.0f), "failed");
+                        else if (x->player) ImGui::TextColored(ImVec4(0.5f, 1.0f, 0.5f, 1.0f), "yes");
+                        else ImGui::TextDisabled(x->female < 0 ? "glTF only" : "no");
+                        ImGui::TableNextColumn(); ImGui::TextUnformatted(x->note[0] ? x->note : x->ok ? "glTF + PNG" : "");
+                        if (x->note[0] && ImGui::IsItemHovered()) ImGui::SetTooltip("%s", x->note);
+                    }
+                    ImGui::EndTable();
                 }
-                ImGui::EndTable();
+                ImGui::TreePop();
             }
         }
         ImGui::PopID();

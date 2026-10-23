@@ -75,7 +75,8 @@ int main(int argc, char** argv)
 
     char err[160] = "";
     snprintf(p, sizeof(p), "%s/test_import.cvxm", dir);
-    CHECK(imp_write_cvxm(&m, p, 0.1f, 0xF00000, err, sizeof(err)) || (printf("%s\n", err), 0));
+    ImpFit fit = { 1, { { 6, { 0.5f, -0.25f, 0 } } } };   /* the right arm in by 0.5 and down by 0.25 (game units) */
+    CHECK(imp_write_cvxm(&m, p, 0.1f, 0xF00000, &fit, err, sizeof(err)) || (printf("%s\n", err), 0));
     FILE* f = fopen(p, "rb");
     CHECK(f);
     static unsigned char d[1 << 20];
@@ -92,7 +93,7 @@ int main(int argc, char** argv)
     {   /* skin: the finger's weight went to its hand, the largest first, normalised */
         const CvxmSkin* s = (const CvxmSkin*)(d + rd(d + 16));
         CHECK(s[0].w[0] > 0.74f && s[0].w[0] < 0.76f && s[0].w[1] > 0.24f && s[0].w[2] == 0 && s[0].node[0] != s[0].node[1]);
-        CHECK(s[0].pos[0] < -2.99f && s[0].pos[0] > -3.01f && s[0].pos[1] > 13.99f && s[0].pos[1] < 14.01f);   /* turned (x negated) and scaled */
+        CHECK(s[0].pos[0] < -2.49f && s[0].pos[0] > -2.51f && s[0].pos[1] > 13.74f && s[0].pos[1] < 13.76f);   /* turned (x negated), scaled, moved with its arm */
     }
     snprintf(p, sizeof(p), "%s/test_import.glb", dir);
     CHECK(imp_write_glb(&m, p, "test", 0.01f, err, sizeof(err)) || (printf("%s\n", err), 0));

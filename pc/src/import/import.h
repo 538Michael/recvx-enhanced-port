@@ -8,8 +8,10 @@ extern "C" {
 
 enum { IMPORT_OUTBREAK2, IMPORT_SOURCES };
 
-/* what to extract (F4 checkboxes) */
-enum { IMPORT_PLAYERS = 1, IMPORT_NPCS = 2, IMPORT_ENEMIES = 4 };
+/* the groups of models (F4 lists them by group), and what to extract: bits 1 << group (F4 checkboxes,
+   RECVX_IMPORT_WHAT) */
+enum { IMPORT_GROUP_PLAYERS, IMPORT_GROUP_CUTSCENE, IMPORT_GROUP_NPCS, IMPORT_GROUP_ENEMIES, IMPORT_GROUPS };
+enum { IMPORT_PLAYERS = 1, IMPORT_CUTSCENE = 2, IMPORT_NPCS = 4, IMPORT_ENEMIES = 8, IMPORT_ALL = 15 };
 
 typedef struct ImportSettings {
     char dir[1024];                     /* ini import_dir; empty: <mods>/import (RECVX_MODS, default ./mods) */
@@ -26,6 +28,7 @@ typedef struct ImportItem {
     int nodes, meshes, verts, tris, textures;
     int player;           /* 1: converted for "You appear as" (<id>.cvxm), 2: male, female in `female` */
     int female;
+    int group;            /* IMPORT_GROUP_* (from the id) */
     char note[160];       /* failure reason, or what was left out */
 } ImportItem;
 
@@ -59,6 +62,7 @@ int import_run(int src, int what);
 void import_registry_load(void);
 
 /* source-specific extractors (ob2.c) */
+int ob2_group(const char* id);   /* IMPORT_GROUP_* of a disc file name, -1: not a character model */
 int ob2_extract(const char* iso, const char* outdir, int what, ImportItem* items, int max, int* n);
 
 #ifdef __cplusplus

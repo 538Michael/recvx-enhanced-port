@@ -17,7 +17,7 @@ const ImportSource import_sources[IMPORT_SOURCES] = {
     { "outbreak2", "Resident Evil Outbreak File #2", "SLUS-20984" },
 };
 
-#define ITEMS_MAX 512
+#define ITEMS_MAX 1024
 
 /* ini import_dir, else <mods>/import (RECVX_MODS, default ./mods) */
 static void source_dir(int src, char* out, int n)
@@ -74,6 +74,7 @@ int import_results(int src, ImportItem* out, int max, char* when, int wn)
         x->ok = atoi(fld[3]); x->nodes = atoi(fld[4]); x->meshes = atoi(fld[5]); x->verts = atoi(fld[6]);
         x->tris = atoi(fld[7]); x->textures = atoi(fld[8]); x->player = atoi(fld[9]); x->female = atoi(fld[10]);
         snprintf(x->note, sizeof(x->note), "%s", fld[11] ? fld[11] : "");
+        x->group = ob2_group(x->id);   /* (one source so far) */
     }
     fclose(f);
     return n;

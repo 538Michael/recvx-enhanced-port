@@ -240,6 +240,13 @@ static int read_mesh(Rd* r, const Mesh* me, const Amo* a, int mi, const int* mes
         p += sz;
     }
     if (!vert || !nv || !prims || nv > 65535 || r->bad) return 0;
+    if (wgt && jnt && nj == 1 && nv < 40) {   /* the eyeball overlay: a few quads on the head alone (the node
+        with the face bones below it), textured with a bare white eyeball; drawn, it hides the irises the face
+        texture has painted (the eyes looked blind; when Outbreak shows it is not known). Left out. */
+        int head = (int)u32(r, jnt);
+        for (int i = 0; i < m->nn; i++)
+            if (m->node[i].parent == head && m->node[i].keep == 2) { m->eyes_left_out++; return 1; }
+    }
     int base = m->nv, rigid = -1;
     if (!wgt || !jnt)
         for (int i = 0; i < m->nn; i++) if (meshnode[i] == mi) rigid = i;
@@ -360,6 +367,19 @@ static int read_nbd(const unsigned char* d, uint32_t n, ImpModel* m, char* err, 
 }
 
 /* ---------------------------------------------------------------- the extraction */
+/* IMPORT_GROUP_* of a disc file name, -1: not a character model */
+int ob2_group(const char* n)
+{
+    int d1 = n[1] >= '0' && n[1] <= '9', d2 = n[2] >= '0' && n[2] <= '9';
+    if (n[0] == 'P' && d1) return IMPORT_GROUP_PLAYERS;
+    if ((n[0] == 'E' || n[0] == 'H') && n[1] == 'P' && d2) return IMPORT_GROUP_CUTSCENE;
+    if (n[0] == 'N' && d1) return IMPORT_GROUP_NPCS;
+    if (n[0] == 'H' && n[1] == 'N' && (d2 || n[2] == '_')) return IMPORT_GROUP_NPCS;
+    if (n[0] == 'E' && d1) return IMPORT_GROUP_ENEMIES;
+    if (n[0] == 'H' && n[1] == 'E' && d2) return IMPORT_GROUP_ENEMIES;
+    return -1;
+}
+
 static const char* const cast[8] = { "Kevin Ryman", "Mark Wilkins", "Jim Chapman", "George Hamilton",
                                      "David King", "Alyssa Ashcroft", "Yoko Suzuki", "Cindy Lennox" };
 
@@ -399,6 +419,43 @@ static void keep_body(ImpModel* m)
     for (int i = 0; i < m->nn; i++) if (m->node[i].face) m->node[i].keep = 1;
 }
 
+/* The fit to Code: Veronica's proportions (impmodel.h ImpFit). Outbreak's shoulders are wide and its
+   jackets padded: the shoulder joints sit 1.76 units out at a head height of 15.5 (Kevin), Claire's 1.4
+   at 15.05. On the human skeleton the arms (from the clavicle, nodes 12 and 16) are moved in by a part of
+   the difference to Claire's proportion and lowered a little; the shoulders' vertices follow by their
+   weights. Per model (prefix of the file name) the defaults can be changed here. */
+static const struct { const char* id; float in, down; } fits[] = {
+    { "", 0.8f, 0.30f },        /* everyone: most of the way to Claire's shoulder width, 3 cm lower */
+    { "P05", 0.9f, 0.35f },     /* Alyssa: padded jackets */
+    { "EP05", 0.9f, 0.35f },
+};
+
+/* Outbreak's human skeleton (players, NPCs, some enemies): clavicles 12 / 16 on the chest 11, the
+   shoulders 13 / 17 below them, the head 21 on the neck 20 */
+static int human_skeleton(const ImpModel* m)
+{
+    return m->nn >= 36 && m->node[12].parent == 11 && m->node[16].parent == 11 && m->node[13].parent == 12 &&
+           m->node[17].parent == 16 && m->node[21].parent == 20;
+}
+
+static void ob2_fit(const char* id, const ImpModel* m, ImpFit* fit)
+{
+    float in = 0, down = 0, (*W)[16];
+    size_t best = 0;
+    memset(fit, 0, sizeof(*fit));
+    for (size_t i = 0; i < sizeof(fits) / sizeof(fits[0]); i++)
+        if (!strncmp(id, fits[i].id, strlen(fits[i].id)) && strlen(fits[i].id) >= best) { best = strlen(fits[i].id); in = fits[i].in; down = fits[i].down; }
+    if (!human_skeleton(m) || !(W = calloc(m->nn, sizeof(*W)))) return;
+    imp_world(m, W);
+    float half = (fabsf(W[13][12]) + fabsf(W[17][12])) * 0.5f * 0.1f, head = W[21][13] * 0.1f, target = head * 1.4f / 15.05f;
+    float dx = half > target ? in * (half - target) : 0, s12 = W[13][12] > 0 ? 1.0f : -1.0f;
+    free(W);
+    /* (game space: x turned, so a shoulder at Outbreak's +x moves in towards +x in the game) */
+    fit->move[0].node = 12; fit->move[0].d[0] = s12 * dx; fit->move[0].d[1] = -down;
+    fit->move[1].node = 16; fit->move[1].d[0] = -s12 * dx; fit->move[1].d[1] = -down;
+    fit->n = 2;
+}
+
 int ob2_extract(const char* isopath, const char* outdir, int what, ImportItem* items, int max, int* count)
 {
     FILE* f = pc_fopen(isopath, "rb");
@@ -420,16 +477,16 @@ int ob2_extract(const char* isopath, const char* outdir, int what, ImportItem* i
     free(top);
     if (!rom) { snprintf(pg->phase, sizeof(pg->phase), "NETBIO00.DAT / romdata_usa.afs not found"); fclose(f); return -1; }
 
-    /* what to extract: the players (P<chr>_<costume>.nbd), NPCs (N*.NBD), enemies (E*.NBD) */
+    /* what to extract (all character models are in romdata_usa.afs; the scenario archives hold rooms,
+       objects and effects only): the players (P<chr>_<costume>.nbd), their cutscene (EP) and high-detail
+       (HP) versions, NPCs (N*, high-detail HN*), enemies (E*, high-detail HE*) */
     int* list = malloc(sizeof(int) * nrom), nl = 0;
     for (int i = 0; list && i < nrom; i++) {
         const char* n = rom[i].name;
         const char* dot = strrchr(n, '.');
         if (!dot || SDL_strcasecmp(dot, ".nbd")) continue;
-        int pl = (n[0] == 'P' && n[1] >= '0' && n[1] <= '9' && n[3] == '_');
-        int npc = n[0] == 'N' && n[1] >= '0' && n[1] <= '9';
-        int en = n[0] == 'E' && n[1] >= '0' && n[1] <= '9';
-        if ((pl && (what & IMPORT_PLAYERS)) || (npc && (what & IMPORT_NPCS)) || (en && (what & IMPORT_ENEMIES))) list[nl++] = i;
+        int g = ob2_group(n);
+        if (g >= 0 && (what & (1 << g))) list[nl++] = i;
     }
     pg->total = nl;
     for (int li = 0; li < nl && *count < max; li++) {
@@ -442,14 +499,21 @@ int ob2_extract(const char* isopath, const char* outdir, int what, ImportItem* i
         snprintf(id, sizeof(id), "%.*s", idl < 15 ? idl : 15, e->name);
         for (char* c = id; *c; c++) *c = (char)SDL_toupper((unsigned char)*c);
         snprintf(it->id, sizeof(it->id), "%s", id);
-        if (id[0] == 'P') {
-            int c = atoi(id + 1), v = atoi(id + 4);   /* P<chr 2 digits>_<costume> */
-            snprintf(it->name, sizeof(it->name), "%s", c >= 0 && c < 8 ? cast[c] : "?");
-            snprintf(it->variant, sizeof(it->variant), "Costume %d", v + 1);
-            it->female = c >= 5;
-        } else {
-            snprintf(it->name, sizeof(it->name), "%s %s", id[0] == 'N' ? "NPC" : "Enemy", id);
-            it->female = -1;
+        it->group = ob2_group(e->name);
+        {   /* names: the cast for P, EP (event) and HP (high detail); the others by their file */
+            const char* q = id[0] == 'P' ? id + 1 : (id[0] == 'E' || id[0] == 'H') && id[1] == 'P' ? id + 2 : NULL;
+            int c = q ? atoi(q) : -1, v = q && strchr(q, '_') ? atoi(strchr(q, '_') + 1) : -1;
+            if (c >= 0 && c < 8) {
+                snprintf(it->name, sizeof(it->name), "%s", cast[c]);
+                if (id[0] == 'P') snprintf(it->variant, sizeof(it->variant), "Costume %d", v + 1);
+                else if (id[0] == 'E') snprintf(it->variant, sizeof(it->variant), "Cutscene, costume %d", v + 1);
+                else snprintf(it->variant, sizeof(it->variant), "High detail");
+                it->female = c >= 5;
+            } else {
+                snprintf(it->name, sizeof(it->name), "%s %s", it->group == IMPORT_GROUP_ENEMIES ? "Enemy" : "NPC", id);
+                snprintf(it->variant, sizeof(it->variant), "%s", id[0] == 'H' ? "High detail" : "");
+                it->female = it->group == IMPORT_GROUP_ENEMIES ? -1 : 0;   /* (NPCs: not known; a man's motions) */
+            }
         }
         snprintf(pg->phase, sizeof(pg->phase), "%s %s (%s)", it->name, it->variant, e->name);
         unsigned char* data = e->size > 0 && e->size < (64u << 20) ? malloc(e->size) : NULL;
@@ -465,13 +529,18 @@ int ob2_extract(const char* isopath, const char* outdir, int what, ImportItem* i
                 snprintf(path, sizeof(path), "%s/%s_tex%d.png", dir, id, k);
                 if (!imp_write_png(&m, k, path) && !err[0]) snprintf(err, sizeof(err), "texture %d: unsupported picture", k);
             }
-            if (it->ok && it->female >= 0) {   /* the playable characters: "You appear as" */
-                keep_body(&m);
-                snprintf(path, sizeof(path), "%s/%s.cvxm", dir, id);
+            if (it->ok && it->female < 0 && human_skeleton(&m)) it->female = 0;   /* an enemy on the human skeleton (as a man) */
+            else if (it->ok && it->female < 0) snprintf(err, sizeof(err), "glTF only: not the human skeleton (%d nodes)", m.nn);
+            if (it->ok && it->female >= 0) {   /* people: "You appear as" when the skeleton is the human one */
                 char e2[160] = "";
-                if (imp_write_cvxm(&m, path, 0.1f, 0x00F00000u + 16u * (unsigned)list[li], e2, sizeof(e2))) it->player = 1;
+                ImpFit fit;
+                keep_body(&m);
+                ob2_fit(id, &m, &fit);
+                snprintf(path, sizeof(path), "%s/%s.cvxm", dir, id);
+                if (imp_write_cvxm(&m, path, 0.1f, 0x00F00000u + 16u * (unsigned)list[li], &fit, e2, sizeof(e2))) it->player = 1;
                 else snprintf(err, sizeof(err), "no player model: %s", e2);
             }
+            if (m.eyes_left_out && !err[0]) snprintf(err, sizeof(err), "eyeball overlay left out (it hid the painted irises)");
             imp_free(&m);
         }
         free(data);

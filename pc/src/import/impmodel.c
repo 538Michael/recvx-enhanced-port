@@ -394,7 +394,7 @@ static int cv_tex(Buf* b, const unsigned char* t, int len, unsigned gindex, int*
     return !b->bad;
 }
 
-int imp_write_cvxm(const ImpModel* m, const char* path, float scale, unsigned gindex, char* err, int en)
+int imp_write_cvxm(const ImpModel* m, const char* path, float scale, unsigned gindex, const ImpFit* fit, char* err, int en)
 {
     int map[IMP_NODES], kept[CV_MAX], par[CV_MAX], nk = 0, order[CV_MAX], no = 0, ok = 0;
     float (*W)[16] = calloc(m->nn ? m->nn : 1, sizeof(*W)), rest[CV_MAX][3];
@@ -436,6 +436,19 @@ int imp_write_cvxm(const ImpModel* m, const char* path, float scale, unsigned gi
         const float* w = W[kept[order[i]]];
         rest[i][0] = -w[12] * scale; rest[i][1] = w[13] * scale; rest[i][2] = -w[14] * scale;
     }
+    float shift[CV_MAX][3];   /* the fit: per kept node its own move plus its ancestors' */
+    memset(shift, 0, sizeof(shift));
+    for (int f = 0; fit && f < fit->n && f < IMP_MOVES; f++) {
+        int a = fit->move[f].node;
+        if (a < 0 || a >= m->nn) continue;
+        int top = slot[map[a]];
+        for (int i = 0; i < no; i++) {   /* (i is below top when top is on its parent chain) */
+            int q = i;
+            while (q >= 0 && q != top) q = par[order[q]] >= 0 ? slot[par[order[q]]] : -1;
+            if (q == top) for (int c = 0; c < 3; c++) shift[i][c] += fit->move[f].d[c];
+        }
+    }
+    for (int i = 0; i < no; i++) for (int c = 0; c < 3; c++) rest[i][c] += shift[i][c];
 
     /* skin: per vertex up to 4 (node, weight) of the kept skeleton */
     if (!(sk = calloc(m->nv, sizeof(*sk)))) { free(W); return fail(err, en, "out of memory"); }
@@ -452,6 +465,7 @@ int imp_write_cvxm(const ImpModel* m, const char* path, float scale, unsigned gi
         if (s <= 0) { sk[v].node[0] = 1; sk[v].w[0] = s = 1; }   /* (unweighted: the pelvis) */
         for (int k = 0; k < 4; k++) sk[v].w[k] /= s;
         sk[v].pos[0] = -m->pos[v][0] * scale; sk[v].pos[1] = m->pos[v][1] * scale; sk[v].pos[2] = -m->pos[v][2] * scale;
+        for (int k = 0; k < 4; k++) for (int c = 0; c < 3; c++) sk[v].pos[c] += sk[v].w[k] * shift[sk[v].node[k]][c];
         sk[v].nrm[0] = -m->nrm[v][0]; sk[v].nrm[1] = m->nrm[v][1]; sk[v].nrm[2] = -m->nrm[v][2];
     }
 

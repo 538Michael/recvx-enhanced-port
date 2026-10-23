@@ -28,7 +28,7 @@ extern const ActorModel actor_models[];
 /* Player models imported from other games' discs (F4, pc/src/import; docs/IMPORT_OUTBREAK.md):
    actor index ACTOR_MODELS + k, "You appear as" chr COOP_CHR_MAX + 1 + k. Filled by
    import_registry_load (main thread, before the game uses them; the count is published last). */
-#define ACTOR_IMPORT_MAX 64
+#define ACTOR_IMPORT_MAX 384   /* (all of Outbreak File #2's people fit) */
 extern ActorModel actor_imports[ACTOR_IMPORT_MAX];
 extern char actor_import_name[ACTOR_IMPORT_MAX][96];
 extern char actor_import_file[ACTOR_IMPORT_MAX][1200];   /* its .cvxm */
