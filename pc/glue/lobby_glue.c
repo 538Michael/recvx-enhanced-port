@@ -356,7 +356,7 @@ static void pv_set(int k, int chr, int played)
     if (actor_set(k, chr >= COOP_CHR_ACTOR ? chr - COOP_CHR_ACTOR : -1)) p->obj[2].flg = 0;   /* no hair on another model */
     else player_hair(p->obj, &p->w, file & 3, pvb[k].hair0, pvb[k].hair3);   /* Claire's hair simulates in work of its own */
     pv_hands(p, k, appear_voice(chr) >= 0 ? appear_voice(chr) : file & 3);
-    host_log("lobby: preview %d shows %s\n", k, chr >= COOP_CHR_ACTOR ? actor_models[chr - COOP_CHR_ACTOR].name : "a player model");
+    host_log("lobby: preview %d shows %s\n", k, chr >= COOP_CHR_ACTOR ? appear_name(chr) : "a player model");
 }
 
 static void pv_pose(int k, float x, int ay)

@@ -565,8 +565,7 @@ int imp_write_cvxm(const ImpModel* m, const char* path, float scale, unsigned gi
         if (!texok[k] || !cv_tex(&f, m->tim2[k], m->tim2_len[k], gindex + k, &a)) {
             free(W); free(sk); free(mlb.p); free(f.p);
             return fail(err, en, "texture %d is not a 4/8-bit picture with a 32-bit palette", k);
-        }
-        align(&f, 64, 0);
+        }   /* (chunks follow each other without padding: the loader steps by 32 + size) */
     }
     put32(&f, 0xFFFFFFFF); put32(&f, 0); put(&f, NULL, 24);
     align(&f, 16, 0);

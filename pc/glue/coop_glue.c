@@ -622,7 +622,7 @@ void coop_control_remote(void)
     for (i = 0; tx.mset == MSET_NONE && i < (int)sys->ewk_n && i < 128; i++)
         if ((ene[i].flg & 0x1) && ene[i].mnwP == plp->mnwP) tx.mset = i;   /* grabbed: the player plays the enemy's set */
     tx.mfile = sys->ply_id + (sys->costume & 3) * 4;
-    tx.chr = !g_coop.chr ? sys->ply_id : g_coop.chr == 5 ? 0 : g_coop.chr >= COOP_CHR_ACTOR ? 4 + g_coop.chr - COOP_CHR_ACTOR : g_coop.chr - 1;
+    tx.chr = !g_coop.chr || g_coop.chr >= COOP_CHR_IMPORT ? sys->ply_id : g_coop.chr == 5 ? 0 : g_coop.chr >= COOP_CHR_ACTOR ? 4 + g_coop.chr - COOP_CHR_ACTOR : g_coop.chr - 1;   /* (an imported model, which the partner may not have: shown as played) */
     tx.costume = !g_coop.chr ? sys->costume & 3 : g_coop.chr == 5;
     tx.stg = sys->stg_no; tx.rom = sys->rom_no; tx.pos = sys->pos_no;
     tx.rcase = (unsigned)my_case() <= 9 ? (uint8_t)(my_case() + 1) : 0;   /* (sys->rcase alone: a door's script picks the next room's before it leaves) */

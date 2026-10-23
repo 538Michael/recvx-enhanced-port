@@ -39,12 +39,14 @@ void njRotateXYZ(NJS_MATRIX* m, Angle angx, Angle angy, Angle angz);
 #include "../../decomp/include/ps2/veronica/prog/pwksub.h"
 #include "../../decomp/include/ps2/veronica/prog/objitm.h"
 #include "../src/host/actors.h"
+#include "../src/import/impmodel.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 void host_log(const char* fmt, ...);
+FILE* pc_fopen(const char* utf8_path, const char* mode);   /* host/fileio.h */
 void bhArmIkMdk(BH_PWORK* ewP, int bas_no, NJS_POINT3* effP, int rot);   /* playpch.c */
 Sint32 ADXF_ReadNw32(ADXF adxf, Sint32 nsct, void* buf);   /* PC: synchronous */
 extern NJS_TEXMEMLIST* Ps2_tex_info;
@@ -78,6 +80,9 @@ typedef struct Disguise {
     NJS_TEXLIST* tex[16];               /* texlists we uploaded */
     int tex_n;
     Rig rig;                            /* rig.ok: posed from the source's skeleton */
+    const CvxmSkin* skin;               /* an imported model (.cvxm): its vertices skinned every pose (imp_skin) */
+    float* vtx;                         /* its vertex chunk's data (position, normal per vertex) */
+    int nv;
     struct {   /* the player characters' cutscene models: the head part the scripts link to them (Claire's
                   ponytail, Wesker's sunglasses), from the character's part file (load_head) */
         O_WORK ow[16] __attribute__((aligned(16)));
@@ -565,6 +570,8 @@ static void unload(Disguise* d)
     d->model = -1;
     memset(&d->w, 0, sizeof(d->w));
     d->rig.ok = 0;
+    d->skin = NULL;
+    d->vtx = NULL;
 }
 
 static int free_entries(void)
@@ -932,12 +939,82 @@ static void head_draw(Disguise* d)
     if (d->hp.on && d->mapped && (op->flg & 0x1) && !(op->mdflg & 0x1)) bhPutModel((BH_PWORK*)op);
 }
 
+/* An imported player model (pc/src/import, .cvxm: impmodel.h): its chunk list and textures as the
+   game's, one mesh on the pelvis whose vertices imp_skin moves with the skeleton. */
+static int load_import_model(Disguise* d, int k)
+{
+    const char* path = actor_import_file[k];
+    unsigned char *p, own[16] = { 0 };
+    FILE* f = pc_fopen(path, "rb");
+    int size = 0, texn;
+    unsigned int nv, toff, soff;
+    if (f && !fseek(f, 0, SEEK_END)) size = (int)ftell(f);
+    if (!f || size < 64 || size > KEEP_SIZE || fseek(f, 0, SEEK_SET)) {
+        if (f) fclose(f);
+        host_log("actor: %s cannot be read (%d bytes)\n", path, size);
+        return 0;
+    }
+    unload(d);   /* (the buffer is the shown model's until here) */
+    if (fread(d->keep, 1, size, f) != (size_t)size) size = 0;
+    fclose(f);
+    if (!size) { host_log("actor: %s cannot be read\n", path); return 0; }
+    nv = rd32(d->keep + 20); toff = rd32(d->keep + 12); soff = rd32(d->keep + 16);
+    if (rd32(d->keep) != CVXM_MAGIC || rd32(d->keep + 4) != CVXM_VERSION || rd32(d->keep + 8) != 60 || toff >= (unsigned)size ||
+        (uint64_t)soff + (uint64_t)nv * sizeof(CvxmSkin) > (uint64_t)size || !list_len(d->keep + 60, d->keep + toff)) {
+        host_log("actor: %s is not a model of this version\n", path);
+        return 0;
+    }
+    texn = realize(d, d->keep + 60, own);
+    if (d->w.mdl_n != 1 || d->w.mdl[0].obj_num < 2 || !d->w.mdl[0].objP[1].model || !tex_room(actor_import_name[k], texn)) return 0;
+    p = (unsigned char*)d->w.mdl[0].objP[1].model->vlist;
+    if (!p || p[0] != 51 || rd32(p + 4) >> 16 != nv) { host_log("actor: %s: no vertex chunk of %u vertices\n", path, nv); return 0; }
+    if (own[0]) {
+        bhSetMemPvpTexture(d->w.mdl[0].texP, d->keep + toff, 0);
+        d->w.mdl[0].flg |= 0x200;
+        d->tex[d->tex_n++] = d->w.mdl[0].texP;
+    }
+    d->skin = (const CvxmSkin*)(d->keep + soff);
+    d->vtx = (float*)(p + 64);
+    d->nv = (int)nv;
+    return 1;
+}
+
+/* An imported model's vertices for this pose: linear blend skinning from the node matrices (each
+   bind orientation is the identity, so a node's bind matrix is a translation to its rest position),
+   into the frame of the pelvis (node 1), which draws them. */
+static void imp_skin(Disguise* d)
+{
+    const O_WORK* ow = d->w.mlwP->owP;
+    const float* m1 = ow[1].mtx;
+    int n = d->rig.n, i, j, c;
+    if (!d->skin || !d->rig.ok) return;
+    for (i = 0; i < d->nv; i++) {
+        const CvxmSkin* s = &d->skin[i];
+        float p[3] = { 0 }, q[3] = { 0 }, l[3], *o = d->vtx + 8 * i;
+        for (j = 0; j < 4 && s->w[j] > 0; j++) {
+            int k = s->node[j] < n ? s->node[j] : 1;
+            const float* m = ow[k].mtx;
+            float r[3];
+            for (c = 0; c < 3; c++) r[c] = s->pos[c] - d->rig.rest[k][c];
+            for (c = 0; c < 3; c++) {   /* (row vectors: p * M) */
+                p[c] += s->w[j] * (r[0] * m[c] + r[1] * m[4 + c] + r[2] * m[8 + c] + m[12 + c]);
+                q[c] += s->w[j] * (s->nrm[0] * m[c] + s->nrm[1] * m[4 + c] + s->nrm[2] * m[8 + c]);
+            }
+        }
+        for (c = 0; c < 3; c++) l[c] = p[c] - m1[12 + c];
+        for (c = 0; c < 3; c++) {   /* times the pelvis's rotation transposed (orthonormal: its inverse) */
+            o[c] = l[0] * m1[c * 4] + l[1] * m1[c * 4 + 1] + l[2] * m1[c * 4 + 2];
+            o[4 + c] = q[0] * m1[c * 4] + q[1] * m1[c * 4 + 1] + q[2] * m1[c * 4 + 2];
+        }
+    }
+}
+
 static int load(Disguise* d, int idx)
 {
     int heap = heap_free(), anim;
-    const char* name = idx >= ACTOR_PART ? "part file" : actor_models[idx].name;
+    const char* name = idx >= ACTOR_PART ? "part file" : actor_model(idx)->name;
     memset(d->mth, 0, sizeof(d->mth));
-    if (!(idx >= ACTOR_PART ? load_part_model(d, idx - ACTOR_PART + 10) : load_room_model(d, idx))) {
+    if (!(idx >= ACTOR_PART ? load_part_model(d, idx - ACTOR_PART + 10) : idx >= ACTOR_MODELS ? load_import_model(d, idx - ACTOR_MODELS) : load_room_model(d, idx))) {
         unload(d);
         return 0;
     }
@@ -948,7 +1025,7 @@ static int load(Disguise* d, int idx)
     d->w.sx = d->w.sy = d->w.sz = d->w.sxb = d->w.syb = d->w.szb = 1.0f;
     d->w.mnwP = d->w.mnwPb = d->mth;
     d->w.mtn_add = 65536;
-    anim = idx >= ACTOR_PART || actor_models[idx].anim;
+    anim = idx >= ACTOR_PART || actor_model(idx)->anim;
     if (anim) rig_build(&d->rig, d->w.mdl[0].objP, d->w.mdl[0].obj_num, 1);
     host_log("actor: %s loaded (%d sub-models, %d nodes, %d KB texture heap), %s; map", name, d->w.mdl_n,
              d->w.mdl[0].obj_num, (heap - heap_free()) >> 10, d->rig.ok ? "player animations" : "own idle motion");
@@ -1155,7 +1232,7 @@ static BH_PWORK* shadow(int who, BH_PWORK* src)
     s->body = 0;
     if (s->src != src || s->motion < 0 || s->motion > 3) return NULL;   /* no actor_source this tick (a lobby preview) */
     s->src = NULL;
-    if (d->model >= 0) anim = !d->rig.ok ? ANIM_IDLE : d->model >= ACTOR_PART ? appear_part_anim(d->model - ACTOR_PART) : actor_models[d->model].anim;
+    if (d->model >= 0) anim = !d->rig.ok ? ANIM_IDLE : d->model >= ACTOR_PART ? appear_part_anim(d->model - ACTOR_PART) : actor_model(d->model)->anim;
     else anim = s->mesh >= 0 && s->mesh <= 3 ? appear_part_anim(s->mesh) : ANIM_IDLE;
     chr = appear_motion_chr(anim, s->motion);
     if (chr < 0 || chr == s->fail) return NULL;
@@ -1304,7 +1381,7 @@ int actor_set(int who, int idx)
     actor_on = 0;
     for (who = 0; who < ACTOR_SLOTS; who++) actor_on |= dg[who].model >= 0;
     actor_on |= sh[0].body | sh[1].body;
-    if (idx < 0 || (idx >= ACTOR_MODELS && idx < ACTOR_PART) || idx > ACTOR_PART + 9) return 0;
+    if (idx < 0 || (idx >= ACTOR_MODELS && idx < ACTOR_PART && !actor_model(idx)) || idx > ACTOR_PART + 9) return 0;
     if (!load(d, idx)) {
         d->fail = idx;
         host_log("actor: model %d cannot be shown\n", idx);
@@ -1386,6 +1463,7 @@ void actor_pose(int who, BH_PWORK* src)
                     if (d->rig.map[k] >= 0 && sr.map[k] >= 0) memcpy(&src->mlwP->owP[(int)sr.map[k]].mtx[12], &m->owP[(int)d->rig.map[k]].mtx[12], 12);
             }
             head_pose(d, who == ACTOR_DOUBLE ? dbl_tick == 1 : !redraw);   /* (one head part, one swing per tick) */
+            imp_skin(d);
             return;
         }
     }
