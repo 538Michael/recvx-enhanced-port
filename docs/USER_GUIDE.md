@@ -194,7 +194,8 @@ menus, the typewriter's save screen and LOAD GAME (with either save system: poin
 selects it, a click picks it, the wheel or a click on the arrows scrolls, YES / NO and the memory
 cards too) and the game's questions such as "Use an ink ribbon?"; right click goes back; drag to
 rotate and wheel to zoom when examining an item), **Fixed
-camera controls** (`fixed_cam_controls`: Classic (tank) 0, **Modern (camera-relative)** 1; see
+camera controls** (`fixed_cam_controls`: Classic (tank) 0, Modern (camera-relative) 1,
+**Combined** (the stick modern, the d-pad tank) 2; see
 [Modern controls](#modern-controls-fixed-cameras)), then the bindings ([Rebinding](#rebinding)).
 
 ### Third person
@@ -425,9 +426,10 @@ reload and the ammo stays in your inventory.
 ### Modern controls (fixed cameras)
 
 F1 -> Controls or ENHANCED SETTINGS -> CONTROLS: **Fixed camera controls** = Modern
-(camera-relative), ini `fixed_cam_controls = 1`, the default on a first start (an existing
-`recvx.ini` keeps its choice); Classic (tank controls) is `fixed_cam_controls = 0`. Like the
-alternate controls of the Resident Evil HD remasters:
+(camera-relative), ini `fixed_cam_controls = 1`; Classic (tank controls) is
+`fixed_cam_controls = 0`; **Combined** (`fixed_cam_controls = 2`, the default) plays the left
+stick as Modern and the gamepad's d-pad as Classic, as in the Resident Evil HD remaster. Like the
+alternate controls of the HD remasters, Modern is:
 
 - The **left stick** or the **d-pad** (arrow keys on the keyboard) points where the character
   walks on screen; it turns there quickly (180 degrees in about 0.3 s) and walks. Pushed far
@@ -448,6 +450,17 @@ alternate controls of the Resident Evil HD remasters:
   the direction only counts as "forward" when it points roughly where the character faces.
 - Third person keeps its own controls; this option only applies to the fixed cameras. In co-op
   it changes only your own player.
+
+**Combined**: the left stick walks as Modern above (cuts, stairs and the quick-turn row
+included); the d-pad drives as Classic: up forward, down back, left / right turn, back + run
+quick-turns. Both work at any time; while the stick is pushed past its dead zone it wins and the
+d-pad waits until it is let go. Aiming is the game's own with either (up / down aim up / down).
+The arrow keys on the keyboard stay modern, as before; choose Classic for tank controls on the
+keyboard too.
+
+A `recvx.ini` from before Combined has `fixed_cam_controls = 1` both for the old default and for
+Modern chosen by hand, so it becomes Combined (the stick plays the same); choose Modern again to
+have the d-pad camera-relative. Classic (`0`) stays.
 
 Hotkeys:
 

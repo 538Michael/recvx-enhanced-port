@@ -7,6 +7,11 @@
 - **More enemies per room**: a room now holds about twice as many enemies as before, so the enemy
   spawner, extra enemies and the randomizer can fill rooms with much bigger crowds, in co-op too.
 
+### Controls
+
+- **Combined controls** (CONTROLS, now the default): the left stick walks where it points on
+  screen, the d-pad drives with tank controls, like in the Resident Evil HD remaster.
+
 ### Co-op
 
 - **Brighter lobby models**: the characters in the lobby are now lit like in a photo studio, so

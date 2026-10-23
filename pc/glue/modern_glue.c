@@ -3,8 +3,9 @@
    character walks on screen. Each frame the direction becomes the game's own input - forward
    (and run when the stick is pushed far) - and the character turns towards it after the mode
    handler, so the player state machine, its motions, doors, stairs and pushing stay the game's.
-   Aiming, the quick-turn row and third person keep the original input. Game thread; the
-   direction math is pc/src/input/modern.c. */
+   Aiming, the quick-turn row and third person keep the original input. Combined (the default)
+   leaves the gamepad's d-pad to the game, Classic tank controls; the stick wins over it, the
+   arrow keys stay modern. Game thread; the direction math is pc/src/input/modern.c. */
 #include "../../decomp/include/ps2/veronica/prog/types.h"
 #include "../../decomp/include/ps2/veronica/prog/main.h"
 #include "../src/host/modern.h"
@@ -12,7 +13,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-int pad_move_dir(float* x, float* y);   /* pad.c: screen direction (x right, y up), 1 = analog */
+int pad_move_dir(float* x, float* y, int* dpad);   /* pad.c: screen direction (x right, y up), 1 = analog; dpad: the gamepad's d-pad */
 int pc_in_play(const BH_PWORK* p, int scope);   /* reload_glue.c */
 int pad_quickturn_held(void);
 uint64_t gs_frame_count(void);
@@ -51,7 +52,7 @@ unsigned int modern_pad(unsigned int pad)
 {
     const float* m = (const float*)cam.mtx;
     float x, y, rx, rz, d;
-    int analog, cut;
+    int analog, dpad, cut;
     steer = 0;
     if (!g_modern_on || tps_on || !m || !sys || !plp || !in_play() || plp->mode1 != 0) {
         hold.held = 0;   /* aiming: the original input */
@@ -61,8 +62,8 @@ unsigned int modern_pad(unsigned int pad)
         hold.held = 0;
         return (pad & ~0x6F) | 0x2;
     }
-    analog = pad_move_dir(&x, &y);
-    if (x == 0 && y == 0) { hold.held = 0; return pad; }
+    analog = pad_move_dir(&x, &y, &dpad);
+    if ((x == 0 && y == 0) || (g_modern_on == MODERN_COMBINED && dpad)) { hold.held = 0; return pad; }   /* Combined: the d-pad as Classic */
 
     /* the camera on screen: its right axis (first column of the view matrix) on the ground */
     rx = m[0]; rz = m[8];
