@@ -72,8 +72,10 @@ uint64_t pc_effect_poly(void) { return pc_cur_mesh & 1 ? pc_cur_mesh | (uint64_t
    pc_native_prim): its primitive, depth, texture and texture coordinates, not its place or colour.
    The renderer pairs it with the nearest polygon of the same look in the previous frame (as several
    instances of one mesh), so sliding panels, opening windows and the cursor move at the display
-   rate. A letter (the font's texture list) also carries the letter before it and the step to it,
-   so a changed text never slides one string's letters into another's. Tags end in binary 10:
+   rate. A letter (the font's texture list) also carries the letters before it on its line and the
+   steps between them, so a changed text never slides one string's letters into another's (a shared
+   pair of letters was enough: a new help text flew in from the old one's place). Pairs further
+   apart than any menu moves a piece are not paired (stream.c MENU_JUMP). Tags end in binary 10:
    meshes are aligned pointers, effects odd. 0: no tag. */
 int pc_menu_smooth_on(void);   /* host.c: the setting, with display-rate frames */
 int pc_menu_smooth(void)
@@ -97,11 +99,21 @@ uint32_t pc_menu_tag(unsigned int prim, int n, const NativeVertex* v, const Nati
         if (v) { MIX(lroundf(v[i].s * 4096.0f)); MIX(lroundf(v[i].t * 4096.0f)); }
         else { MIX(r[i].u | (uint32_t)r[i].v << 16); MIX(lroundf(r[i].s * 4096.0f)); MIX(lroundf(r[i].t * 4096.0f)); }
     x = v ? v->x : r->x / 16.0f; y = v ? v->y : r->y / 16.0f;   /* 2D: w = 1 */
-    if (Ps2_current_texlist == &sys->ef_tlist && (prim & 0x10)) {   /* a letter */
-        uint32_t look = h;
+    if (!(prim & 0x10)) {   /* untextured: its colour and which way each corner lies from the first (a left
+                               arrow is not a right one, a horizontal line not a vertical one; a growing box stays itself) */
+        MIX(v ? (uint32_t)v->r | v->g << 8 | v->b << 16 : (uint32_t)r->r | r->g << 8 | r->b << 16);
+        for (int i = 1; i < n; i++) {
+            float dx = (v ? v[i].x : r[i].x / 16.0f) - x, dy = (v ? v[i].y : r[i].y / 16.0f) - y;
+            MIX((dx > 0.5f) - (dx < -0.5f) + 3 * ((dy > 0.5f) - (dy < -0.5f)));
+        }
+    }
+    if (Ps2_current_texlist == &sys->ef_tlist && (prim & 0x10)) {   /* a letter: its string up to it */
+        float lh = 0.0f;   /* the letter's height */
+        for (int i = 1; i < n; i++) lh = fmaxf(lh, fabsf((v ? v[i].y : r[i].y / 16.0f) - y));
         if (frame != stream_game_frames()) { frame = stream_game_frames(); prev_letter = 0; }
-        MIX(prev_letter); MIX(lroundf(x - px)); MIX(lroundf(y - py));
-        prev_letter = look; px = x; py = y;
+        if (fabsf(y - py) > 0.5f || x <= px || x - px > 3.0f * lh) prev_letter = 0;   /* the next line or another string */
+        else { MIX(prev_letter); MIX(lroundf(x - px)); }
+        prev_letter = h; px = x; py = y;
     }
 #undef MIX
     return (h & ~3u) | 2;

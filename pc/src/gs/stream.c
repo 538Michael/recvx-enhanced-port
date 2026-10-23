@@ -548,6 +548,12 @@ static const Frame* matched_for;
    catch a teleport within a camera cut. At 128 px, near walls in a fast turn (third person,
    mouse) lost their interpolation and visibly jumped against the rest */
 #define NATIVE_JUMP (1024 * 16)
+/* a menu's 2D piece (MENU_TAG) is paired by its look only, so another piece of the same look can
+   stand in for one that wrapped round or left: the OPTION screen's two picture bands show the same
+   pictures 368 px apart and scroll round, the map's lines all look alike. No menu moves a piece
+   further than 320 px in a game frame (the status screen's panels sliding in): a pair further
+   apart than that is two pieces, not one that moved */
+#define MENU_JUMP (336 * 16)
 
 static long moved(uint64_t x, uint64_t y)
 {
@@ -629,7 +635,7 @@ static long inst_pair(const Frame* p, const Inst* a, const Frame* c, const Inst*
                     if (pa == NO_POS || pb == NO_POS) { total--; n--; continue; }   /* no screen position: not judged */
                     d = moved(pa, pb);
                     sum += d < 2 * JUMP ? d : 2 * JUMP;
-                    near += d <= ((g->key0 & (NATIVE_KEY | RAW_KEY)) && !(b->mesh & 1) ? NATIVE_JUMP : JUMP);   /* effects: JUMP (a slot reused within a frame) */
+                    near += d <= (MENU_TAG(b->mesh) ? MENU_JUMP : (g->key0 & NATIVE_KEY) && !(b->mesh & 1) ? NATIVE_JUMP : JUMP);   /* effects: JUMP (a slot reused within a frame) */
                 }
                 n += g->nv;
             }
@@ -638,6 +644,16 @@ static long inst_pair(const Frame* p, const Inst* a, const Frame* c, const Inst*
         }
     }
     return n * 2 >= total && near * 2 >= total && n ? (long)(sum / n) : -1;
+}
+
+/* how far instance b (frame c) lies from instance a (frame p): the first vertex of each, d[0] x,
+   d[1] y in 1/16 px (a menu piece: one group) */
+#define AMBIG (4 * 16)
+static void inst_move(const Frame* p, const Inst* a, const Frame* c, const Inst* b, long d[2])
+{
+    uint64_t pa = gpos(p, &p->g[a->g0], 0), pb = gpos(c, &c->g[b->g0], 0);
+    d[0] = (long)(pb & 0xFFFF) - (long)(pa & 0xFFFF);
+    d[1] = (long)((pb >> 16) & 0xFFFF) - (long)((pa >> 16) & 0xFFFF);
 }
 
 int stream_point_at(const Frame* prev, const Frame* cur, float t, float* x, float* y)
@@ -751,6 +767,7 @@ int stream_match(const Frame* p, const Frame* c)
     static uint32_t* order; static uint8_t* used; static size_t cap_order;
     size_t tagged[2] = { 0, 0 }, matched[2] = { 0, 0 }, no_inst = 0, unpaired = 0, with_cam = 0;   /* [1]: effects (odd tags, pc_effect_tag) */
     int moving;
+    long menu_move[2] = { 0, 0 };   /* how the last matched menu piece moved (1/16 px) */
     matched_for = NULL;
     if (!p || !c || c->continuation || p->partial || (!c->nvx && !c->nin)) return 0;
     if (p->scene != c->scene) {
@@ -783,7 +800,7 @@ int stream_match(const Frame* p, const Frame* c)
     for (size_t i = 0; i < c->nin; i++) {
         const Inst* b = &c->in[i];
         size_t lo = 0, hi = p->nin, best = (size_t)-1;
-        long best_d = 2 * JUMP + 1;
+        long best_d = 2 * JUMP + 1, next_d = 2 * JUMP + 1;
         int fx = b->mesh & 1;
         if (!b->ng) continue;
         if (b->ng > cap_pair) { cap_pair = b->ng * 2; pair = xrealloc(pair, cap_pair * sizeof(*pair)); }
@@ -797,7 +814,26 @@ int stream_match(const Frame* p, const Frame* c)
             long d;
             if (used[m]) continue;
             d = inst_pair(p, a, c, b);
-            if (d >= 0 && d < best_d) { best_d = d; best = m; }
+            if (d >= 0 && d < best_d) { next_d = best_d; best_d = d; best = m; }
+            else if (d >= 0 && d < next_d) next_d = d;
+        }
+        if (MENU_TAG(b->mesh) && best != (size_t)-1) {
+            /* a menu piece whose look is there more than once (the "On" of every row of a list):
+               when two candidates are about as near (the list scrolled a row) the nearer one is
+               a guess, and a wrong one slides a row's text over the next. Take the candidate that
+               moved as the menu piece matched before it did (its row), or none */
+            if (next_d - best_d < AMBIG) {
+                long err_best = AMBIG;
+                best = (size_t)-1;
+                for (size_t m = lo; m < p->nin && p->in[order[m]].mesh == b->mesh; m++) {
+                    long d[2], err;
+                    if (used[m] || inst_pair(p, &p->in[order[m]], c, b) < 0) continue;
+                    inst_move(p, &p->in[order[m]], c, b, d);
+                    err = labs(d[0] - menu_move[0]) > labs(d[1] - menu_move[1]) ? labs(d[0] - menu_move[0]) : labs(d[1] - menu_move[1]);
+                    if (err < err_best) { err_best = err; best = m; }
+                }
+            }
+            if (best != (size_t)-1) inst_move(p, &p->in[order[best]], c, b, menu_move);
         }
         if (best == (size_t)-1) {
             for (uint32_t k = 0; k < b->ng; k++) {

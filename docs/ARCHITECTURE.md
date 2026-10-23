@@ -280,10 +280,17 @@ shows in-between images at the display rate:
   are aligned pointers, effects odd). The matcher pairs it with the least-moved polygon of the
   same look in the previous frame (as instances of one mesh, `NATIVE_JUMP`); sprites, lines and
   points (`EV_RAW`) under such a tag become groups too (`RAW_KEY`) and their positions are blended
-  in the replay. A letter of the font (`sys->ef_tlist`) also carries the letter drawn before it and
-  the step to it, so changed text never slides letters from one string to another; colours,
-  texture coordinates and new or changed parts are the current frame's, so a cursor highlight or
-  a new text shows at once. Executed frames are unchanged (the tags only add stream events).
+  in the replay. An untextured piece also carries its colour and which way each corner lies from
+  the first (left and right arrows, horizontal and vertical lines differ). A letter of the font
+  (`sys->ef_tlist`) carries the letters before it on its line and the steps between them, so a
+  changed text never slides letters from one string to another. Looks repeat (both OPTION picture
+  bands show the same pictures 368 px apart and scroll round; every row of a list says "On"), so
+  two more rules: a pair further apart than `MENU_JUMP` (336 px; the furthest a menu moves a
+  piece in a game frame is 320 px, the status screen's panels) is two pieces, and when two
+  candidates are about as near (within `AMBIG`, 4 px: a list scrolled a row) the one that moved
+  as the menu piece matched before it did is taken, or none. Colours, texture coordinates and new
+  or changed parts are the current frame's, so a cursor highlight or a new text shows at once.
+  Executed frames are unchanged (the tags only add stream events).
 - **Frame blend**: `PS2_swap` mixes each new frame 75% over the previous display image (a
   motion trail). Replays start from the display image as the frame found it, so the trail stays
   correct. With frame blend off the swap copies the frame instead (as during movies).
