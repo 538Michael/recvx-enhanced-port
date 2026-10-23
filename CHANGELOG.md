@@ -11,6 +11,9 @@
 
 - **Brighter lobby models**: the characters in the lobby are now lit like in a photo studio, so
   faces and clothes are clearly visible instead of almost black.
+- **Model list in the lobby**: MODEL now opens a scrollable list of all models (also with the mouse
+  wheel) that shows each one in the preview as you move through it, so finding the one you want is
+  quicker.
 
 ### Fixes
 

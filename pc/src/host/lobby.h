@@ -8,10 +8,11 @@ extern "C" {
 #endif
 
 /* keys for a text field, besides the characters 32..126 */
-enum { LK_ENTER = 256, LK_ESC, LK_BACK, LK_DEL, LK_LEFT, LK_RIGHT, LK_HOME, LK_END };
+enum { LK_ENTER = 256, LK_ESC, LK_BACK, LK_DEL, LK_LEFT, LK_RIGHT, LK_HOME, LK_END, LK_PGUP, LK_PGDN };
 
 typedef struct LobbyIO {
     volatile int text_on;           /* game thread: a text field is edited (the keyboard types, it is no pad) */
+    volatile int list_on;           /* game thread: a list is shown (Page Up / Down, Home, End come as keys) */
     volatile unsigned int head, tail;   /* key ring: the main thread writes at head, the game thread reads at tail */
     volatile int keys[64];
     char clip[128];                 /* game thread: text for the clipboard ... */

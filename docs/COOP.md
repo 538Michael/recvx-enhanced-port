@@ -58,7 +58,13 @@ drawn in the game's own style; your model turns in a 3D preview on the left. It 
 
 * **NAME**: what your partner sees above your head and in the lobby. Up to 15 characters: letters,
   digits, space and `-_.!?'()+`. Default: your login name.
-* **MODEL** ("You appear as"): see "You appear as".
+* **MODEL** ("You appear as", see "You appear as"): shows your model's name and opens a page with
+  the list of all models, in the order and with the names of the other menus. The list scrolls to
+  your current model (gold, with an arrow); the 3D preview shows the one under the cursor, and a bar
+  at the right shows where you are in the list. Up/down move (past the end to **BACK**), left/right,
+  L1/R1 and Page Up/Down a page, Home/End to the first and last; the mouse hovers, the wheel
+  scrolls. Confirm or a click takes the model and returns to MODEL; BACK (or cancel, or a right
+  click) returns without changing it.
 * **START** (host): a new game (normal, easy, very easy) or one of your saves
   ("Save nn: character stage-room"; nn is the save's number, or the memory card slot with the
   Memory card save system, [USER_GUIDE.md](USER_GUIDE.md#saves)).
