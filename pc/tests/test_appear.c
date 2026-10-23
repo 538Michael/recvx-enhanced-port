@@ -47,6 +47,16 @@ int main(void)
     CHECK(appear_voice(COOP_CHR_ACTOR + 0) == 0 && appear_voice(COOP_CHR_ACTOR + 1) == 1 && appear_voice(COOP_CHR_ACTOR + 3) == 2 && appear_voice(COOP_CHR_ACTOR + 5) == 3);   /* the cutscene models */
     CHECK(appear_voice(COOP_CHR_ACTOR + 8) == 1 && appear_voice(COOP_CHR_ACTOR + 13) == 1 && appear_voice(COOP_CHR_ACTOR + 17) == 1);  /* Alfred, Rodrigo, Tyrant */
     CHECK(appear_voice(COOP_CHR_ACTOR + 12) == 0 && appear_voice(COOP_CHR_ACTOR + 24) < 0 && appear_voice(COOP_CHR_MAX + 1) < 0);    /* Alexia, Cerberus */
+    /* imported player models (pc/src/import): listed last, after the cutscene models */
+    actor_imports[0] = (ActorModel){ .name = "Kevin", .anim = ANIM_MALE };
+    actor_imports[1] = (ActorModel){ .name = "Alyssa", .anim = ANIM_FEMALE };
+    actor_import_n = 2;
+    CHECK(appear_count() == n + 2 && appear_at(n) == COOP_CHR_IMPORT && appear_at(n + 1) == COOP_CHR_IMPORT + 1 && appear_at(n + 2) == 0);
+    CHECK(appear_pos(COOP_CHR_IMPORT + 1) == n + 1 && appear_canon(COOP_CHR_IMPORT + 1) == COOP_CHR_IMPORT + 1 && appear_canon(COOP_CHR_IMPORT + 2) == 0);
+    CHECK(appear_step(COOP_CHR_ACTOR + 5, 1) == COOP_CHR_IMPORT && appear_step(COOP_CHR_IMPORT + 1, 1) == 0);
+    CHECK(!strcmp(appear_name(COOP_CHR_IMPORT + 1), "Alyssa") && appear_voice(COOP_CHR_IMPORT) == 1 && appear_voice(COOP_CHR_IMPORT + 1) == 0);
+    CHECK(actor_model(ACTOR_MODELS + 1) == &actor_imports[1] && !actor_model(ACTOR_MODELS + 2) && actor_model(3) == &actor_models[3]);
+    actor_import_n = 0;
     printf("appear: ok, %d of %d listed\n", n, COOP_CHR_MAX + 1);
     return 0;
 }

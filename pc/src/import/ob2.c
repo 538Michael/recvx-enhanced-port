@@ -94,7 +94,7 @@ static AfsFile* afs_list(FILE* f, int64_t base, int* count)
    16-bit words. A flag word gives the kind of the next 16 items, highest bit first: 0 a literal
    word; 1 a copy word c: count = c >> 11 (0: the count follows), distance back = c & 0x7ff
    (0: that many zero words). Returns the output size in bytes, -1 if the input is broken. */
-static int sld(const unsigned char* src, int n, unsigned char* dst, int cap)
+int ob2_sld(const unsigned char* src, int n, unsigned char* dst, int cap)
 {
     const uint16_t* s = (const uint16_t*)src;
     uint16_t* d = (uint16_t*)dst;
@@ -333,7 +333,7 @@ static int read_nbd(const unsigned char* d, uint32_t n, ImpModel* m, char* err, 
         if (sz > n - tp) { r.bad = 1; break; }
         int cap = 8 << 20, got;
         unsigned char* out = malloc(cap);
-        if (!out || (got = sld(d + tp, (int)sz, out, cap)) < 64) { free(out); snprintf(err, en, "texture %u: bad compressed data", k); imp_free(m); return 0; }
+        if (!out || (got = ob2_sld(d + tp, (int)sz, out, cap)) < 64) { free(out); snprintf(err, en, "texture %u: bad compressed data", k); imp_free(m); return 0; }
         unsigned char* fit = realloc(out, got);
         m->tim2[m->ntex] = fit ? fit : out;
         m->tim2_len[m->ntex++] = got;

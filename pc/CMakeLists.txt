@@ -254,6 +254,11 @@ add_test(NAME ntex COMMAND test_ntex)
 add_executable(test_appear tests/test_appear.c src/host/actors.c)
 add_test(NAME appear COMMAND test_appear)
 
+# imports (src/import): SLD, TIM2, the glTF and .cvxm writers on a synthetic model
+add_executable(test_import tests/test_import.c src/import/impmodel.c src/import/ob2.c src/import/import.c src/host/actors.c src/host/fileio.c)
+target_link_libraries(test_import PRIVATE SDL3::SDL3 m)
+add_test(NAME import COMMAND test_import ${CMAKE_CURRENT_BINARY_DIR})
+
 # enemy variants (pc/src/host/variants.c): the built-in table, the mods/enemies.ini reader
 add_executable(test_variants tests/test_variants.c src/host/variants.c src/host/actors.c src/host/fileio.c)
 add_test(NAME variants COMMAND test_variants)
