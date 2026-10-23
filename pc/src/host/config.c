@@ -80,7 +80,7 @@ static const struct { const char* key; int* val; int lo, hi; } keys[] = {
     { "menu_mouse", (int*)&g_menu_mouse.on, 0, 1 },
     { "input_source", &g_input_source, 0, 2 },            /* INPUT_*: Auto, Keyboard/mouse only, Gamepad only */
     { "input_pad", &g_input_pad, 0, 4 },                  /* 0 any gamepad, n player n's (bindings.c) */
-    { "fixed_cam_controls", &g_modern_on, 0, 1 },        /* fixed cameras: 0 classic (tank), 1 modern (camera-relative) */
+    { "fixed_cam_controls", &g_modern_on, 0, 2 },        /* fixed cameras: 0 classic (tank), 1 modern (camera-relative), 2 combined */
     { "enemy_extra", &g_enemy_opts.extra, 0, 3 },        /* enemy options (docs/ENEMIES.md "Enemy options") */
     { "enemy_place", &g_enemy_opts.place, 0, 1 },
     { "enemy_random", &g_enemy_opts.rand, 0, 1 },
@@ -145,11 +145,13 @@ void config_load(void)
 {
     char p[1100], line[1100], k[64], val[128];
     int v;
+    int combined_seen = 0;
     FILE* f;
     path(p, sizeof(p));
     if (!(f = pc_fopen(p, "r"))) { default_name(); player_id(); return; }
     while (fgets(line, sizeof(line), f))
         if (sscanf(line, " coop_join = %127s", g_coop.join) == 1) continue;
+        else if (sscanf(line, " fixed_cam_version = %d", &v) == 1) { combined_seen = 1; continue; }
         else if (sscanf(line, " coop_player_id = %127s", val) == 1) { if (!unhex(val, g_coop.pid, 16)) memset(g_coop.pid, 0, 16); continue; }
         else if (sscanf(line, " coop_player_key = %127s", val) == 1) { if (!unhex(val, g_coop.pkey, 32)) memset(g_coop.pkey, 0, 32); continue; }
         else if (!strncmp(line, "coop_server =", 13)) { if (sscanf(line + 13, " %127s", g_coop.server) != 1) g_coop.server[0] = 0; continue; }   /* empty: no server */
@@ -161,6 +163,9 @@ void config_load(void)
             for (size_t i = 0; i < SDL_arraysize(keys); i++)
                 if (!strcmp(k, keys[i].key) && v >= keys[i].lo && v <= keys[i].hi) *keys[i].val = v;
     fclose(f);
+    /* a file from before Combined (no fixed_cam_version line): Modern, the default then and always
+       written, becomes Combined; Classic, never the default since Modern, stays */
+    if (!combined_seen && g_modern_on == 1) g_modern_on = MODERN_COMBINED;
     g_coop.chr = appear_canon(g_coop.chr);   /* an event double no longer listed: its listed twin (actors.c) */
     default_name();
     player_id();
@@ -192,6 +197,7 @@ static int write_ini(FILE* f, void* ud)
 {
     (void)ud;
     for (size_t i = 0; i < SDL_arraysize(keys); i++) fprintf(f, "%s = %d\n", keys[i].key, *keys[i].val);
+    fprintf(f, "fixed_cam_version = 1\n");   /* fixed_cam_controls knows Combined (config_load) */
     fprintf(f, "coop_join = %s\n", g_coop.join);
     fprintf(f, "coop_server = %s\n", g_coop.server);
     if (g_coop.name[0]) fprintf(f, "coop_name = %s\n", g_coop.name);

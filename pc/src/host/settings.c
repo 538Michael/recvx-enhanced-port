@@ -317,7 +317,7 @@ static const char* const detectors[] = { "As original", "Skipped" };
 static const char* const conns[] = { "Automatic", "Direct (P2P)", "Via server" };
 static const char* const atmos_names[] = { "Per cut (original)", "Smooth" };
 static const char* const free_cam_names[] = { "B (behind character)", "A (free)" };
-static const char* const fixed_cam_names[] = { "Classic (tank)", "Modern (camera-relative)" };
+static const char* const fixed_cam_names[] = { "Classic (tank)", "Modern (camera-relative)", "Combined (d-pad tank)" };
 static const char* const tps_pad_names[] = { "Classic (tank, camera behind)", "Modern (twin-stick)" };
 static const char* const noclips[] = { "Off", "Through walls", "Walls + fly" };
 static const char* const sources[] = { "Auto", "Keyboard/mouse only", "Gamepad only" };
@@ -403,9 +403,10 @@ const Setting g_settings[] = {
     { SP_CONTROLS, "Vibration strength", V(g_config.rumble), 0, 100, 10, .fmt = "%d%%",
       .help = "How strongly the gamepad rumbles. Turn vibration on or off in the game's OPTION menu (VIBRATION), which a gamepad with rumble makes available." },
     { SP_CONTROLS, "Mouse in menus", V(g_menu_mouse.on), 0, 1, 1, .help = "Inventory, item box, map, files and these menus: point, left click selects, right click goes back." },
-    { SP_CONTROLS, "Fixed camera controls", V(g_modern_on), 0, 1, 1, fixed_cam_names,
+    { SP_CONTROLS, "Fixed camera controls", V(g_modern_on), 0, 2, 1, fixed_cam_names,
       .help = "Modern: the left stick or the d-pad (arrow keys) walks where it points on screen, pushed far or with run it runs; "
-              "aiming and the quick turn as Classic. Not in third person." },
+              "aiming and the quick turn as Classic. Combined: the stick and arrow keys as Modern, the gamepad's d-pad as Classic "
+              "(tank). Not in third person." },
 
     { SP_TPS, "Over-the-shoulder camera", V(g_tps.on), 0, 1, 1, .help = "Third person: mouse/keyboard or twin-stick gamepad controls and free aim. Events, doors and menus keep the original camera.", .group = "CAMERA" },
     { SP_TPS, "Mouse/keyboard camera", V(g_tps.free_cam), 0, 1, 1, free_cam_names,
