@@ -77,9 +77,16 @@ typedef struct Pose {
     union { uint8_t reject, rcase; };   /* PKT_REJECT, PKT_BYE: COOP_REJ_*. PKT_POSE: the room case of the room the sender
                                            is in, + 1 (0: not sent, a build before it): its room file RM_<stg><rom><case> */
     uint8_t voice_n, voice;             /* counts the sender's player voices; the last one's program (SE 0x400 + voice) */
-    uint8_t pflg;                       /* the sender's player flg & 6 (2, 4: being hit or held: enemies wait) */
+    uint8_t pflg;                       /* the sender's player flg & 6 (2, 4: being hit or held: enemies wait); bits 0 and
+                                           3..7: its aim pitch (coop_pitch_get; 0 straight, also from a build before it) */
     uint8_t flr;                        /* the sender's floor (flr_no + 3); 0: not sent (a build before this field) */
 } Pose;
+/* Pose.pflg's other bits (receivers before them read pflg & 6): the pitch the sender's upper body is bent by
+   (third-person free aim; the fixed cameras' aim up/down is a motion), -31..31 steps of COOP_PITCH_STEP radians */
+#define COOP_PITCH_MAX 31
+#define COOP_PITCH_STEP (1.0471976f / COOP_PITCH_MAX)   /* free aim's limit, 60 degrees */
+static inline int coop_pitch_get(uint8_t pflg) { return ((int8_t)(pflg & 0xF8) >> 2) | (pflg & 1); }
+static inline uint8_t coop_pitch_bits(int v) { return (uint8_t)((v & 1) | (v >> 1 & 0x1F) << 3); }
 enum { COOP_REJ_CODE = 1, COOP_REJ_BUSY = 2, COOP_REJ_REMOVED = 3 };   /* REMOVED: in a goodbye, the host removed us */
 
 typedef struct PoseExt {                /* lobby extension: in the first datagram of a frame (PF_EXT) */

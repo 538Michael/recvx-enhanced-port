@@ -90,6 +90,7 @@ static O_WRK p2obj[3];                  /* [2]: hair / Wesker's piece, as sys->o
 static ML_WORK no_model;                /* stands in for a weapon slot that has none yet */
 static int p2_chr = -1, p2_costume, p2_mfile = -1, p2_wpn = -1, p2_fail = -1, p2_show, p2_drawn;
 static int p2_busy, p2_seen_room = -1;  /* the partner is busy (BUSY_*); the room it was last shown in */
+static float p2_pitch;                  /* the partner's aim pitch shown (radians, Pose.pflg) */
 static int frozen;                      /* both players are in the trade screen: the enemies stand still (coop_trade_frozen) */
 
 #define MAX_MTN (int)(sizeof(p2.plmth) / sizeof(MN_WORK))
@@ -405,7 +406,7 @@ static void self_keep(void)
     O_WRK* op = &sys->obwp[2];
     self_cine_hair();
     if (actor_shown(0) && !self_cine) op->flg &= ~0x1;   /* also when the game set up the player again (story switch) */
-    actor_source(0, plp, self_mesh >= 0 && self_ours() ? self_mesh & 3 : actor_shown(0) ? -1 : sys->ply_id, sys->ply_id);   /* gender-matched animations */
+    actor_source(0, plp, self_mesh >= 0 && self_ours() ? self_mesh & 3 : actor_shown(0) ? -1 : sys->ply_id, sys->ply_id, tps_aim_pitch());   /* gender-matched animations */
     actor_pose(0, plp);
     if (self_mesh < 0 || !self_ours()) return;
     keep_bones(&plp->mdl[0], self_bone);
@@ -700,18 +701,22 @@ void coop_control_remote(void)
        held (flg 2/4: other enemies wait, one attack at a time, as for our player) */
     ply2.hp = rx.hp; ply2.stflg = rx.stflg; ply2.mode0 = rx.mode0; ply2.mode1 = rx.mode1;
     ply2.flg = (ply2.flg & ~6u) | (rx.pflg & 6);
+    /* its aim pitch: the upper body bent as its third-person free aim bends it (the fixed cameras' aim up/down is
+       in its motion), eased over the poses; straight from a build without it */
+    p2_pitch += (coop_pitch_get(rx.pflg) * COOP_PITCH_STEP - p2_pitch) * 0.5f;
 pose:
     if (!set) return;
     if (p2_other_mesh) keep_bones(&ply2.mdl[0], p2_bone);
     bhSetMotion(&ply2, 0, ply2.mtn_md, ply2.mtn_tp);
     if (p2_wpn == 1) lighter_arm();
     bhCalcModel(&ply2);
+    tps_bend(&ply2, p2_pitch);   /* (arms, head, weapons and the muzzle flash follow) */
     /* its hit capsule, as player.c sets ours every frame: most enemies' attacks (dogs, Hunters, Tyrant,
        Bandersnatch, Nosferatu, the zombie's lunge) test it - left at 0,0,0 they all missed the stand-in */
     ply2.watr.c1.x = ply2.mlwP->owP[4].mtx[12]; ply2.watr.c1.y = ply2.mlwP->owP[4].mtx[13]; ply2.watr.c1.z = ply2.mlwP->owP[4].mtx[14];
     ply2.watr.c2.x = ply2.mlwP->owP->mtx[12]; ply2.watr.c2.y = ply2.mlwP->owP->mtx[13]; ply2.watr.c2.z = ply2.mlwP->owP->mtx[14];
     ply2.watr.r = 2.5f;
-    actor_source(1, &ply2, p2_chr < 4 ? p2_chr : -1, p2_mfile & 3);   /* gender-matched animations */
+    actor_source(1, &ply2, p2_chr < 4 ? p2_chr : -1, p2_mfile & 3, p2_pitch);   /* gender-matched animations */
     actor_pose(1, &ply2);
     for (i = 0; i < 2; i++) {
         O_WRK* op = &p2wpn[i];
@@ -5972,7 +5977,9 @@ void coop_frame(void)
     if (!tx_in_game) tx.flags = 0;   /* title, menus, loading */
     else {
         tx.stflg |= plp->stflg & 0x300;   /* shot/footstep marks: guns set theirs after our hook (weapon objects) */
-        tx.pflg = plp->flg & 6;           /* hit or held, after the enemies' steps of this frame */
+        int v = (int)lroundf(tps_aim_pitch() / COOP_PITCH_STEP);
+        tx.pflg = (uint8_t)((plp->flg & 6) |   /* hit or held, after the enemies' steps of this frame */
+                            coop_pitch_bits(v > COOP_PITCH_MAX ? COOP_PITCH_MAX : v < -COOP_PITCH_MAX ? -COOP_PITCH_MAX : v));   /* the aim pitch */
         tx.flr = (unsigned char)(plp->flr_no + 3);
     }
     tx.busy = !sys || (sys->tk_flg & 0x28) || (sys->ss_flg & 0x400000) || (sys->cb_flg & 0x1) ? BUSY_NONE :   /* title, (re)start, demo, a door: gone */

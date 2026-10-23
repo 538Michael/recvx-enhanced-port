@@ -85,8 +85,9 @@ int  actor_double_acting(void);         /* a cutscene double of the character pl
 int  actor_double_kept(void);           /* the doubles stay the game's for the chosen model: the played character's own cutscene model */
 /* before actor_pose(who, src) (slots 0, 1): src shows the mesh of player character `mesh` (0..3, a
    part-file mesh on the real skeleton; -1: a catalogue model is shown) and plays the motions of
-   character `motion`. Gender-matched animations need it; without it src's own motions are used. */
-void actor_source(int who, struct BH_PWORK* src, int mesh, int motion);
+   character `motion`, its upper body bent by `pitch` (radians: the free-aim bend, tps_bend). Gender-matched
+   animations need it; without it src's own motions are used. */
+void actor_source(int who, struct BH_PWORK* src, int mesh, int motion, float pitch);
 int  actor_put_body(int who, struct BH_PWORK* src);   /* draw src (bhPutModel), in its gender-matched pose if it has one */
 int  actor_frame(const struct BH_PWORK* p);   /* the motion frame p shows this tick (our player: before bhSetMotion's advance) */
 void actor_textures_released(void);     /* njReleaseTextureAll */

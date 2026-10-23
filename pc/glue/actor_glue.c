@@ -994,6 +994,7 @@ typedef struct Shadow {
     BH_PWORK w;
     int chr, fail, wpn_no;              /* the motion set loaded (ply_id, -1 none), one that failed, the weapon's */
     int mesh, motion;                   /* actor_source */
+    float pitch;                        /* actor_source: the source's free-aim bend */
     BH_PWORK *src, *drv;                /* actor_source's source; this tick's pose (NULL: the source's own) */
     NJS_CNK_OBJECT* of;                 /* the source's objects the copy was made from */
     int body;                           /* the source's own mesh is drawn with our matrices */
@@ -1132,16 +1133,17 @@ static BH_PWORK* shadow_step(Shadow* s, BH_PWORK* src, int from)
         s->obj[9].ang[1] = -910;
         bhCalcModel(&s->w);
     }
-    if (src == plp) tps_bend(&s->w);
+    tps_bend(&s->w, s->pitch);
     return &s->w;
 }
 
-void actor_source(int who, BH_PWORK* src, int mesh, int motion)
+void actor_source(int who, BH_PWORK* src, int mesh, int motion, float pitch)
 {
     if (who < 0 || who > 1) return;
     sh[who].src = src;
     sh[who].mesh = mesh;
     sh[who].motion = motion;
+    sh[who].pitch = pitch;
 }
 
 /* this tick's gender-matched pose of slot who's source, or NULL */

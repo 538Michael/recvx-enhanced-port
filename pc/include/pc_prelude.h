@@ -288,7 +288,8 @@ void  tps_player_mode(void);   /* before the player's mode handler: the straight
 void  tps_player(void);
 void  tps_calc_model(void);
 struct BH_PWORK;
-void  tps_bend(struct BH_PWORK* p);   /* the last free-aim bend on a display copy of the player (actor_glue.c) */
+void  tps_bend(struct BH_PWORK* p, float pitch);   /* the free-aim bend by pitch (radians) on a display copy (actor_glue.c), the partner */
+float tps_aim_pitch(void);   /* the pitch of our free-aim bend this tick (radians, 0: none) */
 #include "ps2sdk_shim.h"
 #include "ps2_hw.h"
 #define u_long ps2_u_long

@@ -1542,11 +1542,17 @@ void tps_calc_model(void)
     }
 }
 
-/* the same bend on a display copy of the player posed this tick (actor_glue.c: a gender-matched
-   pose; its base matrix is the player's) */
-void tps_bend(BH_PWORK* p)
+/* the pitch our upper body is bent by this tick (radians, 0: none): the co-op pose sends it */
+float tps_aim_pitch(void)
 {
-    if (tps_on && bend_a != 0 && p->mlwP->obj_num > 9) bend(p, bend_a);
+    return tps_on ? bend_a * 2 : 0;
+}
+
+/* that bend (pitch radians) on another model posed this tick: a display copy of the player (actor_glue.c: a
+   gender-matched pose; its base matrix is the player's), the co-op partner with the pitch its pose sent */
+void tps_bend(BH_PWORK* p, float pitch)
+{
+    if (pitch != 0 && p->mlwP->obj_num > 9) bend(p, pitch / 2);
 }
 
 /* RECVX_EFF_TRACE=1 (test aid): the live effects at the frame hand-off - id.type, an
