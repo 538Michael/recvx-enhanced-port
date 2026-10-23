@@ -134,10 +134,13 @@ void import_registry_load(void)
         char dir[1100];
         int n = import_results(src, items, ITEMS_MAX, NULL, 0);
         source_dir(src, dir, sizeof(dir));
+        for (int g = 0; g < IMPORT_GROUPS; g++)   /* grouped (the manifest is in disc order): the lobby's list shows the groups */
         for (int i = 0; i < n && k < ACTOR_IMPORT_MAX; i++) {
-            if (!items[i].player) continue;
+            if (!items[i].player || (items[i].group > 0 ? items[i].group : 0) != g) continue;
             ActorModel* am = &actor_imports[k];
-            SDL_snprintf(actor_import_name[k], sizeof(actor_import_name[k]), "%s (%s)", items[i].name, items[i].variant);
+            if (items[i].variant[0]) SDL_snprintf(actor_import_name[k], sizeof(actor_import_name[k]), "%s (%s)", items[i].name, items[i].variant);
+            else SDL_snprintf(actor_import_name[k], sizeof(actor_import_name[k]), "%s", items[i].name);
+            actor_import_group[k] = (unsigned char)(items[i].group >= 0 ? items[i].group : 0);
             SDL_snprintf(actor_import_file[k], sizeof(actor_import_file[k]), "%s/%s/%s.cvxm", dir, items[i].id, items[i].id);
             memset(am, 0, sizeof(*am));
             am->name = actor_import_name[k];

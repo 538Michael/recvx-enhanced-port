@@ -55,6 +55,10 @@ int main(void)
     CHECK(appear_pos(COOP_CHR_IMPORT + 1) == n + 1 && appear_canon(COOP_CHR_IMPORT + 1) == COOP_CHR_IMPORT + 1 && appear_canon(COOP_CHR_IMPORT + 2) == 0);
     CHECK(appear_step(COOP_CHR_ACTOR + 5, 1) == COOP_CHR_IMPORT && appear_step(COOP_CHR_IMPORT + 1, 1) == 0);
     CHECK(!strcmp(appear_name(COOP_CHR_IMPORT + 1), "Alyssa") && appear_voice(COOP_CHR_IMPORT) == 1 && appear_voice(COOP_CHR_IMPORT + 1) == 0);
+    actor_import_group[1] = 2;
+    CHECK(!strcmp(appear_group(1), "CVX characters") && !strcmp(appear_group(COOP_CHR_IMPORT + 1), "Outbreak NPCs"));
+    CHECK(!strcmp(appear_group(COOP_CHR_ACTOR), "CVX cutscene") && !strcmp(appear_group(COOP_CHR_ACTOR + 13), "CVX story cast"));
+    CHECK(!strcmp(appear_group(COOP_CHR_ACTOR + 61), "CVX enemies"));
     CHECK(actor_model(ACTOR_MODELS + 1) == &actor_imports[1] && !actor_model(ACTOR_MODELS + 2) && actor_model(3) == &actor_models[3]);
     actor_import_n = 0;
     printf("appear: ok, %d of %d listed\n", n, COOP_CHR_MAX + 1);

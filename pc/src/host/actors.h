@@ -32,6 +32,7 @@ extern const ActorModel actor_models[];
 extern ActorModel actor_imports[ACTOR_IMPORT_MAX];
 extern char actor_import_name[ACTOR_IMPORT_MAX][96];
 extern char actor_import_file[ACTOR_IMPORT_MAX][1200];   /* its .cvxm */
+extern unsigned char actor_import_group[ACTOR_IMPORT_MAX];   /* IMPORT_GROUP_* (import.h) */
 extern int actor_import_n;
 const ActorModel* actor_model(int idx);   /* catalogue entry or import idx, NULL if none */
 
@@ -73,6 +74,7 @@ int appear_pos(int chr);              /* the position of chr (a hidden one: its 
 int appear_canon(int chr);            /* chr, or the listed twin of a hidden one */
 int appear_step(int chr, int dir);    /* the next (dir 1) or previous (-1) listed chr, wrapping */
 const char* appear_name(int chr);
+const char* appear_group(int chr);    /* the list's group of chr (the lobby's model page shows them as headers) */
 /* game thread (pc/glue/actor_glue.c). who: display slot 0 our player, 1 the co-op partner,
    ACTOR_DOUBLE the cutscene double of the character played, ACTOR_VARIANT + k enemy variants. idx: catalogue entry, ACTOR_PART + n
    for player part file 10 + n, or -1. */

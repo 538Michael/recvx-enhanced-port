@@ -529,9 +529,15 @@ int ob2_extract(const char* isopath, const char* outdir, int what, ImportItem* i
                 snprintf(path, sizeof(path), "%s/%s_tex%d.png", dir, id, k);
                 if (!imp_write_png(&m, k, path) && !err[0]) snprintf(err, sizeof(err), "texture %d: unsupported picture", k);
             }
-            if (it->ok && it->female < 0 && human_skeleton(&m)) it->female = 0;   /* an enemy on the human skeleton (as a man) */
-            else if (it->ok && it->female < 0) snprintf(err, sizeof(err), "glTF only: not the human skeleton (%d nodes)", m.nn);
-            if (it->ok && it->female >= 0) {   /* people: "You appear as" when the skeleton is the human one */
+            /* (people on a skeleton of their own: N08's 24 nodes, HN_70's 74, convert by the body groups too;
+               the "*_N" files are hair and face parts of the high-detail models) */
+            float lo = 1e9f, hi = -1e9f;
+            for (int v = 0; v < m.nv; v++) { lo = fminf(lo, m.pos[v][1]); hi = fmaxf(hi, m.pos[v][1]); }
+            int human = it->ok && (human_skeleton(&m) || (it->group != IMPORT_GROUP_ENEMIES && !strstr(id, "_N"))) &&
+                        hi - lo > 100.0f;   /* a whole body, at least a metre tall (HE01_56 is a severed arm on the skeleton) */
+            if (it->ok && !human && !err[0]) snprintf(err, sizeof(err), "glTF only: not a whole body on the human skeleton (%d nodes)", m.nn);
+            if (human && it->female < 0) it->female = 0;   /* an enemy on the human skeleton (as a man) */
+            if (human) {   /* "You appear as": every model on the human skeleton */
                 char e2[160] = "";
                 ImpFit fit;
                 keep_body(&m);

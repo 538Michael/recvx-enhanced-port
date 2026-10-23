@@ -84,6 +84,7 @@ _Static_assert(sizeof(actor_models) / sizeof(actor_models[0]) == ACTOR_MODELS, "
 ActorModel actor_imports[ACTOR_IMPORT_MAX];
 char actor_import_name[ACTOR_IMPORT_MAX][96];
 char actor_import_file[ACTOR_IMPORT_MAX][1200];
+unsigned char actor_import_group[ACTOR_IMPORT_MAX];
 int actor_import_n;
 
 static int imports(void) { return __atomic_load_n(&actor_import_n, __ATOMIC_ACQUIRE); }
@@ -211,6 +212,20 @@ int appear_step(int chr, int dir)
 {
     int n = appear_count();
     return appear_at((appear_pos(chr) + dir + n) % n);
+}
+
+/* in list order: the player files, the story cast, the enemies, the player characters' cutscene
+   models (the tail), then the imports by their group */
+const char* appear_group(int chr)
+{
+    static const char* const imp[4] = { "Outbreak playable", "Outbreak cutscene", "Outbreak NPCs", "Outbreak enemies" };
+    int k = import_of(chr), id;
+    if (k >= 0) return imp[actor_import_group[k] & 3];
+    chr = appear_canon(chr);
+    if (chr < COOP_CHR_ACTOR) return "CVX characters";
+    if (tail_at(chr) >= 0) return "CVX cutscene";
+    id = actor_models[chr - COOP_CHR_ACTOR].id;
+    return id > 30 && id != 51 && id != 52 ? "CVX story cast" : "CVX enemies";   /* (51, 52: zombies) */
 }
 
 const char* appear_name(int chr)

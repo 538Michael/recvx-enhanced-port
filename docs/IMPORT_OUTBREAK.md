@@ -15,7 +15,7 @@ lists what was extracted; it is built so other games can be added as further sou
 |---|---|
 | 1. Format research | done: disc layout, archives, compression, model and texture format ("Disc format") |
 | 2. Extractor (C, `pc/src/import/`) | done: every character model on the disc (537: 30 playable, 40 cutscene / high detail, 276 NPCs, 191 enemies) to glTF + PNG |
-| 3. Conversion to CVX player models | done for every model on the human skeleton (355: all 30 playable, 39 of 40 cutscene / high detail, 267 of 276 NPCs, 19 enemies): `.cvxm`, listed in "You appear as", skinned every frame, retargeted from the player's motions; checked in game (walk, aim, grabs, third person, cutscenes) |
+| 3. Conversion to CVX player models | done for every model on the human skeleton (324: all 30 playable, 39 of 40 cutscene / high detail, 238 of 276 NPCs, 17 enemies): `.cvxm`, listed in "You appear as", skinned every frame, retargeted from the player's motions; checked in game (walk, aim, grabs, third person, cutscenes) |
 | 4. F4 window | done: disc image, what to extract (four groups), progress, results grouped (playable, cutscene / high detail, NPCs, enemies) from the manifest (also after a restart) |
 | 5. Notes for later (voices, ad-libs, animations) | first findings ("Notes for later") |
 | 6. Verification | headless extraction, glTF/`.cvxm` checks and previews, in-game shots, ctest (`import`, `appear`), Linux and Windows builds, layout check |
@@ -166,11 +166,14 @@ it, also after a restart, and the registry reads it at start. The disc is identi
 `SYSTEM.CNF` (`SLUS_209.84`); another region's disc is refused. All 30 player models: 23 MB of
 output, a few seconds; everything (537 models): 490 MB, about a minute.
 
-Not converted (glTF only), with the reason in the manifest: 172 enemies that are not on the human
-skeleton (zombies of the 23-node skeleton, dogs, creatures: "glTF only: not the human skeleton (n
-nodes)") and 10 NPC / high-detail parts (`HN*_N`, `HP03_N`: 3..9 nodes, heads and props: "not a
-humanoid skeleton"). Enemies on the human skeleton (19: the high-detail zombies `HE01_*`, `E28`,
-`E45`) convert and move with a man's motions.
+Converted: every whole body on the human skeleton (clavicles on the chest, shoulders below them,
+the head on the neck), and the people on skeletons of their own (`N08`'s 24 nodes, `HN_70`'s 74;
+they convert by the body groups as well). Not converted (glTF only, "glTF only: not a whole body on
+the human skeleton (n nodes)" in the manifest): 174 enemies (zombies of the 23-node skeleton,
+dogs, creatures; `HE01_10` and `HE01_56`, severed body parts on the human skeleton: a model has to
+be at least a metre tall), and 39 hair and face parts of the high-detail models (`HN*_N`,
+`HP03_N`; an earlier version converted 29 of them into floating hair). The 17 enemies on the human
+skeleton (the high-detail zombies `HE01_*`, `E28`, `E45`) move with a man's motions.
 
 Settings (recvx.ini): `import_outbreak2_iso` (the disc image), `import_dir` (default
 `<mods>/import`, `RECVX_MODS` respected). Environment: `RECVX_IMPORT=outbreak2` (headless, exits),
@@ -327,6 +330,16 @@ triangles, textures, player model yes/no/failed, notes). After an extraction the
 models are added to "You appear as" at once (up to 384 imports, `ACTOR_IMPORT_MAX`; an import is
 sent to the co-op partner as the played character, the lobby's model byte too).
 
+The lobby's MODEL page (main's scrollable list of "You appear as") lists the imports after Code:
+Veronica's own models, by group (`import_registry_load` registers them group by group; the
+manifest is in disc order). A group's first row (and the page's top row) carries the group's name
+on the right with a line above it (`actors.c appear_group`: CVX characters, CVX story cast, CVX
+enemies, CVX cutscene, Outbreak playable, Outbreak cutscene, Outbreak NPCs, Outbreak enemies). 384
+entries with all groups extracted: L1/R1 and Page Up/Down a page, Home/End, the wheel 3 rows a
+notch, and a click on the scroll bar jumps to that part of the list. The preview loads the entry
+under the cursor once it has stayed 8 frames (main's delay); checked with 43 imports loaded one after
+the other while paging (all loaded, none refused).
+
 ## Notes for later
 
 ### Voices
@@ -385,7 +398,7 @@ sent to the co-op partner as the played character, the lobby's model byte too).
 * Shoulders: lobby front views of Claire, Chris and four imports before / after.
 * Grip: Claire, Chris and four imports aiming (third person side view) and offline renders of the
   dumped aim pose (front, side, above).
-* All groups extracted (537 models, 0 failed, 355 player models); F4 with the four groups.
+* All groups extracted (537 models, 0 failed, 324 player models); F4 with the four groups.
 * ctest 21/21 (`movies` skipped, as on main), Linux and Windows (mingw) builds, `layout_check.sh`
   main (17a36c8) vs this branch: 156 vanilla and 311 enhanced frames identical.
 
@@ -394,7 +407,8 @@ sent to the co-op partner as the played character, the lobby's model byte too).
 - F4: import window. Resident Evil Outbreak File #2 (SLUS-20984) character models from your own
   disc image to glTF (with PNG textures) and as player models in "You appear as".
 - Every character model of the disc: playable characters, cutscene and high-detail versions,
-  NPCs, enemies; all on the human skeleton usable as player models (355), grouped in F4.
+  NPCs, enemies; all on the human skeleton usable as player models (324), grouped in F4 and in the
+  lobby's model list.
 - Imported faces: the eyes show their irises; the mouth moves with the cutscene lip sync and
   with the player's voice.
 - Imported bodies: shoulders narrowed and lowered towards Code: Veronica's proportions; the

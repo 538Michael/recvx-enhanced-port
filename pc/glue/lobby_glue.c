@@ -1207,6 +1207,11 @@ static void pick_input(unsigned int press, unsigned int rept, unsigned int ok, u
         else if (k == LK_END) pick_to(n - 1, 0);
     }
     if (mt.wheel) pick_scroll(-3 * mt.wheel);   /* > 0: away from the player, up the list */
+    if (mt.left && n > PICK_ROWS && mt.x >= PICK_BAR_X - 4 && mt.x <= PICK_BAR_X + 9 && mt.y >= ROW_Y0 - 2 && mt.y < ROW_Y0 + PICK_ROWS * PICK_H) {
+        /* a click on the scroll bar: that part of the list (a long list: 300 and more with imports) */
+        pick_scroll((int)((mt.y - ROW_Y0) / (PICK_ROWS * PICK_H) * (pick_max_top() + 1)) - lb.top);
+        return;
+    }
     hit = pick_at(mt.x, mt.y);
     if (hit >= 0 && (mt.moved || mt.left || mt.wheel) && hit != lb.pick) { lb.pick = hit; CallSystemSe(0, 2); }
     if (mt.left && hit >= 0) { pick_take(); return; }
@@ -1228,13 +1233,20 @@ static void draw_models(void)
     snprintf(pos, sizeof(pos), "%d / %d", (lb.pick < n ? lb.pick : cur) + 1, n);
     text(634 - text_w(pos, 0.45f), HEAD_Y + 2, pos, 0.45f, 0xFFA0A0A0);
     for (i = lb.top; i < n && i < lb.top + PICK_ROWS; i++) {
-        float y = ROW_Y0 + (i - lb.top) * PICK_H, w, sc;
+        float y = ROW_Y0 + (i - lb.top) * PICK_H, w, sc, lim = right;
         const char* nm = appear_name(appear_at(i));
+        const char* grp = appear_group(appear_at(i));
         unsigned int col = i == cur ? 0xFFFFE080 : i == lb.pick ? 0xFFFFFFFF : 0xFFB0B0B0;   /* the current one: gold, with an arrow */
+        if (i == lb.top || strcmp(grp, appear_group(appear_at(i - 1)))) {   /* a group's first row (and the page's): its name on the right */
+            float gw = text_w(grp, 0.35f);
+            if (i > lb.top) rect(ROW_X - 8, y - 3, right, y - 2, 0x60FFE080, Z_FRONT);
+            text(right - gw - 2, y + 4, grp, 0.35f, 0xFFC8A860);
+            lim = right - gw - 10;
+        }
         if (i == lb.pick) rect(ROW_X - 8, y - 2, right, y + PICK_H - 3, 0x50FFFFFF, Z_FRONT);
         if (i == cur) arrow(ROW_X + 4, y + 9, 1, col);
         w = text_w(nm, ROW_SC);
-        sc = w > right - ROW_X - 18 ? ROW_SC * (right - ROW_X - 18) / w : ROW_SC;   /* a long name: narrower */
+        sc = w > lim - ROW_X - 18 ? ROW_SC * (lim - ROW_X - 18) / w : ROW_SC;   /* a long name: narrower */
         text(ROW_X + 12, y + (ROW_SC - sc) * 14, nm, sc, col);
     }
     if (n > PICK_ROWS) {   /* the scroll bar: the page's share of the list, where it is */
