@@ -31,6 +31,7 @@ typedef struct {
     int  music_volume;       /* 0-100 */
     int  sfx_volume;         /* 0-100 */
     int  interpolate;        /* enhanced mode: display-rate in-between frames of the 30 FPS game */
+    int  menu_smooth;        /* menus' 2D tagged for in-between frames too (view_glue.c pc_menu_tag) */
     int  frame_blend;        /* PS2_swap's 25% previous-frame blend (motion trail): 1 on, 0 off, -1 auto (off in enhanced) */
     int  screen_filter;      /* camera filter (vignette): 0 original 4:3, 1 stretched to the view, 2 off */
     int  cinema_bars;        /* cutscene letterbox bars: same modes */

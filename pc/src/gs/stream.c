@@ -32,6 +32,8 @@
 
 #define NOEV 0xFFFFFFFFu
 #define NATIVE_KEY (1ull << 63)   /* Group.key0 of a native 3D strip (v0 = its event) */
+#define RAW_KEY (1ull << 62)      /* ... of a menu's points, lines or sprites (EV_RAW under a menu tag, pc_menu_tag) */
+#define MENU_TAG(m) (((m) & 3) == 2)
 enum { EV_REG, EV_IMAGE, EV_DISP, EV_DOWNLOAD, EV_TAG, EV_STRIP, EV_NATIVE, EV_TEXDEF, EV_TEXDEF_END, EV_TEXBIND, EV_TEXFORGET, EV_RAW, EV_RTEX, EV_MOVIE, EV_TAGLAST };
 typedef struct { uint8_t kind, reg; uint32_t len; uint64_t v; } Ev;
 typedef struct { uint64_t key0; uint32_t v0, nv, strip, ord, sp; } Group;   /* sp: native strip's first Frame.spos */
@@ -250,12 +252,12 @@ static Deferred* deferred; static size_t ndef, cdef;
 static NativeVertex* defv; static size_t ndefv, cdefv;
 static NativeRawVertex* defr; static size_t ndefr, cdefr;
 
-uint32_t native_defer_raw(unsigned int prim, const NativeRawVertex* v, int n)
+uint32_t native_defer_raw(unsigned int prim, const NativeRawVertex* v, int n, uint32_t mesh)
 {
     GROW(defr, ndefr, cdefr, (size_t)n);
     memcpy(defr + ndefr, v, (size_t)n * sizeof(*v));
     GROW(deferred, ndef, cdef, 1);
-    deferred[ndef] = (Deferred){ prim, (uint32_t)ndefr, (uint32_t)n, 0, 0, 1 };
+    deferred[ndef] = (Deferred){ prim, (uint32_t)ndefr, (uint32_t)n, mesh, 0, 1 };
     ndefr += (size_t)n;
     return (uint32_t)ndef++;
 }
@@ -277,13 +279,16 @@ void native_marker(uint64_t v)
     if ((uint32_t)v >= ndef) return;
     d = &deferred[(uint32_t)v];
     if (d->raw) {
-        Frame* f = recording();
+        Frame* f;
         uint32_t len = d->n * (uint32_t)sizeof(NativeRawVertex);
+        if (d->mesh) { stream_tag(d->mesh); stream_strip(0); }
+        f = recording();
         GROW(f->pool, f->npool, f->cpool, len);
         memcpy(f->pool + f->npool, defr + d->first, len);
         GROW(f->ev, f->nev, f->cev, 1);
         f->ev[f->nev++] = (Ev){ EV_RAW, 0, d->n, f->npool | ((uint64_t)d->prim << 32) };
         f->npool += len;
+        if (d->mesh) stream_tag(0);
         return;
     }
     if (d->mesh) stream_tag(d->mesh);
@@ -293,6 +298,7 @@ void native_marker(uint64_t v)
 }
 
 static const NativeVertex* native_verts(const Frame* f, uint32_t ev) { return (const NativeVertex*)(f->pool + (uint32_t)f->ev[ev].v); }
+static const NativeRawVertex* raw_verts(const Frame* f, uint32_t ev) { return (const NativeRawVertex*)(f->pool + (uint32_t)f->ev[ev].v); }
 
 void stream_disp(uint32_t fbp, uint32_t fbw, uint32_t psm) { push_ev(EV_DISP, 0, 0, fbp | ((uint64_t)fbw << 16) | ((uint64_t)psm << 32)); }
 
@@ -424,6 +430,13 @@ void stream_exec(Frame* f)
             ntex_forget((uint32_t)e->v);
             break;
         case EV_RAW:
+            if (inst >= 0 && MENU_TAG(f->in[inst].mesh)) {   /* a group of its own, matched like a native strip */
+                GROW(f->g, f->ng, f->cg, 1);
+                f->g[f->ng++] = (Group){ RAW_KEY | (e->v >> 32), (uint32_t)i, e->len, strip, ord++, (uint32_t)f->nspos };
+                f->nspos += e->len;
+                f->in[inst].ng++;
+                f->new_group = 1;
+            }
             gs_draw_raw((unsigned int)(e->v >> 32), (const NativeRawVertex*)(f->pool + (uint32_t)e->v), (int)e->len);
             break;
         case EV_REG:
@@ -574,6 +587,11 @@ static void frame_spos(const Frame* cf)
     for (size_t i = 0; i < f->ng; i++) {
         const Group* g = &f->g[i];
         const NativeVertex* nv;
+        if (g->key0 & RAW_KEY) {   /* already GS XYZ form */
+            const NativeRawVertex* rv = raw_verts(f, g->v0);
+            for (uint32_t v = 0; v < g->nv; v++) f->spos[g->sp + v] = rv[v].x | (uint64_t)rv[v].y << 16;
+            continue;
+        }
         if (!(g->key0 & NATIVE_KEY)) continue;
         nv = native_verts(f, g->v0);
         for (uint32_t v = 0; v < g->nv; v++) f->spos[g->sp + v] = project(&nv[v]);
@@ -582,7 +600,7 @@ static void frame_spos(const Frame* cf)
 }
 static uint64_t gpos(const Frame* f, const Group* g, uint32_t v)
 {
-    return g->key0 & NATIVE_KEY ? f->spos[g->sp + v] : vtx(f, g->v0 + v);
+    return g->key0 & (NATIVE_KEY | RAW_KEY) ? f->spos[g->sp + v] : vtx(f, g->v0 + v);
 }
 
 /* Pair the groups of instance b (frame c) with those of instance a (frame p) by strip and
@@ -611,7 +629,7 @@ static long inst_pair(const Frame* p, const Inst* a, const Frame* c, const Inst*
                     if (pa == NO_POS || pb == NO_POS) { total--; n--; continue; }   /* no screen position: not judged */
                     d = moved(pa, pb);
                     sum += d < 2 * JUMP ? d : 2 * JUMP;
-                    near += d <= ((g->key0 & NATIVE_KEY) && !(b->mesh & 1) ? NATIVE_JUMP : JUMP);   /* effects: JUMP (a slot reused within a frame) */
+                    near += d <= ((g->key0 & (NATIVE_KEY | RAW_KEY)) && !(b->mesh & 1) ? NATIVE_JUMP : JUMP);   /* effects: JUMP (a slot reused within a frame) */
                 }
                 n += g->nv;
             }
@@ -796,6 +814,12 @@ int stream_match(const Frame* p, const Frame* c)
                 const Group *g = &c->g[b->g0 + k], *h;
                 if (pair[k] < 0) { unpaired += g->nv; continue; }
                 h = &p->g[pair[k]];
+                if (g->key0 & RAW_KEY) {   /* a menu's sprites: blended in replay unless they stand still */
+                    const NativeRawVertex *ra = raw_verts(p, h->v0), *rb = raw_verts(c, g->v0);
+                    for (uint32_t v = 0; v < g->nv; v++) if (ra[v].x != rb[v].x || ra[v].y != rb[v].y) { nat_prev[g->v0] = (int32_t)h->v0; break; }
+                    matched[fx] += g->nv;
+                    continue;
+                }
                 if (g->key0 & NATIVE_KEY) {   /* native strip: blended vertex for vertex in replay, unless it stands still */
                     if (!nv_same_pos(native_verts(p, h->v0), native_verts(c, g->v0), g->nv)) nat_prev[g->v0] = (int32_t)h->v0;
                     matched[fx] += g->nv;
@@ -914,7 +938,22 @@ void stream_replay(const Frame* r, float t)
         if (e->kind == EV_RTEX) continue;    /* draws bind the executed frame's capture (replay resources) */
         if (e->kind == EV_IMAGE) continue;   /* a replay writes no GS memory: its textures and render-target
                                                   reloads are the executed frame's (gs_gl.c, replay resources) */
-        if (e->kind == EV_RAW) { gs_draw_raw((unsigned int)(e->v >> 32), (const NativeRawVertex*)(r->pool + (uint32_t)e->v), (int)e->len); continue; }
+        if (e->kind == EV_RAW) {
+            const NativeRawVertex* cur = raw_verts(r, (uint32_t)i);
+            if (nat_prev[i] >= 0) {   /* a menu's sprites that moved (stream_match): the in-between position */
+                const NativeRawVertex* prv = raw_verts(nat_prev_frame, (uint32_t)nat_prev[i]);
+                NativeRawVertex bl[64];
+                int n = e->len > 64 ? 64 : (int)e->len;
+                for (int k = 0; k < n; k++) {
+                    bl[k] = cur[k];
+                    bl[k].x = (uint16_t)(prv[k].x + ((float)cur[k].x - prv[k].x) * t + 0.5f);
+                    bl[k].y = (uint16_t)(prv[k].y + ((float)cur[k].y - prv[k].y) * t + 0.5f);
+                }
+                gs_draw_raw((unsigned int)(e->v >> 32), bl, n);
+            } else
+                gs_draw_raw((unsigned int)(e->v >> 32), cur, (int)e->len);
+            continue;
+        }
         if (e->kind == EV_NATIVE) {
             /* native strip: blend each vertex's homogeneous position (linear in view space, so
                this is the in-between camera and object transform) and attributes, then cull,

@@ -129,9 +129,10 @@ static void build_report(unsigned char* r)
     uint32_t b = 0, qbits = 0;
     Sint16 slx = 0, sly = 0;
     uint8_t lx = 128, ly = 128, rx = 128, ry = 128;
-    const bool* k = bind_keys();
+    const bool* k;
 
     ensure_gamepad();
+    k = bind_latch_frame(pc_menu_smooth(), bind_keys());   /* quick presses in menus (bindings.c) */
     bind_combo_frame(input_enabled && !g_lobby_io.text_on, k, tps_mouse_buttons());   /* the reload combination first: it takes its presses from the rows */
     if (input_enabled) {
         int mouse = tps_mouse_buttons(), qt;
@@ -155,6 +156,7 @@ static void build_report(unsigned char* r)
         }
     }
 
+    bind_latch_end();
     b |= scripted_buttons();
     set_move_dir(b, slx, sly);
     quickturn_on = qbits != 0;

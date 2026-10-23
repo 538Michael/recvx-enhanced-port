@@ -23,6 +23,7 @@ void pc_view_changed(void)
 /* enhanced frame interpolation: tags for the renderer (gs/stream.c) */
 #include "../../decomp/include/ps2/veronica/prog/main.h"
 #include "../src/gs/stream.h"
+#include "../src/gs/native.h"
 #include "pc_rules.h"
 #include <string.h>
 
@@ -63,6 +64,48 @@ void pc_effect_tag(const void* op)
     stream_tag(pc_cur_mesh);
 }
 uint64_t pc_effect_poly(void) { return pc_cur_mesh & 1 ? pc_cur_mesh | (uint64_t)pc_cur_strip++ << 32 : 0; }
+
+/* "Smooth menus", while a menu task runs (title, status screen with files and item box, map,
+   typewriter, OPTION; not during the title's intro movie): the frame is handed over before the
+   VBLANK wait (ps2_NaSystem.c Ps2SwapDBuff), quick presses reach the pad report (bindings.c
+   bind_latch_frame), and each 2D polygon outside a mesh gets a tag of its look (native_glue.c
+   pc_native_prim): its primitive, depth, texture and texture coordinates, not its place or colour.
+   The renderer pairs it with the nearest polygon of the same look in the previous frame (as several
+   instances of one mesh), so sliding panels, opening windows and the cursor move at the display
+   rate. A letter (the font's texture list) also carries the letter before it and the step to it,
+   so a changed text never slides one string's letters into another's. Tags end in binary 10:
+   meshes are aligned pointers, effects odd. 0: no tag. */
+int pc_menu_smooth_on(void);   /* host.c: the setting, with display-rate frames */
+int pc_menu_smooth(void)
+{
+    enum { MENUS = 1 << 3 | 1 << 4 | 1 << 9 | 1 << 10 | 1 << 15 | 1 << 16 };   /* njUserMain tasks: Firstmovie (the title menu), Title, Itemselect, Map, Typewriter, Option */
+    extern int pc_movie_on(void);   /* movie_glue.c: the title's intro movie keeps its timing */
+    return pc_menu_smooth_on() && (sys->tk_flg & ~sys->ts_flg & MENUS) != 0 && !pc_movie_on();
+}
+uint32_t pc_menu_tag(unsigned int prim, int n, const NativeVertex* v, const NativeRawVertex* r)
+{
+    extern NJS_TEXLIST* Ps2_current_texlist;
+    extern NJS_TEXMEMLIST* Ps2_now_tex;
+    static uint32_t prev_letter; static uint64_t frame; static float px, py;
+    uint32_t h = 2166136261u;
+    float x, y;
+    if (!pc_menu_smooth() || n < 1) return 0;
+#define MIX(k) (h = (h ^ (uint32_t)(k)) * 16777619u)
+    MIX(prim & 0x7FF); MIX(n); MIX(v ? lroundf(v->z) : (long)r->z);
+    if (prim & 0x10) MIX((uintptr_t)Ps2_now_tex);
+    for (int i = 0; i < n; i++)   /* triangles: S, T (texels with FST); points, lines, sprites (r): UV and S, T */
+        if (v) { MIX(lroundf(v[i].s * 4096.0f)); MIX(lroundf(v[i].t * 4096.0f)); }
+        else { MIX(r[i].u | (uint32_t)r[i].v << 16); MIX(lroundf(r[i].s * 4096.0f)); MIX(lroundf(r[i].t * 4096.0f)); }
+    x = v ? v->x : r->x / 16.0f; y = v ? v->y : r->y / 16.0f;   /* 2D: w = 1 */
+    if (Ps2_current_texlist == &sys->ef_tlist && (prim & 0x10)) {   /* a letter */
+        uint32_t look = h;
+        if (frame != stream_game_frames()) { frame = stream_game_frames(); prev_letter = 0; }
+        MIX(prev_letter); MIX(lroundf(x - px)); MIX(lroundf(y - py));
+        prev_letter = look; px = x; py = y;
+    }
+#undef MIX
+    return (h & ~3u) | 2;
+}
 
 int pc_is_room_object(const void* obj)
 {

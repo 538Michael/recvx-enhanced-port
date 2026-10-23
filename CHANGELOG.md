@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Display
+
+- **Smooth menus** (DISPLAY, on by default): the inventory, map, files, item box, typewriter, title
+  menu and OPTION now move at your display's frame rate like the game itself: panels slide, windows
+  open and the cursor glides smoothly. Menus also react sooner to a press, and quick taps are no
+  longer missed. Off: menus as before.
+
 ### Co-op
 
 - **Quick start** (lobby GAME RULES, EXTRA EVENTS; off by default): a new co-op game starts with the manual
