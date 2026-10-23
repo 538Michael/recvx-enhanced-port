@@ -22,7 +22,7 @@ int coop_item_word_ok(uint32_t w) { int id = (w >> 16) & 0xFF; return id > 0 && 
 int coop_check_pose(const Pose* p)
 {
     if (!fin(p->px) || !fin(p->py) || !fin(p->pz)) return COOP_BAD_FLOAT;
-    if (p->busy > BUSY_TRADE || p->mset < MSET_NONE || p->mset >= 128) return COOP_BAD_FIELD;
+    if (p->busy > BUSY_TRADE || p->mset < MSET_NONE || p->mset >= COOP_ENE_SLOTS) return COOP_BAD_FIELD;
     if (p->flr > 32) return COOP_BAD_FIELD;   /* flr_no + 3: rooms have floors -2..29 (rom->grand[2 + flr_no], 32 entries); 0 not sent */
     if (p->rcase > 10) return COOP_BAD_FIELD;   /* room case + 1: cases 0..9 (one digit of the file name); 0 not sent */
     if ((p->flags & ~PF_ALL) || (p->opts & ~OPT_ALL)) return COOP_BAD_FIELD;   /* only the flags and game rules this protocol has */
@@ -54,7 +54,7 @@ int coop_check_dgram(const void* buf, int n, const char* code, int* nev, int* ne
 
 int coop_check_snap(const EneSnap* s)
 {
-    if (s->idx >= 128 || s->mdl < -1 || s->mdl >= 16) return COOP_BAD_FIELD;
+    if (s->idx >= COOP_ENE_SLOTS || s->mdl < -1 || s->mdl >= 16) return COOP_BAD_FIELD;
     if (s->mnw != MNW_ROOM && s->mnw != MNW_KEEP && (s->mnw < 0 || s->mnw >= COOP_MNW_MAX)) return COOP_BAD_FIELD;
     if (s->mtn_no < 0 || s->mtn_no >= COOP_MNW_MAX || s->frm_no < 0) return COOP_BAD_FIELD;
     if (!fin(s->px) || !fin(s->py) || !fin(s->pz) || !fins(s->watr, 7)) return COOP_BAD_FLOAT;
@@ -68,7 +68,7 @@ static int xfer_fields_ok(const Event* e)
            (len == 64 || off + len == total);
 }
 
-static int fx_ref(int r) { return r < 128 || r >= FX_RECEIVER; }   /* an enemy slot or FX_* */
+static int fx_ref(int r) { return r < COOP_ENE_SLOTS || (r >= FX_RECEIVER && r <= FX_NONE); }   /* an enemy slot or FX_* */
 /* objects: slots 4..31 (sys->obwp, coop_glue.c OBJ_N); fins also keeps their angles within the int they become */
 static int atr_ok(const AtrRec* r, int kind, int ix) { return fins(r->p, 6) && (kind != ATR_WAL || r->type < 8) && (kind != ATR_OBJ || (ix >= 4 && ix < 32)); }
 
@@ -83,7 +83,7 @@ int coop_check_event(const Event* e, int from_host)
     if ((from_host && guest_only(e->type)) || (!from_host && host_only(e->type))) return COOP_BAD_DIR;
     switch (e->type) {
     case EV_ENE_HIT:
-        if (e->idx >= 128) return COOP_BAD_FIELD;
+        if (e->idx >= COOP_ENE_SLOTS) return COOP_BAD_FIELD;
         for (k = 0; k < 6; k++) {
             if (e->u.eh.jnt[k] < -1 || e->u.eh.jnt[k] >= 64) return COOP_BAD_FIELD;
             if (e->u.eh.dam[k] < 0 || e->u.eh.dam[k] > 10000 || (e->u.eh.jnt[k] < 0 && e->u.eh.dam[k])) return COOP_BAD_FIELD;
@@ -111,7 +111,7 @@ int coop_check_event(const Event* e, int from_host)
         return e->u.lost.item > 0 && e->u.lost.item < 156 ? COOP_OK : COOP_BAD_FIELD;
     case EV_GRAB:
     case EV_UNGRAB:
-        if (e->idx >= 128 || (e->u.gr.child >= 128 && e->u.gr.child != 255) || e->u.gr.state > 1 || e->u.gr.pset > 1) return COOP_BAD_FIELD;
+        if (e->idx >= COOP_ENE_SLOTS || e->u.gr.state > 1 || e->u.gr.pset > 1) return COOP_BAD_FIELD;
         if (e->u.gr.mdl < -1 || e->u.gr.mdl >= 16 || e->u.gr.cmdl < -1 || e->u.gr.cmdl >= 16) return COOP_BAD_FIELD;
         for (k = 0; k < 2; k++) {
             int m = k ? e->u.gr.cmnw : e->u.gr.mnw;
@@ -145,23 +145,24 @@ int coop_check_event(const Event* e, int from_host)
             if (!coop_item_word_ok(e->u.bx.w[k])) return COOP_BAD_FIELD;
         return COOP_OK;
     case EV_SPAWN:
-        if (e->idx >= 128 || e->u.sp.room > 9999) return COOP_BAD_FIELD;
+        if (e->idx >= COOP_ENE_SLOTS || e->u.sp.room > 9999) return COOP_BAD_FIELD;
         return fin(e->u.sp.px) && fin(e->u.sp.py) && fin(e->u.sp.pz) ? COOP_OK : COOP_BAD_FLOAT;
     case EV_EOPTS:
         return e->u.eo.extra >= 0 && e->u.eo.extra <= 3 && (unsigned)e->u.eo.place <= 1 && (unsigned)e->u.eo.rand <= 1 && e->u.eo.seed >= 0 &&
                (unsigned)e->u.eo.variety <= 1 && (unsigned)e->u.eo.events <= 1 ? COOP_OK : COOP_BAD_FIELD;
-    case EV_FX:
-        if (!fx_ref(e->idx)) return COOP_BAD_FIELD;
+    case EV_FX:   /* (a burst: Event.idx is not read) */
         if (e->u.fx.id == FX_BURST) {   /* counts and times bounded (the effect loops over them), floats finite */
             const uint32_t* w = e->u.fxr.w;
             if (e->u.fxr.nw != FX_RAW_WORDS || w[0] < 1 || w[0] > 32 || w[4] > 600 || w[7] > 600) return COOP_BAD_FIELD;
             return fins((const float*)&w[1], 3) && fins((const float*)&w[5], 2) && fins((const float*)&w[8], 7) && fins((const float*)&w[17], 1) ? COOP_OK : COOP_BAD_FLOAT;
         }
         if (e->u.fx.id == FX_ARM)
-            return e->idx < 128 ? (fins(e->u.fxa.len, 4) && fabsf(e->u.fxa.len[3]) < 1000 ? COOP_OK : COOP_BAD_FLOAT) : COOP_BAD_FIELD;
+            return e->idx < COOP_ENE_SLOTS ? (fins(e->u.fxa.len, 4) && fabsf(e->u.fxa.len[3]) < 1000 ? COOP_OK : COOP_BAD_FLOAT) : COOP_BAD_FIELD;
         if (e->u.fx.id == FX_PARTICLE)
-            return e->u.fxp.typ < FX_PTCL_TYPES && e->u.fxp.mk2 <= 1 && e->u.fxp.lnk < 64 ? (fins(e->u.fxp.off, 3) && fins(e->u.fxp.dir, 3) ? COOP_OK : COOP_BAD_FLOAT) : COOP_BAD_FIELD;
-        if (e->u.fx.id >= 400 || e->u.fx.lkono >= 64 || !fx_ref(e->u.fx.owner) || !fx_ref(e->u.fx.exp0)) return COOP_BAD_FIELD;
+            return e->u.fxp.typ < FX_PTCL_TYPES && e->u.fxp.mk2 <= 1 && e->u.fxp.lnk < 64 && e->u.fxp.refs <= FXR_IDX &&
+                   fx_ref(coop_fx_get(e->idx, e->u.fxp.refs, FXR_IDX)) ? (fins(e->u.fxp.off, 3) && fins(e->u.fxp.dir, 3) ? COOP_OK : COOP_BAD_FLOAT) : COOP_BAD_FIELD;
+        if (e->u.fx.id >= 400 || e->u.fx.lkono >= 64 || (e->u.fx.refs & ~(FXR_IDX | FXR_OWNER | FXR_EXP0)) || !fx_ref(coop_fx_get(e->idx, e->u.fx.refs, FXR_IDX)) ||
+            !fx_ref(coop_fx_get(e->u.fx.owner, e->u.fx.refs, FXR_OWNER)) || !fx_ref(coop_fx_get(e->u.fx.exp0, e->u.fx.refs, FXR_EXP0))) return COOP_BAD_FIELD;
         if (e->u.fx.txp < -1 || e->u.fx.txp >= 16 || e->u.fx.mlw < -1 || e->u.fx.mlw >= 16) return COOP_BAD_FIELD;
         return fins(e->u.fx.p, 3) && fins(e->u.fx.o, 3) && fins(e->u.fx.n, 3) ? COOP_OK : COOP_BAD_FLOAT;
     case EV_GRANT:
@@ -176,7 +177,7 @@ int coop_check_event(const Event* e, int from_host)
     case EV_GONE:
         if (e->u.gn.n < 1 || e->u.gn.n > COOP_GONE_MAX || e->idx > 9) return COOP_BAD_COUNT;
         for (k = 0; k < e->u.gn.n; k++)
-            if (e->u.gn.slot[k] >= 128) return COOP_BAD_FIELD;
+            if (e->u.gn.slot[k] >= COOP_ENE_SLOTS) return COOP_BAD_FIELD;
         return COOP_OK;
     case EV_ATR:
         if (e->u.at.kind > ATR_OBJ || e->u.at.n < 1 || e->u.at.n > 2) return COOP_BAD_COUNT;

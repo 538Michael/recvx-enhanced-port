@@ -5,7 +5,7 @@ over the internet or a LAN (UDP). Co-op is an optional addon: with it off the ga
 as without it (every hook is `#ifdef TARGET_PC` and `if (coop_on)`).
 
 Part 1 is for players: how to host, join and play. Part 2 is the reference: architecture,
-protocol 23, security and limits. Related: [SERVER.md](SERVER.md) (the optional co-op server),
+protocol 24, security and limits. Related: [SERVER.md](SERVER.md) (the optional co-op server),
 [USER_GUIDE.md](USER_GUIDE.md) (settings, controls), [ACTORS.md](ACTORS.md) (models and voices),
 [ENEMIES.md](ENEMIES.md) (enemy options), [ARCHITECTURE.md](ARCHITECTURE.md),
 [BUILDING.md](BUILDING.md).
@@ -1027,10 +1027,10 @@ send time minus the echoed datagram's arrival. Sample = arrival - our clock - th
 smoothed (EWMA 0.1). The name tag's point goes with the recorded frame (`stream_point`) and is
 interpolated with the in-between frames; it snaps on camera cuts and in vanilla mode.
 
-## Protocol 23
+## Protocol 24
 
-`COOP_VERSION` is **23**; both players need builds with the same version (a mismatch is reported,
-e.g. "the host runs co-op protocol 22, we 23: both need the same build"). The co-op server does not
+`COOP_VERSION` is **24**; both players need builds with the same version (a mismatch is reported,
+e.g. "the host runs co-op protocol 23, we 24: both need the same build"). The co-op server does not
 look at the game protocol. Version history in short: 11 join code, 1200-byte datagrams, checked
 events, `EV_ATR`; 12 `EV_FX`; 13 `EV_GRANT`; 14 `EV_TSCREEN`; 15 `EV_GONE`; 16 player id and rejoin
 tag, `EV_OWN`; 17 trade requests; 18 voices; 19 the game rules `OPT_IMPORTANT`, `OPT_NO_RIBBON`,
@@ -1042,7 +1042,8 @@ make other enemies from the same seed); 21 `COOP_HIT_PRECISE` in `EV_ENE_HIT` (t
 "Precise hits", [THIRDPERSON.md](THIRDPERSON.md#precise-hits)); 22 the game rules `OPT_GAMEOVER_BOTH`
 and `OPT_SKIP_DETECTOR`, `PF_GAME_OVER`, `EV_BLOB` `pad` 2 and the `EV_OWN` `tid` (see "Game over",
 "Metal detector"); 23 the game rule `OPT_QUICK_START` (see "Quick start"; it takes the last free bit of
-`Pose.opts`, so a further rule needs a field of its own). `Pose.pflg` and `Pose.flr` were added inside protocol 18,
+`Pose.opts`, so a further rule needs a field of its own); 24 enemy slots 0..254 (`COOP_ENE_SLOTS`, the PC's
+255 slots) in every slot field, and `EV_FX` marks its `FX_*` references in `refs` (the bytes 253..255 are slots now). `Pose.pflg` and `Pose.flr` were added inside protocol 18,
 `Pose.rcase` inside protocol 22, the aim pitch in `Pose.pflg`'s spare bits inside protocol 23 (0 means "not
 sent", and receivers fall back; a receiver before the pitch reads `pflg & 6` only and keeps the straight pose).
 
@@ -1076,7 +1077,7 @@ over its datagrams.
 | 16-31 | `seq` (sender's frame counter; older poses dropped), `t_ms`, `echo_ms`, `echo_age` (ping) |
 | 32-39 | `chr`, `costume`, `stg`, `rom`, `pos` (room entry point), `opts` (host's game rules: `OPT_INDIVIDUAL` 1, `OPT_TRADE_FREEZE` 2, `OPT_IMPORTANT` 4, `OPT_NO_RIBBON` 8, `OPT_SKIP_SYNC` 16, `OPT_GAMEOVER_BOTH` 32, `OPT_SKIP_DETECTOR` 64, `OPT_QUICK_START` 128), `regroup` (host counter), `mfile` (sender's own part file - 10) |
 | 40-91 | position (3 floats), angles (3 ints), `mtn_no`, `frm_no` (the frame shown, before the step's advance: `actor_frame`), `mtn_md`, `hokan_count`, `hokan_rate`, `wpnr_no`, `hp`, `mode0`, `mode1`, `nev`, `nene` |
-| 92-107 | `stflg`, `ev_ack` (highest event id applied from the peer), `mset` (`MSET_OWN` -1, `MSET_ROOM` -2, `MSET_NONE` -3, or an enemy slot), `busy` (`BUSY_NONE/EVENT/MENU/BOX/TRADE`), `reject` (`PKT_BYE`, `PKT_REJECT`) or, in `PKT_POSE`, `rcase` (the room case of the room the sender is in + 1, 0 not sent; same room means the same case too, and the follow loads it), `voice_n`, `voice`, `pflg` (`flg & 6`: hit / held; bits 0 and 3-7 the aim pitch, -31..31 steps of 60/31 degrees, 0 straight or not sent: `coop_pitch_get`), `flr` (`flr_no + 3`, 0 not sent) |
+| 92-107 | `stflg`, `ev_ack` (highest event id applied from the peer), `mset` (`MSET_OWN` -1, `MSET_ROOM` -2, `MSET_NONE` -3, or an enemy slot 0..254), `busy` (`BUSY_NONE/EVENT/MENU/BOX/TRADE`), `reject` (`PKT_BYE`, `PKT_REJECT`) or, in `PKT_POSE`, `rcase` (the room case of the room the sender is in + 1, 0 not sent; same room means the same case too, and the follow loads it), `voice_n`, `voice`, `pflg` (`flg & 6`: hit / held; bits 0 and 3-7 the aim pitch, -31..31 steps of 60/31 degrees, 0 straight or not sent: `coop_pitch_get`), `flr` (`flr_no + 3`, 0 not sent) |
 
 `flags`: `PF_IN_GAME` 1, `PF_VISIBLE` 2, `PF_ROOM_MTN` 4, `PF_WANT_BLOB` 8 (joiner asks for the
 game state), `PF_EXT` 16 (a `PoseExt` follows), `PF_CINE` 32 (in a cutscene its skip button could
@@ -1100,13 +1101,13 @@ skips at once.
 
 ### EneSnap (100 bytes)
 
-Slot, `mode[4]`, model index (`mlwP` as index into the enemy's `mdl[]`, -1..15), motion set (offset
+Slot (0..254), `mode[4]`, model index (`mlwP` as index into the enemy's `mdl[]`, -1..15), motion set (offset
 0..511 from the enemy's own set, `MNW_ROOM`, `MNW_KEEP`), `flg flg2 stflg mdflg`, position, angles,
 `mtn_no` (< 512), `frm_no`, `mtn_md`, `hokan_count`, `hokan_rate`, hp, hit capsule `watr[7]`.
 
 ### Events
 
-`Event` (88 bytes): `id` (reliable, in order), `type`, `idx` (enemy slot or a type-specific index),
+`Event` (88 bytes): `id` (reliable, in order), `type`, `idx` (enemy slot 0..254 or a type-specific index),
 `stg`, `rom` (events for another room are dropped), then an 80-byte payload.
 
 | Type | Id | Direction | Payload |
@@ -1118,7 +1119,7 @@ Slot, `mode[4]`, model index (`mlwP` as index into the enemy's `mdl[]`, -1..15),
 | `EV_PICKUP` | 5 | either | Item taken: item for the partner too (0: spot only), spot, its `it_flg` bit; `undo` 1 (host only, bit given): both took that spot, the joiner's pickup goes back |
 | `EV_LOST` | 6 | either | A key item used up |
 | `EV_ESTATE` | 7 | either | Grab state chunk (enemy work, `exp0`, linked child, the player) |
-| `EV_GRAB` | 8 | host | A zombie grab handed to the joiner: child slot, model/set indices, the stand-in's flag changes, the `EV_ESTATE` transfer id |
+| `EV_GRAB` | 8 | host | A zombie grab handed to the joiner: child slot (255 none), model/set indices, the stand-in's flag changes, the `EV_ESTATE` transfer id |
 | `EV_UNGRAB` | 9 | joiner | The grab handed back (with or without state) |
 | `EV_TRIG` | 10 | either | World event block: gate flag set/bit/value, room case, script signature, action offsets (24 per event, up to 48) |
 | `EV_TRADE` | 11 | either | F3 trade: `TD_OFFER`, `TD_ANSWER`, `TD_CANCEL`, `TD_QUERY`; transaction id, item word |
@@ -1127,7 +1128,7 @@ Slot, `mode[4]`, model index (`mlwP` as index into the enemy's `mdl[]`, -1..15),
 | `EV_SPAWN` | 14 | host | An added enemy (`SpawnNote`), or a randomizer record the host kept |
 | `EV_EOPTS` | 15 | host | Enemy options: extra 0..3, placements, randomizer, seed, variety 0..1, event enemies 0..1 |
 | `EV_ATR` | 16 | either | 1..2 room records (wall, trigger, floor, object) after a world event |
-| `EV_FX` | 17 | either | An effect started here (`FX_BURST` 308, `FX_PARTICLE` 302, `FX_ARM`, or a generic entry) |
+| `EV_FX` | 17 | either | An effect started here (`FX_BURST` 308, `FX_PARTICLE` 302, `FX_ARM`, or a generic entry). What it follows (`idx`), its model's owner and `exp0` are each an enemy slot or, with their bit in `refs` (`FXR_IDX` 1, `FXR_OWNER` 2, `FXR_EXP0` 4), `FX_RECEIVER` 0, `FX_SENDER` 1 or `FX_NONE` 2 |
 | `EV_GRANT` | 18 | either | An event gave the sender an item: item, count, floor, position |
 | `EV_TSCREEN` | 19 | either | Trade screen op (below) |
 | `EV_GONE` | 20 | joiner | Dead enemies (up to 26: slot, type, model version) |
@@ -1181,10 +1182,10 @@ stream or game):
   `EV_GRAB`, `EV_BOXFIX`, `EV_SPAWN`, `EV_EOPTS`, `EV_SKIP`, `TS_SWAP`, `TS_QUERY`; joiner-only: `EV_UNGRAB`,
   `EV_GONE`, `EV_OWN`, `TS_DONE`). Examples: joints -1..63, damage 0..10000 and none on an absent
   joint, only the hit bits, weapon < 23; flag words < 120; item words id 1..155, count <= 999; enemy
-  slots < 128; transfer chunks aligned and inside the total; effect ids < 400, references an enemy
+  slots < 255; transfer chunks aligned and inside the total; effect ids < 400, references an enemy
   slot or `FX_*`; world-record objects in slots 4..31; grant positions within the save format;
   `EV_SKIP` only `SKIP_GO` in a room 0..9 / 0..99.
-* Every snapshot: slot < 128, model index -1..15, motion set and motion < 512, finite floats.
+* Every snapshot: slot < 255, model index -1..15, motion set and motion < 512, finite floats.
 
 Then, when applying:
 

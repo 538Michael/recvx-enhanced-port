@@ -30,7 +30,7 @@ void coop_test_aids(CoopTest* t)
         static int in;
         int k, held = 0;
         if (bg == (const char*)-1) bg = getenv("RECVX_COOP_BYE_GRABBED");
-        for (k = 0; bg && !t->host && t->on && k < 128; k++) held |= t->owned[k];
+        for (k = 0; bg && !t->host && t->on && k < PC_ENE_SLOTS; k++) held |= t->owned[k];
         in = held ? in + 1 : 0;
         if (bg && in > atoi(bg)) { bg = NULL; t->req = COOP_REQ_STOP; host_log("coop: test: disconnect while grabbed\n"); }
     }
@@ -42,14 +42,14 @@ void coop_test_aids(CoopTest* t)
         int k, n;
         if (kl == (const char*)-1) kl = getenv("RECVX_COOP_KILL");
         if (kl && sys && plp && t->in_game && sscanf(kl, "%u:%d%n", &f, &k, &n) == 2 && t->clock >= f) {
-            if (k >= 0 && k < 128 && (ene[k].flg & 0x1) && ene[k].mlwP) {
+            if (k >= 0 && k < PC_ENE_SLOTS && (ene[k].flg & 0x1) && ene[k].mlwP) {
                 ene[k].dam[1] += 1000;   /* (bhEne_CalcDamage skips joint 0) */
                 ene[k].flg |= 0x4;
                 ene[k].djnt_no = 1;
                 ene[k].wpnr_no = 3;      /* the handgun */
                 ene[k].dpx = ene[k].px; ene[k].dpy = ene[k].py + 10; ene[k].dpz = ene[k].pz;
             }
-            host_log("coop: test: lethal hit on enemy %d (hp %d, owned %d) at host frame %u\n", k, k >= 0 && k < 128 ? ene[k].hp : 0, k >= 0 && k < 128 ? t->owned[k] : 0, t->clock);
+            host_log("coop: test: lethal hit on enemy %d (hp %d, owned %d) at host frame %u\n", k, k >= 0 && k < PC_ENE_SLOTS ? ene[k].hp : 0, k >= 0 && k < PC_ENE_SLOTS ? t->owned[k] : 0, t->clock);
             kl = kl[n] == ',' ? kl + n + 1 : NULL;
         }
     }
@@ -97,7 +97,7 @@ void coop_test_aids(CoopTest* t)
         float bd = 1e9f;
         if (vomit == (const char*)-1) vomit = getenv("RECVX_COOP_VOMIT");
         if (vomit && t->host && sys && t->proxy_ok && sscanf(vomit, "%u", &vf) == 1 && t->frame >= vf) {
-            for (i = 0; i < (int)sys->ewk_n && i < 128; i++) {
+            for (i = 0; i < (int)sys->ewk_n && i < PC_ENE_SLOTS; i++) {
                 float dx = ene[i].px - t->partner->px, dz = ene[i].pz - t->partner->pz;
                 if ((ene[i].flg & 0x1) && ene[i].id == 1 && ene[i].type < 16 && (0xFC33 >> ene[i].type & 1) && ene[i].mode0 == 1 && !(ene[i].flg & 0x80) && ene[i].exp0 && !t->owned[i] && dx * dx + dz * dz < bd) { bd = dx * dx + dz * dz; best = i; }
             }
@@ -115,7 +115,7 @@ void coop_test_aids(CoopTest* t)
         int i, n = 0;
         if (cr == (const char*)-1) cr = getenv("RECVX_COOP_CRAWL");
         if (cr && t->host && sys && t->in_game && sscanf(cr, "%u", &cf) == 1 && t->frame >= cf) {
-            for (i = 0; i < (int)sys->ewk_n && i < 128; i++) {
+            for (i = 0; i < (int)sys->ewk_n && i < PC_ENE_SLOTS; i++) {
                 BH_PWORK* ep = &ene[i];
                 BH_PWORK* c = (BH_PWORK*)ep->exp1;
                 if (!(ep->flg & 0x1) || ep->id != 1 || (ep->flg & 0x80) || !ep->exp0 || ep->mode0 != 1 || ep->hp < 0 || t->owned[i] ||
@@ -128,7 +128,7 @@ void coop_test_aids(CoopTest* t)
                 ep->type = ep->type == 1 ? 3 : 2;
                 ep->mtn_add = 0;
                 if (ep->hp > 15) ep->hp = 15;
-                if (c >= ene && c < ene + 128) { *(int*)&c->mode0 = *(int*)&ep->mode0; c->mtn_add = 0; c->type = ep->type; }
+                if (c >= ene && c < ene + PC_ENE_SLOTS) { *(int*)&c->mode0 = *(int*)&ep->mode0; c->mtn_add = 0; c->type = ep->type; }
                 n++;
             }
             host_log("coop: test: %d zombies crawl now (host frame %u)\n", n, t->frame);
@@ -142,7 +142,7 @@ void coop_test_aids(CoopTest* t)
             unsigned int h = 0;
             int i, f, n = 0, near_i = 0;
             float nd = 1e9f;
-            for (i = 0; i < (int)sys->ewk_n && i < 128; i++)
+            for (i = 0; i < (int)sys->ewk_n && i < PC_ENE_SLOTS; i++)
                 if (ene[i].flg & 0x1) {
                     unsigned int v[5] = { 0, 0, (unsigned int)ene[i].mtn_no, (unsigned int)ene[i].frm_no, (unsigned int)ene[i].ay };
                     float dx = ene[i].px - plp->px, dz = ene[i].pz - plp->pz;
@@ -151,7 +151,7 @@ void coop_test_aids(CoopTest* t)
                     if (ene[i].id == 1 && dx * dx + dz * dz < nd) { nd = dx * dx + dz * dz; near_i = i; }
                 }
             if (t->frame % 300 == 0)
-                for (i = 0; i < (int)sys->ewk_n && i < 128; i++)
+                for (i = 0; i < (int)sys->ewk_n && i < PC_ENE_SLOTS; i++)
                     if ((ene[i].flg & 0x1) && ene[i].id < 31) host_log("coop: trade trace: enemy %d id %d at (%.1f %.1f) mode %d\n", i, ene[i].id, ene[i].px, ene[i].pz, ene[i].mode0);
             host_log("coop: trade trace: frozen %d, %d enemies, state hash %08x, nearest zombie %d at (%.2f %.2f) %.1f away, motion %d frame %d, us (%.1f %.1f) hp %d mode %d\n",
                      t->frozen, n, h, near_i, ene[near_i].px, ene[near_i].pz, sqrtf(nd), ene[near_i].mtn_no, ene[near_i].frm_no >> 16, plp->px, plp->pz, plp->hp, plp->mode0);

@@ -374,7 +374,7 @@ static void randomize(const EnemyOpts* o)
                 if ((f & K_NOCOUNT) && all_dead_check) w[i] = 0;
                 if ((f & K_RMFLG) && rm_flg_used) w[i] = 0;
                 if ((f & K_HEAVY) && heavy) w[i] = 0;
-                if (cost - slot_cost(save.id) + kt[i].cost > 128 - SPAWN_SLOTS_FREE) w[i] = 0;
+                if (cost - slot_cost(save.id) + kt[i].cost > PC_ENE_SLOTS - SPAWN_SLOTS_FREE) w[i] = 0;
                 if (w[i] && (f & K_BIG)) {
                     if (big < 0) big = open_dirs(&save, 35.0f);
                     if (big < 5) w[i] = 0;
@@ -507,7 +507,7 @@ static void headshot_test(void)
     if (n < 0 || !sys || !plp || (sys->gm_flg & 0x9) || (sys->cb_flg & 0x1)) return;
     if (gen != enemy_room_gen) { gen = enemy_room_gen; t = 0; }
     if (++t < n || t > n + 90) return;
-    for (k = 0; k < (int)sys->ewk_n && k < 128; k++) {
+    for (k = 0; k < (int)sys->ewk_n && k < PC_ENE_SLOTS; k++) {
         BH_PWORK* ep = &ene[k];
         if (!(ep->flg & 0x1) || ep->id != 1 || (ep->flg & 0x80) || !ep->exp0) continue;
         if (t == n && !(ep->flg & 0x2) && !(ep->stflg & 0x1000000) && ep->mode0 == 1) {

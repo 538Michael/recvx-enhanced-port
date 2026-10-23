@@ -455,7 +455,7 @@ packets) make these file and save limits that the PC does not raise:
 | Routes | 255 | u8 ids, 255 = none |
 | Lights / event lights | 256 / 128 | `hidlgt` masks, byte operands |
 | Effects | 256 records | `efid[256]`; ids < 450 |
-| Enemies / objects / items | 128 slots (incl. children) / 32 (4 reserved) / 32 | runtime arrays |
+| Enemies / objects / items | 128 (slots incl. children; the PC has 255 slots, records stay within 128) / 32 (4 reserved) / 32 | runtime arrays |
 | Floor levels | `flr_no` -2..28 | `grand[32]`, `grand[31]` = 0 |
 | Messages, event cameras | 256; 16 key frames per event camera | byte operands |
 | Names | stage 1 digit, room 2, case 1 | file name pattern |

@@ -10,7 +10,7 @@ unless noted; types are in `decomp/include/ps2/veronica/prog/types.h`. Related:
 ## Summary
 
 * All characters and enemies are `BH_PWORK` (0x580 bytes): the player is `ply` (`plp`), enemies
-  `ene[128]`. A model is an `ML_WORK`: a flat array of `NJS_CNK_OBJECT` nodes in depth-first
+  `ene[]` (128; 255 on the PC). A model is an `ML_WORK`: a flat array of `NJS_CNK_OBJECT` nodes in depth-first
   order plus one `O_WORK` (matrix) per node. Motions (`MN_WORK`) are per-frame keys, one track
   per node, bound to the skeleton **purely by node index**.
 * The four player files (Claire, Chris, Steve, Wesker; Claire's second costume) share **the same

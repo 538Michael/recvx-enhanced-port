@@ -1089,7 +1089,7 @@ static BH_PWORK* shadow_step(Shadow* s, BH_PWORK* src, int from)
     if (set == src->mnwPb) {   /* base and weapon motions: the same number */
         if (s->mth[mtn].datP && s->mth[mtn].obj_num <= 22) set = s->mth;
     } else {   /* grabbed: the player plays the enemy's set */
-        for (i = 0; i < (int)sys->ewk_n && i < 128; i++)
+        for (i = 0; i < (int)sys->ewk_n && i < PC_ENE_SLOTS; i++)
             if ((ene[i].flg & 0x1) && (ene[i].mnwP == set || ene[i].mnwPb == set)) {
                 k = appear_grab_motion(ene[i].id, mtn, from, s->chr);
                 if (k >= 0 && set[k].datP && set[k].obj_num <= 22) mtn = k;
@@ -1537,7 +1537,7 @@ static int double_acting(const BH_PWORK* ep, int pid)
 int actor_double_acting(void)
 {
     int i;
-    for (i = 0; i < (int)sys->ewk_n && i < 128; i++) if (double_acting(&ene[i], sys->ply_id & 3)) return 1;
+    for (i = 0; i < (int)sys->ewk_n && i < PC_ENE_SLOTS; i++) if (double_acting(&ene[i], sys->ply_id & 3)) return 1;
     return 0;
 }
 
@@ -1549,7 +1549,7 @@ void actor_double_tick(void)
     int i, pid = sys->ply_id & 3;
     dbl_posed = NULL;
     if (d->model < 0 || !d->rig.ok) return;
-    for (i = 0; i < (int)sys->ewk_n && i < 128; i++) {
+    for (i = 0; i < (int)sys->ewk_n && i < PC_ENE_SLOTS; i++) {
         BH_PWORK* ep = &ene[i];
         if (!double_acting(ep, pid)) continue;
         if (d->face) face_step(d, ep);
@@ -1575,7 +1575,7 @@ void actor_doubles(int idx)
     dbl_kept = idx >= 0 && idx < ACTOR_MODELS && actor_models[idx].id == doubles[pid][0];
     if (dbl_kept) idx = -1;   /* the played character's own cutscene model: the game's double (its face, its hands, its head part) */
     if (idx >= 0)
-        for (i = 0; i < (int)sys->ewk_n && i < 128 && !any; i++)
+        for (i = 0; i < (int)sys->ewk_n && i < PC_ENE_SLOTS && !any; i++)
             for (j = 0; j < 3; j++) any |= (ene[i].flg & 0x1) && doubles[pid][j] && ene[i].id == doubles[pid][j];
     actor_set(ACTOR_DOUBLE, any ? idx : -1);
 }
