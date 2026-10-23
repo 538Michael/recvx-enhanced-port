@@ -18,8 +18,10 @@ int pad_quickturn_held(void);
 uint64_t gs_frame_count(void);
 
 #define RUN_PUSH 0.7f                   /* the stick pushed this far runs */
+#define MOVE_REBASE 10                  /* game frames after a special move in which a cut is not held */
 
 static ModernHold hold;
+static uint64_t move_end;               /* the last frame of a special move (stairs, ladder, climbing over, pushing) */
 static float target;                    /* the angle to turn to this frame */
 static int steer;                       /* modern_pad asked modern_player to turn */
 
@@ -65,6 +67,10 @@ unsigned int modern_pad(unsigned int pad)
     /* the camera on screen: its right axis (first column of the view matrix) on the ground */
     rx = m[0]; rz = m[8];
     cut = cam.ncut | cam.camver << 8;
+    /* a special move steers itself, so a cut during it (or as control returns) is not held: back
+       in control, the direction takes the camera on screen now */
+    if (plp->mode2 > 13 || plp->mode2 == 12) move_end = gs_frame_count();
+    else if (gs_frame_count() - move_end <= MOVE_REBASE && hold.cut != cut) hold.held = 0;
     modern_hold(&hold, atan2f(x, y) * (32768.0f / 3.14159265f), cut, &rx, &rz);
     target = modern_target(rx, rz, x, y);
     d = modern_wrap(target - (short)plp->ay);

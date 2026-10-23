@@ -20,6 +20,9 @@
 - **Vibration**: gamepads with rumble now vibrate as the original controller did, when you shoot,
   get grabbed or hit, and in big moments. OPTION's VIBRATION can now be chosen when such a gamepad
   is connected, and a new Vibration strength setting (CONTROLS) makes it softer.
+- **Modern controls after stairs**: when the camera changes while you climb stairs or a ladder, or
+  climb over something, the stick now follows the new camera as soon as you are back in control,
+  instead of keeping the old camera's directions until you let go.
 
 ### Co-op
 
