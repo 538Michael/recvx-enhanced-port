@@ -43,6 +43,7 @@ struct Frame {
     int partial, continuation;
     uint64_t scene;                          /* pc_frame_view: stage, room, cut */
     float view[6];                           /* ... and the camera's eye and view direction */
+    float cam[STREAM_CAM];                   /* ... and its matrix and projection (unmatched meshes move with it) */
     float pt[3]; int pt_flags;               /* stream_point */
     int fade;                                /* pc_frame_fade: the picture shows through a screen fade */
     /* filled by the render thread when executed */
@@ -323,8 +324,8 @@ void stream_submit(void)
 {
     extern int gs_take_view_change(void);
     extern void pc_view_changed(void);
-    extern uint64_t pc_frame_view(float view[6]);
-    recording()->scene = pc_frame_view(rec->view);
+    extern uint64_t pc_frame_view(float view[6], float cam[STREAM_CAM]);
+    recording()->scene = pc_frame_view(rec->view, rec->cam);
     memcpy(rec->pt, point, sizeof(point));
     rec->pt_flags = point_flags;
     point_flags = 0;
@@ -664,11 +665,74 @@ static int view_cut(const Frame* p, const Frame* c)
     return 1;
 }
 
+/* A mesh none of whose instances was drawn in the previous frame cannot be blended vertex for
+   vertex. Drawn as in the new frame it stood still on the screen while the camera's in-between
+   images moved everything around it: with a moving camera (third person, a fixed camera
+   panning) it jumped against the scene and sank into or rose out of the wall or floor it lies
+   on. Enemies that animate by switching models are such meshes in every switch frame: the bugs
+   of 9/17 cycle four models (en10.c, en71.c), all switching every third game frame. Instead the
+   mesh moves with the camera: its view-space position in the new frame, put back into the
+   previous frame's view (as if it stood still in the world), is its previous position
+   (cam_move, nv_camera); its own motion in that one game frame is not blended. Not for effects
+   (their first frame, mostly at something moving: a muzzle flash), single strips missing from a
+   matched mesh (parts of the player turning with the third-person camera) or a mesh whose
+   instances all moved too far to pair (the player when the third-person camera swings past her
+   at a wall): those stay as in the new frame. NAT_CAMERA in nat_prev. */
+#define NAT_CAMERA (-2)
+static float cam_a[9], cam_b[3];      /* view_prev = view_cur * A + b (row vectors) */
+static const float *cam_cur, *cam_prev;
+/* 1 if both frames have a camera and it differs; sets cam_a, cam_b */
+static int cam_move(const Frame* p, const Frame* c)
+{
+    const float *r = c->cam, *q = p->cam;
+    float inv[9], det;
+    if (r[12] == 0.0f || q[12] == 0.0f || r[13] == 0.0f || q[13] == 0.0f || !memcmp(r, q, sizeof(c->cam))) return 0;
+    inv[0] = r[4] * r[8] - r[5] * r[7]; inv[1] = r[2] * r[7] - r[1] * r[8]; inv[2] = r[1] * r[5] - r[2] * r[4];
+    inv[3] = r[5] * r[6] - r[3] * r[8]; inv[4] = r[0] * r[8] - r[2] * r[6]; inv[5] = r[2] * r[3] - r[0] * r[5];
+    inv[6] = r[3] * r[7] - r[4] * r[6]; inv[7] = r[1] * r[6] - r[0] * r[7]; inv[8] = r[0] * r[4] - r[1] * r[3];
+    det = r[0] * inv[0] + r[1] * inv[3] + r[2] * inv[6];
+    if (!(det > 1e-12f || det < -1e-12f)) return 0;
+    for (int i = 0; i < 9; i++) inv[i] /= det;
+    for (int i = 0; i < 3; i++)
+        for (int j = 0; j < 3; j++) cam_a[i * 3 + j] = inv[i * 3] * q[j] + inv[i * 3 + 1] * q[3 + j] + inv[i * 3 + 2] * q[6 + j];
+    for (int j = 0; j < 3; j++) cam_b[j] = q[9 + j] - (r[9] * cam_a[j] + r[10] * cam_a[3 + j] + r[11] * cam_a[6 + j]);
+    cam_cur = r; cam_prev = q;
+    return 1;
+}
+/* v (the new frame's) as the previous frame's camera would have drawn it */
+static NativeVertex nv_camera(const NativeVertex* v)
+{
+    const float *r = cam_cur, *q = cam_prev;
+    NativeVertex o = *v;
+    float vx = (v->x - r[14] * v->w) / r[12], vy = (v->y - r[15] * v->w) / r[13], vz = v->w, x, y, z;
+    x = vx * cam_a[0] + vy * cam_a[3] + vz * cam_a[6] + cam_b[0];
+    y = vx * cam_a[1] + vy * cam_a[4] + vz * cam_a[7] + cam_b[1];
+    z = vx * cam_a[2] + vy * cam_a[5] + vz * cam_a[8] + cam_b[2];
+    o.x = q[14] * z + q[12] * x; o.y = q[15] * z + q[13] * y;   /* as native_glue.c pc_native_strip */
+    o.z = -q[17] - q[16] * z; o.w = z;
+    o.near_d = z - q[18]; o.far_d = q[19] - z;
+    return o;
+}
+
+/* group g of the matched frame c moves with the camera (NAT_CAMERA): a native strip in 3D; a 2D
+   polygon (w = 1, native_glue.c pc_native_prim) is not in the world. Returns its vertices. */
+static size_t mark_camera(const Frame* c, const Group* g)
+{
+    const NativeVertex* v;
+    if (!(g->key0 & NATIVE_KEY)) return 0;
+    v = native_verts(c, g->v0);
+    for (uint32_t k = 0; k < g->nv && k < 64; k++)
+        if (v[k].w == 1.0f) return 0;
+    nat_prev[g->v0] = NAT_CAMERA;
+    return g->nv;
+}
+
 /* match frame c against p; 1 if in-between frames make sense */
 int stream_match(const Frame* p, const Frame* c)
 {
     static uint32_t* order; static uint8_t* used; static size_t cap_order;
-    size_t tagged[2] = { 0, 0 }, matched[2] = { 0, 0 }, no_inst = 0, unpaired = 0;   /* [1]: effects (odd tags, pc_effect_tag) */
+    size_t tagged[2] = { 0, 0 }, matched[2] = { 0, 0 }, no_inst = 0, unpaired = 0, with_cam = 0;   /* [1]: effects (odd tags, pc_effect_tag) */
+    int moving;
     matched_for = NULL;
     if (!p || !c || c->continuation || p->partial || (!c->nvx && !c->nin)) return 0;
     if (p->scene != c->scene) {
@@ -676,6 +740,7 @@ int stream_match(const Frame* p, const Frame* c)
         return 0;
     }
     if (view_cut(p, c)) return 0;
+    moving = cam_move(p, c);
     frame_spos(p);
     frame_spos(c);
     if (c->nvx > cap_prev) {
@@ -716,7 +781,14 @@ int stream_match(const Frame* p, const Frame* c)
             d = inst_pair(p, a, c, b);
             if (d >= 0 && d < best_d) { best_d = d; best = m; }
         }
-        if (best == (size_t)-1) { for (uint32_t k = 0; k < b->ng; k++) no_inst += c->g[b->g0 + k].nv; continue; }
+        if (best == (size_t)-1) {
+            for (uint32_t k = 0; k < b->ng; k++) {
+                const Group* g = &c->g[b->g0 + k];
+                no_inst += g->nv;
+                if (moving && !fx && (lo == p->nin || p->in[order[lo]].mesh != b->mesh)) with_cam += mark_camera(c, g);   /* no instance of it at all */
+            }
+            continue;
+        }
         used[best] = 1;
         inst_pair(p, &p->in[order[best]], c, b);   /* the pairs of the chosen instance */
         {
@@ -739,7 +811,7 @@ int stream_match(const Frame* p, const Frame* c)
         }
     }
     {
-        if (interp_stats()) printf("interp: meshes %zu/%zu, vertices %zu/%zu tagged matched, effects %zu/%zu, %zu total; unmatched: %zu no instance, %zu unpaired groups\n", c->nin, p->nin, matched[0], tagged[0], matched[1], tagged[1], c->nvx, no_inst, unpaired);
+        if (interp_stats()) printf("interp: meshes %zu/%zu, vertices %zu/%zu tagged matched, effects %zu/%zu, %zu total; unmatched: %zu no instance, %zu unpaired groups, %zu moved with the camera\n", c->nin, p->nin, matched[0], tagged[0], matched[1], tagged[1], c->nvx, no_inst, unpaired, with_cam);
     }
     /* most meshes lost or jumping although the camera did not cut: a scene change */
     if (!matched[0] || matched[0] * 2 < tagged[0]) return 0;
@@ -848,11 +920,14 @@ void stream_replay(const Frame* r, float t)
                this is the in-between camera and object transform) and attributes, then cull,
                clip and draw */
             const NativeVertex* cur = native_verts(r, (uint32_t)i);
-            if (nat_prev[i] >= 0) {
-                const NativeVertex* prv = native_verts(nat_prev_frame, (uint32_t)nat_prev[i]);
-                NativeVertex bl[64];
+            if (nat_prev[i] >= 0 || nat_prev[i] == NAT_CAMERA) {
+                const NativeVertex* prv = nat_prev[i] >= 0 ? native_verts(nat_prev_frame, (uint32_t)nat_prev[i]) : NULL;
+                NativeVertex bl[64], pv;
                 int n = e->len > 64 ? 64 : (int)e->len;
-                for (int k = 0; k < n; k++) bl[k] = nv_blend_pos(&prv[k], &cur[k], t);
+                for (int k = 0; k < n; k++) {
+                    if (!prv) pv = nv_camera(&cur[k]);
+                    bl[k] = nv_blend_pos(prv ? &prv[k] : &pv, &cur[k], t);
+                }
                 native_draw((unsigned int)(e->v >> 32), bl, n, -1);
             } else if (r != cached_for || !gs_draw_native_cached((unsigned int)(e->v >> 32), i))   /* as the executed frame */
                 native_draw((unsigned int)(e->v >> 32), cur, (int)e->len, -1);

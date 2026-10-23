@@ -262,6 +262,15 @@ shows in-between images at the display rate:
   its animation frame (texture coordinates) and colour are the current frame's. Effects use the
   128 px limit and do not count towards the "most meshes matched" test. 2D effects, lines and
   effects with their own draw function (`ef_fnc`) stay as they are.
+- **New meshes move with the camera**: a mesh none of whose instances was drawn in the previous
+  frame is placed in the previous frame's view as if it stood still in the world and blended
+  from there (`stream.c cam_move`/`nv_camera`, with each frame's `cam.mtx` and projection from
+  `view_glue.c take_cam`). Drawn as in the new frame, it stood still on screen while everything
+  around it moved, so with a moving camera it jumped against the scene and sank into the wall or
+  floor it lies on. Enemies that animate by switching models are such meshes in every switch
+  frame: the bugs of 9/17 cycle four models (`en10.c`, `en71.c`) and all switch every third game
+  frame. Effects, strips missing from a matched mesh and meshes whose instances all moved too far
+  to pair stay as in the new frame; so does everything when the camera did not change.
 - **Frame blend**: `PS2_swap` mixes each new frame 75% over the previous display image (a
   motion trail). Replays start from the display image as the frame found it, so the trail stays
   correct. With frame blend off the swap copies the frame instead (as during movies).

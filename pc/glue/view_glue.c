@@ -177,6 +177,25 @@ int pc_model_clip(const void* center, float r)
    direction of cam.mtx, which bhControlCamera computed for the drawing. */
 static uint64_t scene_now;
 static float view_now[6];
+/* The camera the native vertices are computed with (native_glue.c pc_native_strip): cam.mtx's
+   rotation rows and translation (view = world * R + T), then the projection kx, ky, offset x, y,
+   depth a, b and the near and far planes; all 0 without a camera. stream.c moves what has no
+   counterpart in the previous frame with the camera from it (stream_match). */
+static float cam_now[STREAM_CAM];
+static void take_cam(void)
+{
+    extern float fVu1AspectH, fVu1OffsetY, Ps2_zbuff_a, Ps2_zbuff_b;
+    const float* m;
+    memset(cam_now, 0, sizeof(cam_now));
+    if (!cam.mtx) return;
+    m = &(*cam.mtx)[0];
+    for (int r = 0; r < 4; r++)
+        for (int c = 0; c < 3; c++) cam_now[r * 3 + c] = m[r * 4 + c];
+    cam_now[12] = fVu1AspectW * fVu1Projection; cam_now[13] = fVu1AspectH * fVu1Projection;
+    cam_now[14] = fVu1OffsetX; cam_now[15] = fVu1OffsetY;
+    cam_now[16] = Ps2_zbuff_a; cam_now[17] = Ps2_zbuff_b;
+    cam_now[18] = _fNaViwClipNear; cam_now[19] = _fNaViwClipFar;
+}
 static void take_view(void)
 {
     uint32_t cut = 0xFFFFFFFFu;
@@ -192,6 +211,7 @@ static void take_view(void)
             view_now[3 + r] = m[r * 4 + 2];
         }
     }
+    take_cam();
     view_taken = 1;
 }
 /* stream submit: 1 if the screen fade covers the frame but lets it through (a room's fade-in): HD
@@ -200,10 +220,11 @@ static void take_view(void)
 int pc_frame_fade(void) { return sys->fade_an > 0.0f && sys->fade_an < 255.0f; }
 
 /* stream_submit: the scene and view (eye, direction) of the frame being submitted */
-uint64_t pc_frame_view(float view[6])
+uint64_t pc_frame_view(float view[6], float camera[STREAM_CAM])
 {
     if (!view_taken) take_view();
     view_taken = 0;
     memcpy(view, view_now, sizeof(view_now));
+    memcpy(camera, cam_now, sizeof(cam_now));
     return scene_now;
 }
