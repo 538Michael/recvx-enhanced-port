@@ -935,6 +935,9 @@ floor or trigger, "Yes" chosen, an item used) hold only where the player did it.
   swap is recorded as refused so a late copy cannot apply.
 * When a session ends, held escrow goes back into the inventory (else the item box); a later
   "taken" answer removes that copy again.
+* Every item that moves in or out (trades, escrow, item box fixes) goes through `pc_rules.h` `pc_inv_add` /
+  `pc_inv_take` (ctest `rules`): all or nothing, and a word with count 0 (the Combat Knife as picked up, an empty
+  gun, Claire's Gold Lugers) takes a cell like any other.
 
 ### Saved inventories and rejoin
 
@@ -1005,10 +1008,10 @@ No item is ever moved: what a box holds stays reachable through its own screen.
 `0x910001`) and `sys->itm[383]` already lists FILE entry 0, the manual. Reading it (`fileview.c`) takes the
 item out and sets `ic_flg[15]` bit 31. The combat knife on the table of 0/0 is item record 0 (item 8) with item
 trigger 7 and `it_flg` bit 120: the room's scd1 `ItmCk` picks it up, its scd0 `ItmSetCk` leaves the spot empty
-once the bit is set. `quick_start` puts the knife (`0x80001`) in the manual's bag slot, sets `ic_flg[15]` bit 31
-and `it_flg` bit 120 and clears `ic_flg` bit 120, as `bhItmCk` does; with `OPT_IMPORTANT` (shared loot) it marks
-bit 120 as an important spot (`IMP_SPOTS`) taken by us (`IMP_TAKEN`), as `coop_item_taken` would. A bag without
-the manual is no new game's and is left alone.
+once the bit is set. `quick_start` puts the knife (`0x80000`: count 0, as `GetItem` gives it) in the manual's bag
+slot, sets `ic_flg[15]` bit 31 and `it_flg` bit 120 and clears `ic_flg` bit 120, as `bhItmCk` does; with
+`OPT_IMPORTANT` (shared loot) it marks bit 120 as an important spot (`IMP_SPOTS`) taken by us (`IMP_TAKEN`), as
+`coop_item_taken` would. A bag without the manual is no new game's and is left alone.
 
 * Host: `system.c bhSysCallMonitor` calls `pc_quick_start` right after `AllItemInit(0)`, the new-game step a
   loaded game skips (`ss_flg` 0x200); in a session as host with the rule on.
