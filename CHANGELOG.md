@@ -15,6 +15,10 @@
   were elsewhere, such as the handgun in the prison courtyard, could be missing from the floor when
   you came in, if you had got that item from the same event in an earlier co-op game since starting
   the program. It now lies there, and it glints like other items on the floor so it is easy to spot.
+- **Flickering bugs with display-rate frames**: in Chris's Antarctic Base, the swarm of bugs on the
+  walls and floor of the ant hall jittered against the walls and flickered in and out of them
+  while the camera moved, most of all in over-the-shoulder view. They now move smoothly with the
+  rest of the picture.
 
 ## 0.6.7 (2026-10-22)
 

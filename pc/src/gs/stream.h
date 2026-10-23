@@ -23,6 +23,7 @@ void     stream_movie(uint32_t tbp, int index);    /* movie frame index is the t
 enum { STREAM_PT_FRONT = 1, STREAM_PT_BEHIND = 2 };
 void     stream_point(float x, float y, float w, int flags);
 void     stream_submit(void);                       /* end of frame (buffer swap) */
+#define  STREAM_CAM 20                              /* view_glue.c pc_frame_view: the frame's camera and projection */
 void     stream_download(void* dst, uint32_t len);  /* StoreImage: waits for the pixels */
 uint64_t stream_game_frames(void);
 /* render thread */
