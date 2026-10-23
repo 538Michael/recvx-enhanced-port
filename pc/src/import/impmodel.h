@@ -19,6 +19,7 @@ typedef struct ImpStrip { int first, n, tex; } ImpStrip;   /* idx[first .. first
 typedef struct ImpModel {
     int nmesh;              /* meshes of the source model (information) */
     int eyes_left_out;      /* eyeball overlay meshes not converted (ob2.c read_mesh) */
+    float lid_travel[2];    /* the blink: how far the upper lid (left, right) goes down to close (model units; ob2.c lid_falloff) */
     int nn;
     ImpNode node[IMP_NODES];
     int nv;                 /* vertices in model space (the bind pose), weights per node */
@@ -64,9 +65,10 @@ int  imp_write_cvxm(const ImpModel* m, const char* path, float scale, unsigned g
         u32 texture block offset (64-aligned), u32 skin offset, u32 vertices, u32 nodes,
         28: u8 face[5]: the object index of each face bone (IMP_FACE_* - 1: upper and lower lid
         left, upper and lower lid right, jaw), 255 none (version 1: no face table)
+        36: float lid_travel[2] (left, right; the game's units; version 3, else 0)
      model chunk list: u32 size, MLB (bhMlbBinRealize), u32 -1
      texture block: "TIM2" chunks as bhSetMemPvpTexture reads them, then an end chunk (-1)
      skin: per vertex float pos[3], nrm[3] (model space, the game's units), u8 node[4], float w[4] */
 #define CVXM_MAGIC 0x4D495852u   /* "RXIM" */
-#define CVXM_VERSION 2
+#define CVXM_VERSION 3
 typedef struct CvxmSkin { float pos[3], nrm[3]; unsigned char node[4]; float w[4]; } CvxmSkin;

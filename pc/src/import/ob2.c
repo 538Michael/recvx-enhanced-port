@@ -430,6 +430,48 @@ static const struct { const char* id; float in, down; } fits[] = {
     { "EP05", 0.9f, 0.35f },
 };
 
+/* The upper lids' weights for our blink (actor_glue.c imp_face moves the upper lid bone down). Outbreak
+   weights skin up to the brow to that bone, some of it fully (Cindy: up to 3 cm above the lid), and the
+   rest of the lid often only by a tenth (its blink must turn that bone differently): moved as they
+   were, the forehead went down with the lid. So the weights on the upper lid bone are set from the
+   height instead: fully from the lid's margin (the lowest of its vertices with the most weight: the
+   middle of the lid) up to 4 mm above it, fading out at 12 mm (Outbreak's model units are
+   centimetres); the rest stays on the vertex's other nodes (or goes to the bone's parent, the face
+   root, which is the head): the brow and the forehead stay. The travel to close: from the margin down
+   to the lower lid's highest vertex within a centimetre to the side of it. */
+static void lid_falloff(ImpModel* m)
+{
+    const float full = 0.4f, band = 0.8f;
+    for (int u = 0; u < m->nn; u++) {
+        int f = m->node[u].face, side = f == IMP_FACE_LID_UP_L ? 0 : 1, lo = -1, vm = -1;
+        if (f != IMP_FACE_LID_UP_L && f != IMP_FACE_LID_UP_R) continue;
+        for (int i = 0; i < m->nn; i++) if (m->node[i].face == f + 1) lo = i;
+        float wx = 0, ym = 1e9f, yl = -1e9f;
+        for (int v = 0; v < m->nv; v++)
+            for (int j = 0; j < 4; j++) if (m->jnt[v][j] == u && m->wgt[v][j] > wx) wx = m->wgt[v][j];
+        for (int v = 0; v < m->nv; v++)
+            for (int j = 0; j < 4; j++)
+                if (m->jnt[v][j] == u && m->wgt[v][j] >= 0.95f * wx && m->pos[v][1] < ym) { ym = m->pos[v][1]; vm = v; }
+        for (int v = 0; v < m->nv && vm >= 0; v++)
+            for (int j = 0; j < 4; j++)
+                if (m->jnt[v][j] == lo && m->wgt[v][j] >= 0.5f && fabsf(m->pos[v][0] - m->pos[vm][0]) < 1.0f && m->pos[v][1] > yl) yl = m->pos[v][1];
+        m->lid_travel[side] = vm >= 0 && yl > -1e8f && ym > yl ? 0.95f * (ym - yl) : 0;
+        for (int v = 0; v < m->nv && vm >= 0; v++)
+            for (int j = 0; j < 4; j++) {
+                if (m->jnt[v][j] != u || m->wgt[v][j] <= 0) continue;
+                float t = fminf(1.0f, fmaxf(0.0f, 1.0f - (m->pos[v][1] - ym - full) / band)), others = 1.0f - m->wgt[v][j];
+                int k;
+                m->wgt[v][j] = t;
+                if (others > 1e-4f) { for (k = 0; k < 4; k++) if (k != j) m->wgt[v][k] *= (1.0f - t) / others; }
+                else if (t < 1.0f) {   /* (all of it was on the lid: the rest to the parent, in a free slot) */
+                    for (k = 0; k < 4 && (k == j || m->wgt[v][k] > 0); k++) {}
+                    if (k < 4) { m->jnt[v][k] = (unsigned char)m->node[u].parent; m->wgt[v][k] = 1.0f - t; }
+                    else m->wgt[v][j] = 1.0f;
+                }
+            }
+    }
+}
+
 /* Outbreak's human skeleton (players, NPCs, some enemies): clavicles 12 / 16 on the chest 11, the
    shoulders 13 / 17 below them, the head 21 on the neck 20 */
 static int human_skeleton(const ImpModel* m)
@@ -541,6 +583,7 @@ int ob2_extract(const char* isopath, const char* outdir, int what, ImportItem* i
                 char e2[160] = "";
                 ImpFit fit;
                 keep_body(&m);
+                lid_falloff(&m);
                 ob2_fit(id, &m, &fit);
                 snprintf(path, sizeof(path), "%s/%s.cvxm", dir, id);
                 if (imp_write_cvxm(&m, path, 0.1f, 0x00F00000u + 16u * (unsigned)list[li], &fit, e2, sizeof(e2))) it->player = 1;

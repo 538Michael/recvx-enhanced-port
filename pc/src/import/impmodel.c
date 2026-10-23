@@ -600,6 +600,8 @@ int imp_write_cvxm(const ImpModel* m, const char* path, float scale, unsigned gi
         }
         put(&f, face, sizeof(face));
     }
+    align(&f, 36, 0);
+    for (int k = 0; k < 2; k++) { float t = m->lid_travel[k] * scale; uint32_t u; memcpy(&u, &t, 4); put32(&f, u); }
     align(&f, 60, 0);
     put32(&f, (uint32_t)(16 + mlb.n));
     {   /* MLB header: "MDL", status 0xbc (a chunk model, as the game's), header size, objects, texlist, objects */

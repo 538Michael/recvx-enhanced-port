@@ -25,6 +25,9 @@ lists what was extracted; it is built so other games can be added as further sou
 | 10. Mouth (round 3) | the jaw arrived but turned only 0..5 degrees (the cast's masks talk mostly with lip muscles): amplified, checked in the opening's talking scene; in gameplay the jaw follows the loudness of the player's voice ("Faces") |
 | 11. Shoulders (round 3) | narrowed towards Code: Veronica's proportions and lowered at conversion (a fit per model: the arms moved with their weighted vertices, "Adjusting parts") |
 | 12. Grip (round 3) | the support hand under the gun again: below the gun hand, fingers along the gun, compared with Claire's and Chris's grips ("Posture") |
+| 13. Blink (round 4) | fixed: the whole forehead moved with the lids; the upper lid's weights are now set from the height (the lid only) and it closes by its own measured opening ("Faces") |
+| 14. Grip (round 4) | retuned: the support hand hung low and its fingers reached far past the grip; now right under the gun hand on the centre line, for all 8 characters ("Posture") |
+| 15. Lobby list (round 4) | main's MODEL page lists all imports, grouped with headers; scroll bar click; checked with 384 entries ("F4 window") |
 
 Resume notes: build with `cmake --build build`; headless run:
 `RECVX_MODS=<out> RECVX_IMPORT=outbreak2 RECVX_IMPORT_ISO=<image> build/pc/recvx --save-dir <tmp>`
@@ -269,10 +272,18 @@ wrist back along its forearm by half the hand; with the gun hand in front, the s
 up behind it, hidden by the gun hand. Compared frame by frame with Claire and Chris (side view,
 offline renders front / side / above): their grip pieces reach in from the left wrist and curl
 under the gun, Outbreak's open hand is straight. Now, in a grip (hands up to 2 apart, fading out at
-4): the left wrist goes as far below the gun hand's wrist as the source's (Claire's sideways offset
-is left out: the palm right under the gun), back along the gun (the right forearm) by a quarter of
-the hand (the hand's length and direction measured at load from its vertices), and the left hand
-is turned so its fingers point along the gun. The same for men (Chris's motions) and women
+4): the left wrist goes below the gun hand's wrist (Claire's sideways offset is left out: the palm
+right under the gun), and the left hand is turned so its fingers point along the gun (the right
+forearm; the hand's length and direction measured at load from its vertices).
+
+Fourth report: the support hand (Kevin's at least) still hung beneath the gun and reached too far
+out. With the source's full drop (0.36 below the gun hand's wrist for Chris, 0.46 for Claire, times
+the shoulder ratio) the palm hung under the gun, and with the wrist a quarter hand back the
+straight fingers (Outbreak's hands are 1.6 units, 16 cm) reached 1.2 units ahead of the gun hand's
+wrist, past the grip. Tuned against Claire and Chris (third-person side view in game; front, side
+and above offline), for all 8 characters: 0.6 of the source's drop, the wrist a twentieth of the
+hand ahead of the gun hand's: the palm right under the gun hand, the fingers ending at the front of
+the grip. The same for men (Chris's motions) and women
 (Claire's) and every arm length (offsets in the model's proportion). The right hand and the gun are
 unchanged (the shot still comes from the game's own skeleton). Dual weapons hold the hands further
 apart and keep the scaled offset only.
@@ -287,7 +298,8 @@ inside). The eyes: the face texture has the irises painted in, and a small eyeba
 the eyes). Without that scrolling it covered the irises white ("blind"), so the extractor leaves
 it out (`ob2.c read_mesh`, for the `.glb` and the `.cvxm`; the manifest notes it). The converter keeps these five bones
 (roles found from the positions: the lowest is the jaw, per side the higher lid is the upper one)
-and lists them in the `.cvxm` header (version 2; version 1 files still load, without a face).
+and lists them in the `.cvxm` header (version 2; version 1 files still load, without a face;
+version 3 adds each upper lid's travel to close).
 
 Code: Veronica: the player characters blink by switching the head's texture list (`player.c`,
 `PlyEyeTab`: after 30 ticks a 3% chance per tick, then 8 ticks: half, closed, half, open); the
@@ -296,9 +308,19 @@ driven per phoneme from the room's lip data, `bhLipSet`; `MASK_WORK.param.jawang
 angle in degrees).
 
 `actor_glue.c imp_face`, before the skinning of every pose: the same blink (own random numbers:
-the game's `rand()` is left alone), the upper lids moved down along the head's up axis by 1.7 x
-the lid gap at the closed step (the partial weights need more than the gap), the lower lids up by
-0.3; and the jaw:
+the game's `rand()` is left alone), the upper lids moved down along the head's up axis until their
+margin meets the lower lid (the lower lid stays); and the jaw:
+
+The blink (fourth report: "the whole forehead moves"). Cause: Outbreak weights skin up to the brow
+to the upper lid bone (Cindy: vertices 3 cm above the lid, some fully), while the lid's own margin
+often has only a tenth; and the lid bones sit at the same place in every model (the eyes do not),
+so the old travel (1.7 x the bone gap: 1.7 cm) was 3 to 4 times the eye's opening. The forehead and
+brows went down with the lids. Now `ob2.c lid_falloff` sets the weights on the upper lid bone from
+the height: fully from the lid's margin (the lowest of its vertices with the most weight: the
+middle of the lid) up to 4 mm above it, fading out at 12 mm, the rest on the head; it also measures
+the travel, from the margin to the lower lid's highest vertex within a centimetre to the side, and
+the `.cvxm` (version 3) carries it (0.2..1.3 cm; version 2 files: 1.1 x the bone gap). Test aid:
+`RECVX_IMPORT_BLINK=0..1` holds the lids.
 
 * **Cutscenes**: while the model stands in for a cast double, the jaw turns by the double's
   current `jawang` (the lip sync the game computes for the double anyway). Checked in the

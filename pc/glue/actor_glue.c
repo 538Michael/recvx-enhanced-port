@@ -86,6 +86,7 @@ typedef struct Disguise {
     float hand_dir[3];                  /* its left hand: wrist to fingertips at rest (the two-handed grip) */
     signed char fbone[IMP_FACES - 1];   /* its face bones (IMP_FACE_* - 1: lids, jaw), -1 none */
     int blink, blink_wait;              /* the blink: step 0..7 of it (-1 none), ticks since the last */
+    float lid_travel[2];                /* how far each upper lid goes down to close (imp_face) */
     float talk;                         /* the jaw (degrees) from the player's voice, imp_face */
     unsigned int seed;                  /* (its own random numbers: the game's rand() stays the game's) */
     struct {   /* the player characters' cutscene models: the head part the scripts link to them (Claire's
@@ -510,17 +511,19 @@ static void retarget(Disguise* d, BH_PWORK* src, const Rig* sr)
                     /* In a grip (hands up to 2 apart, fading out at 4) the palm under the gun: Code: Veronica's
                        grip pieces reach in from the wrist and curl under the weapon, Outbreak's hand is open and
                        straight (it went on along the left forearm, across and past the gun to the right, or with
-                       its wrist pulled back it hid behind the gun hand). So the wrist goes as far below the gun
-                       hand's as the source's and back along the gun (the right forearm) by a quarter of the
-                       hand; the fingers are turned along the gun below (the palm's centre under the grip). */
+                       its wrist pulled back it hid behind the gun hand; with the source's full drop and a quarter
+                       hand back it hung low and its fingers reached far past the grip). So the wrist goes 0.6 of
+                       the source's drop below the gun hand's wrist, a twentieth of the hand ahead of it along the
+                       gun (the right forearm), and the fingers are turned along the gun: the palm right under the
+                       gun hand, on the body's centre line (the source's sideways offset is left out). */
                     if (g > 0 && tr->map[8] >= 0) {
                         const float *rh = &m->owP[r].mtx[12], *re = &m->owP[(int)tr->map[8]].mtx[12];
                         for (j = 0; j < 3; j++) { y[j] = dm[4 + j]; yl += y[j] * y[j]; rd[j] = rh[j] - re[j]; rl += rd[j] * rd[j]; hl += d->hand_dir[j] * d->hand_dir[j]; }
                         if (yl > 1e-6f && rl > 1e-6f) {
-                            const float c = 0.25f;   /* (the wrist back by a quarter of the hand) */
+                            const float c = -0.05f, dk = 0.6f;   /* (tuned against Claire and Chris, all 8 characters: the wrist just ahead of the gun hand's, 0.6 of the source's drop) */
                             yl = sqrtf(yl); rl = sqrtf(rl); hl = sqrtf(hl);
                             for (j = 0; j < 3; j++) dn += off[j] * y[j] / yl;
-                            for (j = 0; j < 3; j++) off[j] += g * (dn * y[j] / yl - c * hl * rd[j] / rl - off[j]);
+                            for (j = 0; j < 3; j++) off[j] += g * (dk * dn * y[j] / yl - c * hl * rd[j] / rl - off[j]);
                         }
                     }
                 }
@@ -1030,6 +1033,15 @@ static int load_import_model(Disguise* d, int k)
         d->fbone[k] = rd32(d->keep + 4) >= 2 && d->keep[28 + k] < d->w.mdl[0].obj_num ? (signed char)d->keep[28 + k] : -1;
     d->blink = -1;
     d->blink_wait = 0;
+    for (int e = 0; e < 2; e++) {   /* how far each upper lid closes (version 3, ob2.c lid_falloff); else 1.1 x the
+        gap between the lid bones */
+        int up = d->fbone[2 * e], lo = d->fbone[2 * e + 1];
+        float t = 0;
+        if (rd32(d->keep + 4) >= 3) memcpy(&t, d->keep + 36 + 4 * e, 4);
+        if (!(t > 0 && t < 0.3f) && up >= 0 && lo >= 0) t = 1.1f * (d->w.mlwP->objP[up].pos[1] - d->w.mlwP->objP[lo].pos[1]);
+        d->lid_travel[e] = t > 0 && t < 0.3f ? t : 0;
+        if (getenv("RECVX_IMPORT_POSE")) host_log("import: lid %d travel %.3f\n", e, d->lid_travel[e]);   /* (test aid) */
+    }
     d->seed = 0x2545F491u * (unsigned)(k_seed++ + 1);
     return 1;
 }
@@ -1050,7 +1062,6 @@ static void imp_face(Disguise* d, const BH_PWORK* src, int step)
 {
     static const unsigned char tab[8] = { 0, 0, 1, 1, 2, 2, 1, 0 };   /* PlyEyeTab: 0 open, 1 half, 2 closed */
     O_WORK* ow = d->w.mlwP->owP;
-    const NJS_CNK_OBJECT* o = d->w.mlwP->objP;
     float shut = 0, jaw = 0;
     int k;
     if (step) {
@@ -1059,6 +1070,7 @@ static void imp_face(Disguise* d, const BH_PWORK* src, int step)
         else if (d->blink >= 0 && ++d->blink > 7) d->blink = -1;
     }
     if (d->blink >= 0) shut = tab[d->blink] / 2.0f;
+    if (getenv("RECVX_IMPORT_BLINK")) shut = (float)atof(getenv("RECVX_IMPORT_BLINK"));   /* test aid: the lids held (0 open, 0.5 half, 1 closed) */
     if (src && src->mskp && src->exp1 && d == &dg[ACTOR_DOUBLE]) {
         jaw = ((const MASK_WORK*)src->exp1)->param.jawang;   /* (degrees) */
         if (jaw > 1.5f) jaw += 1.5f * (jaw - 1.5f);
@@ -1074,14 +1086,11 @@ static void imp_face(Disguise* d, const BH_PWORK* src, int step)
     if (getenv("RECVX_IMPORT_JAW")) jaw = (float)atof(getenv("RECVX_IMPORT_JAW"));   /* test aid: the jaw open this far (degrees) */
     if (getenv("RECVX_IMPORT_POSE") && step && d == &dg[ACTOR_DOUBLE] && jaw != 0) host_log("import: double's jaw %.1f frame %d\n", jaw, (int)gs_frame_count());   /* (test aid) */
     jaw *= 3.14159265f / 180.0f;
-    for (k = 0; k < 2; k++) {   /* the upper lid down onto the lower one along the head's up axis (the lower one a little up) */
-        int up = d->fbone[2 * k], lo = d->fbone[2 * k + 1], c;
-        if (up < 0 || lo < 0 || shut <= 0) continue;
-        float gap = o[up].pos[1] - o[lo].pos[1];
-        for (c = 0; c < 3; c++) {
-            ow[up].mtx[12 + c] -= 1.7f * shut * gap * ow[up].mtx[4 + c];
-            ow[lo].mtx[12 + c] += 0.3f * shut * gap * ow[lo].mtx[4 + c];
-        }
+    for (k = 0; k < 2; k++) {   /* the upper lid down along the head's up axis until its margin meets the lower lid
+        (the lower lid stays). Only the lid moves: ob2.c lid_falloff left the brow's weights on the head. */
+        int up = d->fbone[2 * k], c;
+        if (up < 0 || shut <= 0) continue;
+        for (c = 0; c < 3; c++) ow[up].mtx[12 + c] -= shut * d->lid_travel[k] * ow[up].mtx[4 + c];
     }
     if (d->fbone[4] >= 0 && jaw != 0) {   /* the jaw turned about the head's x axis at its pivot (the chin down and back) */
         float* m = ow[(int)d->fbone[4]].mtx, r[3][3], cs = cosf(jaw), sn = sinf(jaw);
