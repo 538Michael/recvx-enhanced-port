@@ -74,10 +74,13 @@ typedef struct CoopState {
     int skip_sync;                  /* a cutscene both play is skipped when both pressed skip (ini coop_skip_sync) */
     int gameover_both;              /* game over: 0 each player alone, 1 both (the host's CONTINUE / NO decides; ini coop_gameover) */
     int skip_detector;              /* the prison's metal detector (0/9) never goes off, its empty security boxes rest (ini coop_skip_detector) */
+    int quick_start;                /* a new game starts with the manual read and the knife in the bag (ini coop_quick_start) */
     int hide_ip;                    /* Hide IP addresses (ini hide_ip): on screen masked, coop_shown */
 } CoopState;
 /* the session's "Metal detector: Skipped" rule (OPT_SKIP_DETECTOR): hosting our skip_detector, joining the host's (coop_glue.c) */
 int coop_skip_detector(void);
+/* the session's "Quick start" rule (OPT_QUICK_START): hosting our quick_start, joining the host's (coop_glue.c) */
+int coop_quick_start(void);
 /* Hide IP addresses: every address shown on screen goes through here. With hide_ip on, the
    text with its IPv4 addresses and the join and co-op server host names masked (net_mask_addrs),
    else text itself. A ring of 4 buffers per thread (lobby_io.c). Input fields mask as passwords. */

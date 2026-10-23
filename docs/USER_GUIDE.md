@@ -244,7 +244,8 @@ items go to both. Individual: each player takes their own copy), "Important item
 shared loot, on by default: weapons and ink ribbons lie there for each player), "Synchronized cutscene skip" (a cutscene both watch is skipped once both pressed skip),
 "Game over" (Each player, or Both: one game over is both players' and the host's Retry answers for
 both; [COOP.md](COOP.md#game-over)), "Metal detector" (Skipped, the default: the prison's metal
-detector lets you through with weapons; [COOP.md](COOP.md#metal-detector)), freezing enemies while trading, remembering partner inventories; and the connection: mode, host
+detector lets you through with weapons; [COOP.md](COOP.md#metal-detector)), "Quick start" (off by default:
+a new game starts with the manual read and the knife in the bag; [COOP.md](COOP.md#quick-start)), freezing enemies while trading, remembering partner inventories; and the connection: mode, host
 port and UPnP. See [COOP.md](COOP.md#settings). The address, room code, server, name, password
 and the save to start from or join with are chosen in the lobby (MULTIPLAYER) or F3.
 

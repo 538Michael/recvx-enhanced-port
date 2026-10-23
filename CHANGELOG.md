@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Co-op
+
+- **Quick start** (lobby GAME RULES, EXTRA EVENTS; off by default): a new co-op game starts with the manual
+  already read and the combat knife in your bag instead of on the table, for both players.
+
 ### Fixes
 
 - **Co-op: items from missed events**: a weapon or key item that an event gave your partner while you
