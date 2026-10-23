@@ -8,6 +8,7 @@
 #include "bindings.h"
 #include "modern.h"
 #include "../net/rdv_proto.h"
+#include "../import/import.h"
 #include <SDL3/SDL.h>
 #include <stdio.h>
 #include <string.h>
@@ -58,7 +59,7 @@ static const struct { const char* key; int* val; int lo, hi; } keys[] = {
     { "smooth_menus", &g_config.menu_smooth, 0, 1 },
     { "frame_blend", &g_config.frame_blend, -1, 1 },
     { "coop_port", &g_coop.port, 1, 65535 },
-    { "coop_char", &g_coop.chr, 0, COOP_CHR_MAX },
+    { "coop_char", &g_coop.chr, 0, COOP_CHR_IMPORT + ACTOR_IMPORT_MAX - 1 },   /* (imports: checked after import_registry_load) */
     { "appear_gender_anim", &g_appear_anim, 0, 1 },
     { "appear_cutscene_face", &g_appear_face, 0, 1 },
     { "appear_in_cutscenes", &g_appear_cutscene, 0, 1 },
@@ -147,7 +148,7 @@ void config_load(void)
     int v;
     FILE* f;
     path(p, sizeof(p));
-    if (!(f = pc_fopen(p, "r"))) { default_name(); player_id(); return; }
+    if (!(f = pc_fopen(p, "r"))) { import_registry_load(); default_name(); player_id(); return; }
     while (fgets(line, sizeof(line), f))
         if (sscanf(line, " coop_join = %127s", g_coop.join) == 1) continue;
         else if (sscanf(line, " coop_player_id = %127s", val) == 1) { if (!unhex(val, g_coop.pid, 16)) memset(g_coop.pid, 0, 16); continue; }
@@ -156,11 +157,14 @@ void config_load(void)
         else if (sscanf(line, " coop_name = %15[^\r\n]", g_coop.name) == 1) continue;
         else if (sscanf(line, " iso = %1023[^\r\n]", g_config.iso_path) == 1) continue;
         else if (sscanf(line, " hd_textures_dir = %1023[^\r\n]", ini_hd_dir) == 1) { SDL_strlcpy(g_config.hd_textures_dir, ini_hd_dir, sizeof(ini_hd_dir)); continue; }
+        else if (sscanf(line, " import_dir = %1023[^\r\n]", g_import.dir) == 1) continue;   /* F4 imports (pc/src/import) */
+        else if (sscanf(line, " import_outbreak2_iso = %1023[^\r\n]", g_import.iso[IMPORT_OUTBREAK2]) == 1) continue;
         else if (sscanf(line, " %63[a-z_0-9] = %127[^\r\n]", k, val) == 2 && bind_ini_line(k, trim(val))) continue;
         else if (sscanf(line, " %63[a-z_0-9] = %d", k, &v) == 2)
             for (size_t i = 0; i < SDL_arraysize(keys); i++)
                 if (!strcmp(k, keys[i].key) && v >= keys[i].lo && v <= keys[i].hi) *keys[i].val = v;
     fclose(f);
+    import_registry_load();   /* the imported player models: their chr values exist from here */
     g_coop.chr = appear_canon(g_coop.chr);   /* an event double no longer listed: its listed twin (actors.c) */
     default_name();
     player_id();
@@ -202,6 +206,8 @@ static int write_ini(FILE* f, void* ud)
     }
     if (g_config.iso_path[0]) fprintf(f, "iso = %s\n", g_config.iso_path);
     if (ini_hd_dir[0]) fprintf(f, "hd_textures_dir = %s\n", ini_hd_dir);   /* not --hd-textures */
+    if (g_import.dir[0]) fprintf(f, "import_dir = %s\n", g_import.dir);
+    if (g_import.iso[IMPORT_OUTBREAK2][0]) fprintf(f, "import_outbreak2_iso = %s\n", g_import.iso[IMPORT_OUTBREAK2]);
     bind_ini_write(f);
     return 0;
 }

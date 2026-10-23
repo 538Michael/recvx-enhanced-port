@@ -2,6 +2,7 @@
    record were picked by a census over all room files (the smallest room holding the model and,
    for a model with its own motions, its type's motion set; docs/ACTORS.md "You appear as"). */
 #include "actors.h"
+#include <stddef.h>
 
 #define MA ANIM_MALE    /* a man's (Chris's while Claire is played) */
 #define FE ANIM_FEMALE  /* a woman's (Claire's while a man is played) */
@@ -80,6 +81,21 @@ const ActorModel actor_models[] = {
 };
 _Static_assert(sizeof(actor_models) / sizeof(actor_models[0]) == ACTOR_MODELS, "ACTOR_MODELS");
 
+ActorModel actor_imports[ACTOR_IMPORT_MAX];
+char actor_import_name[ACTOR_IMPORT_MAX][96];
+char actor_import_file[ACTOR_IMPORT_MAX][1200];
+int actor_import_n;
+
+static int imports(void) { return __atomic_load_n(&actor_import_n, __ATOMIC_ACQUIRE); }
+static int import_of(int chr) { int k = chr - COOP_CHR_IMPORT; return k >= 0 && k < imports() ? k : -1; }   /* -1: not an import */
+
+const ActorModel* actor_model(int idx)
+{
+    if (idx >= 0 && idx < ACTOR_MODELS) return &actor_models[idx];
+    idx -= ACTOR_MODELS;
+    return idx >= 0 && idx < imports() ? &actor_imports[idx] : NULL;
+}
+
 /* ---------------------------------------------------------------- gender-matched animations */
 int appear_motion_chr(int anim, int played)
 {
@@ -100,6 +116,7 @@ int appear_voice(int chr)
 {
     static const signed char files[COOP_CHR_ACTOR] = { -1, 0, 1, 2, 3, 0 };
     int m = chr - COOP_CHR_ACTOR;
+    if (import_of(chr) >= 0) return actor_imports[import_of(chr)].anim == ANIM_FEMALE ? 0 : 1;
     if (chr < 0 || chr > COOP_CHR_MAX) return -1;
     if (m < 0) return files[chr];
     if (m >= 3 && m <= 4) return 2;   /* Steve's doubles */
@@ -151,6 +168,7 @@ static const short tail[] = { M(0), M(1), M(3), M(5) };
 
 int appear_canon(int chr)
 {
+    if (import_of(chr) >= 0) return chr;
     if (chr < 0 || chr > COOP_CHR_MAX) return 0;
     for (int i = 0; i < (int)(sizeof(twins) / sizeof(twins[0])); i++)
         if (chr == twins[i].hidden) return twins[i].kept;
@@ -165,25 +183,28 @@ static int tail_at(int chr)
 
 static int head(int c) { return appear_canon(c) == c && tail_at(c) < 0; }   /* listed before the tail */
 
+/* the list: the heads, the tail, then the imported models */
 int appear_count(void)
 {
     int n = 0;
     for (int c = 0; c <= COOP_CHR_MAX; c++) n += appear_canon(c) == c;
-    return n;
+    return n + imports();
 }
 
 int appear_at(int i)
 {
     for (int c = 0; c <= COOP_CHR_MAX; c++)
         if (head(c) && i-- == 0) return c;
-    return i >= 0 && i < TAILS ? tail[i] : 0;
+    if (i >= 0 && i < TAILS) return tail[i];
+    i -= TAILS;
+    return i >= 0 && i < imports() ? COOP_CHR_IMPORT + i : 0;
 }
 
 int appear_pos(int chr)
 {
-    int n = 0, t = tail_at(chr = appear_canon(chr));
-    for (int c = 0; c < (t >= 0 ? COOP_CHR_MAX + 1 : chr); c++) n += head(c);
-    return n + (t >= 0 ? t : 0);
+    int n = 0, t = tail_at(chr = appear_canon(chr)), k = import_of(chr);
+    for (int c = 0; c < (t >= 0 || k >= 0 ? COOP_CHR_MAX + 1 : chr); c++) n += head(c);
+    return n + (t >= 0 ? t : 0) + (k >= 0 ? TAILS + k : 0);
 }
 
 int appear_step(int chr, int dir)
@@ -195,5 +216,6 @@ int appear_step(int chr, int dir)
 const char* appear_name(int chr)
 {
     static const char* files[COOP_CHR_ACTOR] = { "As played", "Claire", "Chris", "Steve", "Wesker", "Claire (2nd costume)" };
+    if (import_of(chr) >= 0) return actor_imports[import_of(chr)].name;
     return chr >= 0 && chr < COOP_CHR_ACTOR ? files[chr] : chr <= COOP_CHR_MAX ? actor_models[chr - COOP_CHR_ACTOR].name : "?";
 }

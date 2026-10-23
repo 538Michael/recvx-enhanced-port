@@ -25,6 +25,16 @@ enum { ANIM_IDLE, ANIM_PLAYED, ANIM_MALE, ANIM_FEMALE };
 #define ACTOR_MODELS 62
 extern const ActorModel actor_models[];
 
+/* Player models imported from other games' discs (F4, pc/src/import; docs/IMPORT_OUTBREAK.md):
+   actor index ACTOR_MODELS + k, "You appear as" chr COOP_CHR_MAX + 1 + k. Filled by
+   import_registry_load (main thread, before the game uses them; the count is published last). */
+#define ACTOR_IMPORT_MAX 64
+extern ActorModel actor_imports[ACTOR_IMPORT_MAX];
+extern char actor_import_name[ACTOR_IMPORT_MAX][96];
+extern char actor_import_file[ACTOR_IMPORT_MAX][1200];   /* its .cvxm */
+extern int actor_import_n;
+const ActorModel* actor_model(int idx);   /* catalogue entry or import idx, NULL if none */
+
 /* "Use gender-matched animations" (ini appear_gender_anim, default 1): a model of the other sex
    than the character played moves with the motions of a player character of its own sex */
 extern int g_appear_anim;
@@ -51,6 +61,7 @@ int appear_grab_motion(int id, int mtn, int from, int to);
 /* "You appear as" (g_coop.chr): 0 the character played, 1..5 the player files, then these */
 #define COOP_CHR_ACTOR 6
 #define COOP_CHR_MAX (COOP_CHR_ACTOR + ACTOR_MODELS - 1)
+#define COOP_CHR_IMPORT (COOP_CHR_MAX + 1)   /* the imported models after the catalogue */
 
 /* The list the menus show (F3, the lobby, ENHANCED SETTINGS): one entry per distinct look, the player
    files first, the player characters' cutscene models last. Event doubles of a listed look are left

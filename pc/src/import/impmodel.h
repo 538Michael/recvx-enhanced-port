@@ -1,0 +1,55 @@
+/* A skinned model read from another game's disc, and what it is written as: glTF (.glb, with
+   PNG textures) and the "You appear as" format of this port (.cvxm). docs/IMPORT_OUTBREAK.md */
+#pragma once
+
+#define IMP_NODES 128
+#define IMP_TEX 16
+
+typedef struct ImpNode {
+    int parent;             /* -1: a root */
+    float t[3], q[4];       /* local rest translation, rotation (x, y, z, w) */
+    int keep;               /* a node of the converted (.cvxm) skeleton; 0: merged into its parent */
+} ImpNode;
+
+typedef struct ImpStrip { int first, n, tex; } ImpStrip;   /* idx[first .. first + n): a triangle strip; tex: texture slot or -1 */
+
+typedef struct ImpModel {
+    int nmesh;              /* meshes of the source model (information) */
+    int nn;
+    ImpNode node[IMP_NODES];
+    int nv;                 /* vertices in model space (the bind pose), weights per node */
+    float (*pos)[3], (*nrm)[3], (*uv)[2];
+    unsigned char (*jnt)[4];
+    float (*wgt)[4];
+    int ns, nidx;
+    ImpStrip* strip;
+    int* idx;
+    int ntex;
+    unsigned char* tim2[IMP_TEX];   /* PS2 TIM2 files (one picture each), owned */
+    int tim2_len[IMP_TEX];
+} ImpModel;
+
+void imp_free(ImpModel* m);
+int  imp_tris(const ImpModel* m);   /* triangles the strips make (degenerate ones left out) */
+/* a TIM2 picture as RGBA8 (malloc'd; 4/8-bit indexed with a 32-bit CLUT, 16/24/32-bit direct); 0 = unsupported */
+int  imp_tim2_rgba(const unsigned char* t, int len, int* w, int* h, unsigned char** rgba);
+/* texture slot k as a PNG file */
+int  imp_write_png(const ImpModel* m, int k, const char* path);
+/* glTF 2.0 binary: the skeleton, one skinned mesh (a primitive per texture), embedded PNGs;
+   `scale` turns the model's units into metres */
+int  imp_write_glb(const ImpModel* m, const char* path, const char* name, float scale, char* err, int en);
+/* the port's player-model format: the kept nodes as a Ninja chunk skeleton (all bind angles 0),
+   one mesh on node 1 (the pelvis) that pc/glue/actor_glue.c skins every frame from the weights,
+   the textures as the game's TIM2 chunks with global indices gindex + k. `scale`: model units to
+   the game's; turned 180 degrees about y (Outbreak faces +z, Code: Veronica -z). */
+int  imp_write_cvxm(const ImpModel* m, const char* path, float scale, unsigned gindex, char* err, int en);
+
+/* .cvxm layout (little endian), read by pc/glue/actor_glue.c:
+     0  "RXIM", u32 version (1), u32 model chunk list offset (60: its u32 size word, the MLB at 64),
+        u32 texture block offset (64-aligned), u32 skin offset, u32 vertices, u32 nodes
+     model chunk list: u32 size, MLB (bhMlbBinRealize), u32 -1
+     texture block: "TIM2" chunks as bhSetMemPvpTexture reads them, then an end chunk (-1)
+     skin: per vertex float pos[3], nrm[3] (model space, the game's units), u8 node[4], float w[4] */
+#define CVXM_MAGIC 0x4D495852u   /* "RXIM" */
+#define CVXM_VERSION 1
+typedef struct CvxmSkin { float pos[3], nrm[3]; unsigned char node[4]; float w[4]; } CvxmSkin;

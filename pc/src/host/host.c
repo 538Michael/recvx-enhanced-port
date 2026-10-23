@@ -11,6 +11,7 @@
 #include "lobby.h"
 #include "bindings.h"
 #include "settings.h"
+#include "../import/import.h"
 void render_loop(void);
 #include <SDL3/SDL.h>
 #include <stdarg.h>
@@ -322,6 +323,13 @@ int main(int argc, char** argv)
     config_load();
     parse_args(argc, argv);   /* command line overrides the saved settings */
     { extern void variants_load(void); variants_load(); }   /* mods/enemies.ini: custom enemies (variants.h) */
+    if (SDL_getenv("RECVX_IMPORT")) {   /* headless import (docs/IMPORT_OUTBREAK.md): RECVX_IMPORT=outbreak2, then exit */
+        int src = -1, what = SDL_getenv("RECVX_IMPORT_WHAT") ? atoi(SDL_getenv("RECVX_IMPORT_WHAT")) : IMPORT_PLAYERS;
+        for (int i = 0; i < IMPORT_SOURCES; i++) if (!strcmp(SDL_getenv("RECVX_IMPORT"), import_sources[i].key)) src = i;
+        if (src < 0) host_fatal("RECVX_IMPORT: unknown source '%s' (outbreak2)", SDL_getenv("RECVX_IMPORT"));
+        if (SDL_getenv("RECVX_IMPORT_ISO")) SDL_strlcpy(g_import.iso[src], SDL_getenv("RECVX_IMPORT_ISO"), sizeof(g_import.iso[src]));
+        exit(import_run(src, what) == 0 ? 0 : 1);
+    }
     ps2_memory_init();
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD))
