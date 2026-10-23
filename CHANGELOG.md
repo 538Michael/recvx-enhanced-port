@@ -11,6 +11,8 @@
 
 - **Combined controls** (CONTROLS, now the default): the left stick walks where it points on
   screen, the d-pad drives with tank controls, like in the Resident Evil HD remaster.
+- **Enter in OPTION**: on the keyboard, Enter now selects every OPTION entry, including ENHANCED
+  SETTINGS and RETURN TO TITLE with its yes/no question, without opening anything else afterwards.
 
 ### Co-op
 
