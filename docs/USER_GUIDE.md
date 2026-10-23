@@ -455,6 +455,7 @@ Hotkeys:
 | F1 | settings overlay |
 | F2 | cheat menu |
 | F3 | co-op window |
+| F4 | import window (models from other games' discs; [IMPORT_OUTBREAK.md](IMPORT_OUTBREAK.md), branch `outbreak-import`) |
 | F5 | third-person camera on/off |
 | F11 | windowed / fullscreen (borderless or exclusive, as chosen in Display mode) |
 | Page Up, F / Page Down | noclip fly up / down (when flying is on; R reloads now) |

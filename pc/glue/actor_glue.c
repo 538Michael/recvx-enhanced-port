@@ -1702,7 +1702,7 @@ int actor_hand_free(int who, int node)
 {
     Disguise* d = &dg[who];
     int n = d->model >= 0 && d->mapped ? d->rig.map[node] : -1;
-    return n >= 0 && !node_has_mesh(&d->w, n);
+    return n >= 0 && !d->skin && !node_has_mesh(&d->w, n);   /* (an imported model has its hands in its skinned mesh) */
 }
 
 int actor_head_node(int who) { return dg[who].model >= 0 && dg[who].rig.ok ? dg[who].rig.map[5] : -1; }
