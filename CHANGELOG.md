@@ -7,6 +7,9 @@
 - **Reload with the side pack**: once you have the side pack, ammo in the bag's last two slots now
   reloads your weapon, both with the Reload button and when you fire on an empty magazine, as in the
   original. Before, that ammo was skipped and you had to combine it in the inventory yourself.
+- **Sub machine gun reload crash**: reloading the sub machine gun, with the Reload button or by
+  firing on an empty magazine, no longer crashes the game. It has no reload animation, so the ammo
+  goes in at once and you keep aiming.
 
 ## 0.6.8 (2026-10-23)
 
