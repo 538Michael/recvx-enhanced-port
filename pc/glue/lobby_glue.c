@@ -695,7 +695,7 @@ static void edit_begin(int field)
 {
     lb.edit = field;
     if (field == F_NAME) { snprintf(lb.buf, sizeof(lb.buf), "%s", g_coop.name); lb.max = COOP_NAME_MAX - 1; }
-    else if (field == F_ADDR) { snprintf(lb.buf, sizeof(lb.buf), "%s", g_coop.join); lb.max = 79; }
+    else if (field == F_ADDR) { lb.buf[0] = 0; lb.max = 79; }   /* starts empty; left empty or cancelled, the old address stays */
     else if (field == F_SEED) { snprintf(lb.buf, sizeof(lb.buf), "%d", g_enemy_opts.seed); lb.max = 5; }
     else if (field == F_SERVER) { snprintf(lb.buf, sizeof(lb.buf), "%s", g_coop.server); lb.max = 79; }
     else if (field == F_PW) { snprintf(lb.buf, sizeof(lb.buf), "%s", g_coop.password); lb.max = 40; }
