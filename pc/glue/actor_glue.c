@@ -83,6 +83,7 @@ typedef struct Disguise {
     const CvxmSkin* skin;               /* an imported model (.cvxm): its vertices skinned every pose (imp_skin) */
     float* vtx;                         /* its vertex chunk's data (position, normal per vertex) */
     int nv;
+    float hand_len;                     /* its left hand: wrist to fingertips (the two-handed grip) */
     signed char fbone[IMP_FACES - 1];   /* its face bones (IMP_FACE_* - 1: lids, jaw), -1 none */
     int blink, blink_wait;              /* the blink: step 0..7 of it (-1 none), ticks since the last */
     unsigned int seed;                  /* (its own random numbers: the game's rand() stays the game's) */
@@ -495,7 +496,24 @@ static void retarget(Disguise* d, BH_PWORK* src, const Rig* sr)
             w = (6.0f - sqrtf(ds)) / 3.0f;
             if (w > 0) {
                 if (w > 1) w = 1;
-                for (j = 0; j < 3; j++) t[j] = m->owP[h].mtx[12 + j] + w * (m->owP[r].mtx[12 + j] + sL[j] - sR[j] - m->owP[h].mtx[12 + j]);
+                float off[3];
+                for (j = 0; j < 3; j++) off[j] = sL[j] - sR[j];
+                if (d->skin && tr->map[7] >= 0 && sr->map[7] >= 0 && sr->map[11] >= 0) {
+                    /* An imported model: the hands' offset in proportion to its shoulders (Outbreak's are a
+                       quarter wider than Claire's: unscaled, the left hand was pulled in across the body even
+                       with the arms down, which the source holds 3.5 apart); and in a grip the left hand's
+                       palm, not its wrist, onto the gun: the wrist back along its forearm by half the hand
+                       (its fingers are straight, Code: Veronica's grip pieces curl around the weapon; else
+                       they reached past the gun to the right) */
+                    float ms = rig_dist(tr, tr->map[7], u), ss = rig_dist(sr, sr->map[7], sr->map[11]), fd[3], fl = 0, k = 1, pull;
+                    if (ms > 0.1f && ss > 0.1f) k = ms / ss;
+                    for (j = 0; j < 3; j++) { fd[j] = m->owP[h].mtx[12 + j] - m->owP[f].mtx[12 + j]; fl += fd[j] * fd[j]; }
+                    fl = sqrtf(fl);
+                    pull = fl > 1e-3f ? 0.5f * d->hand_len / fl : 0;
+                    pull *= fminf(1.0f, fmaxf(0.0f, (4.0f - sqrtf(ds)) / 2.0f));   /* (only for a grip: full up to 2 apart, none from 4) */
+                    for (j = 0; j < 3; j++) off[j] = off[j] * k - fd[j] * pull;
+                }
+                for (j = 0; j < 3; j++) t[j] = m->owP[h].mtx[12 + j] + w * (m->owP[r].mtx[12 + j] + off[j] - m->owP[h].mtx[12 + j]);
                 arm_ik(m, rot, u, f, h, t);
                 for (i = 0; i < tr->n; i++) if (from[i] < 0 && tr->par[i] >= 0) follow(d, rot, i, tr->par[i]);
                 place(m, tr, rot, dm, root);
@@ -1102,6 +1120,16 @@ static int load(Disguise* d, int idx)
     d->w.mtn_add = 65536;
     anim = idx >= ACTOR_PART || actor_model(idx)->anim;
     if (anim) rig_build(&d->rig, d->w.mdl[0].objP, d->w.mdl[0].obj_num, 1);
+    d->hand_len = 0;
+    if (d->skin && d->rig.ok && d->rig.map[13] >= 0) {   /* an imported model's left hand: its farthest vertex from the wrist */
+        int i, c, hn = d->rig.map[13];
+        for (i = 0; i < d->nv; i++) {
+            float e = 0;
+            if (d->skin[i].node[0] != hn || d->skin[i].w[0] < 0.5f) continue;
+            for (c = 0; c < 3; c++) e += (d->skin[i].pos[c] - d->rig.rest[hn][c]) * (d->skin[i].pos[c] - d->rig.rest[hn][c]);
+            if (e > d->hand_len * d->hand_len) d->hand_len = sqrtf(e);
+        }
+    }
     host_log("actor: %s loaded (%d sub-models, %d nodes, %d KB texture heap), %s; map", name, d->w.mdl_n,
              d->w.mdl[0].obj_num, (heap - heap_free()) >> 10, d->rig.ok ? "player animations" : "own idle motion");
     if (d->rig.ok) { int k; for (k = 0; k < 22; k++) host_log(" %d", d->rig.map[k]); }
@@ -1505,6 +1533,23 @@ void actor_pose(int who, BH_PWORK* src)
                 for (i = 0; i < sr.n; i++) host_log("actor:  node %2d par %2d rest %7.2f %7.2f %7.2f\n", i, sr.par[i], sr.rest[i][0], sr.rest[i][1], sr.rest[i][2]);
             }
             retarget(d, drv, &sr);
+            if (getenv("RECVX_IMPORT_POSE") && d->skin && who == 0) {   /* test aid: the source's mapped joints (player node order, -1: none), as the pose dump */
+                static FILE* f;
+                char name[600];
+                const float* b = (const float*)d->w.mtxbuf;
+                if (!f) { snprintf(name, sizeof(name), "%s.src", getenv("RECVX_IMPORT_POSE")); f = fopen(name, "w"); }
+                if (f) {
+                    int k, c;
+                    fprintf(f, "%d", (int)drv->mtn_no);
+                    for (k = 0; k < 22; k++)
+                        for (c = 0; c < 3; c++) {
+                            const float* w = sr.map[k] >= 0 ? &drv->mlwP->owP[(int)sr.map[k]].mtx[12] : b + 12;
+                            fprintf(f, " %.4f", (w[0] - b[12]) * b[c * 4] + (w[1] - b[13]) * b[c * 4 + 1] + (w[2] - b[14]) * b[c * 4 + 2]);
+                        }
+                    fputc('\n', f);
+                    fflush(f);
+                }
+            }
             if (getenv("RECVX_RIG_DUMP") && who == 0 && !redraw) {   /* the feet over the floor: the source's lowest ankle/toe and the model's */
                 float fs = 1e9f, ft = 1e9f;
                 int k;
