@@ -371,6 +371,8 @@ const Setting g_settings[] = {
       .help = "Room changes, new game and loading a save without the waits the PS2 needed for its disc and sound chip. Off: as the original. In co-op each player's own." },
     { SP_GAMEPLAY, "Battle Game unlocked", V(g_config.battle_unlocked), 0, 1, 1,
       .help = "The title menu offers BATTLE GAME without a finished playthrough, with all five characters. Saves and records stay as they are; off: as the original." },
+    { SP_GAMEPLAY, "Difficulty select", V(g_config.difficulty_select), 0, 1, 1,
+      .help = "NEW GAME asks for the difficulty, as the European and Japanese versions do: Normal, Easy (supplies in the item box, more ammo per pickup) or Very Easy (also twice the health, stronger healing, weaker enemies). Off: as the US original, always Normal." },
     { SP_GAMEPLAY, "Quick knife", V(g_config.quick_knife), 0, 1, 1,
       .help = "Hold the quick-knife key (Space, right trigger; see CONTROLS) to draw the knife without the inventory; release it for the weapon before." },
     { SP_GAMEPLAY, "Auto-climb stairs", V(g_config.auto_stairs), 0, 1, 1,

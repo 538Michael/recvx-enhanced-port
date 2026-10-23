@@ -9,6 +9,12 @@
   open and the cursor glides smoothly. Menus also react sooner to a press, and quick taps are no
   longer missed. Off: menus as before.
 
+### Gameplay
+
+- **Difficulty select** (GAMEPLAY, on by default): NEW GAME now lets you choose Normal, Easy or Very
+  Easy, as in the European and Japanese versions; the menu was still hidden on the US disc (thanks to
+  Piccio23 for pointing the way). Off: always Normal, as before.
+
 ### Co-op
 
 - **Quick start** (lobby GAME RULES, EXTRA EVENTS; off by default): a new co-op game starts with the manual

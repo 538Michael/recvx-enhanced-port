@@ -170,9 +170,11 @@ Mixing types the PS2 never mixed can still show odd behaviour (a Hunter may leap
   every frame; `ed_flg` is in the save, so kills persist. `scd0` runs `EneSetCk` on the next visit
   and hides dead records; records without a `DieCk` respawn. Kill bits above 511 would not hide
   (retail uses up to 357). "All dead" checks (`DieEventCk`): rooms 3210, 4012, 5550..5710.
-* **Difficulty** (`sys->gm_mode`: 0/1 normal, 2 easy, 3 Battle Game): easy doubles the player's
-  HP (320), takes enemy HP from the second row of the type's table and changes ammo pickups
-  (`item.c getbulletmax`). Counts, placement and speed do not depend on it.
+* **Difficulty** (`sys->gm_mode`: 0 normal, 1 easy, 2 very easy, 3 Battle Game; set by the title's
+  difficulty menu, setting "Difficulty select", or the co-op lobby's START): very easy doubles the
+  player's HP (320) and takes enemy HP from the second row of the type's table; easy and very easy
+  change ammo pickups (`item.c getbulletmax`); easy keeps the enemies' normal HP (type 21 aside).
+  Counts, placement and speed do not depend on it.
 
 ## Co-op
 

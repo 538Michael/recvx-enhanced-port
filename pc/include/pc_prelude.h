@@ -166,6 +166,7 @@ int   pc_detector_skipped(void);              /* co-op rule "Metal detector: Ski
 void  pc_detector_scd1(void);                 /* ... event.c bhControlEvent before scd1: the empty security boxes rest */
 void  pc_quick_start(void);                   /* co-op rule "Quick start" (pc/glue/coop_glue.c): system.c bhSysCallMonitor after a new game's AllItemInit */
 int   pc_battle_unlocked(void);               /* host.c: setting "Battle Game unlocked" (event.c bhCk: every Battle Game character) */
+int   pc_difficulty_select(void);             /* host.c: setting "Difficulty select" (adv.c CheckButton: NEW GAME opens the difficulty menu) */
 void  coop_fx_particle(struct BH_PWORK* ewP, int lnk, const void* offP, const void* dirP, unsigned int col, unsigned int dst, int typ, int mk2);   /* effsub3.c bhSetEffParticle(Mk2) */
 /* "You appear as" (pc/glue/actor_glue.c): another model drawn in place of the player / of the
    played character's cutscene double; appear_on: in use without co-op (coop_control_remote runs) */
