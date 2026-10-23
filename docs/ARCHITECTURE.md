@@ -537,7 +537,8 @@ village, collision. The render thread (GS emulation, replays: `r_exec`, `r_inter
   degrees. The target is the direction on the ground of the view matrix's right axis (`cam.mtx`
   column 0, so cameras with roll work) combined with the stick. While the direction is held across
   a cut (`cam.ncut`, `cam.camver`) the old cut's axis stays until the direction turns by more than
-  35 degrees or is let go. Untouched: aiming (`mode1` 1), the quick-turn row (back only), the game's
+  35 degrees or is let go; not across a cut during a special move (below) or within 10 game frames
+  after one (the stairs of 1/0 cut on the frame control returns): then the current camera. Untouched: aiming (`mode1` 1), the quick-turn row (back only), the game's
   own turns (`flg 0x100000`), third person, menus, events and doors; special moves (`mode2` 12 and
   above 13: stairs, steps, pushing) only get forward, when the direction is within 90 degrees of
   the facing. Only `plp == &ply`, so in co-op only the local player; nothing is sent.

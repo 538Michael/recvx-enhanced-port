@@ -435,7 +435,9 @@ alternate controls of the Resident Evil HD remasters:
   spot first.
 - **Camera cuts**: while the direction is held through a cut, it keeps meaning what it meant in
   the previous camera, so the character keeps going the same way. The new camera takes over when
-  the direction turns by more than 35 degrees or is let go.
+  the direction turns by more than 35 degrees or is let go. A cut during stairs, a ladder,
+  climbing over or pushing does not keep the old camera: back in control, the stick follows the
+  camera on screen.
 - **Aiming** works as in Classic: holding the aim button stops, the stick or d-pad turns and aims
   up / down, the game's auto-aim and the quick knife are unchanged. Letting go of aim returns to
   modern movement.
