@@ -31,6 +31,7 @@
 #include "../src/host/lobby.h"
 #include "../src/host/settings.h"
 #include "../src/host/enemies.h"
+#include "../src/host/biorand.h"
 #include "../src/net/net.h"
 #include "../src/net/rdv_proto.h"
 #include "../src/net/coop_proto.h"   /* REC_*: what the host keeps for us */
@@ -48,6 +49,9 @@ extern const char PlyFlip[23];
 
 enum { BTN_START = 0x800, BTN_UP = 0x1000, BTN_RIGHT = 0x2000, BTN_DOWN = 0x4000, BTN_LEFT = 0x8000 };   /* Pad[] bits */
 #define TITLE_MP 4                      /* ModeCommandId of the MULTIPLAYER row */
+#define BR_ROW 3                        /* the difficulty screen's BIORAND row: cursor 3 of level 1 (pc_newgame_plates) */
+#define BR_LIFT 28.0f                   /* ... MODE SELECT that much higher */
+#define BR_Y 279.0f                     /* ... the row's text */
 
 /* ---------------------------------------------------------------- text */
 #define PRI_TEXT -1.0f
@@ -174,6 +178,9 @@ void pc_title_menu_init(void)
         ap->CursorMax[0] = 4;
         ap->ModeCommandId[0] = 0; ap->ModeCommandId[1] = 1; ap->ModeCommandId[2] = 3; ap->ModeCommandId[3] = 2;
     }
+    biorand_scan();   /* BioRand's pack: the difficulty screen's BIORAND row (pc_newgame_plates) */
+    ap->CursorMax[1] = biorand_pack() ? BR_ROW + 1 : 3;
+    if (ap->Cursor[1] >= ap->CursorMax[1]) ap->Cursor[1] = 0;
     n = ap->CursorMax[0];
     ap->ModeCommandId[n] = TITLE_MP;
     ap->CursorFlag[0][n] = 1;
@@ -181,6 +188,53 @@ void pc_title_menu_init(void)
 }
 
 void pc_tex_keep_original(int texno);
+
+/* NEW GAME's difficulty screen (DisplayNewGamePlate, CheckButton level 1: "Difficulty select") with a BIORAND row
+   when a pack is there (biorand.h; without one the game draws it, as ever): MODE SELECT 28 higher, the row between
+   it and NORMAL, "BIORAND ON" / "BIORAND OFF" in the game's font (the plates' texture lacks letters) with the seed
+   smaller after it. It is cursor 3 (CursorMax[1] 4, pc_title_menu_init): the level's cursor wraps, so up from
+   NORMAL and down from VERY EASY reach it as drawn. Confirm or a click toggles it (pc_title_mouse). */
+static void title_font(void);
+static int br_shown(void) { return AdvWork.CursorMax[1] > BR_ROW; }
+
+int pc_newgame_plates(int cursor, float fade, int flag)
+{
+    static const float v[3] = { 320.0f, 288.0f, 256.0f };   /* NORMAL, EASY, VERY EASY */
+    ADV_WORK* ap = &AdvWork;
+    unsigned int a, col;
+    char seed[32];
+    float w, x, sc = 0.85f;
+    QUAD q;
+    int i, on;
+    if (!br_shown()) return 0;
+    for (i = 0; i < 3; i++) {
+        a = (unsigned int)fade;
+        col = 0x7F7F7F;
+        if (i == cursor) { a += (unsigned int)ap->FlushCount2; col = ap->FontBaseColor; }
+        a <<= 24;
+        if (flag == 0) a = 0xFF000000;
+        SetQuadPos(224.0f, 304.0f + 32.0f * i, 193.0f, 33.0f, &q);
+        SetQuadUv2(0, v[i], 193.0f, 33.0f, 1, &q);
+        AdvEasyDrawTextureS(1, a | col, &q, 0.5f, 1, fade);
+    }
+    SetQuadPos(64.0f, 272.0f - BR_LIFT, 513.0f, 33.0f, &q);   /* MODE SELECT */
+    SetQuadUv2(0, 160.0f, 513.0f, 33.0f, 1, &q);
+    AdvEasyDrawTextureS(1, ((unsigned int)fade << 24) | 0xFFFFFF, &q, 0.5f, 1, fade);
+    FlushPlate();
+    DisplayTitleBg();
+    title_font();
+    a = (unsigned int)(255.0f * (1.0f - ap->FadeRate) * (1.0f - ap->SaverRate));
+    if (a < 8) return 1;
+    col = cursor == BR_ROW ? 0xFFFFFF : 0x9A9A9A;
+    on = biorand_setting();
+    snprintf(seed, sizeof(seed), "%s", on ? biorand_seed_text() : "");
+    w = text_w(on ? "BIORAND ON" : "BIORAND OFF", sc) + (seed[0] ? 10 + text_w(seed, 0.6f) : 0);
+    x = 320.0f - w / 2;
+    text(x, BR_Y, on ? "BIORAND ON" : "BIORAND OFF", sc, a << 24 | col);
+    if (seed[0]) text(x + text_w("BIORAND ON", sc) + 10, BR_Y + 7, seed, 0.6f, a << 24 | 0x60D060);
+    AdvEasySetTextureList(0);   /* the title's texture list again */
+    return 1;
+}
 
 /* DisplayGameModePlate with the MULTIPLAYER row (the game's 3 or 4 rows moved up to make room) */
 void pc_title_plates(int cursor, int n, float fade, int flag)
@@ -243,6 +297,7 @@ void pc_title_mouse(int level, int flag)
     for (i = 0; i < n; i++) {
         float x0, y0, w;
         if (level == 0) { x0 = 140; w = 360; y0 = title_row_y(i, n); }
+        else if (level == 1 && i == BR_ROW) { x0 = 140; w = 360; y0 = BR_Y - 4; }   /* the BIORAND row (pc_newgame_plates) */
         else if (level == 1) { x0 = 224; w = 193; y0 = 304.0f + 32.0f * i; }   /* DisplayNewGamePlate, DisplayExtraGamePlate */
         else { x0 = 64.0f + 256.0f * i; w = 256; y0 = 352; }
         if (mt.x >= x0 && mt.x < x0 + w && mt.y >= y0 && mt.y < y0 + (level == 0 && n >= 5 ? 30 : 32)) hit = i;
@@ -254,6 +309,11 @@ void pc_title_mouse(int level, int flag)
     }
     if (mt.left && hit >= 0) Pad[ap->PortId].press |= BTN_START;
     else if (mt.right) Pad[ap->PortId].press |= AdvGetCancelButton();
+    if (level == 1 && ap->Cursor[1] == BR_ROW && br_shown() && (Pad[ap->PortId].press & (BTN_START | AdvGetOkButton()))) {
+        /* the BIORAND row: toggled, the screen stays (CheckButton would take it for a difficulty) */
+        Pad[ap->PortId].press &= ~(BTN_START | AdvGetOkButton());
+        CallSystemSe(0, biorand_toggle() ? 3 : 1);
+    }
 }
 
 /* ---------------------------------------------------------------- previews */
@@ -597,13 +657,9 @@ static void font_release(void)
    the copyright, in the game's font in green: Adv_BioCvTitle modes 4..17 (PRESS START, the menus and
    the title's fades; not the lobby, 30). The font as the lobby has it, its file read at once (the
    game's file reader stays free) and kept; released when the title ends (lobby_close). */
-static void title_version(void)
+static void title_font(void)
 {
     static int have;   /* font_file holds the font: 1; -1 it cannot be read */
-    ADV_WORK* ap = &AdvWork;
-    unsigned int a = (unsigned int)(255.0f * (1.0f - ap->FadeRate) * (1.0f - ap->SaverRate));   /* under the title's fade and screen saver */
-    char s[24];
-    if (ap->Mode < 4 || ap->Mode > 17 || a < 8) return;
     if (!(sys->ss_flg & 0x40) && !font_state) {
         if (!have) have = afs_read(sys->sys_partid, 1, font_file, sizeof(font_file)) ? 1 : -1;
         if (have < 0) return;
@@ -611,6 +667,15 @@ static void title_version(void)
         font_state = 2;
     }
     font_ok = (sys->ss_flg & 0x40) != 0;
+}
+
+static void title_version(void)
+{
+    ADV_WORK* ap = &AdvWork;
+    unsigned int a = (unsigned int)(255.0f * (1.0f - ap->FadeRate) * (1.0f - ap->SaverRate));   /* under the title's fade and screen saver */
+    char s[24];
+    if (ap->Mode < 4 || ap->Mode > 17 || a < 8) return;
+    title_font();
     snprintf(s, sizeof(s), "v%.*s", (int)strcspn(RECVX_VERSION, " "), RECVX_VERSION);
     {   /* the font's "." advances as wide as a digit: half of it, so it reads v0.6.9 rather than v0. 6. 9 */
         float x, w = 0, dot = text_w(".", 0.6f);
@@ -636,11 +701,11 @@ enum { R_MODE, R_HOSTSTEP, R_JOINSTEP,
        R_SERVER, R_PORT, R_ADDR, R_PW, R_RELAY,
        R_NAME, R_CHAR,
        R_START, R_ITEMS, R_FOLLOW, R_RULES,
-       R_LOOT, R_IMP, R_TFREEZE, R_SKIPS, R_RIBBON, R_GOVER, R_ENEMYPG, R_EVENTPG,
+       R_BIORAND, R_LOOT, R_IMP, R_TFREEZE, R_SKIPS, R_RIBBON, R_GOVER, R_ENEMYPG, R_EVENTPG,
        R_RAND, R_VARIETY, R_EVENTS, R_SEED, R_RSEED, R_EXTRA, R_PLACE, R_QUICK, R_DETECTOR,
        R_HOST, R_GO, R_COPY, R_RCOPY, R_KICK, R_STOP, R_JOIN,
        R_BACK, R_N };
-static const unsigned char row_group[R_N] = { 0, 1, 1, 0, 0, 0, 0, 0, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 7, 7, 4, 4, 4, 4, 4, 8, 8, 4, 4, 5, 5, 5, 5, 5, 5, 5, 6 };
+static const unsigned char row_group[R_N] = { 0, 1, 1, 0, 0, 0, 0, 0, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 7, 7, 4, 4, 4, 4, 4, 8, 8, 4, 4, 5, 5, 5, 5, 5, 5, 5, 6 };
 enum { F_NONE, F_NAME, F_ADDR, F_PORT, F_SEED, F_SERVER, F_PW };
 
 static struct {
@@ -672,10 +737,11 @@ static int row_visible(int r)
     if (lb.step == 6) return 0;   /* the model page draws its list itself (draw_models) */
     if (lb.step == 1) return r == R_MODE || r == R_HOSTSTEP || r == R_JOINSTEP;
     if (r == R_VARIETY || r == R_EVENTS) return lb.step == 4 && shown_eo()->rand;   /* only the randomizer has them */
+    if (r == R_BIORAND) return lb.step == 3 && (host ? biorand_pack() : coop_biorand() == 1);   /* the host has a pack; a guest sees it while it is on */
     if (lb.step == 3) return r == R_GOVER || r == R_ENEMYPG || r == R_EVENTPG || ((r == R_LOOT || r == R_TFREEZE || r == R_SKIPS || r == R_RIBBON) && host) ||
                              (r == R_IMP && host && !g_coop.loot);   /* only shared loot has it */
     if (lb.step == 4) return r >= R_RAND && r <= R_PLACE && (r != R_RSEED || host);
-    if (lb.step == 5) return r == R_QUICK || r == R_DETECTOR;
+    if (lb.step == 5) return (r == R_QUICK && !biorand_active()) || r == R_DETECTOR;   /* BioRand has its own start inventory */
     switch (r) {
     case R_PORT: return host && !srv;
     case R_SERVER: case R_PW: case R_RELAY: return srv;   /* the co-op server (docs/SERVER.md) */
@@ -699,7 +765,7 @@ static int row_locked(int r)
     case R_MODE: case R_PORT: case R_LOOT: case R_IMP: case R_ADDR: case R_RELAY: case R_SERVER: case R_PW: return session_on();
     case R_HOSTSTEP: return joining();
     case R_JOINSTEP: return hosting();
-    case R_GOVER: case R_QUICK: case R_DETECTOR: case R_EXTRA: case R_PLACE: case R_RAND: case R_VARIETY: case R_EVENTS: case R_SEED: return lb.role != 0;   /* the host's choice */
+    case R_GOVER: case R_QUICK: case R_DETECTOR: case R_EXTRA: case R_PLACE: case R_RAND: case R_VARIETY: case R_EVENTS: case R_SEED: case R_BIORAND: return lb.role != 0;   /* the host's choice */
     case R_RCOPY: return !g_coop.room[0];
     default: return 0;
     }
@@ -840,6 +906,7 @@ static void change(int r, int dir)
     case R_SKIPS: g_coop.skip_sync ^= 1; break;
     case R_GOVER: g_coop.gameover_both ^= 1; break;
     case R_QUICK: g_coop.quick_start ^= 1; break;
+    case R_BIORAND: if (!biorand_toggle()) { say(biorand_locked()); CallSystemSe(0, 1); return; } break;
     case R_DETECTOR: g_coop.skip_detector ^= 1; break;
     case R_RIBBON: settings_step(lset("No ink ribbons needed"), dir); break;   /* the GAMEPLAY setting (g_config) */
     case R_START: g_coop.start = step_choice(g_coop.start, dir, 0, n_saves + 2, start_valid); break;
@@ -858,7 +925,7 @@ static void change(int r, int dir)
 
 static int has_value(int r)
 {
-    return r == R_MODE || r == R_RELAY || r == R_LOOT || r == R_IMP || r == R_TFREEZE || r == R_SKIPS || r == R_RIBBON || r == R_GOVER || r == R_QUICK || r == R_DETECTOR || r == R_START || r == R_ITEMS || r == R_FOLLOW ||
+    return r == R_MODE || r == R_RELAY || r == R_BIORAND || r == R_LOOT || r == R_IMP || r == R_TFREEZE || r == R_SKIPS || r == R_RIBBON || r == R_GOVER || r == R_QUICK || r == R_DETECTOR || r == R_START || r == R_ITEMS || r == R_FOLLOW ||
            r == R_EXTRA || r == R_PLACE || r == R_RAND || r == R_VARIETY || r == R_EVENTS;
 }
 
@@ -967,7 +1034,20 @@ static int activate(int r)
         return 0;
     case R_GO:
         if (g_coop.start >= 3) {
+            static int asked = -1;   /* the save BioRand's question was shown for: START again loads it */
             if (!lobby_read_save(g_coop.start - 3, save_buf)) { say("that save cannot be read"); CallSystemSe(0, 1); scan_saves(); return 0; }
+            if (pc_biorand_save_differs(save_buf)) {   /* (biorand_glue.c, as the load screen asks) */
+                if (asked != g_coop.start) {
+                    char m[96];
+                    asked = g_coop.start;
+                    snprintf(m, sizeof(m), "%s %s START again to load it.", pc_biorand_ask(0), pc_biorand_ask(1));
+                    say(m);
+                    CallSystemSe(0, 1);
+                    return 0;
+                }
+                pc_biorand_save_accept(save_buf);
+            }
+            asked = -1;
             host_log("lobby: starting from save file %d\n", g_coop.start - 2);
             return 3;
         }
@@ -1066,6 +1146,8 @@ static void row_text(int r, char* label, char* val, int n)
     case R_IMP: strcpy(label, "IMPORTANT ITEMS"); snprintf(val, n, "%s", g_coop.important ? "For both" : "Shared"); break;
     case R_SKIPS: strcpy(label, "CUTSCENE SKIP"); snprintf(val, n, "%s", g_coop.skip_sync ? "Together" : "Each alone"); break;
     case R_GOVER: strcpy(label, "GAME OVER"); snprintf(val, n, "%s", (lb.role ? coop_host_gameover_both() : g_coop.gameover_both) ? "Both" : "Each player"); break;
+    case R_BIORAND: strcpy(label, "BIORAND"); snprintf(val, n, (lb.role ? coop_biorand() == 1 : biorand_setting()) && biorand_seed_text()[0] ? "On (%s)" : "%s",
+                                                       (lb.role ? coop_biorand() == 1 : biorand_setting()) ? biorand_seed_text()[0] ? biorand_seed_text() : "On" : "Off"); break;
     case R_QUICK: strcpy(label, "QUICK START"); snprintf(val, n, "%s", (lb.role ? coop_quick_start() : g_coop.quick_start) ? "On" : "Off"); break;
     case R_DETECTOR: strcpy(label, "METAL DETECTOR"); snprintf(val, n, "%s", (lb.role ? coop_skip_detector() : g_coop.skip_detector) ? "Skipped" : "As original"); break;
     case R_RIBBON: strcpy(label, "INK RIBBONS"); snprintf(val, n, "%s", settings_get(lset("No ink ribbons needed")) ? "Not needed" : "Needed"); break;
@@ -1135,6 +1217,8 @@ static const char* row_help(int r)
     case R_EVENTPG: return host ? "A page of rules for single events: a quick start and the prison's metal detector." : "The host's rules for single events: a quick start and the prison's metal detector (read-only).";
     case R_LOOT: return "Shared: each item lies there once - whoever takes it has it, so you split the supplies; one item box. Individual: each finds their own copy and has their own box. Keys and story go to both.";
     case R_TFREEZE: return eset(&g_coop.trade_freeze)->help;
+    case R_BIORAND: return host ? "On: you play the BioRand pack in mods/biorand; your partner needs the same pack (the same seed and options), else it cannot join. Off: the normal game for both."
+                                : "The host plays its BioRand pack; yours is the same, so your game follows it.";
     case R_QUICK: return "On: a new game starts with the manual already read (it stays in FILE) and the combat knife in your bag instead of on the table, for both of you. Off: as in single player.";
     case R_DETECTOR: return "Skipped: the prison's metal detector lets both of you pass with weapons and its security boxes stay shut (one holding items still opens). As original: as in single player.";
     case R_IMP: return "For both: weapons and ink ribbons lie there for each of you, each takes their own copy. Shared: they are one pickup like ammo and herbs - whoever takes it has it.";

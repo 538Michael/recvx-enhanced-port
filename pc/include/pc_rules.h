@@ -271,3 +271,8 @@ static inline unsigned int pc_inv_take(unsigned int* b, int max, int s, int coun
     if (b[0] > (unsigned int)s) b[0]--;
     return e;
 }
+
+/* ---------------------------------------------------------------- BioRand (biorand_glue.c, coop_glue.c; decomp hitchk.c) */
+/* the item a floor pickup gives: a generated room's item record names it in `type` (its `id` stays the model);
+   retail leaves type 0 (docs/modding/ROOM_FORMAT.md "Enemies, objects, items") */
+static inline int pc_pickup_item(int type, int id) { return type > 0 && type < 156 ? type : id; }

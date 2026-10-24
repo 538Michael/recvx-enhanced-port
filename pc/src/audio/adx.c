@@ -8,6 +8,7 @@
  */
 #include "../ps2_platform.h"
 #include "audio.h"
+#include "../host/biorand.h"
 #include <SDL3/SDL.h>
 #include <string.h>
 #include <stdio.h>
@@ -32,15 +33,20 @@
    Files in $RECVX_MODS (default ./mods) replace disc files without touching the image
    (docs/modding/README.md "The mods folder"): <mods>/NAME for files opened by name (room files RM_SRRC.RDX, also names the
    disc does not have, and plain ISO files), <mods>/<AFS file>/<id> for entries of AFS archives
-   (e.g. mods/MRY.AFS/12). */
+   (e.g. mods/MRY.AFS/12). While BioRand is on, <mods>/biorand/ (its pack: room files, SYSTEM.AFS/10, /11,
+   ADV.AFS/2) comes first; off, that folder is not looked at (pc/src/host/biorand.h). */
 static FILE* mod_open_path(const char* name, uint32_t* size, char* path, size_t npath)
 {
     static const char* dir;
-    FILE* f;
+    FILE* f = NULL;
     if (!dir) dir = SDL_getenv("RECVX_MODS") ? SDL_getenv("RECVX_MODS") : "mods";
     while (*name == '\\' || *name == '/') name++;
-    snprintf(path, npath, "%s/%s", dir, name);
-    if (!(f = pc_fopen(path, "rb"))) return NULL;
+    if (biorand_active()) {
+        snprintf(path, npath, "%s/biorand/%s", dir, name);
+        f = pc_fopen(path, "rb");
+    }
+    if (!f) snprintf(path, npath, "%s/%s", dir, name);
+    if (!f && !(f = pc_fopen(path, "rb"))) return NULL;
     fseek(f, 0, SEEK_END);
     *size = (uint32_t)ftell(f);
     host_log("mods: %s replaces the disc file (%u bytes)\n", path, *size);

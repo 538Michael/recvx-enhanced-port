@@ -1,4 +1,4 @@
-/* Online co-op wire format (protocol 24, docs/COOP.md "Protocol 24" and "Security") and
+/* Online co-op wire format (protocol 27, docs/COOP.md "Protocol 24" and "Security") and
    the checks every received packet passes before it may change anything. No game state here:
    pc/glue/coop_glue.c applies what passes; pc/tests/test_coop.c feeds malformed packets. */
 #ifndef RECVX_COOP_PROTO_H
@@ -11,7 +11,7 @@ extern "C" {
 #endif
 
 #define COOP_MAGIC 0x504F4F43u          /* "COOP" */
-#define COOP_VERSION 26                 /* 11: join code, datagrams <= 1200 bytes, checked events, EV_ATR; 12: EV_FX; 13: EV_GRANT;
+#define COOP_VERSION 27                 /* 11: join code, datagrams <= 1200 bytes, checked events, EV_ATR; 12: EV_FX; 13: EV_GRANT;
                                            14: EV_TSCREEN, BUSY_TRADE, OPT_TRADE_FREEZE; 15: EV_GONE;
                                            16: player id and rejoin tag in PoseExt, EV_OWN, saved inventories (EV_BLOB pad);
                                            17: TS_WANT, TS_DECLINE (trade screen item requests);
@@ -25,7 +25,8 @@ extern "C" {
                                            23: OPT_QUICK_START (Pose.opts is full: a further rule needs a field of its own);
                                            24: enemy slots 0..254 (COOP_ENE_SLOTS), EV_FX's FX_* references marked in `refs`;
                                            25: Pose.use (the trigger the sender is using: one player at a puzzle at a time);
-                                           26: EneSnap.id (the enemy type in the slot: a snapshot only for the same type) */
+                                           26: EneSnap.id (the enemy type in the slot: a snapshot only for the same type);
+                                           27: PoseExt.br, br_seed, br_id (BioRand: the host's choice, each side's pack) */
 #define COOP_DGRAM_MAX 1200             /* bytes per datagram (below every internet path MTU) */
 #define COOP_EV_FRAME 16                /* events per frame (over the frame's datagrams) */
 #define COOP_SNAP_FRAME 48              /* enemy snapshots per frame */
@@ -96,7 +97,8 @@ typedef struct Pose {
 #define COOP_PITCH_STEP (1.0471976f / COOP_PITCH_MAX)   /* free aim's limit, 60 degrees */
 static inline int coop_pitch_get(uint8_t pflg) { return ((int8_t)(pflg & 0xF8) >> 2) | (pflg & 1); }
 static inline uint8_t coop_pitch_bits(int v) { return (uint8_t)((v & 1) | (v >> 1 & 0x1F) << 3); }
-enum { COOP_REJ_CODE = 1, COOP_REJ_BUSY = 2, COOP_REJ_REMOVED = 3 };   /* REMOVED: in a goodbye, the host removed us */
+enum { COOP_REJ_CODE = 1, COOP_REJ_BUSY = 2, COOP_REJ_REMOVED = 3,   /* REMOVED: in a goodbye, the host removed us */
+       COOP_REJ_BIORAND = 4 };          /* in a guest's goodbye: its BioRand pack is not the host's (protocol 27) */
 
 typedef struct PoseExt {                /* lobby extension: in the first datagram of a frame (PF_EXT) */
     char name[16];
@@ -107,6 +109,10 @@ typedef struct PoseExt {                /* lobby extension: in the first datagra
     char note[40];
     uint8_t pid[16];                    /* guest: its player id (recvx.ini coop_player_id; zero: none) */
     uint8_t tag[16];                    /* guest: rdv_rejoin_tag of its secret over the session's code: the same player again */
+    uint8_t br;                         /* BioRand (protocol 27): host 1 = it plays its pack; guest 1 = it has a pack */
+    uint8_t br_pad[3];                  /* zero */
+    uint32_t br_seed;                   /* the sender's pack: BioRand's seed number (0xFFFFFFFF unknown) and identity */
+    uint32_t br_id;                     /*   (biorand.h biorand_id; 0: no pack). A guest whose pack differs leaves. */
 } PoseExt;
 enum { ITEMS_NEW, ITEMS_SAVE, ITEMS_HOST, ITEMS_CURRENT };   /* PoseExt.items */
 enum { REC_UNKNOWN, REC_NONE, REC_HAVE, REC_OFF };   /* PoseExt.rec: not known yet (or a guest), no saved items for you, some,

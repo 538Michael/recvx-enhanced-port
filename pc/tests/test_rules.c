@@ -1,6 +1,7 @@
 /* pure rules of the PC hooks (pc/include/pc_rules.h, pc/src/gs/native.h), built with the game's flags and types */
 #include "../../decomp/include/ps2/veronica/prog/types.h"
 #include "pc_rules.h"
+#include "../src/host/biorand.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -260,6 +261,21 @@ static void inventory(void)
     }
 }
 
+/* BioRand: the item a pickup gives (a room's type, else id) and the seed from its log line */
+static void biorand(void)
+{
+    CHECK(pc_pickup_item(0, 21) == 21);       /* retail: type 0, the record's id */
+    CHECK(pc_pickup_item(42, 51) == 42);      /* BioRand: type is the item, id the model */
+    CHECK(pc_pickup_item(156, 21) == 21);     /* not an item: the id */
+    CHECK(pc_biorand_seed("R840-0KR3-T4HH4HZZZMEZ9H0007HZZZZZZZ5ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ") == 123456);
+    CHECK(pc_biorand_seed("R840-JZYL-T4HH4HZZZ") == 654321);
+    CHECK(pc_biorand_seed("r840-0kr3-x") == -1);   /* (lower case 'r': not a seed string) */
+    CHECK(pc_biorand_seed("R840-0kr3-") == 123456);
+    CHECK(pc_biorand_seed("R840-0KR") == -1);
+    CHECK(pc_biorand_seed("R840-0KS3-") == -1);   /* S is not in its alphabet */
+    CHECK(pc_biorand_seed("") == -1);
+}
+
 int main(void)
 {
     enemies();
@@ -270,6 +286,7 @@ int main(void)
     warp_music();
     unlock();
     inventory();
+    biorand();
     if (fails) { printf("%d failed\n", fails); return 1; }
     printf("rules: all passed\n");
     return 0;

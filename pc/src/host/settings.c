@@ -14,6 +14,7 @@
 #include "enemies.h"
 #include "lobby.h"
 #include "savestore.h"
+#include "biorand.h"
 #include "../audio/audio.h"
 #include <SDL3/SDL.h>
 #include <stdio.h>
@@ -225,6 +226,14 @@ static const char* tenths(int v, char* b, int n) { snprintf(b, n, "%d.%d", v / 1
    while a SET_CALIB row is chosen: squares on a black and on a white strip, the faint ones at the ends */
 const unsigned char settings_calib[2][CALIB_STEPS] = { { 5, 10, 16, 24, 32 }, { 223, 231, 239, 245, 250 } };
 static void picture_reset(void) { g_config.brightness = 0; g_config.contrast = 100; g_config.gamma = 10; settings_save_later(); }
+static const char* biorand_name(int v, char* b, int n)
+{
+    if (!biorand_pack()) snprintf(b, n, "No pack");
+    else if (v && biorand_seed_text()[0]) snprintf(b, n, "On (%s)", biorand_seed_text());
+    else snprintf(b, n, v ? "On" : "Off");
+    return b;
+}
+static const char* rifle_locked(void) { return biorand_active() ? "On while BioRand is on." : NULL; }
 /* "You appear as": positions in the menus' list (actors.c, without event doubles) */
 static int chr_get(void) { return appear_pos(g_coop.chr); }
 static void chr_set(int v) { g_coop.chr = appear_at(v); }
@@ -378,6 +387,10 @@ const Setting g_settings[] = {
     { SP_GAMEPLAY, "Auto-climb stairs", V(g_config.auto_stairs), 0, 1, 1,
       .help = "Walking or running into a staircase climbs it without the action button. Steps onto or off a ledge, doors and items still need the button." },
     { SP_GAMEPLAY, "Head blow-offs", V(g_config.head_blowoff), 0, 1, 1, .help = "Enables head blow-offs on zombies." },
+    { SP_GAMEPLAY, "Rifle ammo stacks", V(g_config.rifle_stack), 0, 1, 1, .locked = rifle_locked,
+      .help = "Rifle and assault rifle bullets stack in one slot as the other ammo does. Off: each pickup takes a slot, as the original. Always on while BioRand is on." },
+    { SP_GAMEPLAY, "BioRand", V(g_config.biorand), 0, 1, 1, .name = biorand_name, .locked = biorand_locked, .group = "RANDOMIZER",
+      .help = "Plays the randomizer pack BioRand generated into mods/biorand (items, start inventory and doors from its seed). Off: the normal game, the folder is ignored. Changed at the title menu (also NEW GAME's difficulty screen)." },
     { SP_GAMEPLAY, "Save system", V(g_config.save_system), 0, 1, 1, save_systems,
       .help = "Native files: each save is its own file in the saves folder, as many as you like, no memory card screens. Memory card: the original 15 slots. From the next save screen.", .group = "SAVES" },
     { SP_GAMEPLAY, "Import memory card saves", NULL, .flags = SET_ACTION, .apply = import_card,

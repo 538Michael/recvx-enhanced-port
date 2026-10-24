@@ -36,6 +36,7 @@ int ikou3(BH_PWORK* epw, NJS_POINT3* pos, int add_dir);   /* zonzon.c (its heade
 #include "../src/host/bindings.h"
 #include "../src/host/actors.h"
 #include "../src/host/enemies.h"
+#include "../src/host/biorand.h"
 #include "../src/net/net.h"
 #include "../src/net/coop_proto.h"
 #include "pc_rules.h"
@@ -2385,7 +2386,11 @@ static void quick_start(void)
 }
 
 /* system.c bhSysCallMonitor: the host's new game has its items (AllItemInit); the guest's: own_restore */
-void pc_quick_start(void) { if (coop_on && is_host && rule(OPT_QUICK_START)) quick_start(); }
+void pc_quick_start(void)
+{
+    pc_biorand_stamp();   /* the new game's BioRand state into the save words (biorand_glue.c) */
+    if (coop_on && is_host && rule(OPT_QUICK_START)) quick_start();
+}
 
 /* after bhPopGameData put the host's state in place (the game reads it at the restart) */
 static void own_restore(void)
@@ -2410,6 +2415,7 @@ static void own_restore(void)
         AllItemInit();
         sys->ic_flg[15] = ic;   /* AllItemInit clears one "examined" bit */
         if (rule(OPT_QUICK_START)) quick_start();
+        pc_biorand_start_kit();   /* BioRand: the pack's start inventory, as the host's new game had it */
         for (i = 0; i < 4; i++) {   /* as a new game (system.c) */
             sys->ply_hp[i] = sys->gm_mode == 2 ? 320 : 160;
             sys->ply_stflg[i] = 0x40000000;
@@ -2423,6 +2429,7 @@ static void own_restore(void)
         if (sys->ply_hp[i] < 0) sys->ply_hp[i] = sys->gm_mode == 2 ? 320 : 160;
     if (!(rx.opts & OPT_INDIVIDUAL)) memcpy(&sys->itm[64], box, sizeof(box));
     if (own_copies()) imp_restore(spots);
+    pc_biorand_stamp();   /* our saves of this game: the session's BioRand state */
     blob_rec = want_rec = 0;   /* this join's; later states (a story switch, a host restart) keep our own */
 }
 
@@ -2849,7 +2856,7 @@ static int item_word(int w) { return w >= IT_FLG && w < IT_FLG + 32; }
 static int rule(int opt)
 {
     if (is_host) return opt == OPT_IMPORTANT ? g_coop.important : opt == OPT_SKIP_SYNC ? g_coop.skip_sync : opt == OPT_GAMEOVER_BOTH ? g_coop.gameover_both :
-                        opt == OPT_SKIP_DETECTOR ? g_coop.skip_detector : opt == OPT_QUICK_START && g_coop.quick_start;
+                        opt == OPT_SKIP_DETECTOR ? g_coop.skip_detector : opt == OPT_QUICK_START && g_coop.quick_start && !biorand_active();
     return peer_opts >= 0 && (peer_opts & opt);
 }
 
@@ -2896,7 +2903,7 @@ void coop_item_taken(int bit, int etc)
 {
     int id;
     if (!sys || !rom || !sys->itwp || etc >= rom->etc_n || rom->etcp[etc].prm0 >= ITWP_N || !own_copies()) return;
-    id = sys->itwp[rom->etcp[etc].prm0].id;
+    id = pc_pickup_item(sys->itwp[rom->etcp[etc].prm0].type, sys->itwp[rom->etcp[etc].prm0].id);   /* (BioRand: the record's type) */
     if (!important_item(id == 130 ? 35 : id)) return;   /* (130 is 35, as GetItem) */
     sys->itm[IMP_SPOTS + (bit >> 5)] |= 0x80000000u >> (bit & 31);
     host_log("coop: took item %d (flag %d): important items for both, the partner's copy stays\n", id, bit);
@@ -2941,7 +2948,13 @@ static int give_item(int item)
     swork.statusflg &= ~0x100;
     sys->cb_flg = (cb | 0x800) & ~(0x1000000 | 0x400 | 0x8000);
     sys->sb_id = item;
-    GetItem(&st);
+    {   /* the count of a floor pickup of ours (hitchk.c, BioRand) is not this item's: kept for our own pickup */
+        extern unsigned char override_pickup_quantity;
+        unsigned char q = override_pickup_quantity;
+        override_pickup_quantity = 0;
+        GetItem(&st);
+        override_pickup_quantity = q;
+    }
     swork.statusflg = sf;
     sys->cb_flg = cb;
     sys->sb_id = sb;
@@ -5180,7 +5193,7 @@ static int grant_slot(int item)
     int k, j, prop = -1, any = 0;
     for (k = 0; k < rom->itm_n && k < ITWP_N; k++) {
         const O_WRK* op = &sys->itwp[k];
-        if (op->id != item || !(op->flg & 0x1)) continue;
+        if (pc_pickup_item(op->type, op->id) != item || !(op->flg & 0x1)) continue;   /* the item its pickup gives (BioRand: type) */
         any = 1;
         if (op->stflg & 0x1000000) return k;
         for (j = 0; j < rom->etc_n; j++) {
@@ -5213,7 +5226,7 @@ static int grant_model(int item, int i)
     if (disp == 131) disp = 5;    /* sub1.c: the Enhanced Handgun shows the handgun's */
     if (disp == 136) disp = 33;
     for (k = 0; k < rom->itm_n && k < ITWP_N; k++)
-        if (sys->itwp[k].id == item) return -1;   /* (one of ours: grant_slot found it, or not to be shown) */
+        if (pc_pickup_item(sys->itwp[k].type, sys->itwp[k].id) == item) return -1;   /* (one of ours: grant_slot found it, or not to be shown) */
     if (slot >= ITWP_N || slot >= 32) { host_log("coop: no free item slot here for the partner's %s\n", item_name((unsigned)item << 16)); return -1; }
     actor_tex_free(&entries, &heap);
     if (entries < 16 || heap < (1 << 20) || sys->endp - sys->memp < (256 << 10)) {
@@ -5584,6 +5597,8 @@ static int apply_event(const Event* e)
    that never hears it times out (LOST_MS). */
 #define LOST_MS 15000
 static const char* bye_reason;          /* the partner said goodbye (receive): the message, handled in coop_frame */
+static int bye_code;                    /* our goodbye's reason: COOP_REJ_BIORAND (biorand_from_host) */
+static int host_br = -1;                /* guest: the host plays its BioRand pack (1) or not (0), -1 not known yet */
 static NetResolve* join_dns;            /* joiner: the host's name being looked up (join_resolve) */
 static char join_host[128];
 static char left_msg[64];               /* host: why the last partner went ("Partner left"), shown while waiting */
@@ -5653,7 +5668,9 @@ static void stop(void)
     ghost.slot = -1;
     memset(&safe, 0, sizeof(safe));
     if (sys && rom) lighter_light(0);   /* the partner's lighter flame and light */
-    if (have_peer && !echo_delay) send_bye(0);
+    if (have_peer && !echo_delay) send_bye(bye_code);
+    bye_code = 0;
+    host_br = -1;   /* single player: our own BioRand setting again */
     rdv_stop();
     if (join_dns) { net_resolve_cancel(join_dns); join_dns = NULL; }
     g_coop.room[0] = 0;
@@ -5901,6 +5918,23 @@ static int takeover(const NetAddr* from, const unsigned char* buf, int n, const 
     return 1;
 }
 
+/* guest: the host's BioRand (protocol 27, docs/COOP.md "BioRand"). The loader follows the host's choice for the
+   session (coop_biorand); while the host plays its pack, ours must be the same one (seed, options, files), else we
+   leave with why. */
+static void biorand_from_host(void)
+{
+    static char why[200];
+    host_br = rx_ext.br;
+    if (!rx_ext.br || (biorand_pack() && rx_ext.br_id == biorand_id()) || bye_reason) return;
+    if (rx_ext.br_seed == 0xFFFFFFFFu) snprintf(why, sizeof(why), "The host plays a BioRand pack you do not have; generate the same seed (or ask the host to turn BioRand off)");
+    else if (biorand_pack() && (uint32_t)biorand_seed() == rx_ext.br_seed)
+        snprintf(why, sizeof(why), "The host plays BioRand seed %u with other options or another BioRand version; generate the same (or ask the host to turn BioRand off)", rx_ext.br_seed);
+    else snprintf(why, sizeof(why), "The host plays BioRand seed %u; generate the same seed (or ask the host to turn BioRand off)", rx_ext.br_seed);
+    bye_reason = why;
+    bye_code = COOP_REJ_BIORAND;
+}
+int coop_biorand(void) { return coop_on && !is_host ? host_br : -1; }
+
 #define RX_DGRAMS 96
 #define RX_BYTES (128 * 1024)
 #define RX_MS 3
@@ -5977,7 +6011,8 @@ static void receive(void)
             if (is_host && have_peer) {   /* the next partner may come */
                 host_log("coop: partner left\n");
                 partner_gone(1);
-                snprintf(left_msg, sizeof(left_msg), "%s left", g_coop.peer_name[0] ? g_coop.peer_name : "The partner");
+                snprintf(left_msg, sizeof(left_msg), p.reject == COOP_REJ_BIORAND ? "%s left: its BioRand pack is not this one" : "%s left",
+                         g_coop.peer_name[0] ? g_coop.peer_name : "The partner");
                 have_rx = have_peer = 0;
                 snap_n = 0;
                 gone_sid = p.sid;
@@ -6008,6 +6043,7 @@ static void receive(void)
         if (ext) {
             memcpy(&rx_ext, buf + n - sizeof(PoseExt), sizeof(PoseExt));
             if (is_host && !id_ok) partner_identity();
+            if (!is_host) biorand_from_host();
         }
         if (!took) {   /* ping: the first datagram read here (on Windows the one with a noted arrival) */
             took = 1;
@@ -6339,10 +6375,13 @@ void coop_frame(void)
     tx_ext.lobby = g_coop.lobby;
     if (!is_host) { memcpy(tx_ext.pid, g_coop.pid, 16); memcpy(tx_ext.tag, my_tag, 16); tx_ext.items = (uint8_t)items_wire(); }
     else tx_ext.rec = !g_coop.remember ? REC_OFF : !id_ok ? REC_UNKNOWN : rec_have(id_pid) ? REC_HAVE : REC_NONE;
+    tx_ext.br = (uint8_t)(is_host ? biorand_active() : biorand_pack());   /* BioRand (protocol 27): the host's choice; a guest's pack */
+    tx_ext.br_seed = biorand_seed() >= 0 ? (uint32_t)biorand_seed() : 0xFFFFFFFFu;
+    tx_ext.br_id = biorand_id();
     tx.opts = is_host ? (g_coop.loot ? OPT_INDIVIDUAL : 0) | (g_coop.trade_freeze ? OPT_TRADE_FREEZE : 0) | (g_coop.important ? OPT_IMPORTANT : 0) |
                         (pc_cfg_no_ink_ribbon() ? OPT_NO_RIBBON : 0) | (g_coop.skip_sync ? OPT_SKIP_SYNC : 0) |
                         (g_coop.gameover_both ? OPT_GAMEOVER_BOTH : 0) | (g_coop.skip_detector ? OPT_SKIP_DETECTOR : 0) |
-                        (g_coop.quick_start ? OPT_QUICK_START : 0) : 0;
+                        (g_coop.quick_start && !biorand_active() ? OPT_QUICK_START : 0) : 0;   /* BioRand: its own start inventory */
     tx.regroup = regroups;
     tx.seq = frame_no;
     if (echo_delay) {

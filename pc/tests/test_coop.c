@@ -402,6 +402,15 @@ static void test_dgrams(void)
         x.items = 0; x.rec = REC_OFF + 1;
         memcpy(b + n - sizeof(x), &x, sizeof(x));
         CHECK(coop_check_all(b, n, CODE, 1, &nev, &nene, &ext) == COOP_BAD_FIELD);
+        x.rec = 0; x.br = 1; x.br_seed = 123456; x.br_id = 0x1234;   /* protocol 27: BioRand */
+        memcpy(b + n - sizeof(x), &x, sizeof(x));
+        CHECK(coop_check_all(b, n, CODE, 1, &nev, &nene, &ext) == COOP_OK);
+        x.br = 2;
+        memcpy(b + n - sizeof(x), &x, sizeof(x));
+        CHECK(coop_check_all(b, n, CODE, 1, &nev, &nene, &ext) == COOP_BAD_FIELD);
+        x.br = 1; x.br_pad[1] = 1;
+        memcpy(b + n - sizeof(x), &x, sizeof(x));
+        CHECK(coop_check_all(b, n, CODE, 1, &nev, &nene, &ext) == COOP_BAD_FIELD);
         memset(b + n - sizeof(x), 0, sizeof(x));
     }
     {   /* one bad event spoils the datagram */

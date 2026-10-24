@@ -48,6 +48,8 @@ static const struct { const char* key; int* val; int lo, hi; } keys[] = {
     { "skip_intro", &g_config.skip_intro, 0, 1 },
     { "battle_unlocked", &g_config.battle_unlocked, 0, 1 },
     { "difficulty_select", &g_config.difficulty_select, 0, 1 },
+    { "biorand", &g_config.biorand, 0, 1 },             /* BioRand's pack in mods/biorand served (biorand.h) */
+    { "rifle_stack", &g_config.rifle_stack, 0, 1 },     /* rifle ammo stacks (forced on while BioRand is on) */
     { "no_ink_ribbon", &g_config.no_ink_ribbon, 0, 1 },   /* typewriters save without an ink ribbon (co-op: the host's) */
     { "save_system", &g_config.save_system, 0, 1 },     /* 0 native files, 1 memory card */
     { "native_3d", &g_config.native_3d, 0, 1 },

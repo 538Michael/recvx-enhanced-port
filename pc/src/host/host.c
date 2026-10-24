@@ -11,6 +11,7 @@
 #include "lobby.h"
 #include "bindings.h"
 #include "settings.h"
+#include "biorand.h"
 #include "../import/import.h"
 void render_loop(void);
 #include <SDL3/SDL.h>
@@ -328,6 +329,7 @@ int main(int argc, char** argv)
     config_load();
     parse_args(argc, argv);   /* command line overrides the saved settings */
     { extern void variants_load(void); variants_load(); }   /* mods/enemies.ini: custom enemies (variants.h) */
+    biorand_scan();   /* mods/biorand: BioRand's pack (biorand.h) */
     if (SDL_getenv("RECVX_IMPORT")) {   /* headless import (docs/IMPORT_OUTBREAK.md): RECVX_IMPORT=outbreak2, then exit */
         int src = -1, what = SDL_getenv("RECVX_IMPORT_WHAT") ? atoi(SDL_getenv("RECVX_IMPORT_WHAT")) : IMPORT_PLAYERS;
         for (int i = 0; i < IMPORT_SOURCES; i++) if (!strcmp(SDL_getenv("RECVX_IMPORT"), import_sources[i].key)) src = i;

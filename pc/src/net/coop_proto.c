@@ -7,7 +7,7 @@
 #include <stdlib.h>
 
 _Static_assert(sizeof(Pose) == 112, "wire: Pose");
-_Static_assert(sizeof(PoseExt) == 92, "wire: PoseExt");
+_Static_assert(sizeof(PoseExt) == 104, "wire: PoseExt");
 _Static_assert(sizeof(Event) == 88, "wire: Event");
 _Static_assert(sizeof(EneSnap) == 100, "wire: EneSnap");
 _Static_assert(sizeof(AtrRec) == 36, "wire: AtrRec (ATR_WORK)");
@@ -47,7 +47,7 @@ int coop_check_dgram(const void* buf, int n, const char* code, int* nev, int* ne
     if (x) {   /* the extension's enumerations */
         PoseExt e;
         memcpy(&e, (const unsigned char*)buf + n - sizeof(e), sizeof(e));
-        if (e.items > ITEMS_CURRENT || e.rec > REC_OFF) return COOP_BAD_FIELD;
+        if (e.items > ITEMS_CURRENT || e.rec > REC_OFF || e.br > 1 || e.br_pad[0] || e.br_pad[1] || e.br_pad[2]) return COOP_BAD_FIELD;
     }
     *nev = p.nev; *nene = p.nene; *ext = x;
     return coop_check_pose(&p);

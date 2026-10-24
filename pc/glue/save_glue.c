@@ -154,7 +154,7 @@ int pc_save_screen(void) { int s = smouse_seen; smouse_seen = 0; return s; }
 void pc_save_mouse(int saving, unsigned int state, int cg, short* cur_x, short* cur_y, short* sel, SELECTFILEWINDOW* win, MEMORYCARDSTATE* mc)
 {
     static const short yn_save[7] = { 0, 279, 359, 359, 0, 205, 227 };   /* DispTexture's YES/NO arrow by cCgFlag */
-    float yn = saving ? (cg >= 0 && cg < 7 ? yn_save[cg] : 0) : (cg == 2 ? 358 : 0);   /* DispLoadTexture's */
+    float yn = saving ? (cg >= 0 && cg < 7 ? yn_save[cg] : 0) : (cg == 2 || cg == 3 ? 358 : 0);   /* DispLoadTexture's (3: the BioRand question) */
     int hit = -1, cur;
     unsigned int bits = 0;
     smouse_seen = 1;

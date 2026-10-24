@@ -1,5 +1,6 @@
 /* Teleport destinations for the F2 window and ENHANCED SETTINGS > EXTRAS (cheat.h tp_*): every
-   room file on the disc (the decomp's rdx_files[]) and in the mods folder, one row per stage and
+   room file on the disc (the decomp's rdx_files[]) and in the mods folder (with BioRand's pack over it
+   when BioRand is on as the list is read; ponytail: read once, a later toggle keeps it), one row per stage and
    room (its story cases together), with its entry positions and, per entry, the rooms whose doors
    lead there: door triggers (type 0) and the scripts' door calls (op 51 SetDoorCall) and door
    triggers (op 37 EtcAtariSet2 with type 0), of any case (docs/modding/ROOM_FORMAT.md).
@@ -12,6 +13,7 @@
 #include "../ps2_platform.h"
 #include "../audio/audio.h"
 #include "cheat.h"
+#include "biorand.h"
 #include <SDL3/SDL.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -120,7 +122,7 @@ static const char* const stages[10] = {
 static unsigned rd32(const unsigned char* d, long n, long o) { return o >= 0 && o + 4 <= n ? d[o] | d[o + 1] << 8 | d[o + 2] << 16 | (unsigned)d[o + 3] << 24 : 0; }
 
 /* expand.c Expand (docs/modding/ROOM_FORMAT.md "Compression") into *out, grown as needed: the size, -1 if broken */
-static long expand(const unsigned char* s, long n, unsigned char** out, long* cap)
+long pc_prs_expand(const unsigned char* s, long n, unsigned char** out, long* cap)   /* (also biorand_glue.c) */
 {
     const unsigned char* e = s + n;
     long o = 0;
@@ -276,7 +278,10 @@ static int SDLCALL scan(void* ud)
         return 0;
     }
     for (i = 0; i < 205; i++) { SDL_strlcpy(f[nf].name, rdx_files[i], sizeof(f[nf].name)); f[nf].disc = i; f[nf++].mod = 0; }
-    if ((list = SDL_GlobDirectory(mods, "RM_*.RDX", SDL_GLOB_CASEINSENSITIVE, &key))) {   /* key: the count here */
+    for (int layer = 0; layer < 1 + biorand_active(); layer++) {   /* the mods folder, then BioRand's pack over it (biorand.h) */
+        char dir[1100];
+        snprintf(dir, sizeof(dir), layer ? "%s/biorand" : "%s", mods);
+        if (!(list = SDL_GlobDirectory(dir, "RM_*.RDX", SDL_GLOB_CASEINSENSITIVE, &key))) continue;   /* key: the count here */
         for (int m = 0; m < key && nf < MAX_FILES; m++) {
             char nm[12];
             int j;
@@ -285,8 +290,8 @@ static int SDLCALL scan(void* ud)
             nm[11] = 0;
             for (j = 0; j < nf && strcmp(f[j].name, nm); j++) {}
             if (j == nf) { SDL_strlcpy(f[nf].name, nm, sizeof(f[nf].name)); f[nf++].disc = -1; }
-            f[j].mod = 1;
-            nmod++;
+            nmod += !f[j].mod;
+            f[j].mod = 1 + layer;
         }
         SDL_free(list);
     }
@@ -308,13 +313,13 @@ static int SDLCALL scan(void* ud)
         FILE* h = NULL;
         if (f[i].mod) {
             char path[1100];
-            snprintf(path, sizeof(path), "%s/%s", mods, f[i].name);
+            snprintf(path, sizeof(path), f[i].mod == 2 ? "%s/biorand/%s" : "%s/%s", mods, f[i].name);
             if ((h = pc_fopen(path, "rb"))) { fseek(h, 0, SEEK_END); size = (uint32_t)ftell(h); fseek(h, 0, SEEK_SET); }
         } else if (adx_afs_locate(17, f[i].disc, &lsn, &size) && !fseeko(iso, (off_t)lsn * 2048, SEEK_SET)) h = iso;
         if (h && size > (uint32_t)pcap) { unsigned char* p = realloc(in, size); if (p) { in = p; pcap = size; } }
         if (h && size <= (uint32_t)pcap && fread(in, 1, size, h) == size) n = size;
         if (h && h != iso) fclose(h);
-        if (n < 0 || (m = expand(in, n, &out, &cap)) < 0x80) { bad++; host_log("teleport: cannot read %s%s\n", f[i].mod ? "mods/" : "", f[i].name); continue; }
+        if (n < 0 || (m = pc_prs_expand(in, n, &out, &cap)) < 0x80) { bad++; host_log("teleport: cannot read %s%s\n", f[i].mod ? "mods/" : "", f[i].name); continue; }
         parse(out, m, at[file_key(f[i].name)]);
     }
     for (i = 0; i < nrows; i++) {
