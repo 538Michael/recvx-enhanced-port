@@ -125,8 +125,8 @@ packs finished builds into the release archives, named after the version in the 
 
 | Archive | Contents |
 |---|---|
-| `recvx-enhanced-port-VER-linux-i686.tar.gz` | `recvx` (stripped), README, LICENSE, THIRD_PARTY_NOTICES, CHANGELOG, `docs/USER_GUIDE.md` |
-| `recvx-enhanced-port-VER-windows-x86.zip` | `recvx.exe` (stripped), the same docs |
+| `recvx-enhanced-port-VER-linux-i686.tar.gz` | `recvx` (stripped), README, LICENSE, THIRD_PARTY_NOTICES, CHANGELOG, `docs/USER_GUIDE.md`, empty `mods/` and `mods/textures/` (each with a short README.txt) |
+| `recvx-enhanced-port-VER-windows-x86.zip` | `recvx.exe` (stripped), the same docs and folders |
 | `recvx-server-VER-linux-x86_64.tar.gz` | `recvx-server` (static), `recvx-client`, example config, systemd unit, `docs/SERVER.md` |
 | `...-linux-i686-debug.tar.gz`, `...-windows-x86-debug.zip` | the unstripped binaries, for `addr2line` on crash-log addresses |
 
