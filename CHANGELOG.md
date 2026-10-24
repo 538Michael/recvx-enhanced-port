@@ -28,6 +28,14 @@
 - **Sub machine gun reload crash**: reloading the sub machine gun, with the Reload button or by
   firing on an empty magazine, no longer crashes the game. It has no reload animation, so the ammo
   goes in at once and you keep aiming.
+- **Co-op: inventory and actions locked**: after an enemy attack you could sometimes still walk
+  but no longer open the inventory, examine, open doors or pick anything up until you changed rooms
+  (a teleport). It happened most often to the joining player when the host left a menu while a
+  zombie was going for the joiner. The attack now plays out and you get full control back; a lock
+  left behind anyway clears itself after a moment.
+- **Co-op: stuck after a moth larva**: when a larva attached to the host with the partner close by,
+  the host could stay in the throwing-it-off animation for good. The larva now lets go once and play
+  continues, for the host and the joiner.
 
 ## 0.6.8 (2026-10-23)
 
