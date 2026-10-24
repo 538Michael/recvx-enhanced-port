@@ -1033,12 +1033,13 @@ static int load_import_model(Disguise* d, int k)
         d->fbone[k] = rd32(d->keep + 4) >= 2 && d->keep[28 + k] < d->w.mdl[0].obj_num ? (signed char)d->keep[28 + k] : -1;
     d->blink = -1;
     d->blink_wait = 0;
-    for (int e = 0; e < 2; e++) {   /* how far each upper lid closes (version 3, ob2.c lid_falloff); else 1.1 x the
-        gap between the lid bones */
+    for (int e = 0; e < 2; e++) {   /* how far each upper lid closes (version 3, ob2.c lid_falloff: the mesh's opening),
+        at least 0.9 x the gap between the lid bones (Kevin's lid rows are 2 mm apart, the eyes painted
+        between them are taller); version 2: 1.1 x that gap */
         int up = d->fbone[2 * e], lo = d->fbone[2 * e + 1];
-        float t = 0;
-        if (rd32(d->keep + 4) >= 3) memcpy(&t, d->keep + 36 + 4 * e, 4);
-        if (!(t > 0 && t < 0.3f) && up >= 0 && lo >= 0) t = 1.1f * (d->w.mlwP->objP[up].pos[1] - d->w.mlwP->objP[lo].pos[1]);
+        float t = 0, gap = up >= 0 && lo >= 0 ? d->w.mdl[0].objP[up].pos[1] - d->w.mdl[0].objP[lo].pos[1] : 0;
+        if (rd32(d->keep + 4) >= 3) { memcpy(&t, d->keep + 36 + 4 * e, 4); if (t == t) t = fmaxf(t, 0.9f * gap); }
+        else t = 1.1f * gap;
         d->lid_travel[e] = t > 0 && t < 0.3f ? t : 0;
         if (getenv("RECVX_IMPORT_POSE")) host_log("import: lid %d travel %.3f\n", e, d->lid_travel[e]);   /* (test aid) */
     }

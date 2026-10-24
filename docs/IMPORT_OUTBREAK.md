@@ -319,7 +319,11 @@ brows went down with the lids. Now `ob2.c lid_falloff` sets the weights on the u
 the height: fully from the lid's margin (the lowest of its vertices with the most weight: the
 middle of the lid) up to 4 mm above it, fading out at 12 mm, the rest on the head; it also measures
 the travel, from the margin to the lower lid's highest vertex within a centimetre to the side, and
-the `.cvxm` (version 3) carries it (0.2..1.3 cm; version 2 files: 1.1 x the bone gap). Test aid:
+the `.cvxm` (version 3) carries it (0.2..1.3 cm). The game takes at least 0.9 x the lid bones'
+gap (Kevin's lid rows are 2 mm apart, the eyes painted on the face are taller; version 2 files: 1.1
+x the gap). Checked front and side at open, half and closed for all 8 characters: the brows and the
+forehead stay; most close fully, Cindy's and Alyssa's to a slit (their painted eyes reach below the
+lower lid's row). Re-extract after updating (F4) so the models get the new weights. Test aid:
 `RECVX_IMPORT_BLINK=0..1` holds the lids.
 
 * **Cutscenes**: while the model stands in for a cast double, the jaw turns by the double's
