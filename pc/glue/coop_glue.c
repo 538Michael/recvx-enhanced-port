@@ -6237,6 +6237,40 @@ static void send_frame(void)
                        tx.seq, tx.flags, tx.chr, tx.stg, tx.rom, tx.px, tx.py, tx.pz, tx.ay, tx.mtn_no, tx.frm_no >> 16, tx.wpnr_no);
 }
 
+/* Safety net: the screen stays black while we play. A fade to black whose fade-in never ran (fade_an and its target
+   255), or the full-screen render texture drawn in place of the room (gm_flg 0x100) with no effect 110 (the
+   under-water distortion that sets and clears it) alive: the game runs, the room is not shown, until a door
+   (bhInitRoomChangeSystem, the door's fade-in) - a script step co-op cut short. In normal play for SCREEN_STUCK
+   frames (no event, scene, door or menu; pc_in_play): faded in / the room drawn again, as the door would. */
+#define SCREEN_STUCK 90                 /* game frames: 3 s */
+int pc_in_play(const BH_PWORK* p, int scope);   /* reload_glue.c */
+void bhSetScreenFade(unsigned int argb, float ct);   /* screen.c */
+extern float BHD_ASPECT_X, BHD_ASPECT_Y;
+static void screen_guard(void)
+{
+    static unsigned int fade_n, rt_n, last_gfrm;
+    int i, fx = 0, ev = 0;
+    if (sys->gfrm_ct == last_gfrm) return;   /* game frames only */
+    last_gfrm = sys->gfrm_ct;
+    if (!pc_in_play(plp, 0)) { fade_n = rt_n = 0; return; }
+    for (i = 0; i < 512; i++) if ((eff[i].flg & 1) && eff[i].id == 110 && !(eff[i].stflg & 0x1000000)) fx = 1;   /* alive and stepping (not hidden: EffDispSet) */
+    for (i = 0; i < 16; i++) if (bhEtask[i].status) ev |= 1 << i;
+    fade_n = sys->fade_an >= 255.0f && sys->fade_ap == 255 ? fade_n + 1 : 0;
+    rt_n = (sys->gm_flg & 0x100) && !fx ? rt_n + 1 : 0;
+    if (fade_n == SCREEN_STUCK) {
+        host_log("coop: the screen stayed black for %d s while we play in %d/%d (fade %.0f, flags cb %x st %x sp %x, event tasks %x): faded in\n",
+                 SCREEN_STUCK / 30, sys->stg_no, sys->rom_no, sys->fade_an, sys->cb_flg, sys->st_flg, sys->sp_flg, ev);
+        bhSetScreenFade(0, 10.0f);
+    }
+    if (rt_n == SCREEN_STUCK) {
+        host_log("coop: the room was not drawn for %d s while we play in %d/%d (full-screen picture, no effect 110; cb %x st %x, event tasks %x): drawn again\n",
+                 SCREEN_STUCK / 30, sys->stg_no, sys->rom_no, sys->cb_flg, sys->st_flg, ev);
+        sys->gm_flg &= ~0x100100;   /* as effect 110 ends it (effsub1.c) */
+        BHD_ASPECT_Y = 1.0f;
+        njSetAspect(BHD_ASPECT_X, 1.0f);
+    }
+}
+
 void coop_frame(void)
 {
     int req = g_coop.request ? __atomic_exchange_n(&g_coop.request, 0, __ATOMIC_ACQ_REL) : 0;
@@ -6383,6 +6417,7 @@ void coop_frame(void)
         if (have_peer && !join_dns) send_frame();
     }
     if (sys && plp) self_frame();
+    if (sys && plp && in_session_game()) screen_guard();
     if (sys && rom) lighter_light(p2_show && !p2_busy && p2_wpn == 1 && ply2.mlwP && ply2.mlwP->obj_num >= 10);
     if (trace && sys && rom && tx_in_game) world_trace();
     publish();

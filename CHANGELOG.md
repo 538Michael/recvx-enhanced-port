@@ -47,6 +47,8 @@
   enemies, the enemy spawner) could crash the game right away or at the next shot. Fixed.
 - **Co-op crash when the partner changes its look**: an enemy's effect on your partner (fire, acid)
   no longer crashes your game when your partner changes model or character.
+- **Co-op black screen**: if the screen ever stays black (or frozen) while you can move, it comes
+  back after a few seconds instead of only after a door.
 - **Crash reports**: a crash now always writes a small `recvx-crash.log` next to the game. Attach it
   to a bug report; IP addresses are hidden in it.
 

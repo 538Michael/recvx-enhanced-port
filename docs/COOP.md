@@ -1345,6 +1345,11 @@ the session's code. A takeover needs a non-zero tag that matches.
 
 ## Known limits and risks
 
+* A black (or frozen) screen while you can move: a script's fade to black whose fade-in never ran, or the
+  under-water view's full-screen picture left on without its effect, after co-op cut a script step short.
+  After 3 s in normal play (no event, scene, door or menu) the screen fades in / the room is drawn again
+  (`coop_glue.c screen_guard`, logged "the screen stayed black" / "the room was not drawn"); before, it lasted
+  until the next door.
 * UDP and IPv4 only; networks that block UDP cannot play (no TCP fallback).
 * Two players only.
 * Only zombie (en01) grabs are handed over to the joiner's game; other grabbers reach the joiner as
