@@ -42,8 +42,8 @@
   could come back with only the starting items. They now keep their items.
 - **Co-op crashes**: fixed several crashes, mostly for the joining player in the late game (moths,
   boss helpers) and when changing weapons while new enemies appeared.
-- **Co-op black screen**: if the screen stays black while you can move, it now comes back after a
-  few seconds instead of only after a door.
+- **Co-op black screen**: there were some occurrences of a black screen that did not fade away.
+  Those cases were adjusted so it properly fades away again.
 - **Crash reports**: a crash now always writes a small `recvx-crash.log` next to the game. Attach it
   to a bug report; IP addresses are hidden in it.
 
