@@ -559,7 +559,8 @@ static int input(int port)
         return 0;
     }
     if (st.wait_release) {
-        if (bind_any_down() || g_menu_mouse.held) return 0;
+        /* also the pad report this frame's Rept came from: a stick let go after it was read would repeat once more */
+        if (bind_any_down() || pad_report_bits() || g_menu_mouse.held) return 0;
         st.wait_release = 0;
     }
     hit = row_at(mt.x, mt.y);

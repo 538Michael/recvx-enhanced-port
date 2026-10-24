@@ -9,8 +9,10 @@
 
 ### Controls
 
-- **Combined controls** (CONTROLS, now the default): the left stick walks where it points on
-  screen, the d-pad drives with tank controls, like in the Resident Evil HD remaster.
+- **Combined controls** (CONTROLS, now the default): the left stick is for free 3D movement, the
+  d-pad for tank controls, like in the Resident Evil HD remaster.
+- **Aim without auto-aim**: hold the left trigger (E on the keyboard) to aim where your character
+  faces, without turning to the nearest enemy; the normal aim button keeps the auto-aim.
 - **Mouse buttons with the fixed cameras**: a mouse button bound to a game button now works while
   you play, e.g. right mouse to aim and left mouse to fire. Clicks in menus stay menu clicks.
 
@@ -36,6 +38,8 @@
   conditions.
 - **Reload with the side pack**: ammo in the bag's last two slots now reloads your weapon.
 - **Sub machine gun reload crash**: reloading the sub machine gun no longer crashes the game.
+- **Binding the triggers or sticks**: binding LT, RT or a stick direction in ENHANCED SETTINGS no
+  longer switches the menu page.
 - **Co-op: inventory and actions locked**: after an enemy attack you could no longer open the
   inventory, examine or use doors until you changed rooms. Fixed.
 - **Co-op: stuck after a moth larva**: the host could stay in the throwing-it-off animation for good.
@@ -46,7 +50,6 @@
   boss helpers) and when changing weapons while new enemies appeared.
 - **Co-op black screen**: there were some occurrences of a black screen that did not fade away.
   Those cases were adjusted so it properly fades away again.
-- **Rebinding the triggers**: binding LT/RT in ENHANCED SETTINGS no longer turns the menu page.
 - **Crash reports**: a crash now always writes a small `recvx-crash.log` next to the game. Attach it
   to a bug report; IP addresses are hidden in it.
 
