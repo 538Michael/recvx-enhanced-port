@@ -1244,6 +1244,14 @@ static void queue_event(Event* e)
     if (trace) fprintf(stderr, "coop: event %u out type=%d idx=%d\n", e->id, e->type, e->idx);
 }
 
+/* host: the partner held by an enemy whose hold plays a sequence on its victim (seq_hold): the Tyrant's blow
+   takes the player over (mode 5, his motions, en19.c bhEne19_PlyMoveMain) until the victim's motion has run
+   (bhEne_PlyActionMain), Alexia's first form burns it (mode 6, en12.c bhEne12_NG00). Run on the stand-in, which
+   is put back after every step, such a hold never ended: the Tyrant waited for good with his victim "held" and
+   harmed nobody again, Alexia stood still. The hold runs on this copy of the stand-in instead, its motion
+   advanced as the player's own (bhSetMotion's frame step), until the enemy lets go; what it does to the copy
+   goes to the partner's game as hits (and death), as other enemies' attacks. One at a time. */
+static struct { BH_PWORK pw, was; int slot, key; unsigned int t; } ghost = { .slot = -1 };   /* key: the room load (enemy_room_gen) */
 /* A frame without enemy steps (loading, menus) may have replaced the room's enemies: forget
    the retargeting. */
 static void enemy_epoch(void)
@@ -1300,13 +1308,52 @@ static int puppet_step(BH_PWORK* ep)
 /* being hit or held by an enemy (flg 4; the partner's from its pose), or dying */
 int bhCdirCheck(int my_ang, int trg_ang);   /* zonzon.c */
 static int ply_busy(const BH_PWORK* pl) { return (pl->flg & 4) || pl->mode0 == 4 || pl->mode0 == 6 || pl->hp < 0; }
-/* host: a grab handed to the partner's game is running (also in the round trip before its pose shows it) */
+/* host: a hit sent to the partner shows in its pose (flg 4, its reaction) a round trip later; until then the stand-in,
+   put back after every step, was free again at the next step and an enemy whose blow lasts several frames hit it
+   in each of them (Alexia's babies three times at once, the Gulp Worm's swing). As the hit player in single player,
+   the stand-in is busy (flg 4) for the enemies' steps meanwhile. */
+#define HIT_BUSY 15
+static unsigned int hit_until;
+/* the enemies whose hold is a sequence on the victim (ghost): the Tyrant, Alexia's first form, the Gulp Worm (its
+   swallow and throw, en02.c bhEne02_PlayerControl) */
+static int seq_hold(const BH_PWORK* ep) { return ep->id == 19 || ep->id == 12 || ep->id == 2; }
+/* host: a grab handed to the partner's game is running (also in the round trip before its pose shows it), or the
+   partner held by a ghost hold */
 static int partner_held(void)
 {
     int k;
+    if (ghost.slot >= 0 && (!(ene[ghost.slot].flg & 0x1) || ghost.key != enemy_room_gen)) ghost.slot = -1;   /* gone with its room */
+    if (ghost.slot >= 0) return 1;
     for (k = 0; k < PC_ENE_SLOTS; k++)
         if (owned[k]) return 1;
     return 0;
+}
+/* the frame step of bhSetMotion (Motion.c) for a copy that has no model of its own to pose */
+static void ghost_motion(BH_PWORK* pw)
+{
+    int n;
+    if (!pw->mnwP || pw->mtn_no >= 512) return;
+    n = (int)pw->mnwP[pw->mtn_no].frm_num << 16;
+    if (!pw->mnwP[pw->mtn_no].datP || n <= 0) return;
+    if ((pw->mtn_md & 0x1) && pw->frm_mode) pw->frm_no -= pw->mtn_add;
+    else pw->frm_no += pw->mtn_add;
+    if (pw->mtn_md & 0x1) {
+        if (pw->frm_no <= 0 || pw->frm_no >= n - 65536) pw->frm_mode = ~pw->frm_mode;
+    } else if (pw->frm_no < 0) pw->frm_no += n;
+    else if (pw->frm_no >= n) pw->frm_no -= n;
+}
+static void ghost_drop(const char* why)
+{
+    BH_PWORK* ep = &ene[ghost.slot];
+    /* Alexia's burning embrace has no way out (the player is dead, the game over follows): with our player alive
+       she takes up the fight again */
+    if (ep->id == 12 && ep->mode0 == 2 && (ep->flg & 0x1) && !(ep->flg & 0x2)) {
+        *(int*)&ep->mode0 = 1;
+        ep->mtn_no = 0; ep->frm_no = 0;
+        ep->flg |= 0x40;   /* her body pushes players again (bhEne12_Init; the embrace took it away) */
+    }
+    host_log("coop: enemy %d (id %d) lets go of the partner (%s)\n", ghost.slot, ep->id, why);
+    ghost.slot = -1;
 }
 
 static int etr_lim;                     /* RECVX_ENEMY_TRACE (enemy_trace) */
@@ -1364,7 +1411,8 @@ static int enemy_begin(BH_PWORK* ep)
         int held = proxy_ok && partner_held(), cool_p = coop_atk_cooling(&atk[i][1], frame_no), k = ene_slot(ep->lkwkp);
         if (ep->mode0) fx_begin(1);   /* what its step starts goes to the guest (EV_FX); not its initialising step */
         h_mode0 = plp->mode0;
-        if (!proxy_ok) tgt[i] = 0;
+        if (ghost.slot == i && partner_held()) tgt[i] = 1;   /* its hold of the partner runs to its end */
+        else if (!proxy_ok) tgt[i] = 0;
         else if ((ep->flg & 0x80) && k < PC_ENE_SLOTS) tgt[i] = tgt[k];   /* a linked part goes for its parent's victim */
         else {
             CoopTgtIn in = { { 0 } };
@@ -1384,7 +1432,9 @@ static int enemy_begin(BH_PWORK* ep)
                grab motion, the second given the release); in its grab/bite state it keeps a victim within
                reach. Its hit and death states commit to nobody (before, a staggering enemy kept a victim
                that was not near any more). */
-            in.commit = (ep->id == 1 ? ep->exp0 && holding(ep) : ep->mode0 >= 2 && vic->mnwP == ep->mnwP && vic->mnwP != vic->mnwPb && vic->mnwP != sys->rmthp) ? COOP_TGT_HOLD :
+            in.commit = (ep->id == 1 ? ep->exp0 && holding(ep) : ghost.slot == i || ((ep->mode0 >= 2 || seq_hold(ep)) && vic->mnwP == ep->mnwP &&
+                         vic->mnwP != vic->mnwPb && vic->mnwP != sys->rmthp) ||
+                         (ep->id == 15 && (vic->flg & 4) && vic->hp >= 0)) ? COOP_TGT_HOLD :   /* Nosferatu drives his victim until it is up (en15.c) */
                         ep->mode0 == 2 ? COOP_TGT_ATTACK : COOP_TGT_FREE;
             tgt[i] = coop_pick_target(tgt[i], &in);
         }
@@ -1397,7 +1447,8 @@ static int enemy_begin(BH_PWORK* ep)
             plp = &ply2;
             /* held in the partner's game, or this enemy's loop guard: it sees the partner busy and waits (put
                back after the step) */
-            if (held || cool_p) ply2.flg |= 4;
+            if (held || cool_p || (int)(hit_until - frame_no) > 0) ply2.flg |= 4;
+            if (ghost.slot == i) { ghost.was = ghost.pw; plp = &ghost.pw; }   /* its hold of the partner goes on */
             /* the zombie picks its and the player's grab motions by sys->ply_id: the partner's */
             if (ep->id == 1 && rx.mfile >= 0) { swap_pid = sys->ply_id; sys->ply_id = rx.mfile & 3; }
         } else if (coop_atk_cooling(&atk[i][0], frame_no) && !(plp->flg & 4)) {
@@ -1410,6 +1461,8 @@ static int enemy_begin(BH_PWORK* ep)
     return puppet_step(ep);
 }
 
+int coop_partner_step(void) { return swap_plp != NULL; }
+
 void coop_enemy_end(BH_PWORK* ep)
 {
     int i = ep - ene;
@@ -1417,33 +1470,57 @@ void coop_enemy_end(BH_PWORK* ep)
     if (fx_open == 1) { fx_end(ep, 0); fx_arm(ep); }
     aim_restore();
     if (swap_plp) {
-        BH_PWORK* a = &ply2_save;
-        int dh = a->hp - ply2.hp, grab = ply2.mode0 == 4 && a->mode0 != 4 && a->mode0 != 6;
+        int on = plp == &ghost.pw;
+        BH_PWORK* a = on ? &ghost.was : &ply2_save;   /* the victim before the step and after it */
+        BH_PWORK* v = on ? &ghost.pw : &ply2;
+        /* a grab it started (seq_hold: also the Tyrant's takeover, mode 5, and Alexia's embrace, mode 6), its hit
+           reaction, the dead flag it set (Alexia's embrace, the Tyrant's last blow: in single player the game over) */
+        int dh = a->hp - v->hp, react = v->mode0 == 2 && a->mode0 != 2, kill = (v->flg & 2) && !(a->flg & 2) && ply2_save.hp >= 0;
+        int grab = seq_hold(ep) ? !on && v->mode0 >= 4 && v->mode0 <= 6 && (a->mode0 < 4 || a->mode0 > 6) : v->mode0 == 4 && a->mode0 != 4 && a->mode0 != 6;
         if (swap_pid >= 0) { sys->ply_id = swap_pid; swap_pid = -1; }
-        if (etr_lim > 0 && (grab || dh > 0 || (ply2.mode0 == 2 && a->mode0 != 2)))
-            fprintf(stderr, "atk g=%u s=%d id=%d ty=%d to=P %s dh=%d m=%d.%d.%d.%d\n", (unsigned)gs_frame_count(), i, ep->id, ep->type, grab ? "grab" : "hit", dh,
+        if (etr_lim > 0 && (grab || dh > 0 || react || kill))
+            fprintf(stderr, "atk g=%u s=%d id=%d ty=%d to=P %s dh=%d m=%d.%d.%d.%d\n", (unsigned)gs_frame_count(), i, ep->id, ep->type, kill ? "kill" : grab ? "grab" : "hit", dh,
                     ep->mode0, ep->mode1, ep->mode2, ep->mode3);
-        if ((grab || (ply2.mode0 == 2 && a->mode0 != 2)) && coop_atk_note(&atk[i][1], frame_no))
+        if ((grab || react) && coop_atk_note(&atk[i][1], frame_no))
             host_log("coop: loop guard: enemy %d (id %d) started %d attacks on the partner within %u frames: it leaves the partner alone for %u frames\n",
                      i, ep->id, COOP_LOOP_N, COOP_LOOP_WIN, COOP_LOOP_COOL);
         if (grab && ep->id == 1 && !(ep->flg & 0x80) && ep->exp0 && holding(ep) && have_peer)
             grab_out(i, ep);   /* the client's game runs the grab */
-        else if (dh > 0 || (ply2.mode0 == 2 && a->mode0 != 2) || grab) {
+        else if (dh > 0 || react || grab || kill) {
             Event e = { 0 };
             e.type = EV_PLY_HIT;
             e.idx = i;
             e.u.ph.hp_delta = dh > 0 ? dh : 0;
-            e.u.ph.mode[0] = ply2.mode0; e.u.ph.mode[1] = ply2.mode1; e.u.ph.mode[2] = ply2.mode2; e.u.ph.mode[3] = ply2.mode3;
-            e.u.ph.flg_set = ply2.flg & ~a->flg;
+            if (kill && e.u.ph.hp_delta <= ply2_save.hp) e.u.ph.hp_delta = ply2_save.hp + 1 > 1000 ? 1000 : ply2_save.hp + 1;   /* its own death there */
+            e.u.ph.mode[0] = v->mode0; e.u.ph.mode[1] = v->mode1; e.u.ph.mode[2] = v->mode2; e.u.ph.mode[3] = v->mode3;
+            e.u.ph.flg_set = v->flg & ~a->flg;
             e.u.ph.exp1_set = *(int*)p2.plhdw & ~*(int*)(exp_save + 128);
-            e.u.ph.dv[0] = ply2.dvx; e.u.ph.dv[1] = ply2.dvy; e.u.ph.dv[2] = ply2.dvz;
+            e.u.ph.dv[0] = v->dvx; e.u.ph.dv[1] = v->dvy; e.u.ph.dv[2] = v->dvz;
             if (grab) {   /* a grab the partner's game does not run (only zombies' are handed over): a hit there */
-                e.u.ph.mode[0] = 2; e.u.ph.mode[1] = bhCdirCheck(ply2.ay, ep->ay) == 0 ? 0 : 1; e.u.ph.mode[2] = 1; e.u.ph.mode[3] = 0;
+                e.u.ph.mode[0] = 2; e.u.ph.mode[1] = bhCdirCheck(v->ay, ep->ay) == 0 ? 0 : 1; e.u.ph.mode[2] = 1; e.u.ph.mode[3] = 0;
                 e.u.ph.flg_set |= 4;
                 if (ep->id == 4) ep->ct0 = 0;   /* Cerberus lets go after its first bite instead of biting the air for 2 s */
                 host_log("coop: enemy %d (id %d) grabs the partner: sent as a hit\n", i, ep->id);
             }
+            if (kill) host_log("coop: enemy %d (id %d) kills the partner\n", i, ep->id);
             queue_event(&e);
+            hit_until = frame_no + HIT_BUSY;
+        }
+        if (grab && seq_hold(ep) && ghost.slot < 0) {   /* its hold goes on, on a copy (ghost) */
+            ghost.pw = *v;
+            ghost.slot = i;
+            ghost.key = enemy_room_gen;
+            ghost.t = frame_no;
+        } else if (on) {
+            ghost_motion(&ghost.pw);
+            if (etr_lim > 0 && !(frame_no % 15))   /* RECVX_ENEMY_TRACE: the held copy */
+                fprintf(stderr, "ghost s=%d m=%d.%d.%d.%d mtn=%u f=%d add=%d own=%d flg=%x hp=%d\n", i, ghost.pw.mode0, ghost.pw.mode1, ghost.pw.mode2, ghost.pw.mode3,
+                        ghost.pw.mtn_no, ghost.pw.frm_no >> 16, ghost.pw.mtn_add, ghost.pw.mnwP == ghost.pw.mnwPb, ghost.pw.flg, ghost.pw.hp);
+            if (ghost.pw.mnwP == ghost.pw.mnwPb && (ghost.pw.mode0 < 4 || ghost.pw.mode0 > 6)) ghost_drop("let go");
+            else if (ep->id == 12 && (ep->mode0 != 2 || ep->mode3 >= 2)) ghost_drop("the embrace is over");
+            else if ((ghost.pw.flg & 2) && !ghost.pw.mtn_add) ghost_drop("dead");
+            else if (ep->flg & 0x2) ghost_drop("it died");
+            else if (frame_no - ghost.t > 900) ghost_drop("30 s");
         }
         /* everything else (grabs, being moved, motions) is undone: the partner's own game
            decides what its player does */
