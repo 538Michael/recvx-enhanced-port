@@ -180,6 +180,7 @@ ctest --test-dir build --output-on-failure
 | `movies` | decodes every movie of the disc; skipped unless `RECVX_ISO=<image>` is set |
 | `bindings` | control bindings: defaults, rebinding, ini format, a virtual SDL gamepad |
 | `appear` | the "You appear as" model list |
+| `subtitles` | the subtitle (SRT) and language (JSON) readers, speaker tags, the lines shown at a movie frame and while voice clips play, a language over the SRTs (temporary files) |
 | `net` | co-op UDP socket and port mapping start/stop |
 | `coop` | co-op packet parser: malformed events of every type, join code, fuzz loop |
 | `fileio` | UTF-8 paths and replace-on-rename saving |

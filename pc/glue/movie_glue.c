@@ -29,6 +29,8 @@ unsigned short snd_synth_midi_active(void);
 extern int CurrentBgmNo, CurrentBgSeNo[2];
 extern unsigned int AdxPlayFlag[2];
 void   stream_movie(uint32_t tbp, int index);
+int    subs_movie_open(const char* disc_name);
+void   subs_movie_close(void);
 void   audio_movie_volume(float gain);
 float  audio_movie_gain(void);
 uint64_t ps2_vblank_count(void);
@@ -79,6 +81,7 @@ void initAll(void)
         sprintf(name, "\\MOVIE\\MV_%03d.PSS;1", atoi(getenv("RECVX_MOVIE")));
         sceCdSearchFile(&infile.fp, name);
     }
+    subs_movie_open(infile.fp.name);   /* "MV_016.PSS;1": its subtitles (pc/src/movie/subtitles.c), drawn by the overlay */
     if (getenv("RECVX_MOVIE_TRACE") && !trace) trace = fopen(getenv("RECVX_MOVIE_TRACE"), "w");
     if (!skip_movies && !movie_open(infile.fp.lsn, infile.fp.size)) printf("movie: cannot decode %u\n", infile.fp.lsn);
     movie_size(&__image_w__, &__image_h__);
@@ -144,6 +147,7 @@ void termAll(void)
         trace_sound("end");
     }
     movie_close();
+    subs_movie_close();
     rmi.iMovieState = 0;
 }
 

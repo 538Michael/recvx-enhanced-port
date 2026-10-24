@@ -14,6 +14,7 @@
 #include "biorand.h"
 #include "../import/import.h"
 #include "../net/update.h"
+#include "../movie/game_font.h"
 void render_loop(void);
 #include <SDL3/SDL.h>
 #include <stdarg.h>
@@ -104,7 +105,7 @@ float pc_overlay_x(float x)
 
 HostConfig g_config = { .rifle_stack = 1, .window_w = 1280, .window_h = 960, .borderless_extra = 1,.vsync = 1, .log_level = 1, .music_volume = 100, .sfx_volume = 100, .rumble = 100, .interpolate = 1, .menu_smooth = 1, .frame_blend = 0, .aspect = 2, .show_fps = 1, .show_ping = 1,
                        .screen_filter = 1, .cinema_bars = 1, .screen_effects = 1, .native_3d = 1, .model_cull = 1, .native_tex = 1, .hd_textures = 1, .hd_textures_ui = 1, .quick_knife = 1, .head_blowoff = 1,
-                       .skip_doors = 1, .fast_loading = 1, .auto_stairs = 1, .skip_intro = 1, .battle_unlocked = 1, .difficulty_select = 1, .contrast = 100, .gamma = 10, .fog_intensity = 100, .update_check = 1 };   /* first-start defaults; recvx.ini overrides */
+                       .skip_doors = 1, .fast_loading = 1, .auto_stairs = 1, .skip_intro = 1, .battle_unlocked = 1, .difficulty_select = 1, .subtitles = 1, .subtitle_size = 1, .contrast = 100, .gamma = 10, .fog_intensity = 100, .update_check = 1 };   /* first-start defaults; recvx.ini overrides */
 SDL_Window* g_window;
 SDL_GLContext g_gl;
 
@@ -341,6 +342,7 @@ int main(int argc, char** argv)
         exit(import_run(src, what) == 0 ? 0 : 1);
     }
     update_start();   /* the newest version for the title, on a thread of its own (net/update.h) */
+    settings_subtitle_languages();   /* the subtitle languages (mods/subtitles/<code>.json), and the one chosen */
     ps2_memory_init();
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD))
@@ -356,6 +358,7 @@ int main(int argc, char** argv)
         if (!g_config.iso_path[0]) { usage(); host_fatal("no game disc image given"); }
         if (!cdvd_open_image(g_config.iso_path)) host_fatal("cannot open game disc image '%s'", g_config.iso_path);
     }
+    game_font_build();   /* the subtitles' game lettering from the disc's font, in memory (game_font.c) */
 
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);

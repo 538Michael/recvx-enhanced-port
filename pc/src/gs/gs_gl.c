@@ -638,6 +638,7 @@ static uint32_t clut_hash(uint64_t tex0)
 }
 
 static uint32_t mv_tbp = UINT32_MAX;   /* gs_movie_bind */
+static int mv_index;
 static GLuint mv_rgb;
 
 static GLuint tex_get(uint64_t tex0, uint64_t texa, int* out_w, int* out_h, float* ascale)
@@ -1805,6 +1806,7 @@ void gs_movie_bind(uint32_t tbp, int index)
     const uint8_t* yuv;
     gs_flush();   /* draws before this sample what was bound before */
     mv_tbp = tbp;
+    mv_index = index;
     if (!prog_yuv) {
         prog_yuv = compile(movie_vs, movie_fs);
         glUseProgram(prog_yuv);
@@ -1863,6 +1865,9 @@ void gs_movie_bind(uint32_t tbp, int index)
     glActiveTexture(GL_TEXTURE0);
     glBindVertexArray(vao);
 }
+
+/* the movie frame in the executed frame (the one presented), -1 none: the overlay's subtitles */
+int gs_movie_frame(void) { return mv_tbp != UINT32_MAX ? mv_index : -1; }
 
 /* ---------------- presentation (render thread) ---------------- */
 

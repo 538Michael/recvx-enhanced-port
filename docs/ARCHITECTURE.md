@@ -420,6 +420,32 @@ village, collision. The render thread (GS emulation, replays: `r_exec`, `r_inter
   files read from the disc image) and the ADXT stream player with the original status and time
   behaviour (the game waits on `ADXT_STAT_PLAYEND` for voice lines). Each stream is an
   `SDL_AudioStream` decoded on demand on SDL's audio thread.
+  - **Voice subtitles**: the cutscenes' lines are clips of `VOICE1.AFS` / `VOICE2.AFS` (event
+    scripts -> `sdfunc.c PlayVoice*` -> `PlayAdxEx(1, PatId[1], n)`). `ADXT_StartAfs` hands each
+    non-looping clip to `subtitles.c subs_voice_start` (archive name, clip number, length, start
+    time); `ADXT_Stop` ends it. The archive's `<mods>/subtitles/VOICE1.srt` is read at its first
+    clip and kept: a cue's number is the clip, its times count from the clip's start.
+    `overlay_render` asks `subs_voice_text(SDL_GetTicksNS())` when no movie frame is shown. The
+    wall clock is exact here: the retail `ADXT_Pause` is empty (`ps2_cri_adxt.c`), so a clip plays
+    from its start until it ends or is stopped (the paused start of `PlayVoiceEx(..., 1)` and
+    `ContinuePlayVoice` change nothing). A clip's cue may stay `LINGER_MS` (0.6 s) past its end,
+    to be read; the next clip on the slot replaces it.
+  - **Subtitle languages and speakers**:
+    - A language is `<mods>/subtitles/<code>.json`, a flat object of strings read by `subtitles.c`'s own small JSON reader. Its keys are `MV_000/3` (a movie's n-th cue in time order) and `VOICE1/18/2` (clip 18's 2nd cue).
+    - The game thread applies it as an SRT loads (`localize`): translated text replaces the cue's, and the cue's speaker (`<v Claire>` in the SRT, `SubCue.who`) becomes a prefix `\x01<id>\x1f<name>\x02` that `overlay.cpp subtitles_draw` turns into "Name: ", coloured by id, or drops.
+    - `subs_set_language` (any thread) bumps a generation. The next movie or clip reloads the table and every cached voice archive; the existing swap ends tracks that point into old cues.
+    - `subtitle_font` builds one ImGui font per language and style between frames (the atlas is never locked with this backend):
+      - the base is the user's `fonts/cvx.otf`, else the game's lettering (`game_font.c`, below), else their `font.ttf`, or a system font;
+      - `MergeMode` adds the system font, the user's `fonts/<code>.otf`, and the system's CJK font (`.ttc` with `FontNo`).
+      - Non-Latin languages (`latin_language`) use the modern base even with "Game", so a line never mixes the two.
+    - **The game's lettering** (`game_font.c`): nothing of it ships. `main` calls `game_font_build` once, after the disc opens and before the game thread starts:
+      - it reads the US font page (the first 512 x 512 4-bit TIM2 of `SYSTEM.AFS` entry 1, the one `bhDispFontEx` draws messages with: 28 x 28 cells in ASCII order from ' ', the palette's red its 16 grey levels);
+      - traces each cell's fill: upsampled 8x (bicubic), contoured at level 115 by marching squares with interpolated crossings, small specks dropped, the pixel steps smoothed (corners kept) and the outlines simplified;
+      - composes the letters it lacks from its own (Latin-1 and Latin Extended-A accents as drawn marks, ł œ ¡ ¿ “ „ – — … « »), spaces them by the ink, and writes a TrueType font (glyf with straight segments, cmap format 4);
+      - keeps it in memory, about 140 KB, in some 50 ms; nothing is written to disk. `subtitle_font` hands it to `AddFontFromMemoryTTF` (not owned by the atlas). A disc without the page (another region) leaves "Game" on the user's file or the modern font.
+    - Lines are broken by `wrap_at`, not ImGui's word wrap, which only breaks at spaces:
+      - Chinese and Japanese break between characters, except before closing punctuation and small kana, after opening brackets, inside a katakana word or before its particle, and around "・".
+      - `balanced_wrap` then narrows the width while the line count holds, so the lines come out of about equal length.
 - **Sound effects and MIDI** (`audio/snd_iop.c`, `audio/snd_synth.c`): Capcom's TSNDDRV IOP
   driver is emulated at the SIF RPC level. The TQ request layer follows the retail
   `TSNDDRV.IRX`; HD/BD banks are played on a model of Sony's hardware synthesizer on SPU2 voices,
@@ -482,6 +508,22 @@ village, collision. The render thread (GS emulation, replays: `r_exec`, `r_inter
     the factor is 1 and the sprite is the game's.
   - Movie frames have no tagged 3D, so the in-between path never blends or replays them: each
     display refresh shows the latest executed frame.
+  - **Subtitles** (`subtitles.c`; the files: [SUBTITLES.md](SUBTITLES.md)). The voice clips' part is
+    under "ADX" above; for movies:
+    - Loading: `initAll` loads `<mods>/subtitles/MV_nnn.srt` for the file being opened
+      (`infile.fp.name`, after the `RECVX_MOVIE` override), and `termAll` drops it.
+    - Which frame: the render thread knows the movie frame of the frame it presents
+      (`gs_gl.c gs_movie_frame`: the index `gs_movie_bind` got, until the next
+      `gs_frame_begin`). `overlay_render` asks `subs_text_at` for that frame's lines, at time =
+      frame x 1001 / 30 ms (the rate `readMpeg` counts in). So the lines follow the picture,
+      which follows the sound.
+    - Drawing: ImGui's background draw list, over the finished picture but under the overlay's
+      windows.
+    - Threads: the cues sit under a mutex and are copied out, so the render thread never reads
+      freed text. If the next movie loads while a frame of the previous one is still presented
+      (one game frame at most), that frame is looked up in the new movie's cues.
+    - Font: loaded together with ImGui's own default font, at the first overlay frame
+      (`fonts_add`), so ImGui's own choice of its default font is unchanged.
 
 ## Input
 

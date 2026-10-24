@@ -274,6 +274,18 @@ add_test(NAME variants COMMAND test_variants)
 add_executable(test_cast tests/test_cast.c src/host/cast.c src/host/actors.c)
 add_test(NAME cast COMMAND test_cast)
 
+# subtitles (pc/src/movie/subtitles.c): the mods/subtitles/*.srt reader, the lines of a movie frame and of voice clips
+add_executable(test_subtitles tests/test_subtitles.c src/movie/subtitles.c src/host/fileio.c)
+target_compile_options(test_subtitles PRIVATE -std=gnu11)
+target_link_libraries(test_subtitles PRIVATE SDL3::SDL3)
+add_test(NAME subtitles COMMAND test_subtitles)
+# the subtitles' game lettering (pc/src/movie/game_font.c): a drawn font page to TrueType, read back with ImGui's stb_truetype
+add_executable(test_game_font tests/test_game_font.c src/movie/game_font.c)
+target_compile_options(test_game_font PRIVATE -std=gnu11)
+target_include_directories(test_game_font PRIVATE ${imgui_SOURCE_DIR})
+target_link_libraries(test_game_font PRIVATE m)
+add_test(NAME game_font COMMAND test_game_font)
+
 # co-op networking (pc/src/net): a busy port, the port mapping started and stopped again
 add_executable(test_net tests/test_net.c src/net/net.c src/net/portmap.c)
 target_compile_options(test_net PRIVATE $<$<COMPILE_LANGUAGE:C>:-std=gnu11>)

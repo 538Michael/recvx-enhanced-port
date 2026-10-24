@@ -10,6 +10,7 @@
 #include "audio.h"
 #include "../host/biorand.h"
 #include "../../include/pc_parse.h"
+#include "../movie/subtitles.h"
 #include <SDL3/SDL.h>
 #include <string.h>
 #include <stdio.h>
@@ -281,6 +282,7 @@ void ADXT_Stop(void* h)
     if (!t) return;
     if (t->voice >= 0) { audio_stream_stop(t->voice); t->voice = -1; }
     t->stat = ADXT_STAT_STOP;
+    subs_voice_stop((int)(t - talk));
 }
 
 void ADXT_Destroy(void* h) { AdxTalk* t = h; if (!t) return; ADXT_Stop(h); t->used = 0; }
@@ -319,6 +321,8 @@ void ADXT_StartAfs(void* h, int ptid, int fid)
     t->stat = ADXT_STAT_PLAYING;
     t->voice = audio_stream_start_adx(mod ? path : g_config.iso_path, mod ? 0 : (uint64_t)lsn * SECTOR, size, t->vol);
     host_log("adxt: start %d/%d (%u Hz, %u ch, %u samples, loop %d) voice %d\n", ptid, fid, t->rate, t->channels, t->total, t->loop, t->voice);
+    if (!t->loop && ptid >= 0 && ptid < MAX_PT && pt[ptid].name[0])   /* a voice line: its subtitles (<mods>/subtitles/VOICE1.srt) */
+        subs_voice_start((int)(t - talk), pt[ptid].name, fid, t->rate ? (int)((uint64_t)t->total * 1000 / t->rate) : 0, t->start_ns);
 }
 
 static uint64_t played_samples(AdxTalk* t)

@@ -38,6 +38,12 @@ typedef struct {
     int  cinema_bars;        /* cutscene letterbox bars: same modes */
     int  fog_intensity;      /* fog at this % of the original, 0..100 (pc_fog_scale); 100 original, 0 none */
     int  movie_zoom;         /* movies scaled evenly until the letterbox bars leave the screen (movie_glue.c vbrank_draw) */
+    int  subtitles;          /* movies and voice clips show mods/subtitles/MV_nnn.srt, VOICE1.srt (pc/src/movie/subtitles.c, drawn by overlay.cpp) */
+    int  subtitle_size;      /* 0 small, 1 medium, 2 large */
+    int  subtitle_speakers;  /* the speaker's name before a line ("<v Claire>" in the SRT) */
+    int  subtitle_speaker_colors;   /* ... in a colour per character (overlay.cpp) */
+    int  subtitle_font;      /* 0 the game's lettering (pc/src/movie/game_font.c; the user's mods/subtitles/fonts/cvx.otf first), 1 a system font */
+    char subtitle_lang[16];  /* ini subtitle_language: mods/subtitles/<code>.json, "" English (the SRTs) */
     int  screen_effects;     /* full-screen effect overlays (noise/scanline layers): same modes */
     int  brightness;         /* picture calibration in the present pass (gs_gl.c draw_display): -50..50, 0 neutral */
     int  contrast;           /* 50..150 %, 100 neutral */

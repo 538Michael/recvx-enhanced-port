@@ -227,6 +227,11 @@ widescreen, no intro or door animations, fast loading); turn them off for a PS2-
 | Frame blend (trail) | Off | the PS2's motion trail. Auto: only in vanilla |
 | Cutscene bars, Camera vignette, Screen effects | Stretch to width | in widescreen: Original (4:3), Stretch to width or Off |
 | Movie zoom | Off | enlarges movies in widescreen to cut their black bars, never stretched |
+| Subtitles | On | movies and cutscene dialogue show your subtitle files, see [Subtitles](#subtitles); without files nothing changes |
+| Subtitle size | Medium | Small, Medium or Large |
+| Subtitle language | English | English (the SRT files) or a language file found in `mods/subtitles` at start |
+| Subtitle font | Game | the game's lettering, made at start from your disc. Modern: a system font |
+| Speaker names, Speaker name colors | Off | "Claire: ..." before a line whose subtitle names its speaker; each character's name in a colour of its own |
 | Fog intensity | 100% | 100% as on the PS2, 50% twice as far away, 0% none (also the black fog of dark rooms) |
 | Brightness, Contrast, Gamma | 0, 100%, 1.0 | picture calibration; a test pattern shows while one is selected |
 | Reset picture calibration | | back to neutral |
@@ -411,6 +416,28 @@ HD texture packs made for the PCSX2 emulator for SLUS-20184 work as they come.
 
 How it works: HD_PACK.md.
 
+## Subtitles
+
+The US disc has no subtitles. The game shows your own, in any language, for the movies and the
+dialogue of the real-time cutscenes. None are included.
+
+1. Put the subtitle files into `mods/subtitles/`: `MV_016.srt` and so on for the movies (named after
+   `MOVIE/MV_016.PSS`), `VOICE1.srt` and `VOICE2.srt` for the cutscene dialogue, and a
+   `<code>.json` for each other language. On Linux the names are case-sensitive.
+2. Start the game. When a movie with a file starts, the log says
+   `subtitles: mods/subtitles/MV_016.srt: N subtitles`.
+
+- **Language**: Subtitle language lists English (the SRT files) and each `.json` file found at
+  start. A line the language lacks shows in English.
+- **Font**: Subtitle font "Game" uses the game's own lettering, made at start from your disc's font
+  and kept in memory. Your own `mods/subtitles/fonts/cvx.otf` is used instead. Letters it lacks come
+  from the "Modern" font: a bold system font, or your own `mods/subtitles/font.ttf`.
+- **Japanese, Korean, Chinese**: need a font with their letters, `mods/subtitles/fonts/<code>.otf`
+  (for example `ja.otf`) or the system's (Yu Gothic, Malgun Gothic, Microsoft YaHei, Microsoft
+  JhengHei; Linux: Noto Sans CJK). Without one they show as boxes and the log names the missing font.
+
+File format, speakers, languages and timing: SUBTITLES.md.
+
 ## Mods
 
 Files in `mods/` replace disc files without touching your image. The log names each one. To remove a
@@ -422,6 +449,7 @@ mod, delete its files.
 | `ARCHIVE.AFS/N` | entries of the game's AFS archives |
 | `enemies.ini` | custom enemies (ENEMIES.md, "Enemy variants") |
 | `textures/` | [HD texture packs](#hd-texture-packs) |
+| `subtitles/` | [subtitles](#subtitles) for the movies and cutscenes |
 
 Co-op partners need the same `enemies.ini`. Modding guide: modding/README.md.
 
@@ -465,6 +493,8 @@ newest version number, in the background.
 | Gamepad dead in the second window | Input source: Gamepad only, pick the pad number; check Steam Input |
 | Saves gone after changing the save system | Import memory card saves, or switch back |
 | Wrong HD textures after changing a pack | delete `save/hd_textures.txt` |
+| No subtitles | Subtitles on; the files in `mods/subtitles/` named as in [Subtitles](#subtitles); the log names each file read |
+| Subtitle letters show as boxes | Japanese, Korean, Chinese: add `mods/subtitles/fonts/<code>.otf`, see [Subtitles](#subtitles) |
 
 ### Reporting a problem
 

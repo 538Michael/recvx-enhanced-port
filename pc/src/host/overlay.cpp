@@ -20,11 +20,14 @@ extern "C" {
 #include "settings.h"
 #include "lobby.h"
 #include "../import/import.h"
+#include "../movie/subtitles.h"
+#include "../movie/game_font.h"
 #include <SDL3/SDL.h>
 #include <imgui.h>
 #include <imgui_impl_sdl3.h>
 #include <imgui_impl_opengl3.h>
 #include <ctype.h>
+#include <stdlib.h>
 #include <float.h>
 #include <math.h>
 #include <string.h>
@@ -35,6 +38,9 @@ extern "C" void pad_set_game_input_enabled(int on);
 static SDL_Window* win;
 static bool ready, visible, cheats_visible, coop_visible, import_visible;
 static bool tps_key_wait;   /* the next key pressed becomes the third-person toggle key */
+static bool fonts_added;    /* fonts_add, before the first frame */
+static ImFont* sub_font;    /* the subtitles' font for the language and style (subtitle_font), NULL: ImGui's own */
+static char sub_text[2048]; /* the subtitles shown: the movie frame's (subs_text_at) or the voice clips' (subs_voice_text) */
 
 void overlay_init(void* window, void* gl_context)
 {
@@ -435,6 +441,7 @@ static const char* coop_item(unsigned int e, char* buf, size_t n)
 }
 
 extern "C" float gs_hor_scale(void);
+extern "C" int gs_movie_frame(void);
 
 static CoopStatus cs;   /* co-op: what the game thread published (coop_status_get, once per overlay frame) */
 static int tag_flags;   /* the partner's head in the shown frame (STREAM_PT_*, 0: not drawn), game screen */
@@ -659,6 +666,17 @@ static void coop_window(void)
     if (changed) settings_save_later();
 }
 
+/* the game screen (640 x 480, the 4:3 area widened by hor+ hs) in the window, as gs_gl.c presents it */
+struct GameView { float x0, y0, w, h, hs; };
+static GameView game_view(void)
+{
+    ImVec2 ds = ImGui::GetIO().DisplaySize;
+    float hs = gs_hor_scale(), a = 4.0f / 3.0f * hs, vw = ds.y * a, vh = ds.y;
+    if (vw > ds.x) { vw = ds.x; vh = ds.x / a; }
+    if (g_config.aspect == ASPECT_STRETCH && hs == 1.0f) { vw = ds.x; vh = ds.y; }
+    return { (ds.x - vw) * 0.5f, (ds.y - vh) * 0.5f, vw, vh, hs };
+}
+
 /* Above the partner's head (co-op): its name (option) and, while it is busy, what with, one
    box. Off screen or behind the camera (same room): a marker at the edge of the view pointing
    at it, with the name. Game screen (640x480, 4:3 area) to the window as gs_gl.c presents it;
@@ -666,11 +684,8 @@ static void coop_window(void)
 static void name_tag(void)
 {
     static const char* what[] = { "", "cutscene", "menu", "item box", "trading" };
-    ImVec2 ds = ImGui::GetIO().DisplaySize;
-    float hs = gs_hor_scale(), a = 4.0f / 3.0f * hs, vw = ds.y * a, vh = ds.y;
-    if (vw > ds.x) { vw = ds.x; vh = ds.x / a; }
-    if (g_config.aspect == ASPECT_STRETCH && hs == 1.0f) { vw = ds.x; vh = ds.y; }
-    float x0 = (ds.x - vw) * 0.5f, y0 = (ds.y - vh) * 0.5f;
+    GameView v = game_view();
+    float hs = v.hs, vw = v.w, vh = v.h, x0 = v.x0, y0 = v.y0;
     float x = x0 + (0.5f + (tag_x - 320.0f) / (640.0f * hs)) * vw;
     float y = y0 + tag_y / 480.0f * vh;
     bool behind = tag_flags == STREAM_PT_BEHIND;
@@ -843,6 +858,293 @@ static void import_window(void)
     ImGui::End();
 }
 
+/* ImGui's own font for the windows, chosen as ImGui would at the first frame (FontScaleDpi set) */
+static void fonts_add(void)
+{
+    fonts_added = true;
+    ImGui::GetIO().Fonts->AddFontDefault();
+}
+
+static const char* mods_dir(void) { return getenv("RECVX_MODS") ? getenv("RECVX_MODS") : "mods"; }
+
+static bool file_there(const char* path)
+{
+    FILE* f = pc_fopen(path, "rb");
+    if (f) fclose(f);
+    return f != NULL;
+}
+
+/* a system font file: on Windows in %WINDIR%\Fonts, elsewhere a full path */
+static void system_path(char* out, size_t n, const char* file)
+{
+#ifdef _WIN32
+    snprintf(out, n, "%s\\Fonts\\%s", getenv("WINDIR") ? getenv("WINDIR") : "C:\\Windows", file);
+#else
+    snprintf(out, n, "%s", file);
+#endif
+}
+
+/* the system's bold sans for Latin and Cyrillic: its path, "" none */
+static const char* system_font(void)
+{
+    static const char* const sys[] = {
+#ifdef _WIN32
+        "segoeuib.ttf", "arialbd.ttf", "arial.ttf",
+#else
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",           /* Debian, Ubuntu */
+        "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf",                       /* Arch */
+        "/usr/share/fonts/dejavu-sans-fonts/DejaVuSans-Bold.ttf",         /* Fedora */
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+        "/usr/share/fonts/liberation-sans/LiberationSans-Bold.ttf",
+        "/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf",
+        "/usr/share/fonts/noto/NotoSans-Bold.ttf",
+#endif
+    };
+    static char path[1100];
+    static bool looked;
+    if (looked) return path;
+    looked = true;
+    for (int i = 0; i < IM_COUNTOF(sys); i++) {
+        system_path(path, sizeof(path), sys[i]);
+        if (file_there(path)) return path;
+    }
+    path[0] = 0;
+    return path;
+}
+
+/* the system's fonts for the languages Latin fonts lack (the first one there is used; index in a .ttc) */
+static const struct { const char* code; const char* file[4]; int no; } cjk_fonts[] = {
+#ifdef _WIN32
+    { "ja", { "YuGothB.ttc", "meiryob.ttc", "msgothic.ttc" }, 0 },
+    { "ko", { "malgunbd.ttf", "malgun.ttf" }, 0 },
+    { "zh-Hans", { "msyhbd.ttc", "msyh.ttc", "simhei.ttf" }, 0 },
+    { "zh-Hant", { "msjhbd.ttc", "msjh.ttc", "mingliub.ttc" }, 0 },
+#else
+#define NOTO_CJK "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc", "/usr/share/fonts/noto-cjk/NotoSansCJK-Bold.ttc", \
+                 "/usr/share/fonts/google-noto-cjk/NotoSansCJK-Bold.ttc"
+    { "ja", { NOTO_CJK, "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc" }, 0 },   /* Noto Sans CJK: JP, KR, SC, TC */
+    { "ko", { NOTO_CJK }, 1 },
+    { "zh-Hans", { NOTO_CJK, "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc" }, 2 },
+    { "zh-Hant", { NOTO_CJK }, 3 },
+#endif
+};
+
+/* The subtitle font for language `code` and style (Subtitle font: 0 the game's lettering, 1 modern):
+   the base (the player's own <mods>/subtitles/fonts/cvx.otf, else the lettering made from the
+   disc's font at start (game_font.c), else their font.ttf, else the system's; no font is shipped),
+   then merged in for letters it lacks: the system font (under the game's lettering), the player's
+   font for the language (<mods>/subtitles/fonts/<code>.otf) and the system's font for it (Japanese,
+   Korean, Chinese). Made once per pair, between frames (the OpenGL backend takes new fonts at any
+   time). */
+static bool latin_language(const char* code);
+static ImFont* subtitle_font(const char* code, int style)
+{
+    static struct { char code[16]; int style; ImFont* f; } made[24];
+    static int nmade;
+    if (!latin_language(code)) style = 1;   /* Japanese, Russian, ...: the game's lettering has none of their letters */
+    ImFontAtlas* fonts = ImGui::GetIO().Fonts;
+    ImFontConfig cfg;
+    ImFont* f = nullptr;
+    const char* sys = system_font();
+    char path[1100];
+    bool game = false, cjk = false, merged = false;
+    for (int i = 0; i < nmade; i++) if (made[i].style == style && !strcmp(made[i].code, code)) return made[i].f;
+    cfg.Flags |= ImFontFlags_NoLoadError;
+    if (style == 0) {
+        int n = 0;
+        const unsigned char* d = game_font_data(&n);
+        snprintf(path, sizeof(path), "%s/subtitles/fonts/cvx.otf", mods_dir());
+        game = (f = fonts->AddFontFromFileTTF(path, 0.0f, &cfg)) != nullptr;
+        if (!f && d) {   /* the disc's own, kept by game_font.c */
+            ImFontConfig own = cfg;
+            own.FontDataOwnedByAtlas = false;
+            game = (f = fonts->AddFontFromMemoryTTF((void*)d, n, 0.0f, &own)) != nullptr;
+            snprintf(path, sizeof(path), "the game's lettering (made from the disc)");
+        }
+    }
+    for (int i = 0; i < 2 && !f; i++) {
+        snprintf(path, sizeof(path), "%s/subtitles/font.%s", mods_dir(), i ? "otf" : "ttf");
+        f = fonts->AddFontFromFileTTF(path, 0.0f, &cfg);
+    }
+    if (!f && sys[0] && (f = fonts->AddFontFromFileTTF(sys, 0.0f, &cfg))) snprintf(path, sizeof(path), "%s", sys);
+    if (f) {
+        host_log("subtitles: font %s\n", path);
+        cfg.MergeMode = true;
+        if (game && sys[0]) fonts->AddFontFromFileTTF(sys, 0.0f, &cfg);
+        for (int i = 0; i < 2 && code[0] && !merged; i++) {   /* the language's own */
+            snprintf(path, sizeof(path), "%s/subtitles/fonts/%s.%s", mods_dir(), code, i ? "ttf" : "otf");
+            if ((merged = fonts->AddFontFromFileTTF(path, 0.0f, &cfg) != nullptr)) host_log("subtitles: font %s (%s)\n", path, code);
+        }
+        for (int i = 0; i < IM_COUNTOF(cjk_fonts); i++) {
+            if (strcmp(cjk_fonts[i].code, code)) continue;
+            cjk = true;
+            for (int j = 0; j < 4 && cjk_fonts[i].file[j]; j++) {
+                system_path(path, sizeof(path), cjk_fonts[i].file[j]);
+                if (!file_there(path)) continue;
+                cfg.FontNo = (ImU32)cjk_fonts[i].no;
+                if (fonts->AddFontFromFileTTF(path, 0.0f, &cfg)) { host_log("subtitles: font %s (%s)\n", path, code); merged = true; break; }
+            }
+        }
+        if (cjk && !merged) host_log("subtitles: no font with the letters of %s: add mods/subtitles/fonts/%s.otf\n", code, code);
+    }
+    if (nmade < IM_COUNTOF(made)) { snprintf(made[nmade].code, sizeof(made[nmade].code), "%s", code); made[nmade].style = style; made[nmade++].f = f; }
+    return f;
+}
+
+/* one UTF-8 character at s (before e): its code point, *n its bytes */
+static unsigned utf8_at(const char* s, const char* e, int* n)
+{
+    const unsigned char* p = (const unsigned char*)s;
+    int k = *p < 0x80 ? 1 : *p >= 0xF0 ? 4 : *p >= 0xE0 ? 3 : *p >= 0xC0 ? 2 : 1;
+    unsigned c = k == 1 ? *p : *p & (0x7F >> k);
+    if (s + k > e) k = 1;
+    for (int i = 1; i < k; i++) c = c << 6 | (p[i] & 0x3F);
+    *n = k;
+    return c;
+}
+/* Chinese and Japanese: no spaces between words; a line may break between any two of their characters,
+   but not before closing punctuation or small kana, nor after an opening bracket (kinsoku) */
+static bool cjk(unsigned c) { return (c >= 0x2E80 && c < 0xA000) || (c >= 0xF900 && c < 0xFB00) || (c >= 0xFF00 && c < 0xFFF0); }
+static bool no_line_start(unsigned c)
+{
+    static const unsigned list[] = { 0x3001, 0x3002, 0xFF0C, 0xFF0E, 0xFF01, 0xFF1F, 0xFF09, 0x300D, 0x300F, 0x3011, 0x3009, 0x300B, 0x3015,
+                                     0xFF5D, 0x30FC, 0x2026, 0x30FB, 0xFF1A, 0xFF1B, 0x3063, 0x30C3, 0x3083, 0x3085, 0x3087, 0x30E3, 0x30E5,
+                                     0x30E7, 0x3041, 0x3043, 0x3045, 0x3047, 0x3049, 0x30A1, 0x30A3, 0x30A5, 0x30A7, 0x30A9, '!', '?', '.', ',', ')', ':', ';' };
+    for (unsigned k : list) if (c == k) return true;
+    return false;
+}
+static bool no_line_end(unsigned c) { return c == 0x300C || c == 0x300E || c == 0xFF08 || c == 0x3010 || c == 0x3008 || c == 0x300A || c == '('; }
+static bool katakana(unsigned c) { return (c >= 0x30A1 && c <= 0x30FA) || c == 0x30FC; }   /* a word of them stays whole (names, loanwords) */
+static bool hiragana(unsigned c) { return c >= 0x3041 && c <= 0x309F; }                    /* ... with its particle after it */
+
+/* where a subtitle line [s, e) breaks to fit `wrap`: at the last space that fits or between two CJK
+   characters; a single word too long for the line breaks where it overflows */
+static const char* wrap_at(ImFont* font, float fs, const char* s, const char* e, float wrap)
+{
+    const char* best = nullptr;
+    unsigned prev = 0;
+    float w = 0;
+    for (const char* p = s; p < e;) {
+        int n;
+        unsigned c = utf8_at(p, e, &n);
+        float cw = font->CalcTextSizeA(fs, FLT_MAX, 0.0f, p, p + n).x;
+        if (c == ' ') best = p;
+        else if (p > s && (cjk(prev) || cjk(c)) && prev != ' ' && !no_line_start(c) && !no_line_end(prev) &&
+                 !(katakana(prev) && (katakana(c) || hiragana(c))) && prev != 0x30FB && c != 0x30FB) best = p;   /* (not at a name's "・") */
+        if (w + cw > wrap && p > s) return best && best > s ? best : p;
+        w += cw;
+        prev = c;
+        p += n;
+    }
+    return e;
+}
+
+/* the wrap width for [s, e) that keeps its line count but evens the lines out (no last line of a word
+   or two): the narrowest of a few steps from the even share up to `wrap` that needs no more lines */
+static float balanced_wrap(ImFont* font, float fs, const char* s, const char* e, float wrap)
+{
+    auto lines = [&](float w) {
+        int n = 0;
+        for (const char* p = s; p < e; n++) {
+            const char* b = wrap_at(font, fs, p, e, w);
+            if (b <= p) b = e;
+            for (p = b; p < e && *p == ' '; p++) {}
+        }
+        return n;
+    };
+    float total = font->CalcTextSizeA(fs, FLT_MAX, 0.0f, s, e).x;
+    int n = lines(wrap);
+    if (n < 2) return wrap;
+    for (float w = total / n; w < wrap; w *= 1.04f)
+        if (lines(w) <= n) return w;
+    return wrap;
+}
+
+/* languages the game's lettering cannot write: their subtitles use the modern font throughout */
+static bool latin_language(const char* code)
+{
+    static const char* const other[] = { "ja", "ko", "zh", "ru", "uk", "be", "bg", "sr", "mk", "el", "kk", "ar", "he", "th", "hi" };
+    size_t n = strcspn(code, "-_");
+    for (const char* o : other) if (strlen(o) == n && !strncmp(o, code, n)) return false;
+    return true;
+}
+
+/* a character's colour for its name (Speaker name colors), by speaker id; other ids a hue of their own */
+static ImU32 speaker_color(const char* id, size_t n)
+{
+    static const struct { const char* id; ImU32 c; } pal[] = {
+        { "Claire", IM_COL32(255, 120, 120, 255) }, { "Chris", IM_COL32(130, 210, 120, 255) }, { "Steve", IM_COL32(120, 180, 255, 255) },
+        { "Alfred", IM_COL32(195, 150, 255, 255) }, { "Alexia", IM_COL32(255, 150, 215, 255) }, { "Wesker", IM_COL32(255, 210, 90, 255) },
+        { "Rodrigo", IM_COL32(255, 170, 90, 255) }, { "Computer", IM_COL32(150, 215, 215, 255) }, { "Narrator", IM_COL32(205, 205, 205, 255) },
+    };
+    unsigned h = 2166136261u;
+    float r, g, b;
+    for (int i = 0; i < IM_COUNTOF(pal); i++) if (strlen(pal[i].id) == n && !strncmp(pal[i].id, id, n)) return pal[i].c;
+    for (size_t i = 0; i < n; i++) h = (h ^ (unsigned char)id[i]) * 16777619u;
+    ImGui::ColorConvertHSVtoRGB((h % 360) / 360.0f, 0.45f, 1.0f, r, g, b);
+    return IM_COL32((int)(r * 255), (int)(g * 255), (int)(b * 255), 255);
+}
+
+/* the subtitles (sub_text, of a movie or the voice clips playing): centred lines, white with a black
+   outline, wrapped to the 4:3 picture and stacked up from the bottom letterbox bar (the game draws
+   the movies 640 x 320 in the 480 lines, cutscenes have their cinema bars; with Movie zoom and in
+   play over the picture's bottom). Behind the overlay's windows. */
+static void subtitles_draw(void)
+{
+    static const float sizes[] = { 0.042f, 0.052f, 0.065f };   /* Subtitle size: of the screen's height */
+    static const float ring[8][2] = { { -1, -1 }, { 0, -1 }, { 1, -1 }, { -1, 0 }, { 1, 0 }, { -1, 1 }, { 0, 1 }, { 1, 1 } };
+    const ImU32 white = IM_COL32(255, 255, 255, 255);
+    GameView v = game_view();
+    ImFont* font = sub_font ? sub_font : ImGui::GetFont();
+    ImDrawList* dl = ImGui::GetBackgroundDrawList();
+    float fs = v.h * sizes[g_config.subtitle_size >= 0 && g_config.subtitle_size <= 2 ? g_config.subtitle_size : 1];
+    float wrap = 0.88f * (v.w < v.h * 4.0f / 3.0f ? v.w : v.h * 4.0f / 3.0f), lh = fs * 1.15f, o = fs / 18.0f > 1.0f ? fs / 18.0f : 1.0f;
+    static char disp[sizeof(sub_text) + 256];
+    struct { const char* b, *e, *name_end; ImU32 col; } piece[32];
+    int n = 0, len = 0;
+    /* each line: a cue's first starts with its speaker, \x01<id>\x1f<name shown>\x02, which becomes
+       "<name>: " (Speaker names) in the speaker's colour (Speaker name colors) or is dropped */
+    for (const char* s = sub_text; *s && n < 32;) {
+        const char* e = s + strcspn(s, "\n"), *id = nullptr, *us = nullptr;
+        int at = len, name = 0;
+        if (*s == '\x01' && (us = (const char*)memchr(s, '\x1f', (size_t)(e - s)))) {
+            const char* st = (const char*)memchr(us, '\x02', (size_t)(e - us));
+            id = s + 1;
+            if (st) {
+                if (g_config.subtitle_speakers) {
+                    int k = snprintf(disp + len, sizeof(disp) - (size_t)len, "%.*s: ", (int)(st - us - 1), us + 1);
+                    if (k > 0 && k < (int)sizeof(disp) - len) { name = k - 1; len += k; }   /* the name and colon; then a space */
+                }
+                s = st + 1;
+            } else id = nullptr;
+        }
+        len += snprintf(disp + len, sizeof(disp) - (size_t)len, "%.*s", (int)(e - s), s);
+        if (len > (int)sizeof(disp) - 2) len = (int)sizeof(disp) - 2;
+        if (name > len - at) name = len - at;
+        float lw = balanced_wrap(font, fs, disp + at, disp + len, wrap);
+        for (const char* p = disp + at, *le = disp + len; p < le && n < 32;) {   /* wrapped, the lines evened out */
+            const char* w = wrap_at(font, fs, p, le, lw), *t;
+            if (w <= p) w = le;
+            for (t = w; t > p && t[-1] == ' '; t--) {}
+            piece[n].b = p; piece[n].e = t;
+            piece[n].name_end = p == disp + at && name ? (disp + at + name < t ? disp + at + name : t) : p;
+            piece[n++].col = id && g_config.subtitle_speaker_colors ? speaker_color(id, (size_t)(us - id)) : white;
+            for (p = w; p < le && *p == ' '; p++) {}   /* the space it broke at */
+        }
+        s = *e ? e + 1 : e;
+    }
+    float y = v.y0 + v.h * 0.955f - n * lh;
+    for (int i = 0; i < n; i++, y += lh) {
+        float x = v.x0 + v.w * 0.5f - font->CalcTextSizeA(fs, FLT_MAX, 0.0f, piece[i].b, piece[i].e).x * 0.5f, nx = x;
+        for (int k = 0; k < 8; k++) dl->AddText(font, fs, ImVec2(x + ring[k][0] * o, y + ring[k][1] * o), IM_COL32(0, 0, 0, 230), piece[i].b, piece[i].e);
+        if (piece[i].name_end > piece[i].b) {   /* "<name>:" in its colour */
+            dl->AddText(font, fs, ImVec2(x, y), piece[i].col, piece[i].b, piece[i].name_end);
+            nx += font->CalcTextSizeA(fs, FLT_MAX, 0.0f, piece[i].b, piece[i].name_end).x;
+        }
+        dl->AddText(font, fs, ImVec2(nx, y), white, piece[i].name_end, piece[i].e);
+    }
+}
+
 void overlay_render(void)
 {
     if (!ready) return;
@@ -858,12 +1160,17 @@ void overlay_render(void)
     const char* hint = lobby_hint();
     bool tag = coop_on && tag_flags && !cs.trade_open && (g_coop.nametag || cs.busy_kind || cs.trade_hint[0]);   /* co-op: the partner is drawn in the frame shown */
     bool ping = g_config.show_ping && coop_on && cs.state == COOP_CONNECTED;   /* co-op: next to the frame rate */
-    if (!visible && !cheats_visible && !coop_visible && !import_visible && !g_config.show_fps && !ping && !crosshair && !hint && !tag) return;
+    int movie = gs_movie_frame();   /* subtitles: the movie frame's lines, else the voice clips' playing */
+    bool subs = g_config.subtitles && (movie >= 0 ? subs_text_at(movie, sub_text, sizeof(sub_text))
+                                                  : subs_voice_text(SDL_GetTicksNS(), sub_text, sizeof(sub_text))) > 0;
+    if (!visible && !cheats_visible && !coop_visible && !import_visible && !g_config.show_fps && !ping && !crosshair && !hint && !tag && !subs) return;
     {   /* readable on large displays: scale text with the window height (1080p = 1x) */
         int ww, wh;
         SDL_GetWindowSizeInPixels(win, &ww, &wh);
         ImGui::GetStyle().FontScaleDpi = wh > 1080 ? wh / 1080.0f : 1.0f;
     }
+    if (!fonts_added) fonts_add();
+    if (subs) sub_font = subtitle_font(g_config.subtitle_lang, g_config.subtitle_font);   /* (made once per language and style) */
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplSDL3_NewFrame();
     ImGui::NewFrame();
@@ -887,6 +1194,7 @@ void overlay_render(void)
         }
     }
     if (tag) name_tag();
+    if (subs) subtitles_draw();
     if (hint) {
         ImGui::SetNextWindowPos(ImVec2(10, ImGui::GetIO().DisplaySize.y - 10), ImGuiCond_Always, ImVec2(0, 1));
         ImGui::SetNextWindowBgAlpha(0.4f);

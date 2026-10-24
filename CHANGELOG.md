@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased
+
+### Display
+
+- **Subtitles** (DISPLAY, on by default): the movies and the dialogue of the real-time cutscenes
+  can show subtitles in any language from SRT files you add to `mods/subtitles/`: one per movie
+  (`MV_016.srt` for the intro, and so on) and one per voice archive (`VOICE1.srt`, `VOICE2.srt`,
+  numbered by clip); none are included. The lines appear in the black bar under the picture, in
+  step with the voices, with a Subtitle size setting (Small, Medium, Large). See the user guide,
+  "Subtitles".
+- **Subtitle languages**: other languages are JSON files next to the SRTs (`mods/subtitles/pt-BR.json`
+  and so on) with only the text, keyed by subtitle; the timings stay in the SRTs, and a line a
+  language lacks shows in English. Pick one with Subtitle language (DISPLAY). Japanese, Korean and
+  Chinese use a font of their own from `mods/subtitles/fonts/` or the system's.
+- **Speaker names** (DISPLAY, off by default): "Claire: ..." before each line whose subtitle names its
+  speaker, and Speaker name colors gives each character's name a colour of its own.
+- **Subtitle font** (DISPLAY): "Game" draws the subtitles in the game's own lettering, made at start
+  from the font on your disc and kept in memory (a font file you add, `mods/subtitles/fonts/cvx.otf`,
+  replaces it); "Modern" in a system font.
+
 ## 0.6.10 (2026-10-25)
 
 > [!NOTE]

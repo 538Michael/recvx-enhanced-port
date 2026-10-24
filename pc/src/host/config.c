@@ -35,6 +35,11 @@ static const struct { const char* key; int* val; int lo, hi; } keys[] = {
     { "cinema_bars", &g_config.cinema_bars, 0, 2 },
     { "screen_effects", &g_config.screen_effects, 0, 2 },
     { "movie_zoom", &g_config.movie_zoom, 0, 1 },
+    { "subtitles", &g_config.subtitles, 0, 1 },
+    { "subtitle_size", &g_config.subtitle_size, 0, 2 },
+    { "subtitle_speakers", &g_config.subtitle_speakers, 0, 1 },
+    { "subtitle_speaker_colors", &g_config.subtitle_speaker_colors, 0, 1 },
+    { "subtitle_font", &g_config.subtitle_font, 0, 1 },
     { "fog_intensity", &g_config.fog_intensity, 0, 100 },
     { "brightness", &g_config.brightness, -50, 50 },
     { "contrast", &g_config.contrast, 50, 150 },
@@ -168,6 +173,7 @@ void config_load(void)
         else if (sscanf(line, " hd_textures_dir = %1023[^\r\n]", ini_hd_dir) == 1) { SDL_strlcpy(g_config.hd_textures_dir, ini_hd_dir, sizeof(ini_hd_dir)); continue; }
         else if (sscanf(line, " import_dir = %1023[^\r\n]", g_import.dir) == 1) continue;   /* F9 imports (pc/src/import) */
         else if (sscanf(line, " import_outbreak2_iso = %1023[^\r\n]", g_import.iso[IMPORT_OUTBREAK2]) == 1) continue;
+        else if (sscanf(line, " subtitle_language = %15[A-Za-z0-9_-]", g_config.subtitle_lang) == 1) continue;
         else if (sscanf(line, " %63[a-z_0-9] = %127[^\r\n]", k, val) == 2 && bind_ini_line(k, trim(val))) continue;
         else if (sscanf(line, " %63[a-z_0-9] = %d", k, &v) == 2)
             for (size_t i = 0; i < SDL_arraysize(keys); i++)
@@ -222,6 +228,7 @@ static int write_ini(FILE* f, void* ud)
     if (ini_hd_dir[0]) fprintf(f, "hd_textures_dir = %s\n", ini_hd_dir);   /* not --hd-textures */
     if (g_import.dir[0]) fprintf(f, "import_dir = %s\n", g_import.dir);
     if (g_import.iso[IMPORT_OUTBREAK2][0]) fprintf(f, "import_outbreak2_iso = %s\n", g_import.iso[IMPORT_OUTBREAK2]);
+    if (g_config.subtitle_lang[0]) fprintf(f, "subtitle_language = %s\n", g_config.subtitle_lang);   /* mods/subtitles/<code>.json */
     bind_ini_write(f);
     return 0;
 }

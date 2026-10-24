@@ -115,6 +115,7 @@ with mingw-w64: see [docs/BUILDING.md](docs/BUILDING.md).
 | [docs/ACTORS.md](docs/ACTORS.md) | models, skeletons, animation, model swaps |
 | [docs/ENEMIES.md](docs/ENEMIES.md) | enemy data, spawner, enemy options |
 | [docs/HD_PACK.md](docs/HD_PACK.md) | how PCSX2 HD texture packs are matched and loaded |
+| [docs/SUBTITLES.md](docs/SUBTITLES.md) | subtitle files: SRT, speakers, languages, fonts |
 | [docs/modding/](docs/modding/README.md) | room format and building custom rooms |
 | [CHANGELOG.md](CHANGELOG.md) | feature history |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | how to contribute |

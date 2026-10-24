@@ -79,6 +79,7 @@ void     gs_rt_to_mem(uint32_t bp, uint32_t bw, uint32_t psm, uint32_t x, uint32
 unsigned int gs_capture_rt(uint32_t fbp, uint32_t fbw, uint32_t w, uint32_t h, int wide);   /* GL texture of the RT area (0,0)-(w,h); wide: widened by hor+ about x w/2 */
 /* textures at TBP tbp are movie frame index (pc/src/movie) until the next executed frame */
 void     gs_movie_bind(uint32_t tbp, int index);
+int      gs_movie_frame(void);   /* render thread: the movie frame index of the executed frame, -1 none */
 /* decode a texture (TEX0 + TEXA) to RGBA8, w x h */
 void     gs_clut_load(uint64_t tex0);
 void     gs_decode_texture(uint64_t tex0, uint64_t texa, uint32_t w, uint32_t h, uint32_t* out);

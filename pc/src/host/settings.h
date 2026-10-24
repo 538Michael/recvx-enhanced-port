@@ -59,6 +59,7 @@ void settings_save_later(void);                 /* any thread: recvx.ini is writ
 void settings_apply_window(void);               /* main thread: the window size from g_config (windowed) */
 void settings_apply_display(void);              /* main thread: windowed / borderless / exclusive from g_config (F11, Display mode) */
 void settings_display_modes(void);              /* main thread: reread the window's display's modes, refit a borderless window (start, display change) */
+void settings_subtitle_languages(void);         /* main thread, at start: the subtitle languages in mods/subtitles, and the one chosen */
 
 /* game thread glue (options_glue.c) */
 int  pc_in_game(void);
