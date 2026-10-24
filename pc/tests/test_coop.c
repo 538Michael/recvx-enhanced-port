@@ -311,6 +311,8 @@ static void test_snaps(void)
     BADS(t.mdl = 16);          /* B4: the model index into mdl[16] */
     BADS(t.mdl = -2);
     BADS(t.mdl = 127);
+    BADS(t.id = 100);          /* the enemy type: bhJumpEnemy[100] */
+    BADS(t.pad = 1);
     BADS(t.mnw = 512);         /* B4: motion sets only as offsets 0..511 */
     BADS(t.mnw = -1);
     BADS(t.mnw = 0x7000);

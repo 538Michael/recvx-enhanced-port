@@ -11,7 +11,7 @@ extern "C" {
 #endif
 
 #define COOP_MAGIC 0x504F4F43u          /* "COOP" */
-#define COOP_VERSION 25                 /* 11: join code, datagrams <= 1200 bytes, checked events, EV_ATR; 12: EV_FX; 13: EV_GRANT;
+#define COOP_VERSION 26                 /* 11: join code, datagrams <= 1200 bytes, checked events, EV_ATR; 12: EV_FX; 13: EV_GRANT;
                                            14: EV_TSCREEN, BUSY_TRADE, OPT_TRADE_FREEZE; 15: EV_GONE;
                                            16: player id and rejoin tag in PoseExt, EV_OWN, saved inventories (EV_BLOB pad);
                                            17: TS_WANT, TS_DECLINE (trade screen item requests);
@@ -24,7 +24,8 @@ extern "C" {
                                                EV_OWN tid (the last game state the guest loaded); OPT_SKIP_DETECTOR;
                                            23: OPT_QUICK_START (Pose.opts is full: a further rule needs a field of its own);
                                            24: enemy slots 0..254 (COOP_ENE_SLOTS), EV_FX's FX_* references marked in `refs`;
-                                           25: Pose.use (the trigger the sender is using: one player at a puzzle at a time) */
+                                           25: Pose.use (the trigger the sender is using: one player at a puzzle at a time);
+                                           26: EneSnap.id (the enemy type in the slot: a snapshot only for the same type) */
 #define COOP_DGRAM_MAX 1200             /* bytes per datagram (below every internet path MTU) */
 #define COOP_EV_FRAME 16                /* events per frame (over the frame's datagrams) */
 #define COOP_SNAP_FRAME 48              /* enemy snapshots per frame */
@@ -286,7 +287,10 @@ typedef struct EneSnap {
     uint32_t flg, flg2, stflg, mdflg;
     float px, py, pz;
     int32_t ax, ay, az;
-    int32_t mtn_no, frm_no, mtn_md, hokan_count, hokan_rate, hp;
+    int32_t mtn_no, frm_no, mtn_md;
+    int16_t hokan_count;
+    uint8_t id, pad;                    /* the enemy's type (BH_PWORK.id): applied only to a slot holding the same type */
+    int32_t hokan_rate, hp;
     float watr[7];                      /* hit capsule (NJS_CAPSULE) */
 } EneSnap;
 

@@ -2026,7 +2026,8 @@ static int build_snapshots(EneSnap* out)
         s->px = ep->px; s->py = ep->py; s->pz = ep->pz;
         s->ax = ep->ax; s->ay = ep->ay; s->az = ep->az;
         s->mtn_no = ep->mtn_no; s->frm_no = ep->frm_no; s->mtn_md = ep->mtn_md;
-        s->hokan_count = ep->hokan_count; s->hokan_rate = ep->hokan_rate; s->hp = ep->hp;
+        s->hokan_count = (int16_t)ep->hokan_count; s->hokan_rate = ep->hokan_rate; s->hp = ep->hp;
+        s->id = ep->id < 100 ? ep->id : 0;
         memcpy(s->watr, &ep->watr, sizeof(s->watr));
     }
     return n;
@@ -2165,9 +2166,11 @@ static void apply_snapshots(void)
            let our loop run that step. Room loads run enemy steps themselves (bhInitEvent), so
            most are initialised before the first snapshot. */
         if (!(ep->flg & 0x1) || (!is_host && (event_driven(ep) || grips_us(ep) || runs_here(ep)))) continue;
-        /* a part linked to a parent there but without one here: the slot layouts differ (an enemy
-           whose Init ran at another moment); the linked flag would crash bhControlEnemy */
-        if ((s->flg & 0x80) && !ep->lkwkp) { mismatch++; continue; }
+        /* the slot layouts differ (an enemy whose Init ran at another moment, a child the other side made, e.g. moths
+           and their leader): another type here, or a part linked to a parent there but without one here. Its flags,
+           modes and motion would turn a hidden helper without a model into one drawn (bhCalcModel crashed on its NULL
+           mlwP, moths in 5/82) or run another type's code with them (the linked flag crashed bhControlEnemy) */
+        if (((s->flg & 0x1) && s->id != ep->id) || ((s->flg & 0x80) && !ep->lkwkp)) { mismatch++; continue; }
         if (!is_host && (gone_has(s->idx) || ((ep->flg & 0x80) && gone_has(ene_slot(ep->lkwkp))))) {   /* named dead (EV_GONE) */
             if (!(s->stflg & 0x1000000) && !(s->flg & 0x2)) continue;   /* the host has not hidden it yet */
             if (s->idx < PC_ENE_SLOTS) gone_mask[s->idx >> 5] &= ~(1u << (s->idx & 31));
@@ -2176,6 +2179,7 @@ static void apply_snapshots(void)
             ep->stflg = (ep->stflg & ~0x41000000) | (s->stflg & 0x41000000);
             continue;
         }
+        if (!s->mode[0]) continue;   /* a new enemy there whose Init has not run: ours ran, it would run again (its children twice) */
         mnw_set(ep, s->mnw);
         if (s->mdl >= 0 && ep->mdl[s->mdl].objP) ep->mlwP = &ep->mdl[s->mdl];
         if ((int)ep->mtn_no != s->mtn_no) { ep->hokan_count = s->hokan_count ? s->hokan_count + 1 : 0; ep->hokan_rate = s->hokan_rate; }

@@ -41,6 +41,8 @@
 - **Co-op: items kept when joining again**: when the host's game crashed or the connection was lost
   and you join again from your game, you keep your items if the host's save has none of yours (before:
   the character's starting items, in Chris's part his default inventory).
+- **Co-op crash with many enemies**: the joining player's game no longer crashes when an enemy
+  exists on one side only, such as moths, their eggs or a boss's helpers (often in the late game).
 - **Crash reports**: a crash now always writes a small `recvx-crash.log` next to the game. Attach it
   to a bug report; IP addresses are hidden in it.
 

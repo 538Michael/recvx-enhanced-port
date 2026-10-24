@@ -5,7 +5,7 @@ over the internet or a LAN (UDP). Co-op is an optional addon: with it off the ga
 as without it (every hook is `#ifdef TARGET_PC` and `if (coop_on)`).
 
 Part 1 is for players: how to host, join and play. Part 2 is the reference: architecture,
-protocol 25, security and limits. Related: [SERVER.md](SERVER.md) (the optional co-op server),
+protocol 26, security and limits. Related: [SERVER.md](SERVER.md) (the optional co-op server),
 [USER_GUIDE.md](USER_GUIDE.md) (settings, controls), [ACTORS.md](ACTORS.md) (models and voices),
 [ENEMIES.md](ENEMIES.md) (enemy options), [ARCHITECTURE.md](ARCHITECTURE.md),
 [BUILDING.md](BUILDING.md).
@@ -1131,10 +1131,10 @@ send time minus the echoed datagram's arrival. Sample = arrival - our clock - th
 smoothed (EWMA 0.1). The name tag's point goes with the recorded frame (`stream_point`) and is
 interpolated with the in-between frames; it snaps on camera cuts and in vanilla mode.
 
-## Protocol 25
+## Protocol 26
 
-`COOP_VERSION` is **25**; both players need builds with the same version (a mismatch is reported,
-e.g. "the host runs co-op protocol 24, we 25: both need the same build"). The co-op server does not
+`COOP_VERSION` is **26**; both players need builds with the same version (a mismatch is reported,
+e.g. "the host runs co-op protocol 25, we 26: both need the same build"). The co-op server does not
 look at the game protocol. Version history in short: 11 join code, 1200-byte datagrams, checked
 events, `EV_ATR`; 12 `EV_FX`; 13 `EV_GRANT`; 14 `EV_TSCREEN`; 15 `EV_GONE`; 16 player id and rejoin
 tag, `EV_OWN`; 17 trade requests; 18 voices; 19 the game rules `OPT_IMPORTANT`, `OPT_NO_RIBBON`,
@@ -1147,7 +1147,7 @@ make other enemies from the same seed); 21 `COOP_HIT_PRECISE` in `EV_ENE_HIT` (t
 and `OPT_SKIP_DETECTOR`, `PF_GAME_OVER`, `EV_BLOB` `pad` 2 and the `EV_OWN` `tid` (see "Game over",
 "Metal detector"); 23 the game rule `OPT_QUICK_START` (see "Quick start"; it takes the last free bit of
 `Pose.opts`, so a further rule needs a field of its own); 24 enemy slots 0..254 (`COOP_ENE_SLOTS`, the PC's
-255 slots) in every slot field, and `EV_FX` marks its `FX_*` references in `refs` (the bytes 253..255 are slots now); 25 `Pose.use`, the trigger the sender is using (one player at a puzzle at a time, see "Puzzles"; the pose grew to 112 bytes). `Pose.pflg` and `Pose.flr` were added inside protocol 18,
+255 slots) in every slot field, and `EV_FX` marks its `FX_*` references in `refs` (the bytes 253..255 are slots now); 25 `Pose.use`, the trigger the sender is using (one player at a puzzle at a time, see "Puzzles"; the pose grew to 112 bytes); 26 `EneSnap.id`, the enemy type in the slot: a snapshot applies only to a slot holding the same type (`hokan_count` is 16 bits now; the snapshot stays 100 bytes). `Pose.pflg` and `Pose.flr` were added inside protocol 18,
 `Pose.rcase` inside protocol 22, the aim pitch in `Pose.pflg`'s spare bits inside protocol 23 (0 means "not
 sent", and receivers fall back; a receiver before the pitch reads `pflg & 6` only and keeps the straight pose).
 
@@ -1208,7 +1208,10 @@ skips at once.
 
 Slot (0..254), `mode[4]`, model index (`mlwP` as index into the enemy's `mdl[]`, -1..15), motion set (offset
 0..511 from the enemy's own set, `MNW_ROOM`, `MNW_KEEP`), `flg flg2 stflg mdflg`, position, angles,
-`mtn_no` (< 512), `frm_no`, `mtn_md`, `hokan_count`, `hokan_rate`, hp, hit capsule `watr[7]`.
+`mtn_no` (< 512), `frm_no`, `mtn_md`, `hokan_count` (16 bits), the enemy type `id` (< 100) and a zero byte, `hokan_rate`,
+hp, hit capsule `watr[7]`. The receiver applies an active slot's snapshot only to an enemy of the same `id` (the slot
+layouts differ where one side made an enemy the other did not: a moth's leader, children, eggs), and not a new
+enemy's (`mode[0]` 0) to one whose own Init ran.
 
 ### Events
 
@@ -1290,7 +1293,7 @@ stream or game):
   slots < 255; transfer chunks aligned and inside the total; effect ids < 400, references an enemy
   slot or `FX_*`; world-record objects in slots 4..31; grant positions within the save format;
   `EV_SKIP` only `SKIP_GO` in a room 0..9 / 0..99.
-* Every snapshot: slot < 255, model index -1..15, motion set and motion < 512, finite floats.
+* Every snapshot: slot < 255, model index -1..15, motion set and motion < 512, enemy type < 100, finite floats.
 
 Then, when applying:
 
