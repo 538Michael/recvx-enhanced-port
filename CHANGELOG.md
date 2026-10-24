@@ -11,6 +11,8 @@
 
 - **Combined controls** (CONTROLS, now the default): the left stick walks where it points on
   screen, the d-pad drives with tank controls, like in the Resident Evil HD remaster.
+- **Aim without auto-aim**: hold the left trigger (E on the keyboard) to aim where your character
+  faces, without turning to the nearest enemy; the normal aim button keeps the auto-aim.
 
 ### Co-op
 
