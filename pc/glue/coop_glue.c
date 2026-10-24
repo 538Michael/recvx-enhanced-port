@@ -945,6 +945,55 @@ static unsigned short send_estate(int n)
 /* an en01 grab hold: set when the grab starts, cleared by every release (~0x24080, ~0xA4080) */
 static int holding(BH_PWORK* ep) { return ep->exp0 && (*(int*)(ep->exp0 + 0x40) & 0x20000); }
 
+/* Our player's busy flag (flg 4, with 0x10000) is an enemy's attack or grab under way: the inventory, the map,
+   examining, doors and pickups wait until the enemy that set it clears it (bhCheckSubTask, bhControlPlayer). In
+   single player that enemy always does. In co-op its steps could stop running against our player first: the
+   host gave a busy player's enemy to the free partner (coop_pick_target: "a busy target is left for the free
+   player"; a zombie's grab start or its counter-grab after a knife hit sets the flag before the grab plays),
+   and the guest's own enemies became the host's puppets again when the host came back from a menu or into the
+   room. The release then ran on the partner's stand-in, or never: our player walked on but could open nothing
+   until a room change cleared the flag (a teleport, bhInitRoomChangePlayer). So the enemy whose step set it
+   (hold.by), its parts and its type's leader (the moth's and the Black Widow's grab is played by the leader)
+   keep our player: the host's go for it, the guest's run here, until the flag clears. hold_watch: the safety
+   net. */
+static struct { int by, id, room, said; unsigned int seen, orphan; } hold = { -1, 0, -1, 0, 0, 0 };
+static int hold_family(BH_PWORK* ep)
+{
+    BH_PWORK* h;
+    if (hold.by < 0 || !plp || !(plp->flg & 4)) return 0;
+    h = &ene[hold.by];
+    if (!(h->flg & 0x1) || h->id != hold.id) return 0;
+    return pc_root_in(ep, ene, PC_ENE_SLOTS) == pc_root_in(h, ene, PC_ENE_SLOTS) || (!ep->lkwkp && ep->id == h->id && (h->id == 3 || h->id == 6));
+}
+/* linked to a player (lkwkp): the moth's larva rides on the player it was laid on (en27, lkwkp = plp at its
+   Init) and plays that player's motions; it goes for that player only. Before, it was retargeted like any
+   enemy: the host it held counted as busy, the larva went for the free partner standing by and threw itself
+   off the stand-in, while the host stayed in its throw-off motion for good. 1 ours, 2 the partner's */
+static int linked_to(const BH_PWORK* ep) { return !plp ? 0 : ep->lkwkp == (unsigned char*)(swap_plp ? swap_plp : plp) ? 1 : ep->lkwkp == (unsigned char*)&ply2 ? 2 : 0; }
+/* guest: an enemy of ours that holds our player or rides on it keeps running here (as grips_us) */
+static int runs_here(BH_PWORK* ep)
+{
+    if (linked_to(ep) == 1) return 1;
+    if (!hold_family(ep)) return 0;
+    if (!hold.said++) host_log("coop: enemy %d (id %d) holds our player: it runs here until it lets go\n", (int)(ep - ene), ep->id);
+    return 1;
+}
+static unsigned int h_stflg;            /* our player's stflg before the step (a larva laid) */
+static int h_busy, h_ran;               /* our player's busy flag before the step; the step ran here */
+/* the step laid larvae on a player (stflg 0x8000000 << type, en06 NG00): they go for that player from their
+   Init (it links them to plp), whatever the slot targeted before */
+static void larva_laid(unsigned int bits, int partner)
+{
+    int k, t, n = 0;
+    for (k = 0; partner && bits && k < (int)sys->ewk_n && k < PC_ENE_SLOTS; k++) n += (ene[k].flg & 0x1) && ene[k].id == 27 && linked_to(&ene[k]) == 2;
+    for (k = 0; bits && k < (int)sys->ewk_n && k < PC_ENE_SLOTS; k++)
+        if ((ene[k].flg & 0x1) && ene[k].id == 27 && !ene[k].mode0 && (t = ene[k].type) < 3 && (bits >> t & 0x8000000)) {
+            tgt[k] = partner;
+            /* the stand-in's larva bits are the partner's pose (its game has none): at most three, as the bits allow */
+            if (partner && n++ >= 3) ene[k].flg = 0;
+        }
+}
+
 /* neither side has the grab's state any more (the client left, timed out, rejected it), or the
    grab was refused here (eneset.c's one-holder rule) or froze (the watchdog): the enemy goes back
    to standing (en01 MV00: idle motion, then the chase), released, as at the end of a grab. Its
@@ -1124,6 +1173,7 @@ static void grab_in(const Event* e)
     *(unsigned int*)plp->exp1 = (x | (e->u.gr.exp1_a & ~e->u.gr.exp1_b)) & ~(e->u.gr.exp1_b & ~e->u.gr.exp1_a);
     plp->mnwP = (MN_WORK*)set;
     pc_enemy_holds(plp, ep);   /* eneset.c: with added enemies one enemy at a time holds a player - this one */
+    hold.by = i; hold.id = ep->id; hold.room = coop_room_key(); hold.seen = frame_no; hold.said = 1;
     host_log("coop: enemy %d grabs us\n", i);
 }
 
@@ -1198,7 +1248,7 @@ static void grab_failsafe(void)
     }
     safe.held = 1;
     for (i = 0; i < (int)sys->ewk_n && i < PC_ENE_SLOTS; i++)
-        if ((ene[i].flg & 0x1) && grips_us(&ene[i]) && (!is_host || (!tgt[i] && !owned[i]))) {   /* on the host, a holder whose steps run on the partner's stand-in or the partner's game does not hold us */
+        if ((ene[i].flg & 0x1) && (grips_us(&ene[i]) || linked_to(&ene[i]) == 1) && (!is_host || (!tgt[i] && !owned[i]))) {   /* on the host, a holder whose steps run on the partner's stand-in or the partner's game does not hold us; a larva holds us on our own motions */
             if (ene[i].hp >= 0) held = 1;   /* hp 0 is alive: en01 sets a grabbing zombie shot below 0 to 0 */
             else dying = 1;   /* a crawler the player stomps to death (NG02): it lets go when the stomp ends */
         }
@@ -1213,6 +1263,28 @@ static void grab_failsafe(void)
     for (i = 0; i < PC_ENE_SLOTS; i++)
         if (ene[i].exp0 && ene[i].id == 1 && (ene[i].flg & 0x1) && holding(&ene[i]) && (!is_host || (!tgt[i] && !owned[i]))) pc_enemy_unhold(&ene[i]);
     orphan = 0;
+}
+
+/* Safety net for our player's busy flag (hold, above), both sides: set while our player is in normal control
+   (or held on its own motions, as the larva holds it) with no enemy of the holder's family running against it
+   for a second, it is cleared after HOLD_ORPHAN frames, as the enemies clear it, and logged with who set it. */
+#define HOLD_ORPHAN 60
+static void hold_watch(void)
+{
+    BH_PWORK* h = hold.by >= 0 ? &ene[hold.by] : NULL;
+    int own = (plp->mode0 == 4 || plp->mode0 == 6) && plp->mnwP == plp->mnwPb;
+    if (hold.room != coop_room_key() || !(plp->flg & 4)) { hold.by = -1; hold.room = coop_room_key(); h = NULL; }   /* (let go: the next flag is someone else's) */
+    if (!tx_in_game || (sys->cb_flg & 0x5) || plp->hp < 0 || frozen || !(plp->flg & 4) || (plp->mode0 != 1 && !own) || event_driven(plp) ||
+        (h && hold_family(h) && frame_no - hold.seen < 30)) { hold.orphan = 0; return; }
+    if (++hold.orphan < HOLD_ORPHAN) return;
+    host_log("coop: watchdog: our player was left busy (flg %x stflg %x, modes %d %d %d %d, motion %u) for %d frames, set by %s %d (id %d, %s, last step on us %u frames ago%s): cleared\n",
+             plp->flg, plp->stflg, plp->mode0, plp->mode1, plp->mode2, plp->mode3, plp->mtn_no, HOLD_ORPHAN, h ? "enemy" : "no enemy", hold.by, h ? h->id : -1,
+             !h ? "-" : !(h->flg & 0x1) || h->id != hold.id ? "gone" : h->hp < 0 ? "dead" : "alive", frame_no - hold.seen,
+             !h || !is_host ? "" : tgt[hold.by] ? ", targets the partner" : owned[hold.by] ? ", the partner runs it" : "");
+    if (own) player_let_go();
+    else { plp->flg &= ~0x10004; plp->stflg &= ~0x10000; }
+    hold.by = -1;
+    hold.orphan = 0;
 }
 
 /* client, at the hand-off: a grab we run is over when the enemy lets go (or is gone) */
@@ -1346,7 +1418,11 @@ static int in_front(BH_PWORK* ep, const BH_PWORK* pl, float d2)
 static int enemy_begin(BH_PWORK* ep);
 int coop_enemy_begin(BH_PWORK* ep)
 {
-    int i = ep - ene, r = enemy_begin(ep);
+    int i = ep - ene, r;
+    h_busy = plp && (plp->flg & 4);
+    h_stflg = plp ? plp->stflg : 0;
+    r = enemy_begin(ep);
+    h_ran = !r;
     if (!r && i >= 0 && i < PC_ENE_SLOTS && !echo_delay) aim_for_step(ep, i);   /* its step runs here */
     return r;
 }
@@ -1362,9 +1438,15 @@ static int enemy_begin(BH_PWORK* ep)
     if (owned[i]) return is_host ? puppet_step(ep) : 0;   /* a grab the client runs */
     if (is_host) {
         int held = proxy_ok && partner_held(), cool_p = coop_atk_cooling(&atk[i][1], frame_no), k = ene_slot(ep->lkwkp);
+        if (ep->id == 27 && linked_to(ep) == 2 && (!have_rx || !partner_here())) {   /* the partner left: the larva laid on its stand-in goes too */
+            ep->flg = 0;
+            return 1;
+        }
         if (ep->mode0) fx_begin(1);   /* what its step starts goes to the guest (EV_FX); not its initialising step */
         h_mode0 = plp->mode0;
-        if (!proxy_ok) tgt[i] = 0;
+        if (linked_to(ep)) tgt[i] = linked_to(ep) == 2;   /* (the stand-in also while the partner is busy: it keeps its last pose) */
+        else if (ep->id == 27 && !ep->mode0) {}   /* a larva's Init: the player its moth laid it on (larva_laid) */
+        else if (!proxy_ok || hold_family(ep)) tgt[i] = 0;   /* (hold_family: it holds our player) */
         else if ((ep->flg & 0x80) && k < PC_ENE_SLOTS) tgt[i] = tgt[k];   /* a linked part goes for its parent's victim */
         else {
             CoopTgtIn in = { { 0 } };
@@ -1406,13 +1488,13 @@ static int enemy_begin(BH_PWORK* ep)
         }
         return 0;
     }
-    if (!puppets() || !ep->mode0 || event_driven(ep) || grips_us(ep)) return 0;   /* mode0 0: the enemy's own initialising step */
+    if (!puppets() || !ep->mode0 || event_driven(ep) || grips_us(ep) || runs_here(ep)) return 0;   /* mode0 0: the enemy's own initialising step */
     return puppet_step(ep);
 }
 
 void coop_enemy_end(BH_PWORK* ep)
 {
-    int i = ep - ene;
+    int i = ep - ene, swapped = swap_plp != NULL;
     if (i < 0 || i >= PC_ENE_SLOTS) return;
     if (fx_open == 1) { fx_end(ep, 0); fx_arm(ep); }
     aim_restore();
@@ -1445,6 +1527,7 @@ void coop_enemy_end(BH_PWORK* ep)
             }
             queue_event(&e);
         }
+        larva_laid(ply2.stflg & ~a->stflg & 0x38000000, 1);
         /* everything else (grabs, being moved, motions) is undone: the partner's own game
            decides what its player does */
         ply2 = ply2_save;
@@ -1461,6 +1544,12 @@ void coop_enemy_end(BH_PWORK* ep)
     }
     h_mode0 = -1;
     h_flg4 = 0;
+    if (h_ran && !swapped && plp) {   /* its step ran on our player */
+        larva_laid(plp->stflg & ~h_stflg & 0x38000000, 0);
+        if (!h_busy && (plp->flg & 4)) { hold.by = i; hold.id = ep->id; hold.room = coop_room_key(); hold.said = 0; }
+        if (hold_family(ep)) hold.seen = frame_no;
+    }
+    h_ran = 0;
 }
 
 /* ---------------------------------------------------------------- effects (protocol 12, EV_FX) */
@@ -1997,7 +2086,7 @@ static void apply_snapshots(void)
            collision) has not run yet; it must run first, so only wake it like the host's and
            let our loop run that step. Room loads run enemy steps themselves (bhInitEvent), so
            most are initialised before the first snapshot. */
-        if (!(ep->flg & 0x1) || (!is_host && (event_driven(ep) || grips_us(ep)))) continue;
+        if (!(ep->flg & 0x1) || (!is_host && (event_driven(ep) || grips_us(ep) || runs_here(ep)))) continue;
         /* a part linked to a parent there but without one here: the slot layouts differ (an enemy
            whose Init ran at another moment); the linked flag would crash bhControlEnemy */
         if ((s->flg & 0x80) && !ep->lkwkp) { mismatch++; continue; }
@@ -6011,6 +6100,7 @@ void coop_frame(void)
         own_timeout();
         if (sys && !is_host) grab_check();
         if (sys && plp) grab_failsafe();
+        if (sys && plp) hold_watch();
         if (sys && !is_host) gone_frame();
         else if (sys) gone_host_frame();
         apply_snapshots();

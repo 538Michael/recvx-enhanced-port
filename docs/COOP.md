@@ -756,7 +756,11 @@ partner's weapon's arms sound bank is loaded beside ours (programs `0x40 + n`).
 ### Enemies: host authority and puppets
 
 * **Targeting (host)**: each enemy goes for one player at a time (`coop_pick_target`, re-decided at
-  every step; a linked part goes for its parent's). In order:
+  every step; a linked part goes for its parent's). Before the rule: an enemy linked to a player
+  (`lkwkp`: the moth's larva, en27, rides on the player it was laid on and plays that player's motions)
+  goes for that player only, from its Init (`larva_laid`: the step that laid it names the player); and
+  the enemy whose step set the host's busy flag (`flg & 4`), its parts and its type's leader (moth,
+  Black Widow) keep the host until the flag clears (`hold`, below). In order:
   1. **One victim per attack**: a zombie holding, or an enemy whose motions its victim plays, keeps
      the victim. In its grab/bite/throw state (`mode0` 2) it keeps a victim within 3 m. Its hit and
      death states keep nobody.
@@ -808,6 +812,20 @@ partner's weapon's arms sound bank is loaded beside ours (programs `0x40 + n`).
   a grab, a player more than 2.5 m from its last free position in that room is put back; a watchdog
   logs any living enemy whose state has not changed for 5 s and, in co-op or rooms with added
   enemies, releases a zombie stuck in a grab state.
+* **The busy flag** (`hold`, both sides): an enemy's attack or grab sets the player's `flg & 4` (with
+  0x10000) and clears it when it ends; meanwhile the inventory, map, examining, doors and pickups wait
+  (`bhCheckSubTask`, `bhControlPlayer`), the player still walks. In co-op the enemy that set it could stop
+  running against that player first, and the flag stayed until a room change (`bhInitRoomChangePlayer`,
+  hence "a teleport fixes it"): the host's retargeting gave the busy player's enemy to the free partner (a
+  zombie's grab start, its counter-grab after a knife hit; the larva's throw-off), and the joiner's own
+  enemies, running while the host was in a menu or elsewhere, became puppets again mid-attack. Now the
+  enemy whose step set the flag (`grab_in` for a handed-over grab) is its holder: the host targets our
+  player with it, the joiner keeps running it here (`runs_here`, logged "holds our player: it runs here
+  until it lets go"), and a larva linked to the joiner's player too. **Watchdog** (`hold_watch`): the flag
+  set while the player is in normal control (or held on its own motions) with no step of the holder's
+  family on that player for 30 frames, for 60 frames in a row (not in a door, event, cinema or the trade
+  freeze), is cleared as the enemies clear it (a grab on its own motions is let go) and logged: "watchdog:
+  our player was left busy ... set by enemy N (id, gone/dead/alive, ...): cleared".
 * **Kills while the joiner ran the room** (`EV_GONE`): when the host's enemies take over, the joiner
   names its dead enemies and the host hides its live copies of the same type and version.
 
@@ -1246,7 +1264,8 @@ the session's code. A takeover needs a non-zero tag that matches.
 * UDP and IPv4 only; networks that block UDP cannot play (no TCP fallback).
 * Two players only.
 * Only zombie (en01) grabs are handed over to the joiner's game; other grabbers reach the joiner as
-  a hit. A handover takes a few round trips during which that zombie stands still.
+  a hit. A larva the host's moth lays on the joiner rides on the joiner's stand-in in the host's game only
+  (at most three; its bites reach the joiner as hp loss; it goes when the joiner leaves the room). A handover takes a few round trips during which that zombie stands still.
 * The partner has no facial animation and no aim pitch.
 * Some effects are not mirrored: those whose caller sets a matrix or a pointer the record cannot
   name (e.g. Alexia's acid, shell casings) and blood pools.
@@ -1298,6 +1317,9 @@ Environment variables for headless and scripted runs. Frames are co-op frames un
 | `RECVX_COOP_VOMIT="hostframe,..."` | Host: the walking zombie nearest the partner vomits. |
 | `RECVX_COOP_CRAWL="hostframe,..."` | Host: its walking zombies become crawlers (as a knock-down with little health left), which crawl towards their target and grab its legs. |
 | `RECVX_COOP_ORPHAN=frame` | Put our player in a grab with no holder, 3 m off (failsafe test). |
+| `RECVX_COOP_STALE="hostframe,..."` | Our player's busy flag set with no enemy to clear it (the busy flag watchdog's test). |
+| `RECVX_COOP_LARVA="hostframe,..."` / `RECVX_COOP_HATCH="hostframe,..."` | A moth's larva on our player (as one carried into a room) / our larvae hatch now (not while held). |
+| `RECVX_COOP_BUSYLOG=n` | Every n frames: our player's busy flag, modes, motion, whether the status screen is open, the larvae (count, the last one's mode2/mode3 and player: 1xx ours, 2xx the partner's). |
 | `RECVX_COOP_FX=0` | Send no `EV_FX`. |
 | `RECVX_COOP_GOTO="hostframe:x:z:angle,..."` | Our player alone to x/z, facing angle (0..65535), at that host frame. |
 | `RECVX_COOP_PAD="hostframe:hex,..."` | These game pad bits pressed for one frame (`b00` confirm/Cross, `10000` the cutscene skip button). |
