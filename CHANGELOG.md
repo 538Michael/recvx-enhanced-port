@@ -16,33 +16,21 @@
 
 - **Brighter lobby models**: the characters in the lobby are now lit like in a photo studio, so
   faces and clothes are clearly visible instead of almost black.
-- **Model list in the lobby**: MODEL now opens a scrollable list of all models (also with the mouse
-  wheel) that shows each one in the preview as you move through it, so finding the one you want is
-  quicker.
+- **Model list in the lobby**: MODEL now opens a scrollable list of all models that shows each one
+  in the preview as you move through it, so finding the one you want is quicker.
 - **One player per puzzle**: while you use a puzzle, a code terminal or anything else you examined,
   your partner cannot open the same one at the same time ("... is using this").
 
 ### Fixes
 
-- **Co-op puzzles solved by your partner**: a puzzle your partner solves while you are in the room
-  is now solved for you too. Before, it could open again and show nothing (no question, no text),
-  keeping you in it, or a door it unlocked stayed locked until you left the room. Your partner's
-  game also no longer opens the office computer's password screen for you when it turns the
-  computer on.
-- **Reload with the side pack**: once you have the side pack, ammo in the bag's last two slots now
-  reloads your weapon, both with the Reload button and when you fire on an empty magazine, as in the
-  original. Before, that ammo was skipped and you had to combine it in the inventory yourself.
-- **Sub machine gun reload crash**: reloading the sub machine gun, with the Reload button or by
-  firing on an empty magazine, no longer crashes the game. It has no reload animation, so the ammo
-  goes in at once and you keep aiming.
-- **Co-op: inventory and actions locked**: after an enemy attack you could sometimes still walk
-  but no longer open the inventory, examine, open doors or pick anything up until you changed rooms
-  (a teleport). It happened most often to the joining player when the host left a menu while a
-  zombie was going for the joiner. The attack now plays out and you get full control back; a lock
-  left behind anyway clears itself after a moment.
-- **Co-op: stuck after a moth larva**: when a larva attached to the host with the partner close by,
-  the host could stay in the throwing-it-off animation for good. The larva now lets go once and play
-  continues, for the host and the joiner.
+- **Co-op puzzles solved by your partner**: now also count as solved for you when you are in the
+  same room. Before, the puzzle could reopen empty and keep you stuck, or its door stayed locked.
+- **Reload with the side pack**: ammo in the bag's last two slots now reloads your weapon.
+- **Sub machine gun reload crash**: reloading the sub machine gun no longer crashes the game.
+- **Co-op: inventory and actions locked**: after an enemy attack you could no longer open the
+  inventory, examine or use doors until you changed rooms. Fixed.
+- **Co-op: stuck after a moth larva**: the host could stay in the throwing-it-off animation for good.
+  Fixed.
 
 ## 0.6.8 (2026-10-23)
 
