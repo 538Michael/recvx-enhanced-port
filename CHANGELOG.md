@@ -28,7 +28,8 @@
   is now solved for you too. Before, it could open again and show nothing (no question, no text),
   keeping you in it, or a door it unlocked stayed locked until you left the room. Your partner's
   game also no longer opens the office computer's password screen for you when it turns the
-  computer on.
+  computer on. And when one of you has entered the self-destruct code in the Antarctic
+  base, the other entering that room no longer resets it, so the launch room still starts for both.
 - **Reload with the side pack**: once you have the side pack, ammo in the bag's last two slots now
   reloads your weapon, both with the Reload button and when you fire on an empty magazine, as in the
   original. Before, that ammo was skipped and you had to combine it in the inventory yourself.

@@ -264,6 +264,9 @@ loaded in a case it has (before, the load waited for a file that does not exist:
   keep the player there, and a door unlocked by the other player stayed locked until the room was
   entered again. The solution's cutscene plays for the player who solved it (and for the partner
   when the game runs it as a world event, see above).
+* A solution stays when the other player enters the room again: the Antarctic base's self-destruct
+  terminal (code entered by one of you) no longer resets, so the linear launcher next door starts
+  for both.
 * One of you at a time: while you use a puzzle, a terminal or anything else you examined (its
   messages, its screen), your partner cannot open the same one and reads "<name> is using this"
   at the top of the screen. It is free again as soon as you are back in control.
@@ -874,6 +877,16 @@ floor or trigger, "Yes" chosen, an item used) hold only where the player did it.
   record writes (`WalAtariSet`, `EtcAtariSet`, `FlrAtariSet` and their `...2` forms) run again, as
   entering would run them. Nothing else of the entry script runs (models, enemies, items, sounds, room
   flags). The partner does not see the solving player's cutscene (as before: it was not a world event).
+* **An entry script that would undo a solution** (`coop_scd0`, `keep_solved`, `event.c bhInitEvent`): 9/31's
+  entry script clears `ev_flg` 5 on every entry. The self-destruct terminal's code (VERONICA, `sp_evt.c`)
+  sets it, and 9/30 starts the launch when entered with it set; a single player walks from the terminal
+  straight to 9/30. In co-op a partner entering 9/31 after the code (or a game loaded there) cleared it
+  for both, and with the card used up 9/30 never launched. The flag block is noted before the entry
+  script runs; a listed flag (`keep_solved`: 9/31, `ev_flg` 5) that was set and the script cleared is set
+  again at once, so the clear never reaches the partner. Of the other entry-script clears of flags other
+  rooms test (a census of all rooms), none undoes a solution: they re-arm transient state the room
+  sets again (lift floors 7/06 3/21 3/09 4/04 8/04, the piano's music 1/00..1/08, ambient voices
+  1/00 1/09 2/01, 6/05's entry cutscene, 9/28's fight, cutscene rooms).
 * **One player at a trigger** (`coop_examine`, `Pose.use`): `hitchk.c bhCheckExmAtari` asks before it takes
   a type 3 trigger (examine: a message, a close-up, the scripts' "at trigger" test). Our pose carries the
   trigger we examined + 1 while the game holds our player (`st_flg` 4: a message, a close-up, cinema) or we
@@ -1293,8 +1306,10 @@ the session's code. A takeover needs a non-zero tag that matches.
   (its entry script's), not its models, lights or effects: those follow when the room is entered again.
 * One player at a trigger: two presses on the same trigger within one pose's trip (a ping) both
   get in.
-* A room whose entry script writes world flags sets them for both when either enters (9/31 clears
-  `ev_flg` 5, the self-destruct terminal's code, as single player does on every entry).
+* A room whose entry script writes world flags sets them for both when either enters (the lifts'
+  floor, the palace piano's music, ambient voices, a room's entry cutscene: transient state that the
+  room sets again). Of the clears that undo a solution only 9/31's is kept from it (see "An entry script
+  that would undo a solution").
 * Of a world event's results that depend on local state (per-room flags, timing), only collision
   and object placement are synced afterwards.
 * Both taking one pool item (shared loot): the player who gives it back gives the amount a pickup

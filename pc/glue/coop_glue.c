@@ -3605,6 +3605,34 @@ static void rebuild(int key)
     if (runs) host_log("coop: the partner changed world flags of %d/%d: %d record writes of its entry script run again\n", sys->stg_no, sys->rom_no, runs);
 }
 
+/* ---- an entry script that would undo the partner's solution
+   Some entry scripts clear a world flag that another room still needs. 9/31's (the self-destruct terminal)
+   clears ev_flg 5 on every entry: its code sets it (sp_evt.c, VERONICA), and 9/30 starts the launch when it is
+   entered with the flag set. A single player goes from the terminal straight to 9/30; in co-op a partner who
+   (re-)entered 9/31 after the solution cleared it for both, and 9/30 never launched (the card is used up: no
+   second try). In co-op such a clear of a flag that was set before the entry script ran is undone at once (it
+   never reaches the partner). The other entry-script clears of flags other rooms test re-arm transient state
+   (the lifts' floor, the palace piano's music, ambient voices, a room's entry cutscene) and are left alone. */
+static const struct { unsigned char stg, rom, set; unsigned short bit; } keep_solved[] = {
+    { 9, 31, 1, 5 },   /* ev_flg 5: the self-destruct code entered (9/30's launch) */
+};
+static unsigned int scd0_pre[NFLAG];
+/* event.c bhInitEvent, around the entry script: 0 before, 1 after */
+void coop_scd0(int after)
+{
+    unsigned int* f = flag_block();
+    int k;
+    if (!sys) return;
+    if (!after) { memcpy(scd0_pre, f, sizeof(scd0_pre)); return; }
+    for (k = 0; k < (int)(sizeof(keep_solved) / sizeof(keep_solved[0])); k++) {
+        int w = world_off(keep_solved[k].set) + (keep_solved[k].bit >> 5);
+        unsigned int m = 0x80000000u >> (keep_solved[k].bit & 31);
+        if (sys->stg_no != keep_solved[k].stg || sys->rom_no != keep_solved[k].rom || !(scd0_pre[w] & m) || (f[w] & m)) continue;
+        f[w] |= m;
+        host_log("coop: %d/%d's entry script cleared flag %d/%d, set by a solution: kept\n", sys->stg_no, sys->rom_no, keep_solved[k].set, keep_solved[k].bit);
+    }
+}
+
 /* at the hand-off of a frame in game */
 static void world_sync(void)
 {
