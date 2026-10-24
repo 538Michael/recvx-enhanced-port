@@ -9,8 +9,8 @@
 
 ### Controls
 
-- **Combined controls** (CONTROLS, now the default): the left stick walks where it points on
-  screen, the d-pad drives with tank controls, like in the Resident Evil HD remaster.
+- **Combined controls** (CONTROLS, now the default): the left stick is for free 3D movement, the
+  d-pad for tank controls, like in the Resident Evil HD remaster.
 
 ### Co-op
 
