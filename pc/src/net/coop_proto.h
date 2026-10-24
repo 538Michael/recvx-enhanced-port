@@ -11,7 +11,7 @@ extern "C" {
 #endif
 
 #define COOP_MAGIC 0x504F4F43u          /* "COOP" */
-#define COOP_VERSION 24                 /* 11: join code, datagrams <= 1200 bytes, checked events, EV_ATR; 12: EV_FX; 13: EV_GRANT;
+#define COOP_VERSION 25                 /* 11: join code, datagrams <= 1200 bytes, checked events, EV_ATR; 12: EV_FX; 13: EV_GRANT;
                                            14: EV_TSCREEN, BUSY_TRADE, OPT_TRADE_FREEZE; 15: EV_GONE;
                                            16: player id and rejoin tag in PoseExt, EV_OWN, saved inventories (EV_BLOB pad);
                                            17: TS_WANT, TS_DECLINE (trade screen item requests);
@@ -23,7 +23,8 @@ extern "C" {
                                            22: OPT_GAMEOVER_BOTH, PF_GAME_OVER, EV_BLOB pad 2 (a shared game over's continue),
                                                EV_OWN tid (the last game state the guest loaded); OPT_SKIP_DETECTOR;
                                            23: OPT_QUICK_START (Pose.opts is full: a further rule needs a field of its own);
-                                           24: enemy slots 0..254 (COOP_ENE_SLOTS), EV_FX's FX_* references marked in `refs` */
+                                           24: enemy slots 0..254 (COOP_ENE_SLOTS), EV_FX's FX_* references marked in `refs`;
+                                           25: Pose.use (the trigger the sender is using: one player at a puzzle at a time) */
 #define COOP_DGRAM_MAX 1200             /* bytes per datagram (below every internet path MTU) */
 #define COOP_EV_FRAME 16                /* events per frame (over the frame's datagrams) */
 #define COOP_SNAP_FRAME 48              /* enemy snapshots per frame */
@@ -84,6 +85,9 @@ typedef struct Pose {
     uint8_t pflg;                       /* the sender's player flg & 6 (2, 4: being hit or held: enemies wait); bits 0 and
                                            3..7: its aim pitch (coop_pitch_get; 0 straight, also from a build before it) */
     uint8_t flr;                        /* the sender's floor (flr_no + 3); 0: not sent (a build before this field) */
+    uint8_t use;                        /* the room trigger (etc record) the sender examined and is busy with + 1, 0 none:
+                                           the partner may not examine it meanwhile (a puzzle, a terminal) */
+    uint8_t spare[3];
 } Pose;
 /* Pose.pflg's other bits (receivers before them read pflg & 6): the pitch the sender's upper body is bent by
    (third-person free aim; the fixed cameras' aim up/down is a motion), -31..31 steps of COOP_PITCH_STEP radians */
