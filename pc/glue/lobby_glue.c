@@ -612,7 +612,17 @@ static void title_version(void)
     }
     font_ok = (sys->ss_flg & 0x40) != 0;
     snprintf(s, sizeof(s), "v%.*s", (int)strcspn(RECVX_VERSION, " "), RECVX_VERSION);
-    text(632 - text_w(s, 0.6f), 452, s, 0.6f, a << 24 | 0x60D060);
+    {   /* the font's "." advances as wide as a digit: half of it, so it reads v0.6.9 rather than v0. 6. 9 */
+        float x, w = 0, dot = text_w(".", 0.6f);
+        char c[2] = { 0 };
+        for (const char* p = s; *p; p++) w += *p == '.' ? dot * 0.5f : (c[0] = *p, text_w(c, 0.6f));
+        x = 632 - w;
+        for (const char* p = s; *p; p++) {
+            c[0] = *p;
+            text(*p == '.' ? x - dot * 0.25f : x, 452, c, 0.6f, a << 24 | 0x60D060);
+            x += *p == '.' ? dot * 0.5f : text_w(c, 0.6f);
+        }
+    }
     AdvEasySetTextureList(0);   /* the title's texture list again */
 }
 
