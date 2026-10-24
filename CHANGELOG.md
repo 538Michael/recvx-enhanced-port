@@ -34,8 +34,8 @@
   conditions.
 - **Reload with the side pack**: ammo in the bag's last two slots now reloads your weapon.
 - **Sub machine gun reload crash**: reloading the sub machine gun no longer crashes the game.
-- **Binding the triggers or sticks**: in ENHANCED SETTINGS, binding RT, LT or a stick direction no
-  longer switches the page, starts another binding or moves the cursor while you still hold it.
+- **Binding the triggers or sticks**: binding LT, RT or a stick direction in ENHANCED SETTINGS no
+  longer switches the menu page.
 - **Co-op: inventory and actions locked**: after an enemy attack you could no longer open the
   inventory, examine or use doors until you changed rooms. Fixed.
 - **Co-op: stuck after a moth larva**: the host could stay in the throwing-it-off animation for good.
@@ -46,7 +46,6 @@
   boss helpers) and when changing weapons while new enemies appeared.
 - **Co-op black screen**: there were some occurrences of a black screen that did not fade away.
   Those cases were adjusted so it properly fades away again.
-- **Rebinding the triggers**: binding LT/RT in ENHANCED SETTINGS no longer turns the menu page.
 - **Crash reports**: a crash now always writes a small `recvx-crash.log` next to the game. Attach it
   to a bug report; IP addresses are hidden in it.
 
