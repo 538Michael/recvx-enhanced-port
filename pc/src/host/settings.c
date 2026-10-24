@@ -488,7 +488,7 @@ const Setting g_settings[] = {
 
     { SP_EXTRAS, "Infinite health", V(g_cheat.inf_health), 0, 1, 1, .group = "CHEATS" },
     { SP_EXTRAS, "Infinite ammo", V(g_cheat.inf_ammo), 0, 1, 1 },
-    { SP_EXTRAS, "Noclip", V(g_cheat.noclip), 0, 2, 1, noclips, .help = "Walls and enemies no longer block you. Fly: noclip up/down keys (R/F, Page Up/Down) or R2/L2." },
+    { SP_EXTRAS, "Noclip", V(g_cheat.noclip), 0, 2, 1, noclips, .help = "Walls and enemies no longer block you. Fly: Page Up up, F or Page Down down, or R2/L2 on the gamepad." },
     { SP_EXTRAS, "Unlock all", V(g_cheat.unlock), 0, 1, 1,
       .help = "Examining a locked door, card reader or key slot uses its key there, as if you carried it. Switching it on or off counts at once, also in the room you are in. Nothing is added to the inventory." },
     { SP_EXTRAS, "Heal now", NULL, .flags = SET_ACTION | SET_GAME_ONLY, .apply = heal },
