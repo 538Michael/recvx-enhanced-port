@@ -183,6 +183,9 @@ visible, and Contrast until the right square on the white strip is barely visibl
 | Randomizer variety | `enemy_variety` | **Wild** (1): any enemy kind that fits the spot, a different one for each enemy of a room where possible, Tyrants, Giant Black Widows and bats included; Mild (0): two common kinds per room |
 | Randomize event enemies | `enemy_random_events` | **on**: enemies a room shows later become other kinds too, and the ones a scene animates get another look of their own kind (the scene still plays); off: only free-roaming enemies change |
 | Auto-climb stairs | `auto_stairs` | **on**: walking or running into a staircase climbs it, up or down, as the action button would, with every control scheme, in third person and for your co-op character. It starts only while you walk towards the stairs (facing the way they go, within 45 degrees), not while you stand in front of them or walk past along their edge. Where a press would answer a door, item or examine spot first, that spot still needs the button; so do the steps onto or off a ledge, so you never drop off one by accident. Some stairs with an event (such as one in the Palace) need the button the first time; off: the button as in the original |
+| Rifle ammo stacks | `rifle_stack` | **off** (original): every rifle or assault rifle bullet pickup takes a slot of its own; on: they stack in one slot as the other ammo does. Always on while BioRand is on |
+| **Randomizer** | | |
+| BioRand | `biorand` | **off**; on: plays the pack BioRand generated into `mods/biorand` (see [Randomizer (BioRand)](#randomizer-biorand)); shows "No pack" without one. Changed at the title only (also on NEW GAME's difficulty screen); in co-op the host's choice counts |
 | Head blow-offs | `head_blowoff` | **on**: a zombie whose head the game bursts (the magnum, or the shotgun aimed up close) falls without it, on every zombie look and for the co-op partner too; off: as the original, which shows the burst and the blood but leaves the head on ([ENEMIES.md](ENEMIES.md#head-blow-offs)) |
 
 ### Controls
@@ -629,9 +632,36 @@ and **HD textures: UI** (on).
 Files in the `mods` folder (next to where you start the game, or `RECVX_MODS=DIR`) replace disc
 files without touching the image: `mods/NAME` for files opened by name (for example room files
 `RM_xxxx.RDX`) and `mods/<archive>.AFS/<index>` for entries of AFS archives. The log names
-every replaced file. `mods/enemies.ini` adds custom enemies (a type's moves with another look,
+every replaced file. `mods/biorand/` is BioRand's pack, used only while BioRand is on
+([Randomizer (BioRand)](#randomizer-biorand)). `mods/enemies.ini` adds custom enemies (a type's moves with another look,
 tougher, faster or bigger; for the spawner and the Wild randomizer), see [ENEMIES.md](ENEMIES.md)
 "Enemy variants". Modding reference and tools: [modding/README.md](modding/README.md).
+
+## Randomizer (BioRand)
+
+[BioRand](https://github.com/biorand/classic) (by IntelOrca and contributors, MIT) randomizes
+items, the start inventory, enemies and, if you like, doors. It reads your own disc image and
+writes a pack for this port; nothing of the game is shipped with it.
+
+1. In BioRand choose Code: Veronica, the PC version, your disc image (`.iso`) as the game data
+   and this game's folder (the one with `recvx.exe` and `mods`) as the PC folder, then Generate.
+   It writes the pack into `mods/biorand/` (room files, player models, the title picture and
+   `log_pl0.txt`, the spoiler log with the seed). Each generation replaces that folder whole, so
+   keep nothing of your own in it.
+2. Start the game. With "Difficulty select" on, NEW GAME's difficulty screen has a row
+   **BIORAND ON / BIORAND OFF** above the difficulties, with the seed; confirm or click it to switch.
+   Without the difficulty menu, switch **BioRand** in ENHANCED SETTINGS > GAMEPLAY (or F1) while
+   at the title. The row and the setting only show a pack when `mods/biorand` has one.
+3. BioRand on: the pack's files are used over the rest of `mods`. Off: the folder is ignored
+   completely and you play the normal game, even with a pack there.
+
+The choice can only change at the title: a game in progress keeps its rooms. A save remembers
+whether it was made with BioRand and with which pack; loading it with BioRand off, or with a pack of
+another seed, asks first ("Items and doors will not match. Load it?"); YES loads it and carries on
+with the current choice. Rifle and assault rifle bullets always stack while BioRand is on (its item
+amounts count on it). In co-op the host chooses BIORAND in the lobby's GAME RULES; the partner needs
+the same pack (the same seed and options) or it cannot join, and QUICK START is off
+([COOP.md](COOP.md#biorand)).
 
 ## Troubleshooting
 

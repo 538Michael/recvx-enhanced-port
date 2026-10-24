@@ -36,6 +36,11 @@ Related: [../ACTORS.md](../ACTORS.md) (models, skeletons, motions, enemy records
   upper-case names.
 * The log shows `mods: <path> replaces the disc file (<size> bytes)` for every file it uses.
 * Files are read as from the disc (whole 2048-byte sectors, zero padded).
+* `mods/biorand/` is BioRand's pack (`pc/src/host/biorand.h`): while BioRand is on, a disc file is
+  looked up there first, then in `mods/`; off, that folder is never read. BioRand writes room files,
+  `SYSTEM.AFS/10`, `SYSTEM.AFS/11`, `ADV.AFS/2` and `log_pl0.txt` there and replaces the folder
+  whole on each generation, so other mods belong in `mods/` itself. Its room conventions (item
+  `type` and `wrk_no`, the start inventory): [ROOM_FORMAT.md](ROOM_FORMAT.md#enemies-objects-items).
 
 | Mods file | Replaces | Notes |
 |---|---|---|

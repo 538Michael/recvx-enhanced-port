@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Gameplay
+
+- **BioRand randomizer**: play randomized games made with [BioRand](https://github.com/biorand/classic)
+  (thanks to IntelOrca and the BioRand team, who also wrote the game-side support). Generate a seed
+  into the game's folder, then turn BIORAND on in NEW GAME's difficulty screen (or in the settings at
+  the title). Off, you get the normal game. A save made with another seed asks before it loads, and in
+  co-op both players need the same seed.
+- **Rifle ammo stacks** (Gameplay): rifle and assault rifle bullets can stack in one slot like the other
+  ammo. Off by default, as in the original.
+
 ## 0.6.9 (2026-10-24)
 
 ### Gameplay

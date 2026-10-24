@@ -1,4 +1,4 @@
-/* Online co-op wire format (protocol 27, docs/COOP.md "Protocol 24" and "Security") and
+/* Online co-op wire format (protocol 27, docs/COOP.md "Protocol 27" and "Security") and
    the checks every received packet passes before it may change anything. No game state here:
    pc/glue/coop_glue.c applies what passes; pc/tests/test_coop.c feeds malformed packets. */
 #ifndef RECVX_COOP_PROTO_H

@@ -5,7 +5,7 @@ over the internet or a LAN (UDP). Co-op is an optional addon: with it off the ga
 as without it (every hook is `#ifdef TARGET_PC` and `if (coop_on)`).
 
 Part 1 is for players: how to host, join and play. Part 2 is the reference: architecture,
-protocol 26, security and limits. Related: [SERVER.md](SERVER.md) (the optional co-op server),
+protocol 27, security and limits. Related: [SERVER.md](SERVER.md) (the optional co-op server),
 [USER_GUIDE.md](USER_GUIDE.md) (settings, controls), [ACTORS.md](ACTORS.md) (models and voices),
 [ENEMIES.md](ENEMIES.md) (enemy options), [ARCHITECTURE.md](ARCHITECTURE.md),
 [BUILDING.md](BUILDING.md).
@@ -72,7 +72,8 @@ drawn in the game's own style; your model turns in a 3D preview on the left. It 
 * **FOLLOW** (joiner): see "Follow host".
 * **RELAY**: *Only if needed* (Automatic) or *Always* (Via server), see "Connection modes".
 
-**Step 3: GAME RULES** (host): **LOOT** (Shared (one pickup) / Individual (each their own)),
+**Step 3: GAME RULES** (host): **BIORAND** (On / Off with the seed, only when the host has a BioRand pack,
+see "BioRand"), **LOOT** (Shared (one pickup) / Individual (each their own)),
 **IMPORTANT ITEMS** (For both / Shared; only with shared loot, see "Loot modes"), **FREEZE ON TRADE**, **CUTSCENE SKIP** (Together /
 Each alone, see "Cutscenes"), **INK RIBBONS** (Needed / Not needed, see "Saving without ink
 ribbons"), **GAME OVER** (Each player / Both, see "Game over"), and two entries that open a page
@@ -81,7 +82,7 @@ of their own (an arrow after them; RANDOMIZER also shows On or Off):
 | Entry | Its page |
 |---|---|
 | **RANDOMIZER** | The enemy options: **RANDOMIZER**, **VARIETY** (Wild / Mild) and **EVENT ENEMIES** (both shown only with the randomizer on), **SEED**, **NEW RANDOM SEED**, then **EXTRA ENEMIES**, **REARRANGED**. |
-| **EXTRA EVENTS** | Rules for single events: **QUICK START** (On / Off, see "Quick start"), **METAL DETECTOR** (Skipped / As original, see "Metal detector"). |
+| **EXTRA EVENTS** | Rules for single events: **QUICK START** (On / Off, see "Quick start"; hidden and off while BioRand is on), **METAL DETECTOR** (Skipped / As original, see "Metal detector"). |
 
 Confirm or a click opens a page; BACK (or cancel, or a right click) returns to GAME RULES on its
 entry. The joiner sees the host's GAME OVER rule and both pages read-only (THE HOST'S RULES) once
@@ -469,6 +470,27 @@ or already holds the item (not for stackable items), gets nothing.
 An item that is the triggering player's alone: nothing goes on the partner's floor; with shared
 loot a partner who watched the event and got one too gives it back at once ("... from the partner's
 event is the partner's").
+
+### BioRand
+
+With BioRand ([USER_GUIDE.md](USER_GUIDE.md#randomizer-biorand)) the host chooses in GAME RULES, row
+**BIORAND** (the same setting as single player's; shown only when the host has a pack in `mods/biorand`).
+On, both play the host's pack:
+
+* The partner needs the same pack: generated with the same seed and options (BioRand's seed string),
+  so the same room files. A partner without a pack, or with another one, is refused when it joins (or when
+  the host turns BIORAND on) with "The host plays BioRand seed N; generate the same seed (or ask the host to
+  turn BioRand off)"; the host's status says "... left: its BioRand pack is not this one".
+* The partner's game follows the host's choice for the session whatever its own setting (its own setting is
+  back after the session); THE HOST'S RULES shows BIORAND while it is on.
+* QUICK START is off and hidden (the pack has its own start inventory). A partner without a game of its own
+  starts with the pack's start inventory, as the host's new game did (room 0/0's block, run by the game's own
+  item actions on its inventory).
+* Randomized pickups count by the item they give, not by their model: important items for both
+  (`coop_item_taken`), the partner's event items shown in a room (`grant_slot`, `grant_model`).
+* Loading a save from the lobby's START made with another BioRand state asks first (START again loads it).
+
+Rifle ammo stacks for both while BioRand is on. Off, the game is the normal one for both, packs or not.
 
 ### Quick start
 
@@ -1131,10 +1153,10 @@ send time minus the echoed datagram's arrival. Sample = arrival - our clock - th
 smoothed (EWMA 0.1). The name tag's point goes with the recorded frame (`stream_point`) and is
 interpolated with the in-between frames; it snaps on camera cuts and in vanilla mode.
 
-## Protocol 26
+## Protocol 27
 
-`COOP_VERSION` is **26**; both players need builds with the same version (a mismatch is reported,
-e.g. "the host runs co-op protocol 25, we 26: both need the same build"). The co-op server does not
+`COOP_VERSION` is **27**; both players need builds with the same version (a mismatch is reported,
+e.g. "the host runs co-op protocol 26, we 27: both need the same build"). The co-op server does not
 look at the game protocol. Version history in short: 11 join code, 1200-byte datagrams, checked
 events, `EV_ATR`; 12 `EV_FX`; 13 `EV_GRANT`; 14 `EV_TSCREEN`; 15 `EV_GONE`; 16 player id and rejoin
 tag, `EV_OWN`; 17 trade requests; 18 voices; 19 the game rules `OPT_IMPORTANT`, `OPT_NO_RIBBON`,
@@ -1147,7 +1169,7 @@ make other enemies from the same seed); 21 `COOP_HIT_PRECISE` in `EV_ENE_HIT` (t
 and `OPT_SKIP_DETECTOR`, `PF_GAME_OVER`, `EV_BLOB` `pad` 2 and the `EV_OWN` `tid` (see "Game over",
 "Metal detector"); 23 the game rule `OPT_QUICK_START` (see "Quick start"; it takes the last free bit of
 `Pose.opts`, so a further rule needs a field of its own); 24 enemy slots 0..254 (`COOP_ENE_SLOTS`, the PC's
-255 slots) in every slot field, and `EV_FX` marks its `FX_*` references in `refs` (the bytes 253..255 are slots now); 25 `Pose.use`, the trigger the sender is using (one player at a puzzle at a time, see "Puzzles"; the pose grew to 112 bytes); 26 `EneSnap.id`, the enemy type in the slot: a snapshot applies only to a slot holding the same type (`hokan_count` is 16 bits now; the snapshot stays 100 bytes). `Pose.pflg` and `Pose.flr` were added inside protocol 18,
+255 slots) in every slot field, and `EV_FX` marks its `FX_*` references in `refs` (the bytes 253..255 are slots now); 25 `Pose.use`, the trigger the sender is using (one player at a puzzle at a time, see "Puzzles"; the pose grew to 112 bytes); 26 `EneSnap.id`, the enemy type in the slot: a snapshot applies only to a slot holding the same type (`hokan_count` is 16 bits now; the snapshot stays 100 bytes); 27 `PoseExt.br`, `br_seed`, `br_id` (BioRand: the host's choice and each side's pack; `Pose.opts` has no free bit, so a field of its own; the extension grew to 104 bytes). `Pose.pflg` and `Pose.flr` were added inside protocol 18,
 `Pose.rcase` inside protocol 22, the aim pitch in `Pose.pflg`'s spare bits inside protocol 23 (0 means "not
 sent", and receivers fall back; a receiver before the pitch reads `pflg & 6` only and keeps the straight pose).
 
@@ -1160,7 +1182,7 @@ At most `COOP_DGRAM_MAX` = 1200 bytes (below every internet path MTU). A frame's
 as many datagrams as needed, each starting with the pose so each is useful alone:
 
 ```
-Pose (112) | Event x nev (88 each, nev <= 16) | EneSnap x nene (100 each, nene <= 48) | PoseExt (92, if PF_EXT)
+Pose (112) | Event x nev (88 each, nev <= 16) | EneSnap x nene (100 each, nene <= 48) | PoseExt (104, if PF_EXT)
 ```
 
 The size must be exactly that sum. The first datagram of a frame carries the `PoseExt`. Up to 16
@@ -1170,7 +1192,7 @@ over its datagrams.
 | Packet type (`Pose.type`) | Meaning |
 |---|---|
 | `PKT_POSE` 1 | A frame's pose with events, snapshots, extension. |
-| `PKT_BYE` 2 | Goodbye: a bare `Pose`, sent three times by every stop and at exit. `reject` 3 (`COOP_REJ_REMOVED`): the host removed us. |
+| `PKT_BYE` 2 | Goodbye: a bare `Pose`, sent three times by every stop and at exit. `reject` 3 (`COOP_REJ_REMOVED`): the host removed us; 4 (`COOP_REJ_BIORAND`, a joiner's): its BioRand pack is not the host's. |
 | `PKT_REJECT` 3 | Host to a sender it will not adopt: `reject` 1 wrong join code, 2 already has a partner. At most one per second. |
 
 ### Pose (112 bytes)
@@ -1198,11 +1220,15 @@ in a cutscene with `PF_SKIP` of its own and the partner's, sets `cb_flg 0x100000
 request ends with the cutscene; while the partner is no longer in one in our room, a pending request
 skips at once.
 
-### PoseExt (92 bytes)
+### PoseExt (104 bytes)
 
 `name[16]`, `lchr` (lobby model), `lobby` (lobby open), `items` (joiner: `ITEMS_NEW/SAVE/HOST/CURRENT`),
 `rec` (host: `REC_UNKNOWN/NONE/HAVE/OFF`), `note[40]` (what the player chose), `pid[16]` and `tag[16]`
-(joiner: player id and rejoin tag). Only printable ASCII is shown.
+(joiner: player id and rejoin tag), then BioRand (protocol 27): `br` (host: 1 it plays its pack; joiner: 1 it
+has a pack; anything above 1 refused), 3 zero bytes (else refused), `br_seed` (the sender's pack's seed number,
+0xFFFFFFFF unknown), `br_id` (its identity, `biorand_id`: a hash of `log_pl0.txt` with the seed string and spoiler,
+and the room files' names and sizes; 0 no pack). A joiner whose `br_id` differs from the host's while the host's
+`br` is 1 says goodbye with `COOP_REJ_BIORAND`. Only printable ASCII is shown.
 
 ### EneSnap (100 bytes)
 

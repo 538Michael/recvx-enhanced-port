@@ -225,7 +225,7 @@ int pc_newgame_plates(int cursor, float fade, int flag)
     title_font();
     a = (unsigned int)(255.0f * (1.0f - ap->FadeRate) * (1.0f - ap->SaverRate));
     if (a < 8) return 1;
-    col = cursor == BR_ROW ? 0xFFFFFF : 0x9A9A9A;
+    col = cursor == BR_ROW ? 0xFFFFFF : 0x808080;   /* as the plates: the cursor bright, the others grey */
     on = biorand_setting();
     snprintf(seed, sizeof(seed), "%s", on ? biorand_seed_text() : "");
     w = text_w(on ? "BIORAND ON" : "BIORAND OFF", sc) + (seed[0] ? 10 + text_w(seed, 0.6f) : 0);

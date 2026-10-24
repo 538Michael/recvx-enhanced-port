@@ -672,6 +672,13 @@ where the rows come from and who does the I/O:
 | `mcDispFileNumber` | numbers past 99 are drawn narrower, ending where two digits end |
 | `ExecuteSysLoadScreen` / `ExecuteSysSaveScreen` | `pc_sysload_native` / `pc_syssave_native`: `system.dat` read at boot, merged (`SysSaveHikaku`) and written by OPTION and the ranking, in one frame without the card screens |
 
+**BioRand** (`pc/glue/biorand_glue.c`): two save-region words no game code uses, `sys->itm[288]`
+(`'B' << 24 | seed`, 0xFFFFF unknown; 0 without BioRand) and `[289]` (the pack's id), set at a new game and
+when a co-op guest starts; older builds keep them and their saves have 0. `ExecuteStateLoadScreenLoad`
+(both save systems, after the read) goes to state 35 when they differ from the current choice: the
+question with the game's YES / NO (`pc_biorand_save_differs`); YES writes the current words into the
+read save (and its checksum) and loads it, NO goes back to the list. The lobby's START asks the same.
+
 **Sounds**: the native screens keep the card screens' own sound calls (cursor, confirm, cancel,
 the typed-in row's keys and bell after a save); the card-only steps they skip (slot choice, card
 check, the system file's "save?" question) have no screen and play nothing, as no button is
