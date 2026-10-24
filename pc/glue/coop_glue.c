@@ -2300,6 +2300,7 @@ static void session_reset(void)
    game of its own starts with the new-game inventory of the session's game mode. */
 static struct { unsigned int itm[384], stflg[4]; char wno[4]; short hp[4]; } own;
 static int own_valid, own_fixed;   /* own_fixed: a source was given (coop_own_source), no snapshots */
+static int own_cont;               /* our session ended while we played in the host's game, which goes on here (until the title) */
 static int own_hold;               /* our own game restarted (continue after a game over): `own` keeps the items we died with */
 /* saved partner inventories (protocol 16, "saved partner inventories" below), the guest's side */
 static int blob_rec, want_rec;          /* the host's game state on its way carries our saved items; we requested them */
@@ -2389,6 +2390,7 @@ static void own_restore(void)
         memcpy(sys->ply_wno, own.wno, sizeof(own.wno));
         memcpy(sys->ply_hp, own.hp, sizeof(own.hp));
         host_log("coop: keeping our own inventory (hp %d)\n", own.hp[sys->ply_id & 3]);
+        if (want_rec) note("No saved items at the host - you keep your current items");   /* joined again from our game (own_cont) */
     } else {
         AllItemInit();
         sys->ic_flg[15] = ic;   /* AllItemInit clears one "examined" bit */
@@ -2749,7 +2751,10 @@ int coop_items_apply(void)
     items_applied = v;
     want_rec = v == COOP_ITEMS_HOST;
     if (v >= 0 && (ok = lobby_read_save(v, b))) coop_own_source(b);
-    else if (v == COOP_ITEMS_CURRENT && sys && in_session_game()) coop_own_source(NULL);   /* our game: its snapshots */
+    /* our game: its snapshots. "Saved with the host" from the game we played in the host's session (we lost the
+       connection, the host crashed, we left): the host's record if it has one, else these items, not a new inventory
+       (the host's game started again from a save without our record had us start Chris's part from scratch) */
+    else if ((v == COOP_ITEMS_CURRENT || (v == COOP_ITEMS_HOST && own_cont)) && sys && in_session_game()) coop_own_source(NULL);
     else coop_own_from_save(NULL);
     return ok;
 }
@@ -5656,6 +5661,7 @@ static void stop(void)
     bye_reason = NULL;
     left_msg[0] = 0;
     id_ok = id_rejoin = crash_ok = rec_done = 0;
+    if (!is_host && own_live && in_session_game()) own_cont = 1;   /* the host's game goes on here: a join again keeps its items */
     own_live = own_sent_ok = blob_rec = want_rec = 0;
     own_hold = go_was = go_cont = go_want = go_seen = go_held = 0;
     peer_opts = -1;
@@ -6241,7 +6247,7 @@ void coop_frame(void)
     if (req == COOP_REQ_STOP) stop();
     else if (req == COOP_REQ_KICK) kick();
     else if (req) start(req);
-    if (sys && (sys->tk_flg & 0x8)) title_seen = 1;   /* saved partner inventories: a game from the title takes its save's */
+    if (sys && (sys->tk_flg & 0x8)) title_seen = 1, own_cont = 0;   /* saved partner inventories: a game from the title takes its save's */
     else if (sys && title_seen && in_session_game()) { title_seen = 0; records_for_game(); }
     if (coop_on && !is_host && !echo_delay && items_applied != g_coop.items && !own_live && !pop_pending && !popping) coop_items_apply();   /* F3 changed it */
     if (coop_on && !echo_delay && sys) {   /* back at the title from a game of this session: it ends (both sides) */

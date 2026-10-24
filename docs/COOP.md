@@ -436,7 +436,7 @@ when joining", ini `coop_items`):
 
 | Choice | Value | You get |
 |---|---|---|
-| *Saved with the host* (default) | -2 | What the host kept for you from your last visit; none: a new inventory. In the host's lobby the row says "(available)", "(none)" or "(host: off)". |
+| *Saved with the host* (default) | -2 | What the host kept for you from your last visit; none: a new inventory, or, when you join again from the game you played in the host's session (the connection was lost, the host's game crashed, you left), the items you have now. In the host's lobby the row says "(available)", "(none)" or "(host: off)". |
 | *New inventory* | -1 | The new-game inventory of the session's game mode. |
 | A save | 0.. | The items of that save: save number - 1 (native save files), or memory card slot 0..14. |
 | *My current game* (F3 only) | -3 | Joining from your own running game keeps its items. |
@@ -597,6 +597,12 @@ back at once ("Player joined again ... the stale session is replaced" on the hos
 says. Directly, the host recognises you by your player id plus a tag only your secret can make;
 through a server the server gives you your old place the same way. A name alone, or an id without
 the tag, takes over nothing.
+
+If the host's game crashes, the host starts it again and loads its last save; you join again from
+your game (F3 Join, or from the title). You get the items the host saved with that save, as the world
+is that save's again. If that save has none of yours (saved before you joined), you keep the items you
+have ("No saved items at the host - you keep your current items"); before, you started again with the
+new-game inventory of the character (in Chris's part his starting items).
 
 ## Remove stuck player
 
@@ -1047,6 +1053,9 @@ floor or trigger, "Yes" chosen, an item used) hold only where the player did it.
   the session's code). A datagram from a new address that passes every check and carries the current
   partner's id **and** tag replaces the stale session at once. Session ids are random (`rdv_random`).
   The host remembers a partner that went without a goodbye and gives its rejoin the record.
+* A guest whose session ended while it played in the host's game (`own_cont`, until its title) and that joins
+  again with *Saved with the host* takes its current items as the fallback (`ITEMS_CURRENT`'s snapshots): the
+  host's record wins when the host has one, else they stay (not the new-game inventory).
 
 ### Game over
 

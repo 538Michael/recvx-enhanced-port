@@ -38,6 +38,9 @@
   inventory, examine or use doors until you changed rooms. Fixed.
 - **Co-op: stuck after a moth larva**: the host could stay in the throwing-it-off animation for good.
   Fixed.
+- **Co-op: items kept when joining again**: when the host's game crashed or the connection was lost
+  and you join again from your game, you keep your items if the host's save has none of yours (before:
+  the character's starting items, in Chris's part his default inventory).
 - **Crash reports**: a crash now always writes a small `recvx-crash.log` next to the game. Attach it
   to a bug report; IP addresses are hidden in it.
 
