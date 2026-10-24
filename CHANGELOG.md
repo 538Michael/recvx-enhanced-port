@@ -38,17 +38,12 @@
   inventory, examine or use doors until you changed rooms. Fixed.
 - **Co-op: stuck after a moth larva**: the host could stay in the throwing-it-off animation for good.
   Fixed.
-- **Co-op: items kept when joining again**: when the host's game crashed or the connection was lost
-  and you join again from your game, you keep your items if the host's save has none of yours (before:
-  the character's starting items, in Chris's part his default inventory).
-- **Co-op crash with many enemies**: the joining player's game no longer crashes when an enemy
-  exists on one side only, such as moths, their eggs or a boss's helpers (often in the late game).
-- **Co-op crash after a weapon change**: changing weapons just as new enemies appeared (added
-  enemies, the enemy spawner) could crash the game right away or at the next shot. Fixed.
-- **Co-op crash when the partner changes its look**: an enemy's effect on your partner (fire, acid)
-  no longer crashes your game when your partner changes model or character.
-- **Co-op black screen**: if the screen ever stays black (or frozen) while you can move, it comes
-  back after a few seconds instead of only after a door.
+- **Co-op: items kept when joining again**: after the host's game crashed, the joining player
+  could come back with only the starting items. They now keep their items.
+- **Co-op crashes**: fixed several crashes, mostly for the joining player in the late game (moths,
+  boss helpers) and when changing weapons while new enemies appeared.
+- **Co-op black screen**: if the screen stays black while you can move, it now comes back after a
+  few seconds instead of only after a door.
 - **Crash reports**: a crash now always writes a small `recvx-crash.log` next to the game. Attach it
   to a bug report; IP addresses are hidden in it.
 
