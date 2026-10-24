@@ -686,7 +686,7 @@ static float ver_text(float x, float y, const char* s, float sc, unsigned int ar
 
 /* Installed and newest version (net/update.h) below the copyright, right-aligned in the 4:3
    picture's corner: labels and versions each in a column. The installed one is red when a newer
-   one is out; the newest "checking..." (asking), "unknown" (no answer) or "off" in grey. */
+   one is out; the newest "..." (asking), "unknown" (no answer) or "off" in grey. */
 #define VER_SC 0.5f
 static void title_version(void)
 {
@@ -702,13 +702,16 @@ static void title_version(void)
     title_font();
     st = update_newest(newest, sizeof(newest));
     val[0] = update_installed();
-    val[1] = st == UPD_KNOWN ? newest : st == UPD_OFF ? "off" : st == UPD_CHECKING ? "checking..." : "unknown";
+    val[1] = st == UPD_KNOWN ? newest : st == UPD_OFF ? "off" : st == UPD_CHECKING ? "..." : "unknown";
     col[0] = st == UPD_KNOWN && upd_newer(newest, val[0]) ? 0xE04040 : 0x60D060;
     col[1] = st == UPD_KNOWN ? 0x60D060 : 0xA0A0A0;
     lw = text_w(label[0], VER_SC) + text_w("  ", VER_SC);   /* the longer label, then the versions' column */
     w0 = ver_text(0, 0, val[0], VER_SC, 0, 0);
     w1 = ver_text(0, 0, val[1], VER_SC, 0, 0);
-    x = 632 - lw - (w0 > w1 ? w0 : w1);
+    {   /* the column as wide as the widest it can show ("unknown"), so the block never moves when the answer comes */
+        float wu = ver_text(0, 0, "unknown", VER_SC, 0, 0), wm = w0 > w1 ? w0 : w1;
+        x = 632 - lw - (wm > wu ? wm : wu);
+    }
     for (i = 0; i < 2; i++) {
         float y = 445 + i * 14;
         text(x, y, label[i], VER_SC, a | 0xC8C8C8);
