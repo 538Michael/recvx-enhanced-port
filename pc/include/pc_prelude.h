@@ -162,6 +162,7 @@ void  coop_item_taken(int bit, int etc);      /* event.c bhItmCk: we took the it
 void  coop_item_late(int bit);                /* event.c bhItmCk: we took an item whose it_flg bit was set already (the partner was first) */
 int   coop_examine(int etc);                  /* hitchk.c bhCheckExmAtari: we examine trigger etc; 1: the partner is using it (not now) */
 int   coop_replayed_event(void);              /* event.c bhEvtComSet: the running event is one of the partner's, replayed (no terminal) */
+void  coop_scd0(int after);                   /* event.c bhInitEvent: before (0) and after (1) the room's entry script (a solved flag kept) */
 void  coop_retry_point(void);                 /* room.c bhPushGameData: our continue point moved (the host keeps the guest's items with it) */
 int   pc_no_ink_ribbon(void);                 /* typewriters save without an ink ribbon (setting; in co-op the host's rule) */
 int   pc_detector_skipped(void);              /* co-op rule "Metal detector: Skipped" (pc/glue/detector_glue.c): event.c bhPlItemCheck in 0/9 finds no metal */

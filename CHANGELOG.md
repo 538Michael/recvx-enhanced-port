@@ -25,6 +25,8 @@
 
 - **Co-op puzzles solved by your partner**: now also count as solved for you when you are in the
   same room. Before, the puzzle could reopen empty and keep you stuck, or its door stayed locked.
+- **Co-op: self-destruct code undone**: your partner entering the Antarctic base's terminal room
+  after the code was entered no longer resets it, so the launch starts for both.
 - **Reload with the side pack**: ammo in the bag's last two slots now reloads your weapon.
 - **Sub machine gun reload crash**: reloading the sub machine gun no longer crashes the game.
 - **Co-op: inventory and actions locked**: after an enemy attack you could no longer open the
