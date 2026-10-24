@@ -896,7 +896,9 @@ floor or trigger, "Yes" chosen, an item used) hold only where the player did it.
   a type 3 trigger (examine: a message, a close-up, the scripts' "at trigger" test). Our pose carries the
   trigger we examined + 1 while the game holds our player (`st_flg` 4: a message, a close-up, cinema) or we
   are out of the game screen (a terminal), until 10 frames after we are free; the partner in the same room
-  and case does not take that trigger meanwhile ("<name> is using this", top of the screen, 3 s).
+  and case does not take that trigger meanwhile ("<name> is using this", top of the screen, 3 s). `st_flg` 4
+  is also set every frame our busy flag (`flg & 4`) is: a busy flag left behind kept the trigger "in use"
+  for the partner too; the busy flag watchdog (`hold_watch`, "Enemies") frees both.
 * **A replayed event opens no terminal** (`coop_replayed_event`, `event.c bhEvtComSet`): a world event's
   events run on the partner too, so the office computer's power-on (1/09, gate `ev_flg` 164: movie, then
   `EvtComSet 7`) put the partner into the password screen. An event of the partner's block replayed here
