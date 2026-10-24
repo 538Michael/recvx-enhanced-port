@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.6.9 (2026-10-24)
 
 ### Gameplay
 
