@@ -140,6 +140,9 @@ static void set_move_dir(uint32_t b, uint32_t kb, Sint16 sx, Sint16 sy)
 /* Start's keyboard binding (Enter) is down in this report (OPTION takes it as confirm too, options_glue.c) */
 static int kb_start;
 int pad_kb_start(void) { return kb_start; }
+/* the DS2 buttons of the last report (the game's Pad[].on also has stick directions, at rest too) */
+static uint32_t report_bits;
+int pad_report_bits(void) { return (int)report_bits; }
 
 static void build_report(unsigned char* r)
 {
@@ -182,6 +185,7 @@ static void build_report(unsigned char* r)
     set_move_dir(b, kb, slx, sly);
     quickturn_on = qbits != 0;
     b |= qbits;
+    report_bits = b;
     {   /* RECVX_PAD_TRACE=1: log the DS2 buttons when they change */
         static int trace = -1; static uint32_t last;
         if (trace < 0) trace = SDL_getenv("RECVX_PAD_TRACE") != NULL;

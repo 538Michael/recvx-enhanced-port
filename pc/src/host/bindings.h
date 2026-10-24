@@ -71,6 +71,7 @@ int  pc_menu_smooth(void);             /* view_glue.c: Smooth menus, and a menu 
 int  bind_quickturn(int which, int held);   /* which 0 game, 1 third person: 0 off, 1 hold back, 2 back + run (pad.c) */
 int  pad_quick_knife(void);            /* the quick-knife row is held (pad.c) */
 int  pad_reload(void);                 /* a reload row is held (pad.c) */
+int  pad_report_bits(void);            /* the DS2 buttons held in the last pad report (pad.c) */
 int  pad_kb_start(void);               /* Start's keyboard binding is down in the last pad report (pad.c) */
 
 /* Input source of this window (F1 Controls, ENHANCED SETTINGS -> CONTROLS; ini input_source, input_pad;
