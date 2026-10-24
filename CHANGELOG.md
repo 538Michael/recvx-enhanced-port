@@ -19,9 +19,16 @@
 - **Model list in the lobby**: MODEL now opens a scrollable list of all models (also with the mouse
   wheel) that shows each one in the preview as you move through it, so finding the one you want is
   quicker.
+- **One player per puzzle**: while you use a puzzle, a code terminal or anything else you examined,
+  your partner cannot open the same one at the same time ("... is using this").
 
 ### Fixes
 
+- **Co-op puzzles solved by your partner**: a puzzle your partner solves while you are in the room
+  is now solved for you too. Before, it could open again and show nothing (no question, no text),
+  keeping you in it, or a door it unlocked stayed locked until you left the room. Your partner's
+  game also no longer opens the office computer's password screen for you when it turns the
+  computer on.
 - **Reload with the side pack**: once you have the side pack, ammo in the bag's last two slots now
   reloads your weapon, both with the Reload button and when you fire on an empty magazine, as in the
   original. Before, that ammo was skipped and you had to combine it in the inventory yourself.
