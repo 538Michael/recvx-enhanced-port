@@ -503,8 +503,8 @@ village, collision. The render thread (GS emulation, replays: `r_exec`, `r_inter
   buttons into actions in `bhSetPad` as before, so nothing in the game is patched per action.
   The menus name each row by what the button does under the current key type. Keyboard/mouse and
   gamepad have one binding set each, two slots per row; extra rows are the quick turn, quick knife,
-  trade request, reload, the third-person keys and the hotkeys. The ini format is in
-  [USER_GUIDE.md](USER_GUIDE.md#rebinding). Game and third-person rows may share keys (third
+  trade request, reload, the third-person keys and the hotkeys. The ini format: [Binding ini format](#binding-ini-format); the
+  menus: [USER_GUIDE.md](USER_GUIDE.md#rebinding). Game and third-person rows may share keys (third
   person takes over the keys it uses while `g_tps.kb_play`: in a game, no OPTION screen up; the
   title menus and OPTION read the DS2 buttons, so there Q/W/A/S are L1/R1/Square/Triangle); hotkeys
   share with neither. The gamepad set has its own
@@ -590,6 +590,81 @@ village, collision. The render thread (GS emulation, replays: `r_exec`, `r_inter
   frames without pad input) only reads the PS2 pad. `pc_input_active` (`tps_glue.c`) also counts
   third-person mouse motion and PC-only input, so it no longer dims during mouse/keyboard play.
 
+### Binding ini format
+
+Bindings are saved in `recvx.ini` as `key_<row>` and `pad_<row>` (second slot `<row>_2`):
+
+```ini
+key_cross = Z
+key_tps_run = Left Shift
+key_tps_run_2 = Right Shift
+key_tps_aim = Mouse Right
+pad_cross = south
+pad_freeaim = +lefttrigger
+pad_quickturn = -lefty
+```
+
+Keys use SDL key names (`Z`, `Return`, `Left Shift`, `PageUp`), mouse buttons
+`Mouse Left/Middle/Right/X1/X2`. Gamepad inputs are positional (`south` = Xbox A = PlayStation
+Cross, `east`, `west`, `north`, `back`, `start`, `guide`, `leftshoulder`, `rightshoulder`,
+`leftstick`, `rightstick`, `dpup`, `dpdown`, `dpleft`, `dpright`, `misc1`, `paddle1`-`paddle4`,
+`touchpad`) or an axis half (`+lefttrigger`, `-leftx`, `+lefty`, ...). `none` unbinds. Rows beyond
+the DS2 buttons: `freeaim` ("Aim (no auto-aim)"), `quickturn` (unbound: back, then run),
+`quickknife`, `trade`, `reload`, the third-person keys (`key_tps_*`,
+[THIRDPERSON.md](THIRDPERSON.md#usage)), the third-person gamepad set (`pad_tps_*`,
+[THIRDPERSON.md](THIRDPERSON.md#gamepad)) and the hotkeys (`tps_toggle`, `settings`, `cheats`,
+`coop`, `import`, `fullscreen`, `noclip_up`, `noclip_down`).
+
+Older files are migrated by `bindings_version`:
+
+- No `bindings_version` line (from before the reload rows) whose reload rows are still `none`,
+  their default then: they get the current defaults (R; Aim + Triangle on the gamepad; RB in third
+  person). A file that still has the third-person quick turn on RB gets the new default (d-pad down).
+- `bindings_version` below 3 (from before free aim): the left trigger sat on the L2 row, the
+  default then. That line is dropped, so the left trigger becomes free aim's; a key such a file gave
+  another game row (E) stays there, leaving free aim's keyboard slot empty.
+
+### Control details
+
+What the player sees, beyond [USER_GUIDE.md](USER_GUIDE.md#controls):
+
+- **Free aim** ("Aim (no auto-aim)", fixed cameras): aims as the aim button, without its turn to the
+  nearest enemy and without Change aim's turn to the next one. The game's hit check follows the
+  facing and the aim height, so an enemy in front is hit as with auto-aim and a shot past it misses.
+  The dual weapons (Gold Lugers, sub machine gun) keep both arms straight ahead; the knife aims
+  without the turn. Holding both aim rows means no auto-aim. Aim + Triangle reloads with it too.
+  While noclip flying the left trigger flies down instead. In third person it does nothing. In
+  co-op the partner sees the turn and shots as usual.
+- **Reload**: the game's own motion, sound and magazine size, taking the first matching ammo in the
+  inventory as combining would (a stack used up leaves it). Nothing happens without matching ammo,
+  with a full magazine or unlimited ammo, during events, menus, doors or when grabbed. The bow gun
+  reloads the kind of arrows it holds; the sub machine gun has no reload motion (the ammo goes in
+  at once); the grenade launcher (rounds combined in the inventory) and the knife are left alone;
+  the sniper rifle and linear launcher reload only through the scope (their reload ends in it). The
+  gamepad has no free button, so its reload shares Triangle, which does nothing while the weapon is
+  raised in any key type (map, or options in type D). CONTROLS shows such a binding as "Aim +
+  Triangle"; aim and the button pressed together count as Aim + button. A reload binding no other
+  row uses works alone, also lowered; bound to the aim button itself it reloads on every aim. In
+  menus, events and the inventory the shared button always does its own action. In co-op the
+  partner sees the reload and the ammo stays in your inventory.
+- **Modern / Combined**: the keyboard and d-pad (no half push) run with the run button. With
+  Combined, while the stick is past its dead zone it wins and the d-pad waits until it is let go;
+  the arrow keys stay Modern. While climbing or pushing a box the direction counts as forward only
+  when it points roughly where the character faces.
+- **Menus**: menus, messages, the inventory's screens and events use the game's buttons with every
+  scheme (L1 / R1, Q / W, also zoom the map). With the keyboard in third person the third-person
+  keys (W/A/S/D, E, Q, Tab, M) also work in the inventory, map, item box and messages; the title
+  menus and OPTION take the game's keys only. In OPTION the keyboard's Start key (Enter) confirms
+  too (every row, ENHANCED SETTINGS, RETURN TO TITLE's question); a rebound Start key takes this
+  over, the gamepad's Start keeps its PS2 roles. In third person with the Modern gamepad, the
+  buttons that open the inventory (Y), map (View) and OPTION (Start) also close them.
+- **Mouse buttons with the fixed cameras**: any keyboard/mouse row takes one (left, right, middle,
+  the two side buttons). A button held when a menu opens, or pressed to close one, does nothing
+  until released; the click that focuses the window is no press. In third person a game row's
+  mouse button counts only if no third-person row uses it.
+- **Rumble** stops while the window has no focus (unless Gamepad only), and each window rumbles only
+  its own gamepad; with a rumble gamepad connected at the first start VIBRATION is on.
+
 ## Settings
 
 One table, `g_settings[]` in `pc/src/host/settings.c`, drives both the F1 overlay and the
@@ -634,6 +709,144 @@ third-person key binding).
 | `SET_ACTION` (+ `.apply`) | a command, not a value; the native menu runs it when it closes |
 | `SET_NOW` | an action the native menu runs at once |
 | `SET_CALIB` | picture calibration: while the row is chosen, both menus show the grey-step test pattern (`settings_calib`) |
+
+### ini keys
+
+The settings' `recvx.ini` keys (on / off = 1 / 0; choices count from 0 in menu order). Third
+person: [THIRDPERSON.md](THIRDPERSON.md#settings); co-op: [COOP.md](COOP.md#settings); enemy
+options: [ENEMIES.md](ENEMIES.md#enemy-options); bindings: [Binding ini format](#binding-ini-format).
+
+| Setting | ini key |
+|---|---|
+| Display mode | `fullscreen` (0 windowed, 1 fullscreen), `fullscreen_exclusive` (0 borderless, 1 exclusive) |
+| Fullscreen resolution | `fullscreen_w`, `fullscreen_h`, `fullscreen_hz` (all 0: the desktop's) |
+| Window size | `window_w`, `window_h` |
+| (no row) Windows borderless margin | `borderless_extra` (1; see Option details) |
+| VSync, Frame rate limit, Show frame rate | `vsync`, `fps_limit` (0 off, then 30, 60, 90, 120, 144), `show_fps` |
+| Aspect ratio, Internal resolution | `aspect` (0 4:3, 1 stretch, 2 widescreen), `scale` (0 Auto, 1-8) |
+| Display-rate frames, Smooth menus, Frame blend | `interpolate`, `smooth_menus`, `frame_blend` (-1 Auto, 0 Off, 1 On) |
+| Cutscene bars, Camera vignette, Screen effects | `cinema_bars`, `screen_filter`, `screen_effects` (0 Original, 1 Stretch, 2 Off) |
+| Movie zoom, Fog intensity | `movie_zoom`, `fog_intensity` (0-100) |
+| Brightness, Contrast, Gamma | `brightness` (-50-50), `contrast` (50-150), `gamma` (tenths, 5-20) |
+| Native 3D renderer, Native textures, Cull off-screen models | `native_3d`, `native_tex`, `model_cull` |
+| HD textures, font, UI; (no row) pack folder | `hd_textures`, `hd_textures_font`, `hd_textures_ui`, `hd_textures_dir` |
+| (no row) disc image | `iso` |
+| Skip intro, Check for updates, Skip door animations | `skip_intro`, `update_check`, `skip_doors` (0 Off, 1 Instant, 2 Skippable) |
+| Fast loading, Battle Game unlocked, Difficulty select | `fast_loading`, `battle_unlocked`, `difficulty_select` |
+| Quick knife, Auto-climb stairs, Head blow-offs, Rifle ammo stacks | `quick_knife`, `auto_stairs`, `head_blowoff`, `rifle_stack` |
+| BioRand, Save system, No ink ribbons needed | `biorand`, `save_system` (0 Native files, 1 Memory card), `no_ink_ribbon` |
+| Input source, Gamepad | `input_source` (0 Auto, 1 Keyboard/mouse, 2 Gamepad), `input_pad` (0 Any, 1-4) |
+| Vibration strength, Mouse in menus, Fixed camera controls | `rumble_strength`, `menu_mouse`, `fixed_cam_controls` (0 Classic, 1 Modern, 2 Combined) |
+| Music and voice, Sound effects | `music_volume`, `sfx_volume` |
+| APPEARANCE | `coop_char`, `appear_gender_anim`, `appear_in_cutscenes`, `appear_cutscene_face` |
+
+### Option details
+
+What the options do in detail, beyond [USER_GUIDE.md](USER_GUIDE.md#settings):
+
+- **Display mode**: Borderless is a window covering the screen the game is on, at the desktop's
+  resolution; Alt+Tab is instant and popups (volume, notifications, overlays) show over it. Under
+  Windows it is a borderless window `borderless_extra` pixels (default 1) taller or wider than the
+  screen, as drivers switch an exactly screen-sized one to exclusive mode (0: exactly the screen).
+  Exclusive switches the screen to the Fullscreen resolution and minimises on Alt+Tab, giving the
+  desktop its resolution back (under Wayland the screen keeps its mode and the game is scaled to it,
+  without minimising). A mode the screen lacks becomes the closest one. Leaving fullscreen puts the
+  window back where it was, at its size.
+- **Widescreen (hor+)**: with the fixed cameras, room parts the original hides for a camera angle
+  are drawn in the side margins (except walls the camera looks through); the 4:3 middle is exactly
+  the original. The OPTION screen's picture strips reach the window's edges; what the inventory,
+  item box, files and map keep off-screen stays hidden. Screen effects also covers the tint of the
+  sniper rifle's and linear launcher's scope (its reticle stays round in the middle) and the screen
+  of Chris's oil pressure puzzle, which Off shows 4:3 instead of hiding. Movie zoom never cuts the
+  picture: on 16:9 thin bars stay (the movies are wider than 16:9), on ultrawide the movie fills
+  the height; no effect at 4:3.
+- **Smooth menus**: the title menu, inventory (files, map, item box), typewriter and OPTION get
+  display-rate frames (panels slide, windows open, the cursor glides); each picture reaches the
+  screen a game frame sooner after a press, and a key tapped quicker than a game frame is no
+  longer missed ([Input](#input)). The menus' own timing is unchanged.
+- **Fog intensity**: the fog everywhere becomes that of something the value's % as far away; 50%
+  equals the fog density x 2.00 of fmil95's PS2 patch. Lower values also let the unlit cell at the
+  start show more of the room outside. Applies at once.
+- **Picture calibration**: brightness, contrast and gamma change the game's picture (menus and
+  movies included), not the F1 overlay; at the neutral values the picture is exactly the original.
+  F1 shows the test pattern in the setting's tooltip.
+- **Cull off-screen models** does not affect the room itself (walls, floors, props); third person
+  never culls.
+- **Skip intro off**: the warning screen, logos and intro movie play; any key, mouse button or
+  gamepad button skips the one on screen (a press during the Capcom logo's fade-out skips the
+  movie, as Start does on the PS2); a held button does not skip the next one. At PRESS START any
+  key, click or gamepad button opens the menu.
+- **Skip door animations**: doors, stairs, ladders and lifts. Instant shows the game's load screen
+  (no animation, so no door sounds). Skippable: the press that opened the door does not count; a
+  press while the next room still loads ends the animation as soon as the room is ready. In co-op
+  each player's own choice counts for their own doors; following the host always uses the load
+  screen.
+- **Fast loading**: the load screen ends almost as soon as the screen is black (without the "Now
+  Loading..." text); with Skippable doors a press ends the animation that much sooner. The room's
+  rain, smoke and sparks still get their usual head start. In co-op it need not match the
+  partner's. Mechanism: [Fidelity notes](#fidelity-notes).
+- **Battle Game unlocked**: its character select offers Claire, Claire in her other costume,
+  Chris, Steve and Wesker at once. Characters and records you earn are still saved as in the
+  original, and the Linear Launcher still needs an A rank with all five.
+- **Difficulty select** (MODE SELECT of the European and Japanese versions; its pictures are on the
+  US disc too): NORMAL is preselected, so confirming twice starts the original game; Cancel goes
+  back to the title menu. Easy: the item box starts with handgun bullets, bow gun arrows and
+  powder, first aid sprays and ink ribbons, and ammo pickups hold more (handgun bullets 30 instead
+  of 15, for example); health and most enemies as on Normal. Very Easy: twice the health, healing
+  items heal twice as much, enemies with fewer hit points (zombies about half), ammo pickups as
+  Easy, an ink ribbon in the bag that is never used up, and an item box with the bow gun, grenade
+  launcher, shotgun, magnum and assault rifle, their ammo and first aid sprays. Only Normal has the
+  ranking at the end and its A-rank reward. The save list's colours (Easy green, Very Easy red,
+  Normal white) apply with either save system.
+- **Auto-climb stairs**: with every control scheme, in third person and for the co-op character.
+  It starts only while walking towards the stairs (facing the way they go, within 45 degrees), not
+  while standing in front of them or walking past along their edge. Where a press would answer a
+  door, item or examine spot first, that spot still needs the button; so do the steps onto or off
+  a ledge, so you never drop off one by accident. Some stairs with an event (such as one in the
+  Palace) need the button the first time.
+- **Head blow-offs**: on every zombie look and for the co-op partner too
+  ([ENEMIES.md](ENEMIES.md#head-blow-offs)).
+- **Rifle ammo stacks**: rifle and assault rifle bullets; forced on while BioRand is on (its item
+  amounts count on it).
+- **Precise hits** (third person): a head hit does half again the damage (zombies, Cerberus,
+  Bandersnatch, Tyrant, Alexia's first form, Steve), and a zombie's head bursts (magnum, shotgun,
+  sniper rifle) only from a hit on the head. The shotgun keeps a narrow spread; grenades, the bow
+  gun, the rocket and linear launchers and the knife hit as in the game. Not with "Game auto-aim"
+  on the mouse or with the fixed cameras ([THIRDPERSON.md](THIRDPERSON.md#precise-hits)).
+- **Save list** (native files): the heading reads "Load Game" or "Save Game" instead of "MEMORY
+  CARD slot 1"; the list scrolls through all saves. The first native start also copies the system
+  data and co-op partner files from the card; the log says how many saves. A changed save system
+  applies from the next save or load screen.
+- **Return to title**: asks "Return to the title screen?" with NO preselected; works in the Battle
+  Game too; changed options are kept; cancel or a right click answers NO. The title menu's OPTION
+  screen does not have it.
+- **Update check**: up to three tries, a few seconds apart, then not again until the next start;
+  the game never waits for it. The request is a plain HTTP GET with
+  `User-Agent: recvx-enhanced-port/<version>`; no GitHub or other third-party requests; nothing is
+  stored. Test aids: [Environment variables](#environment-variables).
+- **Unlock all** (F2): locks act as if you carried their key, without it entering your inventory;
+  switching it counts at once, also in the current room. Examining a locked door, a card reader or
+  the spot for an emblem, plate or jewel uses the key there as the item screen's Use would (or the
+  game asks "Will you use ...?" as it does when you carry the key); a spot already done is examined
+  as usual. Turned on inside a room, some doors notice it only once you enter the room again. If the
+  game then asks whether to discard the key, nothing is removed. Doors the story keeps shut (locked
+  from the other side, opened by a cutscene) stay shut, and the prison's metal detector room is
+  left out: every other item check (the detector, the typewriters' ink ribbon, weapons and ammo,
+  the item box) uses what you really carry. In co-op it works for whoever turns it on, and a lock
+  opened so opens for the partner as usual.
+- **Teleport** (F2): through the game's door transition. Locations are areas of the game (Claire's
+  and Chris's halves separately, Chris's the last three). Rooms carry the save menu's name where
+  the game has one (read from the disc, e.g. "Prison: front"), every other room a name of ours
+  ("Prison: Graveyard"; rooms that only play a cutscene start with "Cutscene:"); the EXTRAS page
+  leaves out the area where the location already says it. Each entry names the room whose door
+  leads there ("Entry 1: from Prison: Metal detector room"; "+1" when there are more, F2 lists them
+  on hover). Mod rooms show as "Custom room RM_xxxx", or by the name tag in their file header. The
+  list is read from the disc the first time F2 or EXTRAS opens (a few seconds; plain numbers until
+  then). In F2, typing in the open Room list searches every location, and **Raw ids** brings back
+  the stage/room/position numbers. A room may not work in every story state; an unlisted number may
+  crash. The spawner's custom enemies ("[C] ") are Mutated Steve and those of `mods/enemies.ini`
+  ([ENEMIES.md](ENEMIES.md#enemy-variants-custom-enemies)). Actions chosen in ENHANCED SETTINGS run
+  when the menu closes.
 
 ## Save system
 
@@ -801,6 +1014,28 @@ the channel an enemy sound gets and in how many volume/pan updates are sent; the
 
 Not covered: other stale or out-of-range reads that the scenarios do not reach. `rand()` is only
 called by the game thread.
+
+## Command line
+
+| Option | Effect |
+|---|---|
+| `PATH.iso` (also `RECVX_ISO`, or the ISO dropped onto the exe) | the disc image; wins over `iso` in `recvx.ini` |
+| `--save-dir DIR` | where saves and `recvx.ini` go (default `save/` in the current directory if it exists, else next to the program) |
+| `--size WxH` | window size (default 1280x960) |
+| `--fullscreen` | start in fullscreen, of the kind chosen in Display mode (borderless unless exclusive was chosen) |
+| `--borderless`, `--exclusive`, `--windowed` | start in that display mode |
+| `--enhanced` / `--vanilla` | display-rate frames on / off |
+| `--skip-doors` | room transitions without door, stairs and ladder animations (Instant) |
+| `--skip-intro` | boot straight into the title menu |
+| `--hd-textures DIR` | HD texture pack folder (default `mods/textures`) |
+| `--third-person` | start with the over-the-shoulder camera ([THIRDPERSON.md](THIRDPERSON.md)) |
+| `--coop-host PORT`, `--coop-join HOST:PORT#CODE` or `ROOM`, `--coop-server ADDR`, `--coop-conn auto\|direct\|server`, `--coop-pw PASSWORD` | online co-op ([COOP.md](COOP.md#command-line)) |
+| `--log[=FILE]` | copy all output to a log file (default `recvx.log`), with a backtrace on a crash |
+| `--profile[=FILE]`, `--profile-samples=FILE` | performance measurements ([Profiling and logging](#profiling-and-logging)) |
+| `--quiet` | less console output |
+| `--version` | print the version and exit (also the first line of the log and the F1 window title) |
+
+Command-line options override the saved settings for that run.
 
 ## Profiling and logging
 
