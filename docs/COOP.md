@@ -801,12 +801,31 @@ partner's weapon's arms sound bank is loaded beside ours (programs `0x40 + n`).
   player alone for 60 frames (logged: `loop guard: enemy N ... started 3 attacks`).
 * **Damage to the partner**: what the enemy step did to `ply2` is diffed. An hp loss or a hit
   reaction becomes `EV_PLY_HIT`; everything else is undone. Grabs other than the zombie's arrive as
-  a hit.
+  a hit. The dead flag (`flg` 2) an enemy sets on the stand-in (Alexia's embrace, the Tyrant's last
+  blow; in single player the game over) is the partner's death: the hit takes all its health. For
+  the round trip until the partner's pose shows the hit (`HIT_BUSY`, 15 frames) the stand-in counts as
+  busy (`flg` 4), as the hit player does: a blow lasting several frames hits once.
+* **Boss holds (host)**: some holds play a sequence on their victim and end only when its motion has
+  run: the Tyrant's blow takes the player over (mode 5, `en19.c bhEne19_PlyMoveMain`), Alexia's
+  first form burns it (mode 6, `en12.c bhEne12_NG00`), the Gulp Worm swallows and throws it
+  (`en02.c bhEne02_PlayerControl`). On the stand-in, put back after every step, they never ended (the
+  Tyrant held his victim for good and harmed nobody again; Alexia stood still). Such a hold of the
+  partner runs on a copy of the stand-in (`ghost`, one at a time), its motion advanced as the player's
+  own, until the enemy lets go (or dies, or the room is left); the enemy keeps the partner as its
+  target meanwhile, and what it does to the copy goes out as hits. Alexia's embrace has no way out (in
+  single player the game over follows): after it she takes up the fight again. The Tyrant attacks in
+  his move mode, so he keeps a victim playing his motions (and the host is not left in them when he
+  would turn to the partner); the partner's death does not end his blows (`en19.c`). Nosferatu's drive
+  of a struck or seized player (flung, landing, standing up) moves the victim's body: on the stand-in
+  he does not drive it, keeps the partner as his target until it is up again and then lets go; a
+  seized partner takes the throw's landing (80) as a hit (`en15.c`).
 * **Puppets (joiner)**: an enemy runs its own AI once for its initialising step; after that, while
   the host is in the same room, it takes the host's snapshots (explicit fields: flags, position,
   angles, modes, motion, frame, blend, hp, hit capsule; pointers as indices). Linked parts with a
   model of their own are not animated. Snapshots are not used during door transitions. Enemies
-  driven by the joiner's own event run its local AI during it.
+  driven by the joiner's own event run its local AI during it. A puppet morphs (`mdflg` 2) only with
+  the two shapes its own code picks (`obj_a`, `obj_b`); Alexia's tentacles have none on the guest
+  and are drawn unmorphed (before, the guest crashed in her second form's fight).
 * **Hits on puppets (joiner -> host)**: the weapon code's output on a puppet is taken at the
   hand-off, cleared locally and sent as `EV_ENE_HIT`; the host's enemy applies it once in its own
   damage code. A hit arriving after the host's room changed is dropped.

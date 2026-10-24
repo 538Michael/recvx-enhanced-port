@@ -842,7 +842,7 @@ and game frames for game-state aids, as noted. Co-op test aids (`RECVX_COOP_*`,
 
 | Variable | Effect |
 |---|---|
-| `RECVX_TELEPORT="f:stg:rom:pos,..."` | teleport at game frame f |
+| `RECVX_TELEPORT="f:stg:rom:pos[:case],..."` | teleport at game frame f (into that room case; else ours as it is) |
 | `RECVX_TP_NAME="f:entry:room name,..."` | the teleport lists' room of that name (as the menus show it, e.g. `60:1:Prison: Obs. R`), then their Teleport; frames as `RECVX_TELEPORT`. `RECVX_TP_LIST=1` logs every listed room with its entries (`pc/src/host/teleport.c`) |
 | `RECVX_PLAYER=n` | the first teleport switches the played character to `ply_id` n (as the script op `bhPlayerChangeSet`) |
 | `RECVX_WARP="stg:rom:f:x:z:angle,..."` | move the player to x/z f frames after entering that room |

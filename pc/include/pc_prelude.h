@@ -154,6 +154,7 @@ void  coop_player_unload(void);                /* system.c bhSysCallMonitor: the
 struct BH_PWORK;
 int   coop_enemy_begin(struct BH_PWORK* ep);   /* 1 = step done (client puppet) */
 void  coop_enemy_end(struct BH_PWORK* ep);
+int   coop_partner_step(void);                 /* 1 while an enemy's step runs against the partner's stand-in (plp) */
 void  coop_scd1(void);                         /* event.c bhControlEvent: runs the room's per-frame script */
 void  coop_fx_player(void);                    /* game.c, before bhControlPlayer: our step's effects to the partner */
 int   coop_fx_step(int i, int after);          /* effect.c bhControlEffect, around effect i's step (1 before: call after) */

@@ -423,7 +423,7 @@ void cheat_room_warp(int stg, int rom, int pos, int rcase)
     bhSetDoorDemo(0, stg, rom, pos, 255);
 }
 
-static void teleport(int stg, int rom, int pos)
+static void teleport(int stg, int rom, int pos, int rcase)
 {
     static const char* pl = (const char*)-1;
     if (pl == (const char*)-1) pl = getenv("RECVX_PLAYER");
@@ -432,13 +432,13 @@ static void teleport(int stg, int rom, int pos)
         sys->cb_flg |= 0x80;
         pl = NULL;
     }
-    cheat_room_warp(stg, rom, pos, -1);
+    cheat_room_warp(stg, rom, pos, rcase);
 }
 
 /* Testing aid for headless runs, keyed to game frames since start (frames in which the game
    task advanced sys->gfrm_ct, which restarts per room):
-   RECVX_TELEPORT="frame:stage:room:pos,delay:stage:room:pos,..." (later entries: frames after
-   the previous teleport) and RECVX_EQUIP="frame:item:count[,item:count...]" (puts a weapon item
+   RECVX_TELEPORT="frame:stage:room:pos[:case],delay:stage:room:pos,..." (later entries: frames after
+   the previous teleport; case: the room case to load, else ours as it is) and RECVX_EQUIP="frame:item:count[,item:count...]" (puts a weapon item
    in the first slot and equips it with the inventory's WeaponSet; the item may carry its ammo
    kind, e.g. 4102 = 0x1006 grenade launcher with acid rounds; further entries fill the next
    slots; after a ';' another "frame:item:count" equips again later: a weapon switch).
@@ -523,8 +523,10 @@ static void scripted(unsigned int* inv)
     if (sys->gfrm_ct != prev) { prev = sys->gfrm_ct; clock++; in_room++; }
     if (tp && sscanf(tp, "%d:%d:%d:%d%n", &f, &a, &b, &c, &n) == 4 && clock >= f + last &&
         !(sys->gm_flg & 0x9) && !(sys->cb_flg & 0x1)) {
-        printf("test: teleport to %d/%d/%d at game frame %d\n", a, b, c, clock);
-        teleport(a, b, c);
+        int rc = -1, m = 0;
+        if (tp[n] == ':' && sscanf(tp + n, ":%d%n", &rc, &m) == 1) n += m;   /* an optional room case */
+        printf("test: teleport to %d/%d/%d case %d at game frame %d\n", a, b, c, rc, clock);
+        teleport(a, b, c, rc);
         last = clock;
         tp = tp[n] == ',' ? tp + n + 1 : NULL;
     }
@@ -747,7 +749,7 @@ void cheat_frame(void)
            conditions the door trigger checks (hitchk.c) */
         if ((sys->gm_flg & 0x9) || (sys->cb_flg & 0x1)) g_cheat.result = "can't teleport now";
         else {
-            teleport(g_cheat.tp_stg, g_cheat.tp_rom, g_cheat.tp_pos);
+            teleport(g_cheat.tp_stg, g_cheat.tp_rom, g_cheat.tp_pos, -1);
             g_cheat.result = "teleporting";
         }
     }
