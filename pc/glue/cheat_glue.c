@@ -34,6 +34,7 @@ int pc_inf_ammo(void) { return g_cheat.inf_ammo; }
    level means nothing here: there it stays where it is). Only our player: co-op runs the partner
    through plp too. */
 int pad_noclip_vertical(void);
+int pc_in_play(const BH_PWORK* p, int scope);   /* reload_glue.c */
 unsigned int pc_noclip(void)
 {
     static int flew, base, room;   /* base: floor number at take-off, in that room */
@@ -426,8 +427,11 @@ void cheat_room_warp(int stg, int rom, int pos, int rcase)
 static void teleport(int stg, int rom, int pos, int rcase)
 {
     static const char* pl = (const char*)-1;
+    static int nth;
     if (pl == (const char*)-1) pl = getenv("RECVX_PLAYER");
-    if (pl) {   /* test aid: the first teleport switches the character as script op bhPlayerChangeSet does */
+    nth++;
+    /* test aid: the first teleport (RECVX_PLAYER="n:k": the k-th) switches the character as script op bhPlayerChangeSet does */
+    if (pl && (!strchr(pl, ':') || nth >= atoi(strchr(pl, ':') + 1))) {
         sys->cng_pid = atoi(pl) & 3;
         sys->cb_flg |= 0x80;
         pl = NULL;
@@ -452,7 +456,7 @@ static void teleport(int stg, int rom, int pos, int rcase)
    RECVX_EFFECT="frame:effno:type:mode1" spawns effect effno at the player at that game frame
    and sets its mode1 two frames later (e.g. "60:110:0:1": the full-screen distortion of
    bhEff110, which reads the frame buffer back every frame - StoreRenderTex).
-   RECVX_PLAYER=n: the first RECVX_TELEPORT also switches the character played to n (0 Claire,
+   RECVX_PLAYER=n ("n:k": the k-th) : the first RECVX_TELEPORT also switches the character played to n (0 Claire,
    1 Chris, 2 Steve, 3 Wesker) as the story's character switch does.
    RECVX_APPEAR="frame:chr,..." sets "You appear as" (g_coop.chr, the ini's coop_char) at that
    game frame.
@@ -663,7 +667,11 @@ static void scripted(unsigned int* inv)
         ap = ap[n] == ',' ? ap + n + 1 : NULL;
     }
     spawn_frame(clock);   /* RECVX_SPAWN (pc/glue/spawn_glue.c) */
-    if (eq && sscanf(eq, "%d:%d:%d%n", &f, &a, &b, &n) == 3 && clock >= f && sys->mn_mode0 == 0 && plp->mnwP) {
+    /* in play, weapon down (mode1 0), on our own motion set, as the inventory and the quick knife switch: a switch
+       mid-shot, in a grab or in a scene (room motions) realized the weapon motions into another set or left the old
+       weapon's motion on the new one (crash in bhSetMotion) */
+    if (eq && sscanf(eq, "%d:%d:%d%n", &f, &a, &b, &n) == 3 && clock >= f && sys->mn_mode0 == 0 && pc_in_play(plp, 0) &&
+        plp->mnwP == plp->mnwPb && plp->mode1 == 0) {
         printf("test: equip item %d at game frame %d\n", a, clock);
         inv[2] = (unsigned int)a << 16 | b;
         inv[0] = 0;

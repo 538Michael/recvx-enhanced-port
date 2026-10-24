@@ -844,9 +844,9 @@ and game frames for game-state aids, as noted. Co-op test aids (`RECVX_COOP_*`,
 |---|---|
 | `RECVX_TELEPORT="f:stg:rom:pos[:case],..."` | teleport at game frame f (into that room case; else ours as it is) |
 | `RECVX_TP_NAME="f:entry:room name,..."` | the teleport lists' room of that name (as the menus show it, e.g. `60:1:Prison: Obs. R`), then their Teleport; frames as `RECVX_TELEPORT`. `RECVX_TP_LIST=1` logs every listed room with its entries (`pc/src/host/teleport.c`) |
-| `RECVX_PLAYER=n` | the first teleport switches the played character to `ply_id` n (as the script op `bhPlayerChangeSet`) |
+| `RECVX_PLAYER=n`, `RECVX_PLAYER=n:k` | the first (the k-th) teleport switches the played character to `ply_id` n (as the script op `bhPlayerChangeSet`) |
 | `RECVX_WARP="stg:rom:f:x:z:angle,..."` | move the player to x/z f frames after entering that room |
-| `RECVX_EQUIP="f:item:count[;f:item:count]"` | equip a weapon at game frame f (again later after `;`) |
+| `RECVX_EQUIP="f:item:count[;f:item:count]"` | equip a weapon at game frame f (again later after `;`), once the player is in play with the weapon down (as the inventory) |
 | `RECVX_HP="f:hp,..."`, `RECVX_RETRY="f,..."` | set health / set a retry point (Continue resumes in that room) at game frame f |
 | `RECVX_TEST_TYPEWRITER="f,..."` | open the typewriter's save screen at game frame f (as its ink ribbon question's "yes"; no ribbon needed) |
 | `RECVX_TEST_COMPUTER="f:n,..."` | open computer terminal n at game frame f, as the room scripts' `EvtComSet n` (1 self-destruct lock, 2 security lock, 3 Albinoid file, 4-6 3D scanner, 7 password; rooms 9/31, 1/2, 3/12, 0/9, 1/9) |
