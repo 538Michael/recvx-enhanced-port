@@ -210,9 +210,13 @@ void pc_title_plates(int cursor, int n, float fade, int flag)
 /* ---------------------------------------------------------------- mouse */
 static MouseTake mt;                    /* the pointer (game 2D px) and what it did */
 
+static void title_version(void);
+
+/* Adv_BioCvTitle, every frame before its mode's work */
 void pc_title_mouse_active(int on)
 {
     g_menu_mouse.active = on;
+    title_version();
 }
 
 void menu_mouse_take(MouseTake* t)
@@ -587,6 +591,29 @@ static void font_release(void)
         sys->ss_flg &= ~0x40;
     }
     font_state = 0;
+}
+
+/* The version ("v0.6.9", without the git part) at the bottom right of the title's 4:3 picture, below
+   the copyright, in the game's font in green: Adv_BioCvTitle modes 4..17 (PRESS START, the menus and
+   the title's fades; not the lobby, 30). The font as the lobby has it, its file read at once (the
+   game's file reader stays free) and kept; released when the title ends (lobby_close). */
+static void title_version(void)
+{
+    static int have;   /* font_file holds the font: 1; -1 it cannot be read */
+    ADV_WORK* ap = &AdvWork;
+    unsigned int a = (unsigned int)(255.0f * (1.0f - ap->FadeRate) * (1.0f - ap->SaverRate));   /* under the title's fade and screen saver */
+    char s[24];
+    if (ap->Mode < 4 || ap->Mode > 17 || a < 8) return;
+    if (!(sys->ss_flg & 0x40) && !font_state) {
+        if (!have) have = afs_read(sys->sys_partid, 1, font_file, sizeof(font_file)) ? 1 : -1;
+        if (have < 0) return;
+        bhSetFontTexture(font_file);
+        font_state = 2;
+    }
+    font_ok = (sys->ss_flg & 0x40) != 0;
+    snprintf(s, sizeof(s), "v%.*s", (int)strcspn(RECVX_VERSION, " "), RECVX_VERSION);
+    text(632 - text_w(s, 0.6f), 452, s, 0.6f, a << 24 | 0x60D060);
+    AdvEasySetTextureList(0);   /* the title's texture list again */
 }
 
 /* ---------------------------------------------------------------- the lobby */
@@ -1421,7 +1448,7 @@ static void lobby_open(void)
 static void lobby_close(int keep)
 {
     int k;
-    if (!lb.open) return;
+    if (!lb.open) { font_release(); return; }   /* the title's (title_version) */
     if (!keep && (session_on() || g_coop.request)) {
         g_coop.request = COOP_REQ_STOP;
         host_log("lobby: left, the session closes\n");
