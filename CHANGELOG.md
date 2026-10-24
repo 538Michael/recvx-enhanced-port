@@ -13,7 +13,7 @@
   d-pad for tank controls, like in the Resident Evil HD remaster.
 - **Aim without auto-aim**: hold the left trigger (E on the keyboard) to aim where your character
   faces, without turning to the nearest enemy; the normal aim button keeps the auto-aim.
-- **Mouse buttons with the fixed cameras**: a mouse button bound to a game button now works while
+- **Mouse buttons in fixed camera**: a mouse button bound to a game button now works while
   you play, e.g. right mouse to aim and left mouse to fire. Clicks in menus stay menu clicks.
 
 ### Co-op
