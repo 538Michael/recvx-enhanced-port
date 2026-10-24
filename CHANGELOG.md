@@ -11,6 +11,8 @@
 
 - **Combined controls** (CONTROLS, now the default): the left stick walks where it points on
   screen, the d-pad drives with tank controls, like in the Resident Evil HD remaster.
+- **Mouse buttons with the fixed cameras**: a mouse button bound to a game button now works while
+  you play, e.g. right mouse to aim and left mouse to fire. Clicks in menus stay menu clicks.
 
 ### Co-op
 

@@ -496,7 +496,17 @@ pad_quickturn = -lefty
 ```
 
 Keys use SDL key names (`Z`, `Return`, `Left Shift`, `PageUp`), mouse buttons
-`Mouse Left/Middle/Right/X1/X2`. Gamepad inputs are positional (`south` = Xbox A = PlayStation
+`Mouse Left/Middle/Right/X1/X2`.
+
+**Mouse buttons with the fixed cameras**: any keyboard/mouse row takes a mouse button (left,
+right, middle and the two side buttons), not just the third-person ones. None is bound by default
+(the mouse belongs to the menus until you choose); for aim and fire with key type A bind
+`key_r1 = Mouse Right` and `key_cross = Mouse Left` (Aim (R1) and Fire / Confirm (Cross) in the
+menus). They act only while you have control of your character: a click in the inventory, a map or
+OPTION stays the menu's, and a button held when a menu opens, or pressed to close one, does nothing
+until you let go of it. The click that brings the window back into focus is not a press either.
+Third person keeps its own rows (right mouse aim, left mouse fire); there a game row's mouse
+button counts only if no third-person row uses it. Gamepad inputs are positional (`south` = Xbox A = PlayStation
 Cross, `east`, `west`, `north`, `back`, `start`, `guide`, `leftshoulder`, `rightshoulder`,
 `leftstick`, `rightstick`, `dpup`, `dpdown`, `dpleft`, `dpright`, `misc1`, `paddle1`-`paddle4`,
 `touchpad`) or an axis half (`+lefttrigger`, `-leftx`, `+lefty`, ...). `none` unbinds.

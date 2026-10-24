@@ -445,8 +445,8 @@ static void parse_keys(void)
                 snprintf(name, sizeof(name), "%.*s", n, p);
                 for (char* c = name; *c; c++) if (*c == '_') *c = ' ';
                 if (strcmp(name, "-")) {
-                    SDL_Scancode sc = SDL_GetScancodeFromName(name);
-                    if (sc != SDL_SCANCODE_UNKNOWN && st->n < 8) st->keys[st->n++] = (short)sc;
+                    int sc = SDL_strncasecmp(name, "Mouse ", 6) ? (int)SDL_GetScancodeFromName(name) : ini_code(BIND_KB, name);   /* Mouse_Right: held */
+                    if (sc > 0 && st->n < 8) st->keys[st->n++] = (short)sc;
                     else host_log("RECVX_KEYS: unknown key \"%s\"\n", name);
                 }
                 p += n + (p[n] == '+');
@@ -476,7 +476,7 @@ const bool* bind_keys(void)
     if (!nsteps) return k;
     memcpy(merged, k, sizeof(merged));
     if ((st = key_step(gs_frame_count())))
-        for (int i = 0; i < st->n; i++) merged[st->keys[i]] = 1;
+        for (int i = 0; i < st->n; i++) if (st->keys[i] < SDL_SCANCODE_COUNT) merged[st->keys[i]] = 1;
     return merged;
 }
 
@@ -757,8 +757,9 @@ int bind_event(const void* e)
 
 /* ---------------------------------------------------------------- test aids (main thread)
    RECVX_KEYS="<frame>:<key>+<key>,<frame>:-,<frame>:@<x>:<y>": hold keyboard keys (SDL names,
-   '_' for a space) from that presented frame on, as key state and key events; @x:y clicks the
-   left mouse button at window pixel x/y (as events: the overlay), @x:y:r the right one.
+   '_' for a space; Mouse_Left .. Mouse_X2 a mouse button, as events) from that presented frame on,
+   as key state and key events; @x:y clicks the left mouse button at window pixel x/y (as events:
+   the overlay), @x:y:r the right one.
    RECVX_VPAD="<frame>:<input>+<input>,...": a virtual SDL gamepad (RECVX_VPAD_TYPE xbox, ps5 or
    generic; default xbox) holding gamepad inputs in the ini spelling (south, dpup, +lefttrigger),
    or an axis at a value from -1 to 1 (leftx=0.5, lefty=-1: the left stick half right, all up). */
@@ -807,7 +808,7 @@ static const char* script_entry(const char* p, uint64_t now, const char** body)
 /* the same steps as key events (captures, hotkeys, the overlay) and clicks */
 static void keys_frame(uint64_t now)
 {
-    static bool down[SDL_SCANCODE_COUNT];
+    static bool down[BIND_MOUSE + 6];   /* keys, then mouse buttons */
     static int next, click_up;
     static float cx, cy;
     const KeyStep* st;
@@ -817,10 +818,10 @@ static void keys_frame(uint64_t now)
         if (steps[next].click) { cx = steps[next].x; cy = steps[next].y; push_click(cx, cy, 1, steps[next].click); click_up = steps[next].click; }
     if (!nsteps) return;
     st = key_step(now);
-    for (int i = 0; i < SDL_SCANCODE_COUNT; i++) {
+    for (int i = 0; i < BIND_MOUSE + 6; i++) {
         bool want = 0;
         for (int k = 0; st && k < st->n; k++) want |= st->keys[k] == i;
-        if (want != down[i]) { down[i] = want; push_key(i, want); }
+        if (want != down[i]) { down[i] = want; if (i < BIND_MOUSE) push_key(i, want); else push_click(cx, cy, want, i - BIND_MOUSE); }
     }
 }
 

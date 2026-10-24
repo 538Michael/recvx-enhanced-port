@@ -184,6 +184,7 @@ static void controls_section(void)
                                              "person with Modern gamepad controls, instead of the game rows of the same buttons.", bind_pad_desc());
     ImGui::TextDisabled("Click a binding, then press the key/button (Esc cancels, Delete clears); right click clears.\n"
                         "Reload can share a button: then Aim + button reloads.");
+    if (dev == BIND_KB) ImGui::TextDisabled("Mouse buttons work on any row, also with the fixed cameras.");
     if (msg[0]) ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "%s", msg);
     if (ImGui::BeginTable("##binds", 3, ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp)) {
         ImGui::TableSetupColumn("action", ImGuiTableColumnFlags_WidthStretch, 2.2f);

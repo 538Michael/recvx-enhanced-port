@@ -50,6 +50,18 @@ int main(void)
     CHECK(held(B_TPS_RUN, SDL_SCANCODE_RSHIFT) && held(B_NOCLIP_UP, SDL_SCANCODE_PAGEUP));
     CHECK(bind_get(B_TPS_FIRE, BIND_KB, 0) == BIND_MOUSE + SDL_BUTTON_LEFT);
     for (int r = 0; r < B_COUNT; r++) CHECK(!bind_conflict(r, BIND_KB) && !bind_conflict(r, BIND_PAD));
+    {   /* a mouse button captured for a game row (F1, ENHANCED SETTINGS) plays it (fixed cameras: pad.c passes the buttons) */
+        SDL_Event e = { 0 };
+        bind_capture_start(BIND_KB);
+        SDL_Delay(260);   /* not the click that started the capture */
+        e.type = SDL_EVENT_MOUSE_BUTTON_DOWN; e.button.button = SDL_BUTTON_RIGHT;
+        CHECK(bind_event(&e) && bind_capture_poll() == BIND_MOUSE + SDL_BUTTON_RIGHT);
+        bind_set(B_R1, BIND_KB, 1, BIND_MOUSE + SDL_BUTTON_RIGHT);
+        CHECK(!bind_conflict(B_R1, BIND_KB) && bind_get(B_TPS_AIM, BIND_KB, 0) == BIND_MOUSE + SDL_BUTTON_RIGHT);   /* shared with third person */
+        memset(keys, 0, sizeof(keys));
+        CHECK(bind_held(B_R1, BIND_KB, keys, SDL_BUTTON_RMASK) && !bind_held(B_R1, BIND_KB, keys, SDL_BUTTON_LMASK));
+        bind_set(B_R1, BIND_KB, 1, 0);
+    }
     /* third person on the gamepad (modern scheme): its own rows, which share buttons with the game rows on purpose */
     CHECK(bind_get(B_TPS_FIRE, BIND_PAD, 0) == BIND_AXIS + SDL_GAMEPAD_AXIS_RIGHT_TRIGGER * 2 && bind_get(B_TPS_AIM, BIND_PAD, 0) == BIND_AXIS + SDL_GAMEPAD_AXIS_LEFT_TRIGGER * 2);
     CHECK(bind_get(B_TPS_ACTION, BIND_PAD, 0) == 1 + SDL_GAMEPAD_BUTTON_SOUTH && bind_get(B_CROSS, BIND_PAD, 0) == 1 + SDL_GAMEPAD_BUTTON_SOUTH);
