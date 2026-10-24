@@ -377,7 +377,7 @@ screenshots. With it on, no IP address shows on screen, yours or the partner's:
   clipboard, and joining uses what you typed.
 
 `recvx.log` (and the console) still contain the addresses, for troubleshooting: do not show the
-console window on stream or post the log publicly.
+console window on stream or post the log publicly. The crash report `recvx-crash.log` masks them.
 
 ### Sounds
 

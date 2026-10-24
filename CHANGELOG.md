@@ -38,6 +38,8 @@
   inventory, examine or use doors until you changed rooms. Fixed.
 - **Co-op: stuck after a moth larva**: the host could stay in the throwing-it-off animation for good.
   Fixed.
+- **Crash reports**: a crash now always writes a small `recvx-crash.log` next to the game. Attach it
+  to a bug report; IP addresses are hidden in it.
 
 ## 0.6.8 (2026-10-23)
 

@@ -792,6 +792,11 @@ called by the game thread.
 - `--log[=file]` copies all output (the game's own diagnostics and the port's messages) to a log
   file with a timestamp per line; a crash appends a backtrace (Windows: exception address and
   frame chain).
+- Every crash, with or without `--log`, writes `recvx-crash.log` to the current directory (where
+  `--log` puts `recvx.log`; the game's folder for the release builds): the version, the signal or
+  exception with the backtrace or frame chain, and the last 48 `host_log` messages (kept in memory,
+  IPv4 addresses masked) - a few KB for bug reports (`host/log.c`). Addresses resolve with
+  `addr2line -f -e recvx` (Windows: `i686-w64-mingw32-addr2line -f -e recvx.exe`): the image base is fixed.
 - `--profile[=file]` writes one CSV line per game frame: total frame time and exclusive time in
   game logic, VU0, VU1, GS emulation + GL submission, interpolation, presentation and idle wait.
   F1 -> Performance shows the same live. The native `CALCPOINT` (single calls and runs) is not

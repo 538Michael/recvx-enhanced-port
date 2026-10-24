@@ -107,7 +107,11 @@ SDL_GLContext g_gl;
 
 void host_log(const char* fmt, ...)
 {
+    extern void log_keep(const char* fmt, va_list ap);
     va_list ap;
+    va_start(ap, fmt);
+    log_keep(fmt, ap);   /* the last messages, for the crash report (log.c) */
+    va_end(ap);
     if (g_config.log_level <= 0) return;
     va_start(ap, fmt);
     vfprintf(stderr, fmt, ap);
@@ -312,6 +316,7 @@ int main(int argc, char** argv)
     { char* cwd = SDL_GetCurrentDirectory(); if (cwd) { SDL_strlcpy(start_dir, cwd, sizeof(start_dir)); SDL_free(cwd); } }
     parse_args(argc, argv);
     home_dir();
+    { extern void crash_init(const char*); crash_init(RECVX_VERSION); }   /* recvx-crash.log on a crash, with or without --log */
     if (log_path[0]) { extern void log_start(const char*); log_start(log_path); }
     host_log("recvx-enhanced-port " RECVX_VERSION "\n");
     if (profile_path[0]) { extern void prof_open_csv(const char*); prof_open_csv(profile_path); }
