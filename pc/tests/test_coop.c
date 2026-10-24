@@ -372,6 +372,8 @@ static void test_dgrams(void)
     BADP(q.rcase = 11, COOP_BAD_FIELD);
     BADP(q.rcase = 255, COOP_BAD_FIELD);
     BADP(q.pflg = 0xFF, COOP_OK);                 /* hit/held and the aim pitch: every value */
+    BADP(q.use = 255, COOP_OK);                   /* the trigger in use + 1: every value (0 none) */
+    BADP(q.spare[2] = 1, COOP_BAD_FIELD);         /* the spare bytes: zero */
     {   /* the aim pitch in pflg's spare bits: every step back as sent, hit/held kept; a build before it sends straight */
         int v;
         for (v = -COOP_PITCH_MAX; v <= COOP_PITCH_MAX; v++) {

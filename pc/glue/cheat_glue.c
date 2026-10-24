@@ -9,6 +9,7 @@
 #include "../../decomp/include/ps2/veronica/prog/pwksub.h"
 #include "../../decomp/include/ps2/veronica/prog/item.h"
 #include "../../decomp/include/ps2/veronica/prog/hitchk.h"
+void bhSetMessage(int mes_typ, int mes_idx);   /* message.h (its macros.h clashes with this file's headers) */
 #include "../src/host/cheat.h"
 #include "../src/host/coop.h"
 #include "../src/net/coop_proto.h"
@@ -606,6 +607,40 @@ static void scripted(unsigned int* inv)
             sys->cb_flg |= 0x400000;
             printf("test: computer %d in %d/%d at game frame %d\n", a, sys->stg_no, sys->rom_no, clock);
             ct = ct[n] == ',' ? ct + n + 1 : NULL;
+        }
+    }
+    {   /* RECVX_TEST_ROOMFLAGS="frame:mask,...": rm_flg |= mask at that game frame (bit n of the scripts is 0x80000000 >> n):
+           a room script's local step without its input (1/05's switch panel solved: C, E and "decide", 14800000) */
+        static const char* rf = (const char*)-1;
+        unsigned int m;
+        if (rf == (const char*)-1) rf = getenv("RECVX_TEST_ROOMFLAGS");
+        if (rf && sscanf(rf, "%d:%x%n", &f, &m, &n) == 2 && clock >= f) {
+            sys->rm_flg |= m;
+            printf("test: room flags |= %08x in %d/%d at game frame %d\n", m, sys->stg_no, sys->rom_no, clock);
+            rf = rf[n] == ',' ? rf + n + 1 : NULL;
+        }
+    }
+    {   /* RECVX_TEST_EXAMINE="frame:etc,...": the action button on room trigger etc at that game frame, wherever the player
+           stands, as bhCheckExmAtari takes a type 3 trigger: the scripts' "at trigger" test and its message (co-op: unless
+           the partner is using it) */
+        static const char* ex = (const char*)-1;
+        if (ex == (const char*)-1) ex = getenv("RECVX_TEST_EXAMINE");
+        if (ex && sscanf(ex, "%d:%d%n", &f, &a, &n) == 2 && clock >= f && !(sys->cb_flg & 0x1)) {
+            if (coop_on && coop_examine(a))
+                printf("test: examine trigger %d in %d/%d at game frame %d: the partner is using it\n", a, sys->stg_no, sys->rom_no, clock);
+            else {
+                sys->etc_idx = a;
+                sys->cb_flg |= 0x100;
+                if (a < rom->etc_n && rom->etcp[a].type == 3 && (rom->etcp[a].attr & 0x8000)) {
+                    bhSetMessage(0, rom->etcp[a].prm1);
+                    sys->pad_onb = sys->pad_on; sys->pad_psb = sys->pad_ps; sys->pad_oldb = sys->pad_old;
+                    sys->pad_ps = 0;
+                    sys->cb_flg |= 0x20;
+                    sys->st_flg |= 0x2004;
+                }
+                printf("test: examine trigger %d in %d/%d at game frame %d\n", a, sys->stg_no, sys->rom_no, clock);
+            }
+            ex = ex[n] == ',' ? ex + n + 1 : NULL;
         }
     }
     {   /* RECVX_HP="frame:hp,...": our health set at that game frame (a quick game over) */

@@ -5,7 +5,7 @@ over the internet or a LAN (UDP). Co-op is an optional addon: with it off the ga
 as without it (every hook is `#ifdef TARGET_PC` and `if (coop_on)`).
 
 Part 1 is for players: how to host, join and play. Part 2 is the reference: architecture,
-protocol 24, security and limits. Related: [SERVER.md](SERVER.md) (the optional co-op server),
+protocol 25, security and limits. Related: [SERVER.md](SERVER.md) (the optional co-op server),
 [USER_GUIDE.md](USER_GUIDE.md) (settings, controls), [ACTORS.md](ACTORS.md) (models and voices),
 [ENEMIES.md](ENEMIES.md) (enemy options), [ARCHITECTURE.md](ARCHITECTURE.md),
 [BUILDING.md](BUILDING.md).
@@ -255,6 +255,20 @@ loaded in a case it has (before, the load waited for a file that does not exist:
   that room's enemies itself. Re-entering the partner's room hands the enemies back to the host.
 * Enemies killed while the joiner ran them stay dead when the host's enemies take over again
   (within the visit; once both left, the room is loaded the game's way again, as in single player).
+
+### Puzzles
+
+* A puzzle (a switch panel, a code terminal) that either of you solves is solved for both. A partner in the same room finds the room as the solution left it: the solved
+  puzzle no longer opens, a door it unlocked is open, a wall it moved has moved. Before, the panel
+  or terminal could open again for the partner and then show nothing (no question, no text) and
+  keep the player there, and a door unlocked by the other player stayed locked until the room was
+  entered again. The solution's cutscene plays for the player who solved it (and for the partner
+  when the game runs it as a world event, see above).
+* One of you at a time: while you use a puzzle, a terminal or anything else you examined (its
+  messages, its screen), your partner cannot open the same one and reads "<name> is using this"
+  at the top of the screen. It is free again as soon as you are back in control.
+* Joining while the host is inside a puzzle: the joiner waits until the host is back in control
+  (the game state is sent only then) and starts with the puzzle solved or not, as the host left it.
 
 ### A busy partner
 
@@ -846,6 +860,29 @@ floor or trigger, "Yes" chosen, an item used) hold only where the player did it.
   applied when the scene ends or the room changes (a change of our own to a held bit is newer and wins),
   and the replay of its blocks waits too (the stream with it, 10 s at most). Each game then ends its own
   scene as in single player (a "Yes" to the turntable's question takes that player down too).
+* **The room as the partner's flags have it** (`rebuild`, `rb_mark`): a puzzle is often solved by steps
+  that are not a world event block: the answer lives in room flags and its event sets the world flag
+  (the Gold Luger room's switch panel, 1/05: "decide" sets `rm_flg` 8, the block on it starts event 31,
+  which sets `ev_flg` 15), or a terminal sets it (`sp_evt.c` op 0xF0: the main hall's NTC0394 sets
+  `ev_flg` 4, then a room-flag block's event turns trigger 12 into the door). A partner in the room got
+  the flags only and kept the room as it was: the panel's trigger still opened the panel, whose answer
+  blocks test `ev_flg` 15 clear, so the player stayed in it with a question nothing answers (no text);
+  the door stayed locked. Now the world flags (`ev_flg`, `ky_flg`) the partner changes while we are in
+  the room are noted, and once we are out of cinema mode and no world event window is open, the room's
+  entry script `scd0` is walked as the interpreter takes it: its blocks' tests (`Ck`, `CmpB`, `CmpW`; a
+  block with another test is left alone) choose the parts, and in the blocks that test a noted flag its
+  record writes (`WalAtariSet`, `EtcAtariSet`, `FlrAtariSet` and their `...2` forms) run again, as
+  entering would run them. Nothing else of the entry script runs (models, enemies, items, sounds, room
+  flags). The partner does not see the solving player's cutscene (as before: it was not a world event).
+* **One player at a trigger** (`coop_examine`, `Pose.use`): `hitchk.c bhCheckExmAtari` asks before it takes
+  a type 3 trigger (examine: a message, a close-up, the scripts' "at trigger" test). Our pose carries the
+  trigger we examined + 1 while the game holds our player (`st_flg` 4: a message, a close-up, cinema) or we
+  are out of the game screen (a terminal), until 10 frames after we are free; the partner in the same room
+  and case does not take that trigger meanwhile ("<name> is using this", top of the screen, 3 s).
+* **A replayed event opens no terminal** (`coop_replayed_event`, `event.c bhEvtComSet`): a world event's
+  events run on the partner too, so the office computer's power-on (1/09, gate `ev_flg` 164: movie, then
+  `EvtComSet 7`) put the partner into the password screen. An event of the partner's block replayed here
+  (its task level in the replay window) skips the terminal; the rest of the event runs.
 
 ### Flags, pickups, game state
 
@@ -1033,10 +1070,10 @@ send time minus the echoed datagram's arrival. Sample = arrival - our clock - th
 smoothed (EWMA 0.1). The name tag's point goes with the recorded frame (`stream_point`) and is
 interpolated with the in-between frames; it snaps on camera cuts and in vanilla mode.
 
-## Protocol 24
+## Protocol 25
 
-`COOP_VERSION` is **24**; both players need builds with the same version (a mismatch is reported,
-e.g. "the host runs co-op protocol 23, we 24: both need the same build"). The co-op server does not
+`COOP_VERSION` is **25**; both players need builds with the same version (a mismatch is reported,
+e.g. "the host runs co-op protocol 24, we 25: both need the same build"). The co-op server does not
 look at the game protocol. Version history in short: 11 join code, 1200-byte datagrams, checked
 events, `EV_ATR`; 12 `EV_FX`; 13 `EV_GRANT`; 14 `EV_TSCREEN`; 15 `EV_GONE`; 16 player id and rejoin
 tag, `EV_OWN`; 17 trade requests; 18 voices; 19 the game rules `OPT_IMPORTANT`, `OPT_NO_RIBBON`,
@@ -1049,7 +1086,7 @@ make other enemies from the same seed); 21 `COOP_HIT_PRECISE` in `EV_ENE_HIT` (t
 and `OPT_SKIP_DETECTOR`, `PF_GAME_OVER`, `EV_BLOB` `pad` 2 and the `EV_OWN` `tid` (see "Game over",
 "Metal detector"); 23 the game rule `OPT_QUICK_START` (see "Quick start"; it takes the last free bit of
 `Pose.opts`, so a further rule needs a field of its own); 24 enemy slots 0..254 (`COOP_ENE_SLOTS`, the PC's
-255 slots) in every slot field, and `EV_FX` marks its `FX_*` references in `refs` (the bytes 253..255 are slots now). `Pose.pflg` and `Pose.flr` were added inside protocol 18,
+255 slots) in every slot field, and `EV_FX` marks its `FX_*` references in `refs` (the bytes 253..255 are slots now); 25 `Pose.use`, the trigger the sender is using (one player at a puzzle at a time, see "Puzzles"; the pose grew to 112 bytes). `Pose.pflg` and `Pose.flr` were added inside protocol 18,
 `Pose.rcase` inside protocol 22, the aim pitch in `Pose.pflg`'s spare bits inside protocol 23 (0 means "not
 sent", and receivers fall back; a receiver before the pitch reads `pflg & 6` only and keeps the straight pose).
 
@@ -1062,7 +1099,7 @@ At most `COOP_DGRAM_MAX` = 1200 bytes (below every internet path MTU). A frame's
 as many datagrams as needed, each starting with the pose so each is useful alone:
 
 ```
-Pose (108) | Event x nev (88 each, nev <= 16) | EneSnap x nene (100 each, nene <= 48) | PoseExt (92, if PF_EXT)
+Pose (112) | Event x nev (88 each, nev <= 16) | EneSnap x nene (100 each, nene <= 48) | PoseExt (92, if PF_EXT)
 ```
 
 The size must be exactly that sum. The first datagram of a frame carries the `PoseExt`. Up to 16
@@ -1075,7 +1112,7 @@ over its datagrams.
 | `PKT_BYE` 2 | Goodbye: a bare `Pose`, sent three times by every stop and at exit. `reject` 3 (`COOP_REJ_REMOVED`): the host removed us. |
 | `PKT_REJECT` 3 | Host to a sender it will not adopt: `reject` 1 wrong join code, 2 already has a partner. At most one per second. |
 
-### Pose (108 bytes)
+### Pose (112 bytes)
 
 | Bytes | Fields |
 |---|---|
@@ -1084,6 +1121,7 @@ over its datagrams.
 | 32-39 | `chr`, `costume`, `stg`, `rom`, `pos` (room entry point), `opts` (host's game rules: `OPT_INDIVIDUAL` 1, `OPT_TRADE_FREEZE` 2, `OPT_IMPORTANT` 4, `OPT_NO_RIBBON` 8, `OPT_SKIP_SYNC` 16, `OPT_GAMEOVER_BOTH` 32, `OPT_SKIP_DETECTOR` 64, `OPT_QUICK_START` 128), `regroup` (host counter), `mfile` (sender's own part file - 10) |
 | 40-91 | position (3 floats), angles (3 ints), `mtn_no`, `frm_no` (the frame shown, before the step's advance: `actor_frame`), `mtn_md`, `hokan_count`, `hokan_rate`, `wpnr_no`, `hp`, `mode0`, `mode1`, `nev`, `nene` |
 | 92-107 | `stflg`, `ev_ack` (highest event id applied from the peer), `mset` (`MSET_OWN` -1, `MSET_ROOM` -2, `MSET_NONE` -3, or an enemy slot 0..254), `busy` (`BUSY_NONE/EVENT/MENU/BOX/TRADE`), `reject` (`PKT_BYE`, `PKT_REJECT`) or, in `PKT_POSE`, `rcase` (the room case of the room the sender is in + 1, 0 not sent; same room means the same case too, and the follow loads it), `voice_n`, `voice`, `pflg` (`flg & 6`: hit / held; bits 0 and 3-7 the aim pitch, -31..31 steps of 60/31 degrees, 0 straight or not sent: `coop_pitch_get`), `flr` (`flr_no + 3`, 0 not sent) |
+| 108-111 | `use` (the room trigger the sender examined and is held by + 1, 0 none: the partner does not take it meanwhile), 3 spare bytes (zero, else refused) |
 
 `flags`: `PF_IN_GAME` 1, `PF_VISIBLE` 2, `PF_ROOM_MTN` 4, `PF_WANT_BLOB` 8 (joiner asks for the
 game state), `PF_EXT` 16 (a `PoseExt` follows), `PF_CINE` 32 (in a cutscene its skip button could
@@ -1251,6 +1289,12 @@ the session's code. A takeover needs a non-zero tag that matches.
 * Some effects are not mirrored: those whose caller sets a matrix or a pointer the record cannot
   name (e.g. Alexia's acid, shell casings) and blood pools.
 * A cutscene the joiner triggers alone plays only for the joiner (its flags reach the host).
+* A puzzle solved by the partner's own steps in our room changes our room's walls and triggers
+  (its entry script's), not its models, lights or effects: those follow when the room is entered again.
+* One player at a trigger: two presses on the same trigger within one pose's trip (a ping) both
+  get in.
+* A room whose entry script writes world flags sets them for both when either enters (9/31 clears
+  `ev_flg` 5, the self-destruct terminal's code, as single player does on every entry).
 * Of a world event's results that depend on local state (per-room flags, timing), only collision
   and object placement are synced afterwards.
 * Both taking one pool item (shared loot): the player who gives it back gives the amount a pickup
@@ -1319,7 +1363,7 @@ Environment variables for headless and scripted runs. Frames are co-op frames un
 | `RECVX_INF_HEALTH=1` | The F2 infinite-health cheat (survive grabs in tests). |
 
 General test aids used with these (`RECVX_TELEPORT`, `RECVX_WARP`, `RECVX_EQUIP`, `RECVX_FLAGS`,
-`RECVX_SKIP_CINE`, `RECVX_SPAWN`, `RECVX_KEYS`, `RECVX_MENU_MOUSE`, `RECVX_EXIT_FRAME`,
+`RECVX_SKIP_CINE`, `RECVX_SPAWN`, `RECVX_KEYS`, `RECVX_TEST_EXAMINE`, `RECVX_TEST_ROOMFLAGS`, `RECVX_MENU_MOUSE`, `RECVX_EXIT_FRAME`,
 `RECVX_TRACE_SND`, `RECVX_DUMP_*`) are listed in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ctest `coop` (`pc/tests/test_coop.c`) checks every event type from the side that sends it and
