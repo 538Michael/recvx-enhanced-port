@@ -43,6 +43,8 @@
   the character's starting items, in Chris's part his default inventory).
 - **Co-op crash with many enemies**: the joining player's game no longer crashes when an enemy
   exists on one side only, such as moths, their eggs or a boss's helpers (often in the late game).
+- **Co-op crash after a weapon change**: changing weapons just as new enemies appeared (added
+  enemies, the enemy spawner) could crash the game right away or at the next shot. Fixed.
 - **Crash reports**: a crash now always writes a small `recvx-crash.log` next to the game. Attach it
   to a bug report; IP addresses are hidden in it.
 
