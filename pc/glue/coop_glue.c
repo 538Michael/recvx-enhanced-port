@@ -157,6 +157,17 @@ static void release_textures(void)
 
 static void forget(void)
 {
+    int i, k;
+    /* effects that follow the partner's work or use its model or textures (EV_FX: an enemy's effect on the partner,
+       FX_SENDER) end with it: the next step or drawing read ply2's model, zeroed here (a model change: "You appear
+       as", the character switch) */
+    for (i = 0; i < 512; i++) {
+        O_WRK* op = &eff[i];
+        int ours = (op->flg & 1) && (op->lkwkp == (unsigned char*)&ply2 || op->exp0 == (unsigned char*)&ply2 ||
+                                     ((char*)op->mlwP >= (char*)ply2.mdl && (char*)op->mlwP < (char*)(ply2.mdl + 16)));
+        for (k = 0; (op->flg & 1) && !ours && k < ply2.mdl_n && k < 16; k++) ours = ply2.mdl[k].texP && op->txp[0] == ply2.mdl[k].texP;
+        if (ours) { op->flg = 0; host_log("coop: effect %d on the partner ended with its model\n", op->id); }
+    }
     memset(&ply2, 0, sizeof(ply2));
     memset(p2wpn, 0, sizeof(p2wpn));
     memset(p2obj, 0, sizeof(p2obj));
