@@ -30,7 +30,8 @@
 - **Co-op bosses**: the plane's Tyrant hurts both players again, Alexia's first form no longer gets
   stuck after grabbing the joining player, and the Gulp Worm and Nosferatu hit the joining player
   properly.
-- **Co-op crash with Alexia's second form**: the joining player's game no longer crashes.
+- **Co-op crash with Alexia's second form**: the joining player's game no longer crashes in certain
+  conditions.
 - **Reload with the side pack**: ammo in the bag's last two slots now reloads your weapon.
 - **Sub machine gun reload crash**: reloading the sub machine gun no longer crashes the game.
 - **Co-op: inventory and actions locked**: after an enemy attack you could no longer open the
