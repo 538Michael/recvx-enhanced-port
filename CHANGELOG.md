@@ -29,6 +29,13 @@
   keeping you in it, or a door it unlocked stayed locked until you left the room. Your partner's
   game also no longer opens the office computer's password screen for you when it turns the
   computer on.
+- **Co-op bosses**: the Tyrant on the transport plane harms both of you again; after his first blow
+  he could no longer hurt anyone. Alexia's first form no longer gets stuck after seizing the joining
+  player: her burning embrace now kills that player as in single player, and she fights on. The Gulp
+  Worm and Nosferatu also hit and throw the joining player properly instead of holding them in
+  place or only knocking them back, and a long blow (Alexia's babies) no longer hits several times.
+- **Co-op crash with Alexia's second form**: the joining player's game no longer crashes during the
+  fight with her.
 - **Reload with the side pack**: once you have the side pack, ammo in the bag's last two slots now
   reloads your weapon, both with the Reload button and when you fire on an empty magazine, as in the
   original. Before, that ammo was skipped and you had to combine it in the inventory yourself.

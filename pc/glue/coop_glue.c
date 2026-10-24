@@ -5513,6 +5513,7 @@ static void stop(void)
        partner's (forget() clears that one), and no grab position guard carried over */
     if (swap_plp) { plp = swap_plp; swap_plp = NULL; ply2 = ply2_save; }
     if (swap_pid >= 0) { sys->ply_id = swap_pid; swap_pid = -1; }
+    ghost.slot = -1;
     memset(&safe, 0, sizeof(safe));
     if (sys && rom) lighter_light(0);   /* the partner's lighter flame and light */
     if (have_peer && !echo_delay) send_bye(0);
