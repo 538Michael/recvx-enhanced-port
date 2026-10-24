@@ -15,6 +15,7 @@
 #include "lobby.h"
 #include "savestore.h"
 #include "biorand.h"
+#include "../net/update.h"
 #include "../audio/audio.h"
 #include <SDL3/SDL.h>
 #include <stdio.h>
@@ -374,6 +375,8 @@ const Setting g_settings[] = {
       .help = "Also use replacements that show something else than the original, such as redesigned menus, title and inventory. Off: only replacements of the original picture. The port's own menu entries keep the original letters." },
 
     { SP_GAMEPLAY, "Skip intro", V(g_config.skip_intro), 0, 1, 1, .flags = SET_RESTART, .help = "Boot straight into the title menu: no warning screen, logos or intro movie. Off: any button skips each of them.", .group = "GENERAL" },
+    { SP_GAMEPLAY, "Check for updates", V(g_config.update_check), 0, 1, 1, .apply = update_start,
+      .help = "Once at start asks the project's update server for the newest version number, shown on the title screen. Nothing else is sent. Off: no network at all." },
     { SP_GAMEPLAY, "Skip door animations", V(g_config.skip_doors), 0, 2, 1, (const char* const[]){ "Off", "Instant", "Skippable" },
       .help = "Door, stairs and ladder animations. Off: always played. Instant: the game's load screen instead. Skippable: played, any key or button ends it." },
     { SP_GAMEPLAY, "Fast loading", V(g_config.fast_loading), 0, 1, 1,

@@ -146,7 +146,7 @@ FetchContent_Declare(xxhash GIT_REPOSITORY https://github.com/Cyan4973/xxHash.gi
 FetchContent_Declare(bcdec GIT_REPOSITORY https://github.com/iOrange/bcdec.git GIT_TAG 80859ed3b7afb1c527a2a99d70c61457bea72d0c SOURCE_SUBDIR none)
 FetchContent_MakeAvailable(xxhash bcdec)
 target_include_directories(recvx_platform PRIVATE ${xxhash_SOURCE_DIR} ${bcdec_SOURCE_DIR})
-set_property(SOURCE src/host/host.c src/host/overlay.cpp glue/lobby_glue.c APPEND PROPERTY COMPILE_DEFINITIONS "RECVX_VERSION=\"${RECVX_VERSION}\"")
+set_property(SOURCE src/host/host.c src/host/overlay.cpp src/net/update.c APPEND PROPERTY COMPILE_DEFINITIONS "RECVX_VERSION=\"${RECVX_VERSION}\"")
 target_include_directories(recvx_platform PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/include/sdk
@@ -269,6 +269,10 @@ add_executable(test_net tests/test_net.c src/net/net.c src/net/portmap.c)
 target_compile_options(test_net PRIVATE $<$<COMPILE_LANGUAGE:C>:-std=gnu11>)
 target_link_libraries(test_net PRIVATE SDL3::SDL3 miniupnpc::miniupnpc natpmp $<$<BOOL:${WIN32}>:ws2_32>)
 add_test(NAME net COMMAND test_net)
+
+# update check (pc/src/net/update.h): the URL, the server's answer (status, body, junk), version comparison
+add_executable(test_update tests/test_update.c)
+add_test(NAME update COMMAND test_update)
 
 # co-op packets (pc/src/net/coop_proto.c): malformed events of every type, transfers, the event
 # ring, the join code, world event actions, and a fuzz loop

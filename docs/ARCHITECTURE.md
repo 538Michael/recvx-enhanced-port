@@ -84,6 +84,7 @@ Windows `-mno-ms-bitfields`.
 | game (`game_thread`) | the decomp and `pc/glue` (ENHANCED SETTINGS menu, lobby, co-op incl. its UDP socket polled once per frame, cheats applied at the frame hand-off), disc reads, memory card, creating and destroying audio streams |
 | SDL audio | ADX decoding in the stream callbacks (own file handle per voice), the sound driver's 240 Hz tick, its queued commands and the synth mix |
 | portmap | UPnP/NAT-PMP while hosting (`net/portmap.c`) |
+| update | the update check: once per start, up to three HTTP requests, detached (`net/update.c`) |
 | co-op arrival times (Windows) | waits on the co-op socket and notes when data arrived (`net_rx_us`) |
 | log (Linux, `--log`) | copies stdout/stderr into the log file |
 
@@ -846,6 +847,9 @@ and game frames for game-state aids, as noted. Co-op test aids (`RECVX_COOP_*`,
 | `RECVX_SKIP_MOVIES=1` | movies end after 30 game frames without decoding (repeatable test runs) |
 | `RECVX_SKIP_CINE=n` | skip every cutscene after n game frames, as its skip button |
 | `RECVX_MOVIE=n` | play `MV_n.PSS` in place of every movie (e.g. the intro at start-up with `skip_intro = 0`) |
+| `RECVX_UPDATE_CHECK=0` | no update check (no network) and the title's newest version reads "off", as with the setting Off; the headless scripts (`layout_check.sh`, `room_test.sh`, `compare_native.sh`) set it |
+| `RECVX_UPDATE_FAKE=v0.7.0` | the title shows this as the newest version, without asking the server (screenshots) |
+| `RECVX_UPDATE_URL_TEST=http://host[:port]/path` | ask this server instead of the built-in one (`RECVX_UPDATE_URL` in `pc/src/net/update.h`): unreachable servers and junk answers |
 
 ### Scripted input
 

@@ -13,6 +13,7 @@
 #include "settings.h"
 #include "biorand.h"
 #include "../import/import.h"
+#include "../net/update.h"
 void render_loop(void);
 #include <SDL3/SDL.h>
 #include <stdarg.h>
@@ -103,7 +104,7 @@ float pc_overlay_x(float x)
 
 HostConfig g_config = { .window_w = 1280, .window_h = 960, .borderless_extra = 1,.vsync = 1, .log_level = 1, .music_volume = 100, .sfx_volume = 100, .rumble = 100, .interpolate = 1, .menu_smooth = 1, .frame_blend = 0, .aspect = 2, .show_fps = 1, .show_ping = 1,
                        .screen_filter = 1, .cinema_bars = 1, .screen_effects = 1, .native_3d = 1, .model_cull = 1, .native_tex = 1, .hd_textures = 1, .hd_textures_ui = 1, .quick_knife = 1, .head_blowoff = 1,
-                       .skip_doors = 1, .fast_loading = 1, .auto_stairs = 1, .skip_intro = 1, .battle_unlocked = 1, .difficulty_select = 1, .contrast = 100, .gamma = 10, .fog_intensity = 100 };   /* first-start defaults; recvx.ini overrides */
+                       .skip_doors = 1, .fast_loading = 1, .auto_stairs = 1, .skip_intro = 1, .battle_unlocked = 1, .difficulty_select = 1, .contrast = 100, .gamma = 10, .fog_intensity = 100, .update_check = 1 };   /* first-start defaults; recvx.ini overrides */
 SDL_Window* g_window;
 SDL_GLContext g_gl;
 
@@ -337,6 +338,7 @@ int main(int argc, char** argv)
         if (SDL_getenv("RECVX_IMPORT_ISO")) SDL_strlcpy(g_import.iso[src], SDL_getenv("RECVX_IMPORT_ISO"), sizeof(g_import.iso[src]));
         exit(import_run(src, what) == 0 ? 0 : 1);
     }
+    update_start();   /* the newest version for the title, on a thread of its own (net/update.h) */
     ps2_memory_init();
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD))

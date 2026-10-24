@@ -35,6 +35,7 @@
 #include "../src/net/net.h"
 #include "../src/net/rdv_proto.h"
 #include "../src/net/coop_proto.h"   /* REC_*: what the host keeps for us */
+#include "../src/net/update.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -653,8 +654,8 @@ static void font_release(void)
     font_state = 0;
 }
 
-/* The version ("v0.6.9", without the git part) at the bottom right of the title's 4:3 picture, below
-   the copyright, in the game's font in green: Adv_BioCvTitle modes 4..17 (PRESS START, the menus and
+/* The installed and the newest version at the bottom right of the title's 4:3 picture, below
+   the copyright, in the game's font (title_version): Adv_BioCvTitle modes 4..17 (PRESS START, the menus and
    the title's fades; not the lobby, 30). The font as the lobby has it, its file read at once (the
    game's file reader stays free) and kept; released when the title ends (lobby_close). */
 static void title_font(void)
@@ -669,24 +670,49 @@ static void title_font(void)
     font_ok = (sys->ss_flg & 0x40) != 0;
 }
 
+/* a version, its "."s at half advance (the font's "." is as wide as a digit: v0.6.9, not v0. 6. 9);
+   draw 0: only the width */
+static float ver_text(float x, float y, const char* s, float sc, unsigned int argb, int draw)
+{
+    float x0 = x, dot = text_w(".", sc);
+    char c[2] = { 0 };
+    for (; *s; s++) {
+        c[0] = *s;
+        if (draw) text(*s == '.' ? x - dot * 0.25f : x, y, c, sc, argb);
+        x += *s == '.' ? dot * 0.5f : text_w(c, sc);
+    }
+    return x - x0;
+}
+
+/* Installed and newest version (net/update.h) below the copyright, right-aligned in the 4:3
+   picture's corner: labels and versions each in a column. The installed one is red when a newer
+   one is out; the newest "checking..." (asking), "unknown" (no answer) or "off" in grey. */
+#define VER_SC 0.5f
 static void title_version(void)
 {
+    static const char* const label[2] = { "Installed Version:", "Newest Version:" };
     ADV_WORK* ap = &AdvWork;
-    unsigned int a = (unsigned int)(255.0f * (1.0f - ap->FadeRate) * (1.0f - ap->SaverRate));   /* under the title's fade and screen saver */
-    char s[24];
-    if (ap->Mode < 4 || ap->Mode > 17 || a < 8) return;
+    unsigned int a = (unsigned int)(255.0f * (1.0f - ap->FadeRate) * (1.0f - ap->SaverRate)) << 24;   /* under the title's fade and screen saver */
+    char newest[32];
+    const char* val[2];
+    unsigned int col[2];
+    int st, i;
+    float lw, w0, w1, x;
+    if (ap->Mode < 4 || ap->Mode > 17 || a < 8u << 24) return;
     title_font();
-    snprintf(s, sizeof(s), "v%.*s", (int)strcspn(RECVX_VERSION, " "), RECVX_VERSION);
-    {   /* the font's "." advances as wide as a digit: half of it, so it reads v0.6.9 rather than v0. 6. 9 */
-        float x, w = 0, dot = text_w(".", 0.6f);
-        char c[2] = { 0 };
-        for (const char* p = s; *p; p++) w += *p == '.' ? dot * 0.5f : (c[0] = *p, text_w(c, 0.6f));
-        x = 632 - w;
-        for (const char* p = s; *p; p++) {
-            c[0] = *p;
-            text(*p == '.' ? x - dot * 0.25f : x, 452, c, 0.6f, a << 24 | 0x60D060);
-            x += *p == '.' ? dot * 0.5f : text_w(c, 0.6f);
-        }
+    st = update_newest(newest, sizeof(newest));
+    val[0] = update_installed();
+    val[1] = st == UPD_KNOWN ? newest : st == UPD_OFF ? "off" : st == UPD_CHECKING ? "checking..." : "unknown";
+    col[0] = st == UPD_KNOWN && upd_newer(newest, val[0]) ? 0xE04040 : 0x60D060;
+    col[1] = st == UPD_KNOWN ? 0x60D060 : 0xA0A0A0;
+    lw = text_w(label[0], VER_SC) + text_w("  ", VER_SC);   /* the longer label, then the versions' column */
+    w0 = ver_text(0, 0, val[0], VER_SC, 0, 0);
+    w1 = ver_text(0, 0, val[1], VER_SC, 0, 0);
+    x = 632 - lw - (w0 > w1 ? w0 : w1);
+    for (i = 0; i < 2; i++) {
+        float y = 445 + i * 14;
+        text(x, y, label[i], VER_SC, a | 0xC8C8C8);
+        ver_text(x + lw, y, val[i], VER_SC, a | col[i], 1);
     }
     AdvEasySetTextureList(0);   /* the title's texture list again */
 }
