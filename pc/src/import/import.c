@@ -1,4 +1,4 @@
-/* Imports from other games' discs: the F4 window's extraction thread, its manifest, and the
+/* Imports from other games' discs: the F9 window's extraction thread, its manifest, and the
    converted player models for "You appear as" (import.h; docs/IMPORT_OUTBREAK.md). */
 #include "import.h"
 #include "../host/actors.h"

@@ -9,6 +9,7 @@
 #include "../../decomp/include/ps2/veronica/prog/pwksub.h"
 #include "../../decomp/include/ps2/veronica/prog/item.h"
 #include "../../decomp/include/ps2/veronica/prog/hitchk.h"
+void bhSetMessage(int mes_typ, int mes_idx);   /* message.h (its macros.h clashes with this file's headers) */
 #include "../src/host/cheat.h"
 #include "../src/host/coop.h"
 #include "../src/net/coop_proto.h"
@@ -33,6 +34,7 @@ int pc_inf_ammo(void) { return g_cheat.inf_ammo; }
    level means nothing here: there it stays where it is). Only our player: co-op runs the partner
    through plp too. */
 int pad_noclip_vertical(void);
+int pc_in_play(const BH_PWORK* p, int scope);   /* reload_glue.c */
 unsigned int pc_noclip(void)
 {
     static int flew, base, room;   /* base: floor number at take-off, in that room */
@@ -422,22 +424,25 @@ void cheat_room_warp(int stg, int rom, int pos, int rcase)
     bhSetDoorDemo(0, stg, rom, pos, 255);
 }
 
-static void teleport(int stg, int rom, int pos)
+static void teleport(int stg, int rom, int pos, int rcase)
 {
     static const char* pl = (const char*)-1;
+    static int nth;
     if (pl == (const char*)-1) pl = getenv("RECVX_PLAYER");
-    if (pl) {   /* test aid: the first teleport switches the character as script op bhPlayerChangeSet does */
+    nth++;
+    /* test aid: the first teleport (RECVX_PLAYER="n:k": the k-th) switches the character as script op bhPlayerChangeSet does */
+    if (pl && (!strchr(pl, ':') || nth >= atoi(strchr(pl, ':') + 1))) {
         sys->cng_pid = atoi(pl) & 3;
         sys->cb_flg |= 0x80;
         pl = NULL;
     }
-    cheat_room_warp(stg, rom, pos, -1);
+    cheat_room_warp(stg, rom, pos, rcase);
 }
 
 /* Testing aid for headless runs, keyed to game frames since start (frames in which the game
    task advanced sys->gfrm_ct, which restarts per room):
-   RECVX_TELEPORT="frame:stage:room:pos,delay:stage:room:pos,..." (later entries: frames after
-   the previous teleport) and RECVX_EQUIP="frame:item:count[,item:count...]" (puts a weapon item
+   RECVX_TELEPORT="frame:stage:room:pos[:case],delay:stage:room:pos,..." (later entries: frames after
+   the previous teleport; case: the room case to load, else ours as it is) and RECVX_EQUIP="frame:item:count[,item:count...]" (puts a weapon item
    in the first slot and equips it with the inventory's WeaponSet; the item may carry its ammo
    kind, e.g. 4102 = 0x1006 grenade launcher with acid rounds; further entries fill the next
    slots; after a ';' another "frame:item:count" equips again later: a weapon switch).
@@ -451,7 +456,7 @@ static void teleport(int stg, int rom, int pos)
    RECVX_EFFECT="frame:effno:type:mode1" spawns effect effno at the player at that game frame
    and sets its mode1 two frames later (e.g. "60:110:0:1": the full-screen distortion of
    bhEff110, which reads the frame buffer back every frame - StoreRenderTex).
-   RECVX_PLAYER=n: the first RECVX_TELEPORT also switches the character played to n (0 Claire,
+   RECVX_PLAYER=n ("n:k": the k-th) : the first RECVX_TELEPORT also switches the character played to n (0 Claire,
    1 Chris, 2 Steve, 3 Wesker) as the story's character switch does.
    RECVX_APPEAR="frame:chr,..." sets "You appear as" (g_coop.chr, the ini's coop_char) at that
    game frame.
@@ -522,8 +527,10 @@ static void scripted(unsigned int* inv)
     if (sys->gfrm_ct != prev) { prev = sys->gfrm_ct; clock++; in_room++; }
     if (tp && sscanf(tp, "%d:%d:%d:%d%n", &f, &a, &b, &c, &n) == 4 && clock >= f + last &&
         !(sys->gm_flg & 0x9) && !(sys->cb_flg & 0x1)) {
-        printf("test: teleport to %d/%d/%d at game frame %d\n", a, b, c, clock);
-        teleport(a, b, c);
+        int rc = -1, m = 0;
+        if (tp[n] == ':' && sscanf(tp + n, ":%d%n", &rc, &m) == 1) n += m;   /* an optional room case */
+        printf("test: teleport to %d/%d/%d case %d at game frame %d\n", a, b, c, rc, clock);
+        teleport(a, b, c, rc);
         last = clock;
         tp = tp[n] == ',' ? tp + n + 1 : NULL;
     }
@@ -606,6 +613,40 @@ static void scripted(unsigned int* inv)
             ct = ct[n] == ',' ? ct + n + 1 : NULL;
         }
     }
+    {   /* RECVX_TEST_ROOMFLAGS="frame:mask,...": rm_flg |= mask at that game frame (bit n of the scripts is 0x80000000 >> n):
+           a room script's local step without its input (1/05's switch panel solved: C, E and "decide", 14800000) */
+        static const char* rf = (const char*)-1;
+        unsigned int m;
+        if (rf == (const char*)-1) rf = getenv("RECVX_TEST_ROOMFLAGS");
+        if (rf && sscanf(rf, "%d:%x%n", &f, &m, &n) == 2 && clock >= f) {
+            sys->rm_flg |= m;
+            printf("test: room flags |= %08x in %d/%d at game frame %d\n", m, sys->stg_no, sys->rom_no, clock);
+            rf = rf[n] == ',' ? rf + n + 1 : NULL;
+        }
+    }
+    {   /* RECVX_TEST_EXAMINE="frame:etc,...": the action button on room trigger etc at that game frame, wherever the player
+           stands, as bhCheckExmAtari takes a type 3 trigger: the scripts' "at trigger" test and its message (co-op: unless
+           the partner is using it) */
+        static const char* ex = (const char*)-1;
+        if (ex == (const char*)-1) ex = getenv("RECVX_TEST_EXAMINE");
+        if (ex && sscanf(ex, "%d:%d%n", &f, &a, &n) == 2 && clock >= f && !(sys->cb_flg & 0x1)) {
+            if (coop_on && coop_examine(a))
+                printf("test: examine trigger %d in %d/%d at game frame %d: the partner is using it\n", a, sys->stg_no, sys->rom_no, clock);
+            else {
+                sys->etc_idx = a;
+                sys->cb_flg |= 0x100;
+                if (a < rom->etc_n && rom->etcp[a].type == 3 && (rom->etcp[a].attr & 0x8000)) {
+                    bhSetMessage(0, rom->etcp[a].prm1);
+                    sys->pad_onb = sys->pad_on; sys->pad_psb = sys->pad_ps; sys->pad_oldb = sys->pad_old;
+                    sys->pad_ps = 0;
+                    sys->cb_flg |= 0x20;
+                    sys->st_flg |= 0x2004;
+                }
+                printf("test: examine trigger %d in %d/%d at game frame %d\n", a, sys->stg_no, sys->rom_no, clock);
+            }
+            ex = ex[n] == ',' ? ex + n + 1 : NULL;
+        }
+    }
     {   /* RECVX_HP="frame:hp,...": our health set at that game frame (a quick game over) */
         static const char* hp = (const char*)-1;
         if (hp == (const char*)-1) hp = getenv("RECVX_HP");
@@ -626,7 +667,11 @@ static void scripted(unsigned int* inv)
         ap = ap[n] == ',' ? ap + n + 1 : NULL;
     }
     spawn_frame(clock);   /* RECVX_SPAWN (pc/glue/spawn_glue.c) */
-    if (eq && sscanf(eq, "%d:%d:%d%n", &f, &a, &b, &n) == 3 && clock >= f && sys->mn_mode0 == 0 && plp->mnwP) {
+    /* in play, weapon down (mode1 0), on our own motion set, as the inventory and the quick knife switch: a switch
+       mid-shot, in a grab or in a scene (room motions) realized the weapon motions into another set or left the old
+       weapon's motion on the new one (crash in bhSetMotion) */
+    if (eq && sscanf(eq, "%d:%d:%d%n", &f, &a, &b, &n) == 3 && clock >= f && sys->mn_mode0 == 0 && pc_in_play(plp, 0) &&
+        plp->mnwP == plp->mnwPb && plp->mode1 == 0) {
         printf("test: equip item %d at game frame %d\n", a, clock);
         inv[2] = (unsigned int)a << 16 | b;
         inv[0] = 0;
@@ -712,7 +757,7 @@ void cheat_frame(void)
            conditions the door trigger checks (hitchk.c) */
         if ((sys->gm_flg & 0x9) || (sys->cb_flg & 0x1)) g_cheat.result = "can't teleport now";
         else {
-            teleport(g_cheat.tp_stg, g_cheat.tp_rom, g_cheat.tp_pos);
+            teleport(g_cheat.tp_stg, g_cheat.tp_rom, g_cheat.tp_pos, -1);
             g_cheat.result = "teleporting";
         }
     }

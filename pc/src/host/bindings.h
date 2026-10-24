@@ -19,6 +19,7 @@ enum {
     B_QUICKKNIFE,                      /* hold: knife drawn and readied, the weapon before back on release (knife_glue.c) */
     B_TRADE,                           /* co-op: trade request / accept with the partner next to you (coop_glue.c, trade_glue.c) */
     B_RELOAD,                          /* reload the weapon from the inventory's ammo, as on an empty trigger pull (reload_glue.c); R, Aim + Triangle */
+    B_FREEAIM,                         /* fixed cameras: aim as the aim button, without the game's turn to a target (pad.c, modern_glue.c); E, LT */
     /* third person: keyboard and mouse; the gamepad set has its own (modern scheme, g_tps.pad_modern:
        run .. quick turn, knife, options, recenter; the classic scheme drives it through the DS2 rows) */
     B_TPS_FWD, B_TPS_BACK, B_TPS_LEFT, B_TPS_RIGHT, B_TPS_RUN, B_TPS_ACTION, B_TPS_CANCEL,
@@ -71,6 +72,8 @@ int  pc_menu_smooth(void);             /* view_glue.c: Smooth menus, and a menu 
 int  bind_quickturn(int which, int held);   /* which 0 game, 1 third person: 0 off, 1 hold back, 2 back + run (pad.c) */
 int  pad_quick_knife(void);            /* the quick-knife row is held (pad.c) */
 int  pad_reload(void);                 /* a reload row is held (pad.c) */
+int  pad_report_bits(void);            /* the DS2 buttons held in the last pad report (pad.c) */
+int  pad_free_aim(void);               /* the free-aim row raised the weapon in the last pad report (pad.c) */
 int  pad_kb_start(void);               /* Start's keyboard binding is down in the last pad report (pad.c) */
 
 /* Input source of this window (F1 Controls, ENHANCED SETTINGS -> CONTROLS; ini input_source, input_pad;

@@ -1,4 +1,4 @@
-/* Importing assets from other games' discs (F4 window; docs/IMPORT_OUTBREAK.md). The user's own
+/* Importing assets from other games' discs (F9 window; docs/IMPORT_OUTBREAK.md). The user's own
    disc image is read in place; what is extracted goes to <dir>/<source>/ (default mods/import),
    never into the repository. One source so far: Resident Evil Outbreak File #2 (SLUS-20984). */
 #pragma once
@@ -8,7 +8,7 @@ extern "C" {
 
 enum { IMPORT_OUTBREAK2, IMPORT_SOURCES };
 
-/* the groups of models (F4 lists them by group), and what to extract: bits 1 << group (F4 checkboxes,
+/* the groups of models (F9 lists them by group), and what to extract: bits 1 << group (F9 checkboxes,
    RECVX_IMPORT_WHAT) */
 enum { IMPORT_GROUP_PLAYERS, IMPORT_GROUP_CUTSCENE, IMPORT_GROUP_NPCS, IMPORT_GROUP_ENEMIES, IMPORT_GROUPS };
 enum { IMPORT_PLAYERS = 1, IMPORT_CUTSCENE = 2, IMPORT_NPCS = 4, IMPORT_ENEMIES = 8, IMPORT_ALL = 15 };

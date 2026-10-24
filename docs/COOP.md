@@ -5,7 +5,7 @@ over the internet or a LAN (UDP). Co-op is an optional addon: with it off the ga
 as without it (every hook is `#ifdef TARGET_PC` and `if (coop_on)`).
 
 Part 1 is for players: how to host, join and play. Part 2 is the reference: architecture,
-protocol 24, security and limits. Related: [SERVER.md](SERVER.md) (the optional co-op server),
+protocol 26, security and limits. Related: [SERVER.md](SERVER.md) (the optional co-op server),
 [USER_GUIDE.md](USER_GUIDE.md) (settings, controls), [ACTORS.md](ACTORS.md) (models and voices),
 [ENEMIES.md](ENEMIES.md) (enemy options), [ARCHITECTURE.md](ARCHITECTURE.md),
 [BUILDING.md](BUILDING.md).
@@ -256,6 +256,23 @@ loaded in a case it has (before, the load waited for a file that does not exist:
 * Enemies killed while the joiner ran them stay dead when the host's enemies take over again
   (within the visit; once both left, the room is loaded the game's way again, as in single player).
 
+### Puzzles
+
+* A puzzle (a switch panel, a code terminal) that either of you solves is solved for both. A partner in the same room finds the room as the solution left it: the solved
+  puzzle no longer opens, a door it unlocked is open, a wall it moved has moved. Before, the panel
+  or terminal could open again for the partner and then show nothing (no question, no text) and
+  keep the player there, and a door unlocked by the other player stayed locked until the room was
+  entered again. The solution's cutscene plays for the player who solved it (and for the partner
+  when the game runs it as a world event, see above).
+* A solution stays when the other player enters the room again: the Antarctic base's self-destruct
+  terminal (code entered by one of you) no longer resets, so the linear launcher next door starts
+  for both.
+* One of you at a time: while you use a puzzle, a terminal or anything else you examined (its
+  messages, its screen), your partner cannot open the same one and reads "<name> is using this"
+  at the top of the screen. It is free again as soon as you are back in control.
+* Joining while the host is inside a puzzle: the joiner waits until the host is back in control
+  (the game state is sent only then) and starts with the puzzle solved or not, as the host left it.
+
 ### A busy partner
 
 A partner in a cutscene, a menu, the item box or the trade screen stays visible in its last pose
@@ -360,7 +377,7 @@ screenshots. With it on, no IP address shows on screen, yours or the partner's:
   clipboard, and joining uses what you typed.
 
 `recvx.log` (and the console) still contain the addresses, for troubleshooting: do not show the
-console window on stream or post the log publicly.
+console window on stream or post the log publicly. The crash report `recvx-crash.log` masks them.
 
 ### Sounds
 
@@ -419,7 +436,7 @@ when joining", ini `coop_items`):
 
 | Choice | Value | You get |
 |---|---|---|
-| *Saved with the host* (default) | -2 | What the host kept for you from your last visit; none: a new inventory. In the host's lobby the row says "(available)", "(none)" or "(host: off)". |
+| *Saved with the host* (default) | -2 | What the host kept for you from your last visit; none: a new inventory, or, when you join again from the game you played in the host's session (the connection was lost, the host's game crashed, you left), the items you have now. In the host's lobby the row says "(available)", "(none)" or "(host: off)". |
 | *New inventory* | -1 | The new-game inventory of the session's game mode. |
 | A save | 0.. | The items of that save: save number - 1 (native save files), or memory card slot 0..14. |
 | *My current game* (F3 only) | -3 | Joining from your own running game keeps its items. |
@@ -580,6 +597,12 @@ back at once ("Player joined again ... the stale session is replaced" on the hos
 says. Directly, the host recognises you by your player id plus a tag only your secret can make;
 through a server the server gives you your old place the same way. A name alone, or an id without
 the tag, takes over nothing.
+
+If the host's game crashes, the host starts it again and loads its last save; you join again from
+your game (F3 Join, or from the title). You get the items the host saved with that save, as the world
+is that save's again. If that save has none of yours (saved before you joined), you keep the items you
+have ("No saved items at the host - you keep your current items"); before, you started again with the
+new-game inventory of the character (in Chris's part his starting items).
 
 ## Remove stuck player
 
@@ -756,7 +779,11 @@ partner's weapon's arms sound bank is loaded beside ours (programs `0x40 + n`).
 ### Enemies: host authority and puppets
 
 * **Targeting (host)**: each enemy goes for one player at a time (`coop_pick_target`, re-decided at
-  every step; a linked part goes for its parent's). In order:
+  every step; a linked part goes for its parent's). Before the rule: an enemy linked to a player
+  (`lkwkp`: the moth's larva, en27, rides on the player it was laid on and plays that player's motions)
+  goes for that player only, from its Init (`larva_laid`: the step that laid it names the player); and
+  the enemy whose step set the host's busy flag (`flg & 4`), its parts and its type's leader (moth,
+  Black Widow) keep the host until the flag clears (`hold`, below). In order:
   1. **One victim per attack**: a zombie holding, or an enemy whose motions its victim plays, keeps
      the victim. In its grab/bite/throw state (`mode0` 2) it keeps a victim within 3 m. Its hit and
      death states keep nobody.
@@ -780,12 +807,31 @@ partner's weapon's arms sound bank is loaded beside ours (programs `0x40 + n`).
   player alone for 60 frames (logged: `loop guard: enemy N ... started 3 attacks`).
 * **Damage to the partner**: what the enemy step did to `ply2` is diffed. An hp loss or a hit
   reaction becomes `EV_PLY_HIT`; everything else is undone. Grabs other than the zombie's arrive as
-  a hit.
+  a hit. The dead flag (`flg` 2) an enemy sets on the stand-in (Alexia's embrace, the Tyrant's last
+  blow; in single player the game over) is the partner's death: the hit takes all its health. For
+  the round trip until the partner's pose shows the hit (`HIT_BUSY`, 15 frames) the stand-in counts as
+  busy (`flg` 4), as the hit player does: a blow lasting several frames hits once.
+* **Boss holds (host)**: some holds play a sequence on their victim and end only when its motion has
+  run: the Tyrant's blow takes the player over (mode 5, `en19.c bhEne19_PlyMoveMain`), Alexia's
+  first form burns it (mode 6, `en12.c bhEne12_NG00`), the Gulp Worm swallows and throws it
+  (`en02.c bhEne02_PlayerControl`). On the stand-in, put back after every step, they never ended (the
+  Tyrant held his victim for good and harmed nobody again; Alexia stood still). Such a hold of the
+  partner runs on a copy of the stand-in (`ghost`, one at a time), its motion advanced as the player's
+  own, until the enemy lets go (or dies, or the room is left); the enemy keeps the partner as its
+  target meanwhile, and what it does to the copy goes out as hits. Alexia's embrace has no way out (in
+  single player the game over follows): after it she takes up the fight again. The Tyrant attacks in
+  his move mode, so he keeps a victim playing his motions (and the host is not left in them when he
+  would turn to the partner); the partner's death does not end his blows (`en19.c`). Nosferatu's drive
+  of a struck or seized player (flung, landing, standing up) moves the victim's body: on the stand-in
+  he does not drive it, keeps the partner as his target until it is up again and then lets go; a
+  seized partner takes the throw's landing (80) as a hit (`en15.c`).
 * **Puppets (joiner)**: an enemy runs its own AI once for its initialising step; after that, while
   the host is in the same room, it takes the host's snapshots (explicit fields: flags, position,
   angles, modes, motion, frame, blend, hp, hit capsule; pointers as indices). Linked parts with a
   model of their own are not animated. Snapshots are not used during door transitions. Enemies
-  driven by the joiner's own event run its local AI during it.
+  driven by the joiner's own event run its local AI during it. A puppet morphs (`mdflg` 2) only with
+  the two shapes its own code picks (`obj_a`, `obj_b`); Alexia's tentacles have none on the guest
+  and are drawn unmorphed (before, the guest crashed in her second form's fight).
 * **Hits on puppets (joiner -> host)**: the weapon code's output on a puppet is taken at the
   hand-off, cleared locally and sent as `EV_ENE_HIT`; the host's enemy applies it once in its own
   damage code. A hit arriving after the host's room changed is dropped.
@@ -808,6 +854,20 @@ partner's weapon's arms sound bank is loaded beside ours (programs `0x40 + n`).
   a grab, a player more than 2.5 m from its last free position in that room is put back; a watchdog
   logs any living enemy whose state has not changed for 5 s and, in co-op or rooms with added
   enemies, releases a zombie stuck in a grab state.
+* **The busy flag** (`hold`, both sides): an enemy's attack or grab sets the player's `flg & 4` (with
+  0x10000) and clears it when it ends; meanwhile the inventory, map, examining, doors and pickups wait
+  (`bhCheckSubTask`, `bhControlPlayer`), the player still walks. In co-op the enemy that set it could stop
+  running against that player first, and the flag stayed until a room change (`bhInitRoomChangePlayer`,
+  hence "a teleport fixes it"): the host's retargeting gave the busy player's enemy to the free partner (a
+  zombie's grab start, its counter-grab after a knife hit; the larva's throw-off), and the joiner's own
+  enemies, running while the host was in a menu or elsewhere, became puppets again mid-attack. Now the
+  enemy whose step set the flag (`grab_in` for a handed-over grab) is its holder: the host targets our
+  player with it, the joiner keeps running it here (`runs_here`, logged "holds our player: it runs here
+  until it lets go"), and a larva linked to the joiner's player too. **Watchdog** (`hold_watch`): the flag
+  set while the player is in normal control (or held on its own motions) with no step of the holder's
+  family on that player for 30 frames, for 60 frames in a row (not in a door, event, cinema or the trade
+  freeze), is cleared as the enemies clear it (a grab on its own motions is let go) and logged: "watchdog:
+  our player was left busy ... set by enemy N (id, gone/dead/alive, ...): cleared".
 * **Kills while the joiner ran the room** (`EV_GONE`): when the host's enemies take over, the joiner
   names its dead enemies and the host hides its live copies of the same type and version.
 
@@ -846,6 +906,41 @@ floor or trigger, "Yes" chosen, an item used) hold only where the player did it.
   applied when the scene ends or the room changes (a change of our own to a held bit is newer and wins),
   and the replay of its blocks waits too (the stream with it, 10 s at most). Each game then ends its own
   scene as in single player (a "Yes" to the turntable's question takes that player down too).
+* **The room as the partner's flags have it** (`rebuild`, `rb_mark`): a puzzle is often solved by steps
+  that are not a world event block: the answer lives in room flags and its event sets the world flag
+  (the Gold Luger room's switch panel, 1/05: "decide" sets `rm_flg` 8, the block on it starts event 31,
+  which sets `ev_flg` 15), or a terminal sets it (`sp_evt.c` op 0xF0: the main hall's NTC0394 sets
+  `ev_flg` 4, then a room-flag block's event turns trigger 12 into the door). A partner in the room got
+  the flags only and kept the room as it was: the panel's trigger still opened the panel, whose answer
+  blocks test `ev_flg` 15 clear, so the player stayed in it with a question nothing answers (no text);
+  the door stayed locked. Now the world flags (`ev_flg`, `ky_flg`) the partner changes while we are in
+  the room are noted, and once we are out of cinema mode and no world event window is open, the room's
+  entry script `scd0` is walked as the interpreter takes it: its blocks' tests (`Ck`, `CmpB`, `CmpW`; a
+  block with another test is left alone) choose the parts, and in the blocks that test a noted flag its
+  record writes (`WalAtariSet`, `EtcAtariSet`, `FlrAtariSet` and their `...2` forms) run again, as
+  entering would run them. Nothing else of the entry script runs (models, enemies, items, sounds, room
+  flags). The partner does not see the solving player's cutscene (as before: it was not a world event).
+* **An entry script that would undo a solution** (`coop_scd0`, `keep_solved`, `event.c bhInitEvent`): 9/31's
+  entry script clears `ev_flg` 5 on every entry. The self-destruct terminal's code (VERONICA, `sp_evt.c`)
+  sets it, and 9/30 starts the launch when entered with it set; a single player walks from the terminal
+  straight to 9/30. In co-op a partner entering 9/31 after the code (or a game loaded there) cleared it
+  for both, and with the card used up 9/30 never launched. The flag block is noted before the entry
+  script runs; a listed flag (`keep_solved`: 9/31, `ev_flg` 5) that was set and the script cleared is set
+  again at once, so the clear never reaches the partner. Of the other entry-script clears of flags other
+  rooms test (a census of all rooms), none undoes a solution: they re-arm transient state the room
+  sets again (lift floors 7/06 3/21 3/09 4/04 8/04, the piano's music 1/00..1/08, ambient voices
+  1/00 1/09 2/01, 6/05's entry cutscene, 9/28's fight, cutscene rooms).
+* **One player at a trigger** (`coop_examine`, `Pose.use`): `hitchk.c bhCheckExmAtari` asks before it takes
+  a type 3 trigger (examine: a message, a close-up, the scripts' "at trigger" test). Our pose carries the
+  trigger we examined + 1 while the game holds our player (`st_flg` 4: a message, a close-up, cinema) or we
+  are out of the game screen (a terminal), until 10 frames after we are free; the partner in the same room
+  and case does not take that trigger meanwhile ("<name> is using this", top of the screen, 3 s). `st_flg` 4
+  is also set every frame our busy flag (`flg & 4`) is: a busy flag left behind kept the trigger "in use"
+  for the partner too; the busy flag watchdog (`hold_watch`, "Enemies") frees both.
+* **A replayed event opens no terminal** (`coop_replayed_event`, `event.c bhEvtComSet`): a world event's
+  events run on the partner too, so the office computer's power-on (1/09, gate `ev_flg` 164: movie, then
+  `EvtComSet 7`) put the partner into the password screen. An event of the partner's block replayed here
+  (its task level in the replay window) skips the terminal; the rest of the event runs.
 
 ### Flags, pickups, game state
 
@@ -958,6 +1053,9 @@ floor or trigger, "Yes" chosen, an item used) hold only where the player did it.
   the session's code). A datagram from a new address that passes every check and carries the current
   partner's id **and** tag replaces the stale session at once. Session ids are random (`rdv_random`).
   The host remembers a partner that went without a goodbye and gives its rejoin the record.
+* A guest whose session ended while it played in the host's game (`own_cont`, until its title) and that joins
+  again with *Saved with the host* takes its current items as the fallback (`ITEMS_CURRENT`'s snapshots): the
+  host's record wins when the host has one, else they stay (not the new-game inventory).
 
 ### Game over
 
@@ -1033,10 +1131,10 @@ send time minus the echoed datagram's arrival. Sample = arrival - our clock - th
 smoothed (EWMA 0.1). The name tag's point goes with the recorded frame (`stream_point`) and is
 interpolated with the in-between frames; it snaps on camera cuts and in vanilla mode.
 
-## Protocol 24
+## Protocol 26
 
-`COOP_VERSION` is **24**; both players need builds with the same version (a mismatch is reported,
-e.g. "the host runs co-op protocol 23, we 24: both need the same build"). The co-op server does not
+`COOP_VERSION` is **26**; both players need builds with the same version (a mismatch is reported,
+e.g. "the host runs co-op protocol 25, we 26: both need the same build"). The co-op server does not
 look at the game protocol. Version history in short: 11 join code, 1200-byte datagrams, checked
 events, `EV_ATR`; 12 `EV_FX`; 13 `EV_GRANT`; 14 `EV_TSCREEN`; 15 `EV_GONE`; 16 player id and rejoin
 tag, `EV_OWN`; 17 trade requests; 18 voices; 19 the game rules `OPT_IMPORTANT`, `OPT_NO_RIBBON`,
@@ -1049,7 +1147,7 @@ make other enemies from the same seed); 21 `COOP_HIT_PRECISE` in `EV_ENE_HIT` (t
 and `OPT_SKIP_DETECTOR`, `PF_GAME_OVER`, `EV_BLOB` `pad` 2 and the `EV_OWN` `tid` (see "Game over",
 "Metal detector"); 23 the game rule `OPT_QUICK_START` (see "Quick start"; it takes the last free bit of
 `Pose.opts`, so a further rule needs a field of its own); 24 enemy slots 0..254 (`COOP_ENE_SLOTS`, the PC's
-255 slots) in every slot field, and `EV_FX` marks its `FX_*` references in `refs` (the bytes 253..255 are slots now). `Pose.pflg` and `Pose.flr` were added inside protocol 18,
+255 slots) in every slot field, and `EV_FX` marks its `FX_*` references in `refs` (the bytes 253..255 are slots now); 25 `Pose.use`, the trigger the sender is using (one player at a puzzle at a time, see "Puzzles"; the pose grew to 112 bytes); 26 `EneSnap.id`, the enemy type in the slot: a snapshot applies only to a slot holding the same type (`hokan_count` is 16 bits now; the snapshot stays 100 bytes). `Pose.pflg` and `Pose.flr` were added inside protocol 18,
 `Pose.rcase` inside protocol 22, the aim pitch in `Pose.pflg`'s spare bits inside protocol 23 (0 means "not
 sent", and receivers fall back; a receiver before the pitch reads `pflg & 6` only and keeps the straight pose).
 
@@ -1062,7 +1160,7 @@ At most `COOP_DGRAM_MAX` = 1200 bytes (below every internet path MTU). A frame's
 as many datagrams as needed, each starting with the pose so each is useful alone:
 
 ```
-Pose (108) | Event x nev (88 each, nev <= 16) | EneSnap x nene (100 each, nene <= 48) | PoseExt (92, if PF_EXT)
+Pose (112) | Event x nev (88 each, nev <= 16) | EneSnap x nene (100 each, nene <= 48) | PoseExt (92, if PF_EXT)
 ```
 
 The size must be exactly that sum. The first datagram of a frame carries the `PoseExt`. Up to 16
@@ -1075,7 +1173,7 @@ over its datagrams.
 | `PKT_BYE` 2 | Goodbye: a bare `Pose`, sent three times by every stop and at exit. `reject` 3 (`COOP_REJ_REMOVED`): the host removed us. |
 | `PKT_REJECT` 3 | Host to a sender it will not adopt: `reject` 1 wrong join code, 2 already has a partner. At most one per second. |
 
-### Pose (108 bytes)
+### Pose (112 bytes)
 
 | Bytes | Fields |
 |---|---|
@@ -1084,6 +1182,7 @@ over its datagrams.
 | 32-39 | `chr`, `costume`, `stg`, `rom`, `pos` (room entry point), `opts` (host's game rules: `OPT_INDIVIDUAL` 1, `OPT_TRADE_FREEZE` 2, `OPT_IMPORTANT` 4, `OPT_NO_RIBBON` 8, `OPT_SKIP_SYNC` 16, `OPT_GAMEOVER_BOTH` 32, `OPT_SKIP_DETECTOR` 64, `OPT_QUICK_START` 128), `regroup` (host counter), `mfile` (sender's own part file - 10) |
 | 40-91 | position (3 floats), angles (3 ints), `mtn_no`, `frm_no` (the frame shown, before the step's advance: `actor_frame`), `mtn_md`, `hokan_count`, `hokan_rate`, `wpnr_no`, `hp`, `mode0`, `mode1`, `nev`, `nene` |
 | 92-107 | `stflg`, `ev_ack` (highest event id applied from the peer), `mset` (`MSET_OWN` -1, `MSET_ROOM` -2, `MSET_NONE` -3, or an enemy slot 0..254), `busy` (`BUSY_NONE/EVENT/MENU/BOX/TRADE`), `reject` (`PKT_BYE`, `PKT_REJECT`) or, in `PKT_POSE`, `rcase` (the room case of the room the sender is in + 1, 0 not sent; same room means the same case too, and the follow loads it), `voice_n`, `voice`, `pflg` (`flg & 6`: hit / held; bits 0 and 3-7 the aim pitch, -31..31 steps of 60/31 degrees, 0 straight or not sent: `coop_pitch_get`), `flr` (`flr_no + 3`, 0 not sent) |
+| 108-111 | `use` (the room trigger the sender examined and is held by + 1, 0 none: the partner does not take it meanwhile), 3 spare bytes (zero, else refused) |
 
 `flags`: `PF_IN_GAME` 1, `PF_VISIBLE` 2, `PF_ROOM_MTN` 4, `PF_WANT_BLOB` 8 (joiner asks for the
 game state), `PF_EXT` 16 (a `PoseExt` follows), `PF_CINE` 32 (in a cutscene its skip button could
@@ -1109,7 +1208,10 @@ skips at once.
 
 Slot (0..254), `mode[4]`, model index (`mlwP` as index into the enemy's `mdl[]`, -1..15), motion set (offset
 0..511 from the enemy's own set, `MNW_ROOM`, `MNW_KEEP`), `flg flg2 stflg mdflg`, position, angles,
-`mtn_no` (< 512), `frm_no`, `mtn_md`, `hokan_count`, `hokan_rate`, hp, hit capsule `watr[7]`.
+`mtn_no` (< 512), `frm_no`, `mtn_md`, `hokan_count` (16 bits), the enemy type `id` (< 100) and a zero byte, `hokan_rate`,
+hp, hit capsule `watr[7]`. The receiver applies an active slot's snapshot only to an enemy of the same `id` (the slot
+layouts differ where one side made an enemy the other did not: a moth's leader, children, eggs), and not a new
+enemy's (`mode[0]` 0) to one whose own Init ran.
 
 ### Events
 
@@ -1191,7 +1293,7 @@ stream or game):
   slots < 255; transfer chunks aligned and inside the total; effect ids < 400, references an enemy
   slot or `FX_*`; world-record objects in slots 4..31; grant positions within the save format;
   `EV_SKIP` only `SKIP_GO` in a room 0..9 / 0..99.
-* Every snapshot: slot < 255, model index -1..15, motion set and motion < 512, finite floats.
+* Every snapshot: slot < 255, model index -1..15, motion set and motion < 512, enemy type < 100, finite floats.
 
 Then, when applying:
 
@@ -1243,14 +1345,28 @@ the session's code. A takeover needs a non-zero tag that matches.
 
 ## Known limits and risks
 
+* A black (or frozen) screen while you can move: a script's fade to black whose fade-in never ran, or the
+  under-water view's full-screen picture left on without its effect, after co-op cut a script step short.
+  After 3 s in normal play (no event, scene, door or menu) the screen fades in / the room is drawn again
+  (`coop_glue.c screen_guard`, logged "the screen stayed black" / "the room was not drawn"); before, it lasted
+  until the next door.
 * UDP and IPv4 only; networks that block UDP cannot play (no TCP fallback).
 * Two players only.
 * Only zombie (en01) grabs are handed over to the joiner's game; other grabbers reach the joiner as
-  a hit. A handover takes a few round trips during which that zombie stands still.
+  a hit. A larva the host's moth lays on the joiner rides on the joiner's stand-in in the host's game only
+  (at most three; its bites reach the joiner as hp loss; it goes when the joiner leaves the room). A handover takes a few round trips during which that zombie stands still.
 * The partner has no facial animation and no aim pitch.
 * Some effects are not mirrored: those whose caller sets a matrix or a pointer the record cannot
   name (e.g. Alexia's acid, shell casings) and blood pools.
 * A cutscene the joiner triggers alone plays only for the joiner (its flags reach the host).
+* A puzzle solved by the partner's own steps in our room changes our room's walls and triggers
+  (its entry script's), not its models, lights or effects: those follow when the room is entered again.
+* One player at a trigger: two presses on the same trigger within one pose's trip (a ping) both
+  get in.
+* A room whose entry script writes world flags sets them for both when either enters (the lifts'
+  floor, the palace piano's music, ambient voices, a room's entry cutscene: transient state that the
+  room sets again). Of the clears that undo a solution only 9/31's is kept from it (see "An entry script
+  that would undo a solution").
 * Of a world event's results that depend on local state (per-room flags, timing), only collision
   and object placement are synced afterwards.
 * Both taking one pool item (shared loot): the player who gives it back gives the amount a pickup
@@ -1298,6 +1414,9 @@ Environment variables for headless and scripted runs. Frames are co-op frames un
 | `RECVX_COOP_VOMIT="hostframe,..."` | Host: the walking zombie nearest the partner vomits. |
 | `RECVX_COOP_CRAWL="hostframe,..."` | Host: its walking zombies become crawlers (as a knock-down with little health left), which crawl towards their target and grab its legs. |
 | `RECVX_COOP_ORPHAN=frame` | Put our player in a grab with no holder, 3 m off (failsafe test). |
+| `RECVX_COOP_STALE="hostframe,..."` | Our player's busy flag set with no enemy to clear it (the busy flag watchdog's test). |
+| `RECVX_COOP_LARVA="hostframe,..."` / `RECVX_COOP_HATCH="hostframe,..."` | A moth's larva on our player (as one carried into a room) / our larvae hatch now (not while held). |
+| `RECVX_COOP_BUSYLOG=n` | Every n frames: our player's busy flag, modes, motion, whether the status screen is open, the larvae (count, the last one's mode2/mode3 and player: 1xx ours, 2xx the partner's). |
 | `RECVX_COOP_FX=0` | Send no `EV_FX`. |
 | `RECVX_COOP_GOTO="hostframe:x:z:angle,..."` | Our player alone to x/z, facing angle (0..65535), at that host frame. |
 | `RECVX_COOP_PAD="hostframe:hex,..."` | These game pad bits pressed for one frame (`b00` confirm/Cross, `10000` the cutscene skip button). |
@@ -1319,7 +1438,7 @@ Environment variables for headless and scripted runs. Frames are co-op frames un
 | `RECVX_INF_HEALTH=1` | The F2 infinite-health cheat (survive grabs in tests). |
 
 General test aids used with these (`RECVX_TELEPORT`, `RECVX_WARP`, `RECVX_EQUIP`, `RECVX_FLAGS`,
-`RECVX_SKIP_CINE`, `RECVX_SPAWN`, `RECVX_KEYS`, `RECVX_MENU_MOUSE`, `RECVX_EXIT_FRAME`,
+`RECVX_SKIP_CINE`, `RECVX_SPAWN`, `RECVX_KEYS`, `RECVX_TEST_EXAMINE`, `RECVX_TEST_ROOMFLAGS`, `RECVX_MENU_MOUSE`, `RECVX_EXIT_FRAME`,
 `RECVX_TRACE_SND`, `RECVX_DUMP_*`) are listed in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ctest `coop` (`pc/tests/test_coop.c`) checks every event type from the side that sends it and

@@ -154,12 +154,16 @@ void  coop_player_unload(void);                /* system.c bhSysCallMonitor: the
 struct BH_PWORK;
 int   coop_enemy_begin(struct BH_PWORK* ep);   /* 1 = step done (client puppet) */
 void  coop_enemy_end(struct BH_PWORK* ep);
+int   coop_partner_step(void);                 /* 1 while an enemy's step runs against the partner's stand-in (plp) */
 void  coop_scd1(void);                         /* event.c bhControlEvent: runs the room's per-frame script */
 void  coop_fx_player(void);                    /* game.c, before bhControlPlayer: our step's effects to the partner */
 int   coop_fx_step(int i, int after);          /* effect.c bhControlEffect, around effect i's step (1 before: call after) */
 void  coop_item_granted(int item);            /* sub1.c GetItem: an event gave us this item without asking */
 void  coop_item_taken(int bit, int etc);      /* event.c bhItmCk: we took the item of trigger etc, its it_flg bit */
 void  coop_item_late(int bit);                /* event.c bhItmCk: we took an item whose it_flg bit was set already (the partner was first) */
+int   coop_examine(int etc);                  /* hitchk.c bhCheckExmAtari: we examine trigger etc; 1: the partner is using it (not now) */
+int   coop_replayed_event(void);              /* event.c bhEvtComSet: the running event is one of the partner's, replayed (no terminal) */
+void  coop_scd0(int after);                   /* event.c bhInitEvent: before (0) and after (1) the room's entry script (a solved flag kept) */
 void  coop_retry_point(void);                 /* room.c bhPushGameData: our continue point moved (the host keeps the guest's items with it) */
 int   pc_no_ink_ribbon(void);                 /* typewriters save without an ink ribbon (setting; in co-op the host's rule) */
 int   pc_detector_skipped(void);              /* co-op rule "Metal detector: Skipped" (pc/glue/detector_glue.c): event.c bhPlItemCheck in 0/9 finds no metal */

@@ -40,9 +40,9 @@ settings menus) hook into the game through small glue functions.
 | `pc/src/audio/` | CRI ADX (ADXF/ADXT), SDL audio output, the TSNDDRV sound driver (high-level emulation) and its synthesizer |
 | `pc/src/movie/` | PSS demuxer, MPEG-2 decoder, movie player |
 | `pc/src/input/` | DualShock 2 emulation (`pad.c`), bindings, third-person input, mouse in menus |
-| `pc/src/host/` | entry point (`host.c`), render loop, settings table and `recvx.ini`, native save files (`savestore.c`), F1/F2/F3/F4 overlay (Dear ImGui), logging, profilers, model catalogue |
+| `pc/src/host/` | entry point (`host.c`), render loop, settings table and `recvx.ini`, native save files (`savestore.c`), F1/F2/F3/F9 overlay (Dear ImGui), logging, profilers, model catalogue |
 | `pc/src/net/` | co-op UDP, packet formats, port mapping, rendezvous client and protocol |
-| `pc/src/import/` | F4 imports from other games' discs (glTF export, `.cvxm` player models): [IMPORT_OUTBREAK.md](IMPORT_OUTBREAK.md) |
+| `pc/src/import/` | F9 imports from other games' discs (glTF export, `.cvxm` player models): [IMPORT_OUTBREAK.md](IMPORT_OUTBREAK.md) |
 | `pc/server/` | `recvx-server` and the `recvx-client` test tool |
 | `pc/tests/` | ctest programs |
 | `pc/tools/` | code generators (`asm2c.py`, `vsm2inc.py`), room and map tools, test and comparison scripts |
@@ -511,6 +511,12 @@ village, collision. The render thread (GS emulation, replays: `r_exec`, `r_inter
   while `g_tps.pad_play` (third-person play, the game not frozen) and then take their buttons over
   from the game rows; an input held when that changes counts for neither set until let go
   (`pad_row_reads`).
+  Mouse buttons (`tps_input.c`, main thread, read by `pad.c` as `tps_mouse_buttons`): in third
+  person while the mouse is captured; with the fixed cameras a press counts only when made while
+  the player has control (`g_menu_mouse.play`), no menu screen (`g_menu_mouse.active`) or overlay is
+  up, the window has focus and not within 300 ms of getting it (the focusing click), and the input
+  source is not Gamepad only. It holds until released; a menu screen, an overlay or focus loss
+  drops it, so the click that closes a menu is never a game press.
 - **Input source** (`input_source`, `input_pad`): Gamepad only sets
   `SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS` at run time (`bind_apply_source`), so the pad keeps
   working without focus; an environment variable `SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS=1` wins
@@ -793,6 +799,11 @@ called by the game thread.
 - `--log[=file]` copies all output (the game's own diagnostics and the port's messages) to a log
   file with a timestamp per line; a crash appends a backtrace (Windows: exception address and
   frame chain).
+- Every crash, with or without `--log`, writes `recvx-crash.log` to the current directory (where
+  `--log` puts `recvx.log`; the game's folder for the release builds): the version, the signal or
+  exception with the backtrace or frame chain, and the last 48 `host_log` messages (kept in memory,
+  IPv4 addresses masked) - a few KB for bug reports (`host/log.c`). Addresses resolve with
+  `addr2line -f -e recvx` (Windows: `i686-w64-mingw32-addr2line -f -e recvx.exe`): the image base is fixed.
 - `--profile[=file]` writes one CSV line per game frame: total frame time and exclusive time in
   game logic, VU0, VU1, GS emulation + GL submission, interpolation, presentation and idle wait.
   F1 -> Performance shows the same live. The native `CALCPOINT` (single calls and runs) is not
@@ -820,7 +831,7 @@ and game frames for game-state aids, as noted. Co-op test aids (`RECVX_COOP_*`,
 | `RECVX_ISO=path` | the disc image (as on the command line) |
 | `RECVX_MODS=dir` | mods folder (default `./mods`) |
 | `SDL_VIDEO_DRIVER=offscreen` | headless run |
-| `RECVX_SHOW_OVERLAY=1` / `=2` / `=3` / `=4` | open the F1 overlay / the cheats window (F2) / the co-op window / the import window (F4) at start |
+| `RECVX_SHOW_OVERLAY=1` / `=2` / `=3` / `=4` | open the F1 overlay / the cheats window (F2) / the co-op window / the import window (F9) at start |
 | `RECVX_IMPORT=outbreak2`, `RECVX_IMPORT_ISO`, `RECVX_IMPORT_WHAT` | headless import, then exit ([IMPORT_OUTBREAK.md](IMPORT_OUTBREAK.md)) |
 | `RECVX_EXIT_FRAME=n` | exit at presented frame n |
 | `RECVX_WATCHDOG=sec` | Linux: print a backtrace after sec seconds and exit |
@@ -834,7 +845,7 @@ and game frames for game-state aids, as noted. Co-op test aids (`RECVX_COOP_*`,
 | Variable | Effect |
 |---|---|
 | `RECVX_INPUT="frame:buttons,..."` | scripted pad input by presented frame, e.g. `200:start,205:-` |
-| `RECVX_KEYS="f:key+key,f:-,f:@x:y"` | hold keyboard keys (SDL names, `_` for a space) from presented frame f, sent as key events; `@x:y` left-clicks at a window pixel, `@x:y:r` right-clicks |
+| `RECVX_KEYS="f:key+key,f:-,f:@x:y"` | hold keyboard keys (SDL names, `_` for a space; `Mouse_Left` .. `Mouse_X2` a mouse button) from presented frame f, sent as key and button events; `@x:y` left-clicks at a window pixel, `@x:y:r` right-clicks |
 | `RECVX_VPAD="f:input+input,..."`, `RECVX_VPAD_TYPE=xbox\|ps5\|generic` | a virtual SDL gamepad holding inputs (ini spelling) from frame f; `axis=value` holds an axis at -1..1 (`leftx=0.5+lefty=-0.5`: the left stick half up-right) |
 | `RECVX_MENU_MOUSE="f:x:y[:act],..."` | scripted mouse in menus (window pixels; act `l`/`r` click, `L`/`U` left down/up, `w`/`s` wheel) |
 | `RECVX_TPS_MOUSE="frame:dx:dy,..."` | scripted third-person mouse motion |
@@ -844,14 +855,16 @@ and game frames for game-state aids, as noted. Co-op test aids (`RECVX_COOP_*`,
 
 | Variable | Effect |
 |---|---|
-| `RECVX_TELEPORT="f:stg:rom:pos,..."` | teleport at game frame f |
+| `RECVX_TELEPORT="f:stg:rom:pos[:case],..."` | teleport at game frame f (into that room case; else ours as it is) |
 | `RECVX_TP_NAME="f:entry:room name,..."` | the teleport lists' room of that name (as the menus show it, e.g. `60:1:Prison: Obs. R`), then their Teleport; frames as `RECVX_TELEPORT`. `RECVX_TP_LIST=1` logs every listed room with its entries (`pc/src/host/teleport.c`) |
-| `RECVX_PLAYER=n` | the first teleport switches the played character to `ply_id` n (as the script op `bhPlayerChangeSet`) |
+| `RECVX_PLAYER=n`, `RECVX_PLAYER=n:k` | the first (the k-th) teleport switches the played character to `ply_id` n (as the script op `bhPlayerChangeSet`) |
 | `RECVX_WARP="stg:rom:f:x:z:angle,..."` | move the player to x/z f frames after entering that room |
-| `RECVX_EQUIP="f:item:count[;f:item:count]"` | equip a weapon at game frame f (again later after `;`) |
+| `RECVX_EQUIP="f:item:count[;f:item:count]"` | equip a weapon at game frame f (again later after `;`), once the player is in play with the weapon down (as the inventory) |
 | `RECVX_HP="f:hp,..."`, `RECVX_RETRY="f,..."` | set health / set a retry point (Continue resumes in that room) at game frame f |
 | `RECVX_TEST_TYPEWRITER="f,..."` | open the typewriter's save screen at game frame f (as its ink ribbon question's "yes"; no ribbon needed) |
 | `RECVX_TEST_COMPUTER="f:n,..."` | open computer terminal n at game frame f, as the room scripts' `EvtComSet n` (1 self-destruct lock, 2 security lock, 3 Albinoid file, 4-6 3D scanner, 7 password; rooms 9/31, 1/2, 3/12, 0/9, 1/9) |
+| `RECVX_TEST_EXAMINE="f:etc,..."` | the action button on room trigger `etc` at game frame f, wherever the player stands: the scripts' "at trigger" test and the trigger's message, as `bhCheckExmAtari` takes a type 3 trigger (co-op: refused while the partner uses it), e.g. `600:13` the main hall's terminal (1/2), `600:7` the office computer (1/9) |
+| `RECVX_TEST_ROOMFLAGS="f:mask,..."` | `rm_flg \|= mask` (hex; script bit n is `0x80000000 >> n`) at game frame f: a room puzzle's local step without its input, e.g. `600:14800000` in 1/5 with `ev_flg` 146 set: the switch panel answered C, E, decide (solved) |
 | `RECVX_FLAGS="set:bit,..."` | set story flags at the first game frame (1 `ev_flg`, 2 `ky_flg`, 3 `ed_flg`, 7 `it_flg`, 8 `mp_flg`) |
 | `RECVX_INF_AMMO=1`, `RECVX_INF_HEALTH=1`, `RECVX_UNLOCK=1` | infinite ammo / health / unlock all cheats on (unlock all logs each key it uses: `unlock: item N used in S/R, taken` or `nothing reacts`). `RECVX_UNLOCK="f:0/1,..."` switches unlock all at game frame f; a switch in a room logs each lock the entry script set up by the key: `unlock: S/R entry script block X now takes its then/else part` |
 | `RECVX_NOCLIP="f:mode,..."` | noclip mode 0/1/2 from game frame f, logs position every 15 frames |

@@ -12,6 +12,7 @@
 #include <math.h>
 
 void host_log(const char* fmt, ...);
+void bhCheckMothEgg(void);   /* player.c (its header clashes with libc's macros here) */
 
 void coop_test_aids(CoopTest* t)
 {
@@ -133,6 +134,48 @@ void coop_test_aids(CoopTest* t)
             }
             host_log("coop: test: %d zombies crawl now (host frame %u)\n", n, t->frame);
             cr = strchr(cr, ',') ? strchr(cr, ',') + 1 : NULL;
+        }
+    }
+    {   /* test aid: RECVX_COOP_BUSYLOG=n: every n frames our player's busy flag (flg 4: no inventory, no examining), its
+           mode and motion, and whether the status screen is open (st_flg 8) */
+        static int bl = -1;
+        if (bl < 0) bl = getenv("RECVX_COOP_BUSYLOG") ? atoi(getenv("RECVX_COOP_BUSYLOG")) : 0;
+        if (bl > 0 && sys && plp && t->frame % bl == 0) {
+            int k, nl = 0, lm = -1;   /* the moth's larvae (en27): how many, the last one's mode2 mode3 and on whom (1xx us, 2xx the partner) */
+            for (k = 0; k < (int)sys->ewk_n && k < PC_ENE_SLOTS; k++)
+                if ((ene[k].flg & 0x1) && ene[k].id == 27 && ++nl) lm = ene[k].mode2 * 10 + ene[k].mode3 + (ene[k].lkwkp == (unsigned char*)plp ? 100 : ene[k].lkwkp == (unsigned char*)t->partner ? 200 : 0);
+            host_log("coop: test: busy %d (flg %x stflg %x) mode %d.%d.%d.%d motion %u own set %d hp %d, status screen %d, in game %d, larvae %d (%d) at host frame %u\n", (plp->flg & 4) != 0, plp->flg, plp->stflg,
+                     plp->mode0, plp->mode1, plp->mode2, plp->mode3, plp->mtn_no, plp->mnwP == plp->mnwPb, plp->hp, (sys->st_flg & 0x8) != 0, t->in_game, nl, lm, t->clock);
+        }
+    }
+    {   /* test aid: RECVX_COOP_STALE="hostframe,...": our player's busy flag set as an enemy's attack sets it (flg 0x10004,
+           stflg 0x10000), with no enemy to clear it (the hold watchdog's test) */
+        static const char* sb = (const char*)-1;
+        if (sb == (const char*)-1) sb = getenv("RECVX_COOP_STALE");
+        if (sb && sys && plp && t->in_game && plp->mode0 == 1 && t->clock >= (unsigned)atoi(sb)) {
+            plp->flg |= 0x10004;
+            plp->stflg |= 0x10000;
+            host_log("coop: test: our player busy with no enemy at host frame %u\n", t->clock);
+            sb = strchr(sb, ',') ? strchr(sb, ',') + 1 : NULL;
+        }
+    }
+    {   /* test aid: RECVX_COOP_LARVA="hostframe,...": a moth's larva on our player (its stflg bit and the en27 enemy, as
+           player.c bhCheckMothEgg makes the ones carried into a room); RECVX_COOP_HATCH="hostframe,...": the larvae on our
+           player hatch now (en27 BR00 on its floor or timer) */
+        static const char* lv = (const char*)-1;
+        static const char* ht = (const char*)-1;
+        int k;
+        if (lv == (const char*)-1) { lv = getenv("RECVX_COOP_LARVA"); ht = getenv("RECVX_COOP_HATCH"); }
+        if (lv && sys && plp && t->in_game && t->clock >= (unsigned)atoi(lv)) {
+            if (!(plp->stflg & 0x38000000)) { plp->stflg |= 0x8000000; bhCheckMothEgg(); }
+            host_log("coop: test: a larva on our player at host frame %u\n", t->clock);
+            lv = strchr(lv, ',') ? strchr(lv, ',') + 1 : NULL;
+        }
+        if (ht && sys && plp && t->in_game && t->clock >= (unsigned)atoi(ht) && !(plp->flg & 0x4) && !(plp->stflg & 0x30)) {   /* (as BR00: not while held) */
+            for (k = 0; k < (int)sys->ewk_n && k < PC_ENE_SLOTS; k++)
+                if ((ene[k].flg & 0x1) && ene[k].id == 27 && ene[k].lkwkp == (unsigned char*)plp && ene[k].mode0 == 1 && ene[k].mode2 == 0) { ene[k].mode2 = 1; ene[k].mode3 = 0; }
+            host_log("coop: test: our larvae hatch at host frame %u\n", t->clock);
+            ht = strchr(ht, ',') ? strchr(ht, ',') + 1 : NULL;
         }
     }
     {   /* test aid: RECVX_TRADE_TRACE: the room's enemies every 10 frames (the trade screen's freeze) */

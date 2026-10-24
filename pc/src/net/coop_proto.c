@@ -6,7 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-_Static_assert(sizeof(Pose) == 108, "wire: Pose");
+_Static_assert(sizeof(Pose) == 112, "wire: Pose");
 _Static_assert(sizeof(PoseExt) == 92, "wire: PoseExt");
 _Static_assert(sizeof(Event) == 88, "wire: Event");
 _Static_assert(sizeof(EneSnap) == 100, "wire: EneSnap");
@@ -25,6 +25,7 @@ int coop_check_pose(const Pose* p)
     if (p->busy > BUSY_TRADE || p->mset < MSET_NONE || p->mset >= COOP_ENE_SLOTS) return COOP_BAD_FIELD;
     if (p->flr > 32) return COOP_BAD_FIELD;   /* flr_no + 3: rooms have floors -2..29 (rom->grand[2 + flr_no], 32 entries); 0 not sent */
     if (p->rcase > 10) return COOP_BAD_FIELD;   /* room case + 1: cases 0..9 (one digit of the file name); 0 not sent */
+    if (p->spare[0] | p->spare[1] | p->spare[2]) return COOP_BAD_FIELD;   /* (a later field's: zero until then) */
     if ((p->flags & ~PF_ALL) || (p->opts & ~OPT_ALL)) return COOP_BAD_FIELD;   /* only the flags and game rules this protocol has */
     return COOP_OK;
 }
@@ -54,7 +55,7 @@ int coop_check_dgram(const void* buf, int n, const char* code, int* nev, int* ne
 
 int coop_check_snap(const EneSnap* s)
 {
-    if (s->idx >= COOP_ENE_SLOTS || s->mdl < -1 || s->mdl >= 16) return COOP_BAD_FIELD;
+    if (s->idx >= COOP_ENE_SLOTS || s->mdl < -1 || s->mdl >= 16 || s->id >= 100 || s->pad) return COOP_BAD_FIELD;   /* id: bhJumpEnemy[100] */
     if (s->mnw != MNW_ROOM && s->mnw != MNW_KEEP && (s->mnw < 0 || s->mnw >= COOP_MNW_MAX)) return COOP_BAD_FIELD;
     if (s->mtn_no < 0 || s->mtn_no >= COOP_MNW_MAX || s->frm_no < 0) return COOP_BAD_FIELD;
     if (!fin(s->px) || !fin(s->py) || !fin(s->pz) || !fins(s->watr, 7)) return COOP_BAD_FLOAT;

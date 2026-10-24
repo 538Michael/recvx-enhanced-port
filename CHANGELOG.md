@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.6.9 (2026-10-24)
 
 ### Gameplay
 
@@ -9,27 +9,49 @@
 
 ### Controls
 
-- **Combined controls** (CONTROLS, now the default): the left stick walks where it points on
-  screen, the d-pad drives with tank controls, like in the Resident Evil HD remaster.
-- **Enter in OPTION**: on the keyboard, Enter now selects every OPTION entry, including ENHANCED
-  SETTINGS and RETURN TO TITLE with its yes/no question, without opening anything else afterwards.
+- **Combined controls** (CONTROLS, now the default): the left stick is for free 3D movement, the
+  d-pad for tank controls, like in the Resident Evil HD remaster.
+- **Aim without auto-aim**: hold the left trigger (E on the keyboard) to aim where your character
+  faces, without turning to the nearest enemy; the normal aim button keeps the auto-aim.
+- **Mouse buttons in fixed camera**: a mouse button bound to a game button now works while
+  you play, e.g. right mouse to aim and left mouse to fire. Clicks in menus stay menu clicks.
 
 ### Co-op
 
 - **Brighter lobby models**: the characters in the lobby are now lit like in a photo studio, so
   faces and clothes are clearly visible instead of almost black.
-- **Model list in the lobby**: MODEL now opens a scrollable list of all models (also with the mouse
-  wheel) that shows each one in the preview as you move through it, so finding the one you want is
-  quicker.
+- **Model list in the lobby**: MODEL now opens a scrollable list of all models that shows each one
+  in the preview as you move through it, so finding the one you want is quicker.
+- **One player per puzzle**: while you use a puzzle, a code terminal or anything else you examined,
+  your partner cannot open the same one at the same time ("... is using this").
 
 ### Fixes
 
-- **Reload with the side pack**: once you have the side pack, ammo in the bag's last two slots now
-  reloads your weapon, both with the Reload button and when you fire on an empty magazine, as in the
-  original. Before, that ammo was skipped and you had to combine it in the inventory yourself.
-- **Sub machine gun reload crash**: reloading the sub machine gun, with the Reload button or by
-  firing on an empty magazine, no longer crashes the game. It has no reload animation, so the ammo
-  goes in at once and you keep aiming.
+- **Co-op puzzles solved by your partner**: now also count as solved for you when you are in the
+  same room. Before, the puzzle could reopen empty and keep you stuck, or its door stayed locked.
+- **Co-op: self-destruct code undone**: your partner entering the Antarctic base's terminal room
+  after the code was entered no longer resets it, so the launch starts for both.
+- **Co-op bosses**: the plane's Tyrant hurts both players again, Alexia's first form no longer gets
+  stuck after grabbing the joining player, and the Gulp Worm and Nosferatu hit the joining player
+  properly.
+- **Co-op crash with Alexia's second form**: the joining player's game no longer crashes in certain
+  conditions.
+- **Reload with the side pack**: ammo in the bag's last two slots now reloads your weapon.
+- **Sub machine gun reload crash**: reloading the sub machine gun no longer crashes the game.
+- **Binding the triggers or sticks**: binding LT, RT or a stick direction in ENHANCED SETTINGS no
+  longer switches the menu page.
+- **Co-op: inventory and actions locked**: after an enemy attack you could no longer open the
+  inventory, examine or use doors until you changed rooms. Fixed.
+- **Co-op: stuck after a moth larva**: the host could stay in the throwing-it-off animation for good.
+  Fixed.
+- **Co-op: items kept when joining again**: after the host's game crashed, the joining player
+  could come back with only the starting items. They now keep their items.
+- **Co-op crashes**: fixed several crashes, mostly for the joining player in the late game (moths,
+  boss helpers) and when changing weapons while new enemies appeared.
+- **Co-op black screen**: there were some occurrences of a black screen that did not fade away.
+  Those cases were adjusted so it properly fades away again.
+- **Crash reports**: a crash now always writes a small `recvx-crash.log` next to the game. Attach it
+  to a bug report; IP addresses are hidden in it.
 
 ## 0.6.8 (2026-10-23)
 

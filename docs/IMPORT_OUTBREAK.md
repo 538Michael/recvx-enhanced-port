@@ -1,12 +1,11 @@
 # Importing from Resident Evil Outbreak File #2
 
-**Private work (local branch `outbreak-import`), not for the public repository yet.** Nothing from
-any disc is committed: the importer reads the user's own image in place and writes what it
-extracts to the user's mods folder (`mods/import/outbreak2/`, or `import_dir`).
+Nothing from any disc is in the repository: the importer reads the user's own image in place and
+writes what it extracts to the user's mods folder (`mods/import/outbreak2/`, or `import_dir`).
 
 Goal: take the character models of *Resident Evil Outbreak File #2* (US, SLUS-20984) and use them
 as player models in this port ("You appear as", [ACTORS.md](ACTORS.md#you-appear-as)); later
-voices and the social-call ("ad-lib") animations for co-op. The F4 window runs the extraction and
+voices and the social-call ("ad-lib") animations for co-op. The F9 window runs the extraction and
 lists what was extracted; it is built so other games can be added as further sources.
 
 ## PROGRESS
@@ -16,7 +15,7 @@ lists what was extracted; it is built so other games can be added as further sou
 | 1. Format research | done: disc layout, archives, compression, model and texture format ("Disc format") |
 | 2. Extractor (C, `pc/src/import/`) | done: every character model on the disc (537: 30 playable, 40 cutscene / high detail, 276 NPCs, 191 enemies) to glTF + PNG |
 | 3. Conversion to CVX player models | done for every model on the human skeleton (324: all 30 playable, 39 of 40 cutscene / high detail, 238 of 276 NPCs, 17 enemies): `.cvxm`, listed in "You appear as", skinned every frame, retargeted from the player's motions; checked in game (walk, aim, grabs, third person, cutscenes) |
-| 4. F4 window | done: disc image, what to extract (four groups), progress, results grouped (playable, cutscene / high detail, NPCs, enemies) from the manifest (also after a restart) |
+| 4. F9 window | done: disc image, what to extract (four groups), progress, results grouped (playable, cutscene / high detail, NPCs, enemies) from the manifest (also after a restart) |
 | 5. Notes for later (voices, ad-libs, animations) | first findings ("Notes for later") |
 | 6. Verification | headless extraction, glTF/`.cvxm` checks and previews, in-game shots, ctest (`import`, `appear`), Linux and Windows builds, layout check |
 | 7. Posture (round 2) | fixed: the retargeting's rest correction bent the imported meshes (hunched shoulders, head down); imported models now take the source's rotations as they are; the left arm's two-handed grip scaled to the model's shoulders, the palm onto the gun ("Posture") |
@@ -27,7 +26,7 @@ lists what was extracted; it is built so other games can be added as further sou
 | 12. Grip (round 3) | the support hand under the gun again: below the gun hand, fingers along the gun, compared with Claire's and Chris's grips ("Posture") |
 | 13. Blink (round 4) | fixed: the whole forehead moved with the lids; the upper lid's weights are now set from the height (the lid only) and it closes by its own measured opening ("Faces") |
 | 14. Grip (round 4) | retuned: the support hand hung low and its fingers reached far past the grip; now right under the gun hand on the centre line, for all 8 characters ("Posture") |
-| 15. Lobby list (round 4) | main's MODEL page lists all imports, grouped with headers; scroll bar click; checked with 384 entries ("F4 window") |
+| 15. Lobby list (round 4) | main's MODEL page lists all imports, grouped with headers; scroll bar click; checked with 384 entries ("F9 window") |
 
 Resume notes: build with `cmake --build build`; headless run:
 `RECVX_MODS=<out> RECVX_IMPORT=outbreak2 RECVX_IMPORT_ISO=<image> build/pc/recvx --save-dir <tmp>`
@@ -164,7 +163,7 @@ no character models (checked: every `.nbd` in them is a room, an object or an ef
 Output per model in `<dir>/outbreak2/<id>/`: `<id>.glb` (viewable in Blender: one skinned mesh, a
 primitive per texture, the full skeleton, scale 0.01 to metres, textures embedded),
 `<id>_tex<k>.png`, and for every model on the human skeleton `<id>.cvxm`. `<dir>/outbreak2/manifest.txt`
-lists every model (counts, whether it is a player model, failures with their reason); F4 shows
+lists every model (counts, whether it is a player model, failures with their reason); F9 shows
 it, also after a restart, and the registry reads it at start. The disc is identified by
 `SYSTEM.CNF` (`SLUS_209.84`); another region's disc is refused. All 30 player models: 23 MB of
 output, a few seconds; everything (537 models): 490 MB, about a minute.
@@ -180,7 +179,7 @@ skeleton (the high-detail zombies `HE01_*`, `E28`, `E45`) move with a man's moti
 
 Settings (recvx.ini): `import_outbreak2_iso` (the disc image), `import_dir` (default
 `<mods>/import`, `RECVX_MODS` respected). Environment: `RECVX_IMPORT=outbreak2` (headless, exits),
-`RECVX_IMPORT_ISO`, `RECVX_IMPORT_WHAT`, `RECVX_SHOW_OVERLAY=4` (F4 open at start).
+`RECVX_IMPORT_ISO`, `RECVX_IMPORT_WHAT`, `RECVX_SHOW_OVERLAY=4` (F9 open at start).
 
 ## Conversion
 
@@ -323,7 +322,7 @@ the `.cvxm` (version 3) carries it (0.2..1.3 cm). The game takes at least 0.9 x 
 gap (Kevin's lid rows are 2 mm apart, the eyes painted on the face are taller; version 2 files: 1.1
 x the gap). Checked front and side at open, half and closed for all 8 characters: the brows and the
 forehead stay; most close fully, Cindy's and Alyssa's to a slit (their painted eyes reach below the
-lower lid's row). Re-extract after updating (F4) so the models get the new weights. Test aid:
+lower lid's row). Re-extract after updating (F9) so the models get the new weights. Test aid:
 `RECVX_IMPORT_BLINK=0..1` holds the lids.
 
 * **Cutscenes**: while the model stands in for a cast double, the jaw turns by the double's
@@ -345,9 +344,9 @@ Do the Outbreak models support mouth movement? The playable and cutscene models 
 targets, no bones in the lips) and no mouth texture swaps were found. So the mouth can open and
 close; it cannot form vowels.
 
-## F4 window
+## F9 window
 
-`overlay.cpp import_window`, hotkey row "Import window" (F4, `B_IMPORT`; F4 was free). A section
+`overlay.cpp import_window`, hotkey row "Import window" (F9, `B_IMPORT`; F9 was free). A section
 per source: the disc image (file selector, saved as `import_outbreak2_iso`), the output folder,
 checkboxes (playable characters, cutscene / high detail, NPCs, enemies), "Extract characters" (a
 thread; progress bar with the model being read), then the manifest per group (collapsible, with
@@ -408,7 +407,7 @@ the other while paging (all loaded, none refused).
   it renders the same.
 * In game (headless, frame dumps): Kevin, Jim and Alyssa as "You appear as": walking, the
   handgun aimed, zombie grabs, third person from behind and (orbit) the front; the cutscene double
-  loads the same model (textures shared). F4: the "Extract characters" button clicked in a run
+  loads the same model (textures shared). F9: the "Extract characters" button clicked in a run
   with an empty mods folder (progress, then the table); F3 shows the imported model chosen in
   recvx.ini. Screenshots stay in the job directory (game content, not committed).
 * ctest 21/21 (`import` new, `appear` extended), Linux and Windows (mingw) builds,
@@ -424,18 +423,6 @@ the other while paging (all loaded, none refused).
 * Shoulders: lobby front views of Claire, Chris and four imports before / after.
 * Grip: Claire, Chris and four imports aiming (third person side view) and offline renders of the
   dumped aim pose (front, side, above).
-* All groups extracted (537 models, 0 failed, 324 player models); F4 with the four groups.
+* All groups extracted (537 models, 0 failed, 324 player models); F9 with the four groups.
 * ctest 21/21 (`movies` skipped, as on main), Linux and Windows (mingw) builds, `layout_check.sh`
   main (17a36c8) vs this branch: 156 vanilla and 311 enhanced frames identical.
-
-## Unreleased (outbreak-import branch)
-
-- F4: import window. Resident Evil Outbreak File #2 (SLUS-20984) character models from your own
-  disc image to glTF (with PNG textures) and as player models in "You appear as".
-- Every character model of the disc: playable characters, cutscene and high-detail versions,
-  NPCs, enemies; all on the human skeleton usable as player models (324), grouped in F4 and in the
-  lobby's model list.
-- Imported faces: the eyes show their irises; the mouth moves with the cutscene lip sync and
-  with the player's voice.
-- Imported bodies: shoulders narrowed and lowered towards Code: Veronica's proportions; the
-  support hand sits under the gun in the two-handed aim.

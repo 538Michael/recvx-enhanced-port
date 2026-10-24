@@ -25,7 +25,7 @@ enum { ANIM_IDLE, ANIM_PLAYED, ANIM_MALE, ANIM_FEMALE };
 #define ACTOR_MODELS 62
 extern const ActorModel actor_models[];
 
-/* Player models imported from other games' discs (F4, pc/src/import; docs/IMPORT_OUTBREAK.md):
+/* Player models imported from other games' discs (F9, pc/src/import; docs/IMPORT_OUTBREAK.md):
    actor index ACTOR_MODELS + k, "You appear as" chr COOP_CHR_MAX + 1 + k. Filled by
    import_registry_load (main thread, before the game uses them; the count is published last). */
 #define ACTOR_IMPORT_MAX 384   /* (all of Outbreak File #2's people fit) */

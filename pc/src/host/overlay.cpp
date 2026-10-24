@@ -46,7 +46,7 @@ void overlay_init(void* window, void* gl_context)
     ImGui_ImplSDL3_InitForOpenGL(win, (SDL_GLContext)gl_context);
     ImGui_ImplOpenGL3_Init("#version 330 core");
     ready = true;
-    const char* show = SDL_getenv("RECVX_SHOW_OVERLAY");   /* debugging aid (screenshots): 1 F1, 2 the cheats (F2), 3 the co-op window, 4 import (F4) */
+    const char* show = SDL_getenv("RECVX_SHOW_OVERLAY");   /* debugging aid (screenshots): 1 F1, 2 the cheats (F2), 3 the co-op window, 4 import (F9) */
     visible = show && strcmp(show, "3") && strcmp(show, "2") && strcmp(show, "4");
     import_visible = show && !strcmp(show, "4");
     cheats_visible = show && !strcmp(show, "2");
@@ -190,6 +190,7 @@ static void controls_section(void)
                                              "person with Modern gamepad controls, instead of the game rows of the same buttons.", bind_pad_desc());
     ImGui::TextDisabled("Click a binding, then press the key/button (Esc cancels, Delete clears); right click clears.\n"
                         "Reload can share a button: then Aim + button reloads.");
+    if (dev == BIND_KB) ImGui::TextDisabled("Mouse buttons work on any row, also with the fixed cameras.");
     if (msg[0]) ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.4f, 1.0f), "%s", msg);
     if (ImGui::BeginTable("##binds", 3, ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp)) {
         ImGui::TableSetupColumn("action", ImGuiTableColumnFlags_WidthStretch, 2.2f);
@@ -712,7 +713,7 @@ static const char* lobby_hint(void)
     }
 }
 
-/* F4: imports from other games' discs (pc/src/import, docs/IMPORT_OUTBREAK.md). A section per
+/* F9: imports from other games' discs (pc/src/import, docs/IMPORT_OUTBREAK.md). A section per
    source: its disc image, what to extract, the extraction's progress and what was extracted
    (from the source's manifest, so it shows after a restart too). */
 static char picked[1024];
@@ -744,7 +745,7 @@ static void import_window(void)
     }
     ImGui::SetNextWindowPos(ImVec2(60, 60), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(ImVec2(820, 560), ImGuiCond_FirstUseEver);
-    if (!ImGui::Begin("Import (F4)", &import_visible)) { ImGui::End(); return; }
+    if (!ImGui::Begin("Import (F9)", &import_visible)) { ImGui::End(); return; }
     ImGui::TextWrapped("Models from other games' discs, read from your own disc image. What is extracted stays in your mods "
                        "folder. Player models are then listed in \"You appear as\" (F1 > Appearance, F3, the lobby).");
     for (int s = 0; s < IMPORT_SOURCES; s++) {

@@ -352,7 +352,7 @@ our player as one of the player files or one of 62 models found in the room file
 cast, the creatures, the zombie variants (`pc/src/host/actors.c`). It applies in single player and
 co-op (the partner sees it too) and in cutscenes to the event double of the character played
 (unless "Swapped model in cutscenes" is off, see "Cutscene doubles").
-Models imported from other games' discs (F4, branch `outbreak-import`) are listed after the
+Models imported from other games' discs (F9) are listed after the
 catalogue: chr `COOP_CHR_IMPORT + k`, actor index `ACTOR_MODELS + k`, skinned every frame
 ([IMPORT_OUTBREAK.md](IMPORT_OUTBREAK.md#conversion)).
 

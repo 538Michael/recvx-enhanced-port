@@ -269,11 +269,13 @@ Keyboard defaults (all rebindable):
 | Space (hold) | Quick knife |
 | T | Co-op trade request (next to the partner) |
 | R | Reload ([Reload](#reload)) |
+| E (hold) | Aim without auto-aim ([Aiming without auto-aim](#aiming-without-auto-aim)) |
 
 Any gamepad SDL supports works as a DualShock 2 (south/east/west/north = Cross/Circle/Square/
-Triangle, shoulders L1/R1, left trigger L2, right stick click R3). The right trigger is the
-quick knife and the left stick click the trade request, since those buttons have no game action.
-Aim (R1 / RB) + Triangle (Y) reloads ([Reload](#reload)).
+Triangle, shoulders L1/R1, right stick click R3). The right trigger is the quick knife, the left
+trigger aims without auto-aim ([Aiming without auto-aim](#aiming-without-auto-aim)) and the left
+stick click is the trade request, since those buttons have no game action (L2 is OPTION only in
+key type D: bind the L2 row there). Aim (R1 / RB) + Triangle (Y) reloads ([Reload](#reload)).
 The game's own key types (OPTION -> KEY CONFIG) still decide what each PS2 button does.
 
 ### Vibration
@@ -305,6 +307,7 @@ Xbox / PlayStation; keyboard in brackets.
 | Run | B / Circle held (X) | Shift | B / Circle | X / Square, or the stick pushed far |
 | Quick turn | back + run; Modern: the Quick turn row (unbound) | S + Shift | back + run | d-pad down, or stick back + run |
 | Aim | RB / R1 (W) | right mouse | RB / R1 | LT / L2 |
+| Aim without auto-aim | LT / L2 (E) | - (free aim) | - | - |
 | Aim while aiming | d-pad, left stick (arrows): turn, up / down | the mouse | right stick, left stick, d-pad | right stick, left stick, d-pad |
 | Fire | A / Cross (Z) while aiming | left mouse | A / Cross | RT / R2 |
 | Reload | RB + Y (R) | R | RB + Y | RB / R1 |
@@ -425,6 +428,26 @@ A `recvx.ini` from before this (no `bindings_version` line) whose reload rows ar
 their default then, gets these defaults. In co-op it is your own action: the partner sees the
 reload and the ammo stays in your inventory.
 
+### Aiming without auto-aim
+
+With the fixed cameras the aim button (R1 / RB, W) turns the character to the nearest enemy in
+sight as the weapon comes up, wherever it stands, and Change aim (L1 / LB in key type A) turns to
+the next one. **Aim (no auto-aim)** (`key_freeaim` / `pad_freeaim`: E, the left trigger LT / L2)
+aims the same way without either turn: the character keeps facing where it faced, d-pad or stick
+left / right turn it while aiming and up / down aim high or low as usual. The shots go where it
+faces: the game's own hit check always follows the facing and the aim height, so an enemy in front
+is hit as with auto-aim and a shot past it misses. The dual weapons (Gold Lugers, sub machine
+gun) keep both arms straight ahead instead of spreading them onto two enemies. The knife aims as
+the knife does, only without the turn. Release it to lower the weapon, as the aim button; holding
+both, there is no auto-aim. Aim + Triangle reloads with it too ([Reload](#reload)). While noclip
+flying the left trigger flies down instead.
+
+Fixed cameras only: in third person it does nothing (the gamepad's Modern scheme aims with LT
+already, free aim). A `recvx.ini` from before it (`bindings_version` below 3) has the left
+trigger on the L2 row, the default then: that line is dropped, so the left trigger becomes free
+aim's, and a key such a file gave another game row (E) stays there, leaving free aim's keyboard
+slot empty. In co-op it is your own aim: the partner sees your character turn and fire as usual.
+
 ### Modern controls (fixed cameras)
 
 F1 -> Controls or ENHANCED SETTINGS -> CONTROLS: **Fixed camera controls** = Modern
@@ -444,8 +467,8 @@ alternate controls of the HD remasters, Modern is:
   climbing over or pushing does not keep the old camera: back in control, the stick follows the
   camera on screen.
 - **Aiming** works as in Classic: holding the aim button stops, the stick or d-pad turns and aims
-  up / down, the game's auto-aim and the quick knife are unchanged. Letting go of aim returns to
-  modern movement.
+  up / down, the game's auto-aim (none with [Aim without auto-aim](#aiming-without-auto-aim)) and
+  the quick knife are unchanged. Letting go of aim returns to modern movement.
 - **Quick turn**: bind the "Quick turn" row (unbound by default; it holds back, then run). While
   it is held the stick does not walk.
 - Stairs, steps and ladders still start with the action button; while climbing or pushing a box
@@ -471,8 +494,8 @@ Hotkeys:
 | F1 | settings overlay |
 | F2 | cheat menu |
 | F3 | co-op window |
-| F4 | import window (models from other games' discs; [IMPORT_OUTBREAK.md](IMPORT_OUTBREAK.md), branch `outbreak-import`) |
 | F5 | third-person camera on/off |
+| F9 | import window (models from other games' discs; [IMPORT_OUTBREAK.md](IMPORT_OUTBREAK.md)) |
 | F11 | windowed / fullscreen (borderless or exclusive, as chosen in Display mode) |
 | Page Up, F / Page Down | noclip fly up / down (when flying is on; R reloads now) |
 
@@ -492,16 +515,27 @@ key_tps_run = Left Shift
 key_tps_run_2 = Right Shift
 key_tps_aim = Mouse Right
 pad_cross = south
-pad_l2 = +lefttrigger
+pad_freeaim = +lefttrigger
 pad_quickturn = -lefty
 ```
 
 Keys use SDL key names (`Z`, `Return`, `Left Shift`, `PageUp`), mouse buttons
-`Mouse Left/Middle/Right/X1/X2`. Gamepad inputs are positional (`south` = Xbox A = PlayStation
+`Mouse Left/Middle/Right/X1/X2`.
+
+**Mouse buttons with the fixed cameras**: any keyboard/mouse row takes a mouse button (left,
+right, middle and the two side buttons), not just the third-person ones. None is bound by default
+(the mouse belongs to the menus until you choose); for aim and fire with key type A bind
+`key_r1 = Mouse Right` and `key_cross = Mouse Left` (Aim (R1) and Fire / Confirm (Cross) in the
+menus), or `key_freeaim = Mouse Right` to aim without auto-aim. They act only while you have control of your character: a click in the inventory, a map or
+OPTION stays the menu's, and a button held when a menu opens, or pressed to close one, does nothing
+until you let go of it. The click that brings the window back into focus is not a press either.
+Third person keeps its own rows (right mouse aim, left mouse fire); there a game row's mouse
+button counts only if no third-person row uses it. Gamepad inputs are positional (`south` = Xbox A = PlayStation
 Cross, `east`, `west`, `north`, `back`, `start`, `guide`, `leftshoulder`, `rightshoulder`,
 `leftstick`, `rightstick`, `dpup`, `dpdown`, `dpleft`, `dpright`, `misc1`, `paddle1`-`paddle4`,
 `touchpad`) or an axis half (`+lefttrigger`, `-leftx`, `+lefty`, ...). `none` unbinds.
-Extra rows: "Quick turn" (unbound by default: back, then run), "Reload" (R, Aim + Triangle on
+Extra rows: "Aim (no auto-aim)" (E, the left trigger, [Aiming without auto-aim](#aiming-without-auto-aim)),
+"Quick turn" (unbound by default: back, then run), "Reload" (R, Aim + Triangle on
 the gamepad, [Reload](#reload)), the third-person keys, the
 third-person gamepad set (`pad_tps_*`, [Third person with a gamepad](#third-person-with-a-gamepad))
 and the hotkeys.
@@ -609,4 +643,4 @@ tougher, faster or bigger; for the spawner and the Wild randomizer), see [ENEMIE
 | "cannot open game disc image" | check the path; only SLUS-20184 images work |
 | Low frame rate at high resolution | lower Internal resolution, set a Frame rate limit, or turn off Display-rate frames; F1 -> Performance shows where time goes |
 | Gamepad not working in the second window | set Input source to Gamepad only and pick the pad number; check Steam Input |
-| A crash | run with `--log` and attach `recvx.log` (it contains a backtrace) to an issue |
+| A crash | attach `recvx-crash.log` to an issue: every crash writes it (a few KB: the version, a backtrace and the last messages, IP addresses masked) next to `recvx.log`, in the game's folder. For more, run with `--log` and attach `recvx.log` too (it has the whole session and contains IP addresses) |

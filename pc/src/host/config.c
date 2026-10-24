@@ -159,7 +159,7 @@ void config_load(void)
         else if (sscanf(line, " coop_name = %15[^\r\n]", g_coop.name) == 1) continue;
         else if (sscanf(line, " iso = %1023[^\r\n]", g_config.iso_path) == 1) continue;
         else if (sscanf(line, " hd_textures_dir = %1023[^\r\n]", ini_hd_dir) == 1) { SDL_strlcpy(g_config.hd_textures_dir, ini_hd_dir, sizeof(ini_hd_dir)); continue; }
-        else if (sscanf(line, " import_dir = %1023[^\r\n]", g_import.dir) == 1) continue;   /* F4 imports (pc/src/import) */
+        else if (sscanf(line, " import_dir = %1023[^\r\n]", g_import.dir) == 1) continue;   /* F9 imports (pc/src/import) */
         else if (sscanf(line, " import_outbreak2_iso = %1023[^\r\n]", g_import.iso[IMPORT_OUTBREAK2]) == 1) continue;
         else if (sscanf(line, " %63[a-z_0-9] = %127[^\r\n]", k, val) == 2 && bind_ini_line(k, trim(val))) continue;
         else if (sscanf(line, " %63[a-z_0-9] = %d", k, &v) == 2)

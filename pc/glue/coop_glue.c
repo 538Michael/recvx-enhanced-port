@@ -157,6 +157,17 @@ static void release_textures(void)
 
 static void forget(void)
 {
+    int i, k;
+    /* effects that follow the partner's work or use its model or textures (EV_FX: an enemy's effect on the partner,
+       FX_SENDER) end with it: the next step or drawing read ply2's model, zeroed here (a model change: "You appear
+       as", the character switch) */
+    for (i = 0; i < 512; i++) {
+        O_WRK* op = &eff[i];
+        int ours = (op->flg & 1) && (op->lkwkp == (unsigned char*)&ply2 || op->exp0 == (unsigned char*)&ply2 ||
+                                     ((char*)op->mlwP >= (char*)ply2.mdl && (char*)op->mlwP < (char*)(ply2.mdl + 16)));
+        for (k = 0; (op->flg & 1) && !ours && k < ply2.mdl_n && k < 16; k++) ours = ply2.mdl[k].texP && op->txp[0] == ply2.mdl[k].texP;
+        if (ours) { op->flg = 0; host_log("coop: effect %d on the partner ended with its model\n", op->id); }
+    }
     memset(&ply2, 0, sizeof(ply2));
     memset(p2wpn, 0, sizeof(p2wpn));
     memset(p2obj, 0, sizeof(p2obj));
@@ -945,6 +956,55 @@ static unsigned short send_estate(int n)
 /* an en01 grab hold: set when the grab starts, cleared by every release (~0x24080, ~0xA4080) */
 static int holding(BH_PWORK* ep) { return ep->exp0 && (*(int*)(ep->exp0 + 0x40) & 0x20000); }
 
+/* Our player's busy flag (flg 4, with 0x10000) is an enemy's attack or grab under way: the inventory, the map,
+   examining, doors and pickups wait until the enemy that set it clears it (bhCheckSubTask, bhControlPlayer). In
+   single player that enemy always does. In co-op its steps could stop running against our player first: the
+   host gave a busy player's enemy to the free partner (coop_pick_target: "a busy target is left for the free
+   player"; a zombie's grab start or its counter-grab after a knife hit sets the flag before the grab plays),
+   and the guest's own enemies became the host's puppets again when the host came back from a menu or into the
+   room. The release then ran on the partner's stand-in, or never: our player walked on but could open nothing
+   until a room change cleared the flag (a teleport, bhInitRoomChangePlayer). So the enemy whose step set it
+   (hold.by), its parts and its type's leader (the moth's and the Black Widow's grab is played by the leader)
+   keep our player: the host's go for it, the guest's run here, until the flag clears. hold_watch: the safety
+   net. */
+static struct { int by, id, room, said; unsigned int seen, orphan; } hold = { -1, 0, -1, 0, 0, 0 };
+static int hold_family(BH_PWORK* ep)
+{
+    BH_PWORK* h;
+    if (hold.by < 0 || !plp || !(plp->flg & 4)) return 0;
+    h = &ene[hold.by];
+    if (!(h->flg & 0x1) || h->id != hold.id) return 0;
+    return pc_root_in(ep, ene, PC_ENE_SLOTS) == pc_root_in(h, ene, PC_ENE_SLOTS) || (!ep->lkwkp && ep->id == h->id && (h->id == 3 || h->id == 6));
+}
+/* linked to a player (lkwkp): the moth's larva rides on the player it was laid on (en27, lkwkp = plp at its
+   Init) and plays that player's motions; it goes for that player only. Before, it was retargeted like any
+   enemy: the host it held counted as busy, the larva went for the free partner standing by and threw itself
+   off the stand-in, while the host stayed in its throw-off motion for good. 1 ours, 2 the partner's */
+static int linked_to(const BH_PWORK* ep) { return !plp ? 0 : ep->lkwkp == (unsigned char*)(swap_plp ? swap_plp : plp) ? 1 : ep->lkwkp == (unsigned char*)&ply2 ? 2 : 0; }
+/* guest: an enemy of ours that holds our player or rides on it keeps running here (as grips_us) */
+static int runs_here(BH_PWORK* ep)
+{
+    if (linked_to(ep) == 1) return 1;
+    if (!hold_family(ep)) return 0;
+    if (!hold.said++) host_log("coop: enemy %d (id %d) holds our player: it runs here until it lets go\n", (int)(ep - ene), ep->id);
+    return 1;
+}
+static unsigned int h_stflg;            /* our player's stflg before the step (a larva laid) */
+static int h_busy, h_ran;               /* our player's busy flag before the step; the step ran here */
+/* the step laid larvae on a player (stflg 0x8000000 << type, en06 NG00): they go for that player from their
+   Init (it links them to plp), whatever the slot targeted before */
+static void larva_laid(unsigned int bits, int partner)
+{
+    int k, t, n = 0;
+    for (k = 0; partner && bits && k < (int)sys->ewk_n && k < PC_ENE_SLOTS; k++) n += (ene[k].flg & 0x1) && ene[k].id == 27 && linked_to(&ene[k]) == 2;
+    for (k = 0; bits && k < (int)sys->ewk_n && k < PC_ENE_SLOTS; k++)
+        if ((ene[k].flg & 0x1) && ene[k].id == 27 && !ene[k].mode0 && (t = ene[k].type) < 3 && (bits >> t & 0x8000000)) {
+            tgt[k] = partner;
+            /* the stand-in's larva bits are the partner's pose (its game has none): at most three, as the bits allow */
+            if (partner && n++ >= 3) ene[k].flg = 0;
+        }
+}
+
 /* neither side has the grab's state any more (the client left, timed out, rejected it), or the
    grab was refused here (eneset.c's one-holder rule) or froze (the watchdog): the enemy goes back
    to standing (en01 MV00: idle motion, then the chase), released, as at the end of a grab. Its
@@ -1124,6 +1184,7 @@ static void grab_in(const Event* e)
     *(unsigned int*)plp->exp1 = (x | (e->u.gr.exp1_a & ~e->u.gr.exp1_b)) & ~(e->u.gr.exp1_b & ~e->u.gr.exp1_a);
     plp->mnwP = (MN_WORK*)set;
     pc_enemy_holds(plp, ep);   /* eneset.c: with added enemies one enemy at a time holds a player - this one */
+    hold.by = i; hold.id = ep->id; hold.room = coop_room_key(); hold.seen = frame_no; hold.said = 1;
     host_log("coop: enemy %d grabs us\n", i);
 }
 
@@ -1198,7 +1259,7 @@ static void grab_failsafe(void)
     }
     safe.held = 1;
     for (i = 0; i < (int)sys->ewk_n && i < PC_ENE_SLOTS; i++)
-        if ((ene[i].flg & 0x1) && grips_us(&ene[i]) && (!is_host || (!tgt[i] && !owned[i]))) {   /* on the host, a holder whose steps run on the partner's stand-in or the partner's game does not hold us */
+        if ((ene[i].flg & 0x1) && (grips_us(&ene[i]) || linked_to(&ene[i]) == 1) && (!is_host || (!tgt[i] && !owned[i]))) {   /* on the host, a holder whose steps run on the partner's stand-in or the partner's game does not hold us; a larva holds us on our own motions */
             if (ene[i].hp >= 0) held = 1;   /* hp 0 is alive: en01 sets a grabbing zombie shot below 0 to 0 */
             else dying = 1;   /* a crawler the player stomps to death (NG02): it lets go when the stomp ends */
         }
@@ -1213,6 +1274,28 @@ static void grab_failsafe(void)
     for (i = 0; i < PC_ENE_SLOTS; i++)
         if (ene[i].exp0 && ene[i].id == 1 && (ene[i].flg & 0x1) && holding(&ene[i]) && (!is_host || (!tgt[i] && !owned[i]))) pc_enemy_unhold(&ene[i]);
     orphan = 0;
+}
+
+/* Safety net for our player's busy flag (hold, above), both sides: set while our player is in normal control
+   (or held on its own motions, as the larva holds it) with no enemy of the holder's family running against it
+   for a second, it is cleared after HOLD_ORPHAN frames, as the enemies clear it, and logged with who set it. */
+#define HOLD_ORPHAN 60
+static void hold_watch(void)
+{
+    BH_PWORK* h = hold.by >= 0 ? &ene[hold.by] : NULL;
+    int own = (plp->mode0 == 4 || plp->mode0 == 6) && plp->mnwP == plp->mnwPb;
+    if (hold.room != coop_room_key() || !(plp->flg & 4)) { hold.by = -1; hold.room = coop_room_key(); h = NULL; }   /* (let go: the next flag is someone else's) */
+    if (!tx_in_game || (sys->cb_flg & 0x5) || plp->hp < 0 || frozen || !(plp->flg & 4) || (plp->mode0 != 1 && !own) || event_driven(plp) ||
+        (h && hold_family(h) && frame_no - hold.seen < 30)) { hold.orphan = 0; return; }
+    if (++hold.orphan < HOLD_ORPHAN) return;
+    host_log("coop: watchdog: our player was left busy (flg %x stflg %x, modes %d %d %d %d, motion %u) for %d frames, set by %s %d (id %d, %s, last step on us %u frames ago%s): cleared\n",
+             plp->flg, plp->stflg, plp->mode0, plp->mode1, plp->mode2, plp->mode3, plp->mtn_no, HOLD_ORPHAN, h ? "enemy" : "no enemy", hold.by, h ? h->id : -1,
+             !h ? "-" : !(h->flg & 0x1) || h->id != hold.id ? "gone" : h->hp < 0 ? "dead" : "alive", frame_no - hold.seen,
+             !h || !is_host ? "" : tgt[hold.by] ? ", targets the partner" : owned[hold.by] ? ", the partner runs it" : "");
+    if (own) player_let_go();
+    else { plp->flg &= ~0x10004; plp->stflg &= ~0x10000; }
+    hold.by = -1;
+    hold.orphan = 0;
 }
 
 /* client, at the hand-off: a grab we run is over when the enemy lets go (or is gone) */
@@ -1244,6 +1327,14 @@ static void queue_event(Event* e)
     if (trace) fprintf(stderr, "coop: event %u out type=%d idx=%d\n", e->id, e->type, e->idx);
 }
 
+/* host: the partner held by an enemy whose hold plays a sequence on its victim (seq_hold): the Tyrant's blow
+   takes the player over (mode 5, his motions, en19.c bhEne19_PlyMoveMain) until the victim's motion has run
+   (bhEne_PlyActionMain), Alexia's first form burns it (mode 6, en12.c bhEne12_NG00). Run on the stand-in, which
+   is put back after every step, such a hold never ended: the Tyrant waited for good with his victim "held" and
+   harmed nobody again, Alexia stood still. The hold runs on this copy of the stand-in instead, its motion
+   advanced as the player's own (bhSetMotion's frame step), until the enemy lets go; what it does to the copy
+   goes to the partner's game as hits (and death), as other enemies' attacks. One at a time. */
+static struct { BH_PWORK pw, was; int slot, key; unsigned int t; } ghost = { .slot = -1 };   /* key: the room load (enemy_room_gen) */
 /* A frame without enemy steps (loading, menus) may have replaced the room's enemies: forget
    the retargeting. */
 static void enemy_epoch(void)
@@ -1259,6 +1350,7 @@ static int puppets(void) { return !echo_delay && !is_host && same_room() && snap
 
 /* an event task works on this enemy (LoadWork): it runs here, as in a cutscene */
 extern BH_SCEWORK bhEtask[16];
+extern BH_SCEWORK* bhCetask;            /* event.c: the event task running now */
 static int event_driven(const BH_PWORK* ep)
 {
     int i;
@@ -1300,13 +1392,52 @@ static int puppet_step(BH_PWORK* ep)
 /* being hit or held by an enemy (flg 4; the partner's from its pose), or dying */
 int bhCdirCheck(int my_ang, int trg_ang);   /* zonzon.c */
 static int ply_busy(const BH_PWORK* pl) { return (pl->flg & 4) || pl->mode0 == 4 || pl->mode0 == 6 || pl->hp < 0; }
-/* host: a grab handed to the partner's game is running (also in the round trip before its pose shows it) */
+/* host: a hit sent to the partner shows in its pose (flg 4, its reaction) a round trip later; until then the stand-in,
+   put back after every step, was free again at the next step and an enemy whose blow lasts several frames hit it
+   in each of them (Alexia's babies three times at once, the Gulp Worm's swing). As the hit player in single player,
+   the stand-in is busy (flg 4) for the enemies' steps meanwhile. */
+#define HIT_BUSY 15
+static unsigned int hit_until;
+/* the enemies whose hold is a sequence on the victim (ghost): the Tyrant, Alexia's first form, the Gulp Worm (its
+   swallow and throw, en02.c bhEne02_PlayerControl) */
+static int seq_hold(const BH_PWORK* ep) { return ep->id == 19 || ep->id == 12 || ep->id == 2; }
+/* host: a grab handed to the partner's game is running (also in the round trip before its pose shows it), or the
+   partner held by a ghost hold */
 static int partner_held(void)
 {
     int k;
+    if (ghost.slot >= 0 && (!(ene[ghost.slot].flg & 0x1) || ghost.key != enemy_room_gen)) ghost.slot = -1;   /* gone with its room */
+    if (ghost.slot >= 0) return 1;
     for (k = 0; k < PC_ENE_SLOTS; k++)
         if (owned[k]) return 1;
     return 0;
+}
+/* the frame step of bhSetMotion (Motion.c) for a copy that has no model of its own to pose */
+static void ghost_motion(BH_PWORK* pw)
+{
+    int n;
+    if (!pw->mnwP || pw->mtn_no >= 512) return;
+    n = (int)pw->mnwP[pw->mtn_no].frm_num << 16;
+    if (!pw->mnwP[pw->mtn_no].datP || n <= 0) return;
+    if ((pw->mtn_md & 0x1) && pw->frm_mode) pw->frm_no -= pw->mtn_add;
+    else pw->frm_no += pw->mtn_add;
+    if (pw->mtn_md & 0x1) {
+        if (pw->frm_no <= 0 || pw->frm_no >= n - 65536) pw->frm_mode = ~pw->frm_mode;
+    } else if (pw->frm_no < 0) pw->frm_no += n;
+    else if (pw->frm_no >= n) pw->frm_no -= n;
+}
+static void ghost_drop(const char* why)
+{
+    BH_PWORK* ep = &ene[ghost.slot];
+    /* Alexia's burning embrace has no way out (the player is dead, the game over follows): with our player alive
+       she takes up the fight again */
+    if (ep->id == 12 && ep->mode0 == 2 && (ep->flg & 0x1) && !(ep->flg & 0x2)) {
+        *(int*)&ep->mode0 = 1;
+        ep->mtn_no = 0; ep->frm_no = 0;
+        ep->flg |= 0x40;   /* her body pushes players again (bhEne12_Init; the embrace took it away) */
+    }
+    host_log("coop: enemy %d (id %d) lets go of the partner (%s)\n", ghost.slot, ep->id, why);
+    ghost.slot = -1;
 }
 
 static int etr_lim;                     /* RECVX_ENEMY_TRACE (enemy_trace) */
@@ -1346,7 +1477,11 @@ static int in_front(BH_PWORK* ep, const BH_PWORK* pl, float d2)
 static int enemy_begin(BH_PWORK* ep);
 int coop_enemy_begin(BH_PWORK* ep)
 {
-    int i = ep - ene, r = enemy_begin(ep);
+    int i = ep - ene, r;
+    h_busy = plp && (plp->flg & 4);
+    h_stflg = plp ? plp->stflg : 0;
+    r = enemy_begin(ep);
+    h_ran = !r;
     if (!r && i >= 0 && i < PC_ENE_SLOTS && !echo_delay) aim_for_step(ep, i);   /* its step runs here */
     return r;
 }
@@ -1362,9 +1497,16 @@ static int enemy_begin(BH_PWORK* ep)
     if (owned[i]) return is_host ? puppet_step(ep) : 0;   /* a grab the client runs */
     if (is_host) {
         int held = proxy_ok && partner_held(), cool_p = coop_atk_cooling(&atk[i][1], frame_no), k = ene_slot(ep->lkwkp);
+        if (ep->id == 27 && linked_to(ep) == 2 && (!have_rx || !partner_here())) {   /* the partner left: the larva laid on its stand-in goes too */
+            ep->flg = 0;
+            return 1;
+        }
         if (ep->mode0) fx_begin(1);   /* what its step starts goes to the guest (EV_FX); not its initialising step */
         h_mode0 = plp->mode0;
-        if (!proxy_ok) tgt[i] = 0;
+        if (ghost.slot == i && partner_held()) tgt[i] = 1;   /* its hold of the partner runs to its end */
+        else if (linked_to(ep)) tgt[i] = linked_to(ep) == 2;   /* (the stand-in also while the partner is busy: it keeps its last pose) */
+        else if (ep->id == 27 && !ep->mode0) {}   /* a larva's Init: the player its moth laid it on (larva_laid) */
+        else if (!proxy_ok || hold_family(ep)) tgt[i] = 0;   /* (hold_family: it holds our player) */
         else if ((ep->flg & 0x80) && k < PC_ENE_SLOTS) tgt[i] = tgt[k];   /* a linked part goes for its parent's victim */
         else {
             CoopTgtIn in = { { 0 } };
@@ -1384,7 +1526,9 @@ static int enemy_begin(BH_PWORK* ep)
                grab motion, the second given the release); in its grab/bite state it keeps a victim within
                reach. Its hit and death states commit to nobody (before, a staggering enemy kept a victim
                that was not near any more). */
-            in.commit = (ep->id == 1 ? ep->exp0 && holding(ep) : ep->mode0 >= 2 && vic->mnwP == ep->mnwP && vic->mnwP != vic->mnwPb && vic->mnwP != sys->rmthp) ? COOP_TGT_HOLD :
+            in.commit = (ep->id == 1 ? ep->exp0 && holding(ep) : ghost.slot == i || ((ep->mode0 >= 2 || seq_hold(ep)) && vic->mnwP == ep->mnwP &&
+                         vic->mnwP != vic->mnwPb && vic->mnwP != sys->rmthp) ||
+                         (ep->id == 15 && (vic->flg & 4) && vic->hp >= 0)) ? COOP_TGT_HOLD :   /* Nosferatu drives his victim until it is up (en15.c) */
                         ep->mode0 == 2 ? COOP_TGT_ATTACK : COOP_TGT_FREE;
             tgt[i] = coop_pick_target(tgt[i], &in);
         }
@@ -1397,7 +1541,8 @@ static int enemy_begin(BH_PWORK* ep)
             plp = &ply2;
             /* held in the partner's game, or this enemy's loop guard: it sees the partner busy and waits (put
                back after the step) */
-            if (held || cool_p) ply2.flg |= 4;
+            if (held || cool_p || (int)(hit_until - frame_no) > 0) ply2.flg |= 4;
+            if (ghost.slot == i) { ghost.was = ghost.pw; plp = &ghost.pw; }   /* its hold of the partner goes on */
             /* the zombie picks its and the player's grab motions by sys->ply_id: the partner's */
             if (ep->id == 1 && rx.mfile >= 0) { swap_pid = sys->ply_id; sys->ply_id = rx.mfile & 3; }
         } else if (coop_atk_cooling(&atk[i][0], frame_no) && !(plp->flg & 4)) {
@@ -1406,45 +1551,72 @@ static int enemy_begin(BH_PWORK* ep)
         }
         return 0;
     }
-    if (!puppets() || !ep->mode0 || event_driven(ep) || grips_us(ep)) return 0;   /* mode0 0: the enemy's own initialising step */
+    if (!puppets() || !ep->mode0 || event_driven(ep) || grips_us(ep) || runs_here(ep)) return 0;   /* mode0 0: the enemy's own initialising step */
     return puppet_step(ep);
 }
 
+int coop_partner_step(void) { return swap_plp != NULL; }
+
 void coop_enemy_end(BH_PWORK* ep)
 {
-    int i = ep - ene;
+    int i = ep - ene, swapped = swap_plp != NULL;
     if (i < 0 || i >= PC_ENE_SLOTS) return;
     if (fx_open == 1) { fx_end(ep, 0); fx_arm(ep); }
     aim_restore();
     if (swap_plp) {
-        BH_PWORK* a = &ply2_save;
-        int dh = a->hp - ply2.hp, grab = ply2.mode0 == 4 && a->mode0 != 4 && a->mode0 != 6;
+        int on = plp == &ghost.pw;
+        BH_PWORK* a = on ? &ghost.was : &ply2_save;   /* the victim before the step and after it */
+        BH_PWORK* v = on ? &ghost.pw : &ply2;
+        /* a grab it started (seq_hold: also the Tyrant's takeover, mode 5, and Alexia's embrace, mode 6), its hit
+           reaction, the dead flag it set (Alexia's embrace, the Tyrant's last blow: in single player the game over) */
+        int dh = a->hp - v->hp, react = v->mode0 == 2 && a->mode0 != 2, kill = (v->flg & 2) && !(a->flg & 2) && ply2_save.hp >= 0;
+        int grab = seq_hold(ep) ? !on && v->mode0 >= 4 && v->mode0 <= 6 && (a->mode0 < 4 || a->mode0 > 6) : v->mode0 == 4 && a->mode0 != 4 && a->mode0 != 6;
         if (swap_pid >= 0) { sys->ply_id = swap_pid; swap_pid = -1; }
-        if (etr_lim > 0 && (grab || dh > 0 || (ply2.mode0 == 2 && a->mode0 != 2)))
-            fprintf(stderr, "atk g=%u s=%d id=%d ty=%d to=P %s dh=%d m=%d.%d.%d.%d\n", (unsigned)gs_frame_count(), i, ep->id, ep->type, grab ? "grab" : "hit", dh,
+        if (etr_lim > 0 && (grab || dh > 0 || react || kill))
+            fprintf(stderr, "atk g=%u s=%d id=%d ty=%d to=P %s dh=%d m=%d.%d.%d.%d\n", (unsigned)gs_frame_count(), i, ep->id, ep->type, kill ? "kill" : grab ? "grab" : "hit", dh,
                     ep->mode0, ep->mode1, ep->mode2, ep->mode3);
-        if ((grab || (ply2.mode0 == 2 && a->mode0 != 2)) && coop_atk_note(&atk[i][1], frame_no))
+        if ((grab || react) && coop_atk_note(&atk[i][1], frame_no))
             host_log("coop: loop guard: enemy %d (id %d) started %d attacks on the partner within %u frames: it leaves the partner alone for %u frames\n",
                      i, ep->id, COOP_LOOP_N, COOP_LOOP_WIN, COOP_LOOP_COOL);
         if (grab && ep->id == 1 && !(ep->flg & 0x80) && ep->exp0 && holding(ep) && have_peer)
             grab_out(i, ep);   /* the client's game runs the grab */
-        else if (dh > 0 || (ply2.mode0 == 2 && a->mode0 != 2) || grab) {
+        else if (dh > 0 || react || grab || kill) {
             Event e = { 0 };
             e.type = EV_PLY_HIT;
             e.idx = i;
             e.u.ph.hp_delta = dh > 0 ? dh : 0;
-            e.u.ph.mode[0] = ply2.mode0; e.u.ph.mode[1] = ply2.mode1; e.u.ph.mode[2] = ply2.mode2; e.u.ph.mode[3] = ply2.mode3;
-            e.u.ph.flg_set = ply2.flg & ~a->flg;
+            if (kill && e.u.ph.hp_delta <= ply2_save.hp) e.u.ph.hp_delta = ply2_save.hp + 1 > 1000 ? 1000 : ply2_save.hp + 1;   /* its own death there */
+            e.u.ph.mode[0] = v->mode0; e.u.ph.mode[1] = v->mode1; e.u.ph.mode[2] = v->mode2; e.u.ph.mode[3] = v->mode3;
+            e.u.ph.flg_set = v->flg & ~a->flg;
             e.u.ph.exp1_set = *(int*)p2.plhdw & ~*(int*)(exp_save + 128);
-            e.u.ph.dv[0] = ply2.dvx; e.u.ph.dv[1] = ply2.dvy; e.u.ph.dv[2] = ply2.dvz;
+            e.u.ph.dv[0] = v->dvx; e.u.ph.dv[1] = v->dvy; e.u.ph.dv[2] = v->dvz;
             if (grab) {   /* a grab the partner's game does not run (only zombies' are handed over): a hit there */
-                e.u.ph.mode[0] = 2; e.u.ph.mode[1] = bhCdirCheck(ply2.ay, ep->ay) == 0 ? 0 : 1; e.u.ph.mode[2] = 1; e.u.ph.mode[3] = 0;
+                e.u.ph.mode[0] = 2; e.u.ph.mode[1] = bhCdirCheck(v->ay, ep->ay) == 0 ? 0 : 1; e.u.ph.mode[2] = 1; e.u.ph.mode[3] = 0;
                 e.u.ph.flg_set |= 4;
                 if (ep->id == 4) ep->ct0 = 0;   /* Cerberus lets go after its first bite instead of biting the air for 2 s */
                 host_log("coop: enemy %d (id %d) grabs the partner: sent as a hit\n", i, ep->id);
             }
+            if (kill) host_log("coop: enemy %d (id %d) kills the partner\n", i, ep->id);
             queue_event(&e);
+            hit_until = frame_no + HIT_BUSY;
         }
+        if (grab && seq_hold(ep) && ghost.slot < 0) {   /* its hold goes on, on a copy (ghost) */
+            ghost.pw = *v;
+            ghost.slot = i;
+            ghost.key = enemy_room_gen;
+            ghost.t = frame_no;
+        } else if (on) {
+            ghost_motion(&ghost.pw);
+            if (etr_lim > 0 && !(frame_no % 15))   /* RECVX_ENEMY_TRACE: the held copy */
+                fprintf(stderr, "ghost s=%d m=%d.%d.%d.%d mtn=%u f=%d add=%d own=%d flg=%x hp=%d\n", i, ghost.pw.mode0, ghost.pw.mode1, ghost.pw.mode2, ghost.pw.mode3,
+                        ghost.pw.mtn_no, ghost.pw.frm_no >> 16, ghost.pw.mtn_add, ghost.pw.mnwP == ghost.pw.mnwPb, ghost.pw.flg, ghost.pw.hp);
+            if (ghost.pw.mnwP == ghost.pw.mnwPb && (ghost.pw.mode0 < 4 || ghost.pw.mode0 > 6)) ghost_drop("let go");
+            else if (ep->id == 12 && (ep->mode0 != 2 || ep->mode3 >= 2)) ghost_drop("the embrace is over");
+            else if ((ghost.pw.flg & 2) && !ghost.pw.mtn_add) ghost_drop("dead");
+            else if (ep->flg & 0x2) ghost_drop("it died");
+            else if (frame_no - ghost.t > 900) ghost_drop("30 s");
+        }
+        larva_laid(ply2.stflg & ~a->stflg & 0x38000000, 1);
         /* everything else (grabs, being moved, motions) is undone: the partner's own game
            decides what its player does */
         ply2 = ply2_save;
@@ -1461,6 +1633,12 @@ void coop_enemy_end(BH_PWORK* ep)
     }
     h_mode0 = -1;
     h_flg4 = 0;
+    if (h_ran && !swapped && plp) {   /* its step ran on our player */
+        larva_laid(plp->stflg & ~h_stflg & 0x38000000, 0);
+        if (!h_busy && (plp->flg & 4)) { hold.by = i; hold.id = ep->id; hold.room = coop_room_key(); hold.said = 0; }
+        if (hold_family(ep)) hold.seen = frame_no;
+    }
+    h_ran = 0;
 }
 
 /* ---------------------------------------------------------------- effects (protocol 12, EV_FX) */
@@ -1859,7 +2037,8 @@ static int build_snapshots(EneSnap* out)
         s->px = ep->px; s->py = ep->py; s->pz = ep->pz;
         s->ax = ep->ax; s->ay = ep->ay; s->az = ep->az;
         s->mtn_no = ep->mtn_no; s->frm_no = ep->frm_no; s->mtn_md = ep->mtn_md;
-        s->hokan_count = ep->hokan_count; s->hokan_rate = ep->hokan_rate; s->hp = ep->hp;
+        s->hokan_count = (int16_t)ep->hokan_count; s->hokan_rate = ep->hokan_rate; s->hp = ep->hp;
+        s->id = ep->id < 100 ? ep->id : 0;
         memcpy(s->watr, &ep->watr, sizeof(s->watr));
     }
     return n;
@@ -1997,10 +2176,12 @@ static void apply_snapshots(void)
            collision) has not run yet; it must run first, so only wake it like the host's and
            let our loop run that step. Room loads run enemy steps themselves (bhInitEvent), so
            most are initialised before the first snapshot. */
-        if (!(ep->flg & 0x1) || (!is_host && (event_driven(ep) || grips_us(ep)))) continue;
-        /* a part linked to a parent there but without one here: the slot layouts differ (an enemy
-           whose Init ran at another moment); the linked flag would crash bhControlEnemy */
-        if ((s->flg & 0x80) && !ep->lkwkp) { mismatch++; continue; }
+        if (!(ep->flg & 0x1) || (!is_host && (event_driven(ep) || grips_us(ep) || runs_here(ep)))) continue;
+        /* the slot layouts differ (an enemy whose Init ran at another moment, a child the other side made, e.g. moths
+           and their leader): another type here, or a part linked to a parent there but without one here. Its flags,
+           modes and motion would turn a hidden helper without a model into one drawn (bhCalcModel crashed on its NULL
+           mlwP, moths in 5/82) or run another type's code with them (the linked flag crashed bhControlEnemy) */
+        if (((s->flg & 0x1) && s->id != ep->id) || ((s->flg & 0x80) && !ep->lkwkp)) { mismatch++; continue; }
         if (!is_host && (gone_has(s->idx) || ((ep->flg & 0x80) && gone_has(ene_slot(ep->lkwkp))))) {   /* named dead (EV_GONE) */
             if (!(s->stflg & 0x1000000) && !(s->flg & 0x2)) continue;   /* the host has not hidden it yet */
             if (s->idx < PC_ENE_SLOTS) gone_mask[s->idx >> 5] &= ~(1u << (s->idx & 31));
@@ -2009,6 +2190,7 @@ static void apply_snapshots(void)
             ep->stflg = (ep->stflg & ~0x41000000) | (s->stflg & 0x41000000);
             continue;
         }
+        if (!s->mode[0]) continue;   /* a new enemy there whose Init has not run: ours ran, it would run again (its children twice) */
         mnw_set(ep, s->mnw);
         if (s->mdl >= 0 && ep->mdl[s->mdl].objP) ep->mlwP = &ep->mdl[s->mdl];
         if ((int)ep->mtn_no != s->mtn_no) { ep->hokan_count = s->hokan_count ? s->hokan_count + 1 : 0; ep->hokan_rate = s->hokan_rate; }
@@ -2017,6 +2199,9 @@ static void apply_snapshots(void)
             fprintf(stderr, "coop: enemy %d dead here, alive in the host's game: alive again\n", s->idx);
         /* not the host's hit marker (flg & 4): it would come back as a hit of ours */
         ep->flg = s->flg & ~0x4; ep->flg2 = s->flg2 & ~0x4; ep->stflg = s->stflg; ep->mdflg = s->mdflg;
+        /* morphing (mdflg 2) draws between the shapes obj_a and obj_b, which only the enemy's own code picks (Alexia's
+           tentacles, babies, third form): a puppet that never ran that code has none - the guest crashed drawing it */
+        if (!ep->obj_a || !ep->obj_b) ep->mdflg &= ~0x2;
         ep->px = s->px; ep->py = s->py; ep->pz = s->pz;
         ep->ax = s->ax; ep->ay = s->ay; ep->az = s->az;
         ep->mtn_no = s->mtn_no; ep->frm_no = s->frm_no; ep->mtn_md = s->mtn_md; ep->hp = s->hp;
@@ -2130,6 +2315,7 @@ static void session_reset(void)
    game of its own starts with the new-game inventory of the session's game mode. */
 static struct { unsigned int itm[384], stflg[4]; char wno[4]; short hp[4]; } own;
 static int own_valid, own_fixed;   /* own_fixed: a source was given (coop_own_source), no snapshots */
+static int own_cont;               /* our session ended while we played in the host's game, which goes on here (until the title) */
 static int own_hold;               /* our own game restarted (continue after a game over): `own` keeps the items we died with */
 /* saved partner inventories (protocol 16, "saved partner inventories" below), the guest's side */
 static int blob_rec, want_rec;          /* the host's game state on its way carries our saved items; we requested them */
@@ -2219,6 +2405,7 @@ static void own_restore(void)
         memcpy(sys->ply_wno, own.wno, sizeof(own.wno));
         memcpy(sys->ply_hp, own.hp, sizeof(own.hp));
         host_log("coop: keeping our own inventory (hp %d)\n", own.hp[sys->ply_id & 3]);
+        if (want_rec) note("No saved items at the host - you keep your current items");   /* joined again from our game (own_cont) */
     } else {
         AllItemInit();
         sys->ic_flg[15] = ic;   /* AllItemInit clears one "examined" bit */
@@ -2579,7 +2766,10 @@ int coop_items_apply(void)
     items_applied = v;
     want_rec = v == COOP_ITEMS_HOST;
     if (v >= 0 && (ok = lobby_read_save(v, b))) coop_own_source(b);
-    else if (v == COOP_ITEMS_CURRENT && sys && in_session_game()) coop_own_source(NULL);   /* our game: its snapshots */
+    /* our game: its snapshots. "Saved with the host" from the game we played in the host's session (we lost the
+       connection, the host crashed, we left): the host's record if it has one, else these items, not a new inventory
+       (the host's game started again from a save without our record had us start Chris's part from scratch) */
+    else if ((v == COOP_ITEMS_CURRENT || (v == COOP_ITEMS_HOST && own_cont)) && sys && in_session_game()) coop_own_source(NULL);
     else coop_own_from_save(NULL);
     return ok;
 }
@@ -2822,6 +3012,7 @@ void coop_item_late(int bit)
 }
 
 static void gate_hold(int w, unsigned int* set, unsigned int* clr);
+static void rb_mark(int w, unsigned int bits);
 static void gate_ours(int w, unsigned int bits);
 static void gate_release(void);
 static void gate_drop(void);
@@ -2991,6 +3182,7 @@ static int apply_session_event(const Event* e)
                 }
             }
             gate_hold(w, &c.u.fl.set[j], &c.u.fl.clr[j]);   /* a gate of the scene we are in: when it ends */
+            rb_mark(w, f[w] ^ ((f[w] | c.u.fl.set[j]) & ~c.u.fl.clr[j]));
             f[w] = (f[w] | c.u.fl.set[j]) & ~c.u.fl.clr[j];
             last[w] = (last[w] | c.u.fl.set[j]) & ~c.u.fl.clr[j];
         }
@@ -3422,6 +3614,7 @@ static void gate_release(void)
     if (held_key < 0 || (in_scene() && held_key == coop_room_key())) return;
     for (w = 0; w < NFLAG; w++) {
         if (!(held_set[w] | held_clr[w])) continue;
+        rb_mark(w, f[w] ^ ((f[w] | held_set[w]) & ~held_clr[w]));
         f[w] = (f[w] | held_set[w]) & ~held_clr[w];
         last[w] = (last[w] | held_set[w]) & ~held_clr[w];
         n++;
@@ -3528,11 +3721,113 @@ static void atr_put(int kind, int ix, const AtrRec* r)
     }
 }
 
+/* ---- the room as the partner's flags have it
+   The room's entry script (scd0) builds the room from the world flags: which triggers ask what (a puzzle's
+   prompt, "It's locked"), which are doors, which walls stand. A partner in another room gets the flags, and
+   its entry script builds the room right when it gets there. A partner in the room keeps the room as it
+   was, unless the change came as a world event it replays. A puzzle solved by steps of the other player's
+   own game left its trigger asking: the Gold Luger room's switch panel (1/05; the answer starts an event
+   from a block gated by room flags only) opened again and waited for an answer that its blocks, gated by
+   the solved flag, no longer take (stuck in the panel, no text); the main hall's terminal (1/02) sets its
+   flag, a room-flag block then makes the door, so the partner's door stayed locked. So when the partner
+   changes world flags (ev_flg, ky_flg) while we are in the room, the entry script's record writes (walls,
+   triggers, floors) in the blocks that test them run again, as entering would run them, once our scene
+   and any world event window are over. Nothing else of the entry script runs (models, enemies, items,
+   sounds, room flags), and a block with another test than Ck / CmpB / CmpW is left alone. */
+static unsigned int rb_bits[NFLAG];     /* world flags the partner changed in this room, not rebuilt yet */
+static int rb_key = -1;
+static void rb_mark(int w, unsigned int bits)
+{
+    int key = coop_room_key() * 16 + sys->rcase;
+    if (!bits || !(w < 32 || (w >= 96 && w < 112))) return;   /* ev_flg, ky_flg */
+    if (key != rb_key) { memset(rb_bits, 0, sizeof(rb_bits)); rb_key = key; }
+    rb_bits[w] |= bits;
+}
+static int rb_is_rec(int op) { return op == 10 || op == 11 || op == 12 || op == 37 || op == 123 || op == 124; }   /* (Wal|Etc|Flr)AtariSet(2) */
+/* the entry script's code in [o, end) as the interpreter takes it; `hit`: inside a block that tests a changed
+   flag. Returns the record writes run. */
+static int rb_walk(const unsigned char* d, unsigned int o, unsigned int end, int hit, int depth)
+{
+    int n, runs = 0;
+    while (o < end && (n = insn_len(d + o)) > 0 && d[o] != 0) {
+        if (d[o] == 1) {   /* IfelCk: its tests, then the part they choose */
+            Blk b;
+            unsigned int p;
+            int ok = 1, known = 1, h = hit, m;
+            open_block(d, o, &b);
+            if (b.end <= o || b.end > end) return runs;
+            for (p = o + 2; p < b.then0; p += m) {
+                int op = d[p], set = d[p + 1], bit = u16at(d + p + 2) & 0x3FF;
+                m = insn_len(d + p);
+                if (m <= 0 || (op != 4 && op != 6 && op != 7)) { known = 0; break; }
+                if (op == 4 && world_off(set) >= 0 && (rb_bits[world_off(set) + (bit >> 5)] << (bit & 31) >> 31)) h = 1;
+                if (ok) { bhScePtr = (unsigned char*)d + p; ok = bhScenarioJmpT[op]() != 0; }
+            }
+            if (known && depth < 16)
+                runs += ok ? rb_walk(d, b.then0, b.end != b.then1 ? b.then1 - 2 : b.then1, h, depth + 1) : rb_walk(d, b.then1, b.end, h, depth + 1);
+            o = b.end;
+            continue;
+        }
+        if (hit && rb_is_rec(d[o])) {
+            if (trace) fprintf(stderr, "coop: entry script record write at %04x: op %d record %d\n", o, d[o], d[o + 1]);
+            bhScePtr = (unsigned char*)d + o;
+            bhScenarioJmpT[d[o]]();
+            runs++;
+        }
+        o += n;
+    }
+    return runs;
+}
+static void rebuild(int key)
+{
+    const unsigned char* d = (const unsigned char*)rom->evtp;
+    const unsigned int* tab = (const unsigned int*)rom->evtp;
+    unsigned int first, k;
+    int w, any = 0, runs;
+    if (key != rb_key) { memset(rb_bits, 0, sizeof(rb_bits)); rb_key = key; return; }   /* entering built it */
+    for (w = 0; w < NFLAG && !any; w++) any = rb_bits[w] != 0;
+    if (!any || !d || in_scene() || win_rx.open || win_tx.open) return;
+    for (first = tab[0], k = 0; k * 4 < first && k < 1024; k++)
+        if (tab[k] && tab[k] < first) first = tab[k];
+    runs = rb_walk(d, tab[0], code_end(tab, first / 4, tab[0]), 0, 0);
+    memset(rb_bits, 0, sizeof(rb_bits));
+    if (runs) host_log("coop: the partner changed world flags of %d/%d: %d record writes of its entry script run again\n", sys->stg_no, sys->rom_no, runs);
+}
+
+/* ---- an entry script that would undo the partner's solution
+   Some entry scripts clear a world flag that another room still needs. 9/31's (the self-destruct terminal)
+   clears ev_flg 5 on every entry: its code sets it (sp_evt.c, VERONICA), and 9/30 starts the launch when it is
+   entered with the flag set. A single player goes from the terminal straight to 9/30; in co-op a partner who
+   (re-)entered 9/31 after the solution cleared it for both, and 9/30 never launched (the card is used up: no
+   second try). In co-op such a clear of a flag that was set before the entry script ran is undone at once (it
+   never reaches the partner). The other entry-script clears of flags other rooms test re-arm transient state
+   (the lifts' floor, the palace piano's music, ambient voices, a room's entry cutscene) and are left alone. */
+static const struct { unsigned char stg, rom, set; unsigned short bit; } keep_solved[] = {
+    { 9, 31, 1, 5 },   /* ev_flg 5: the self-destruct code entered (9/30's launch) */
+};
+static unsigned int scd0_pre[NFLAG];
+/* event.c bhInitEvent, around the entry script: 0 before, 1 after */
+void coop_scd0(int after)
+{
+    unsigned int* f = flag_block();
+    int k;
+    if (!sys) return;
+    if (!after) { memcpy(scd0_pre, f, sizeof(scd0_pre)); return; }
+    for (k = 0; k < (int)(sizeof(keep_solved) / sizeof(keep_solved[0])); k++) {
+        int w = world_off(keep_solved[k].set) + (keep_solved[k].bit >> 5);
+        unsigned int m = 0x80000000u >> (keep_solved[k].bit & 31);
+        if (sys->stg_no != keep_solved[k].stg || sys->rom_no != keep_solved[k].rom || !(scd0_pre[w] & m) || (f[w] & m)) continue;
+        f[w] |= m;
+        host_log("coop: %d/%d's entry script cleared flag %d/%d, set by a solution: kept\n", sys->stg_no, sys->rom_no, keep_solved[k].set, keep_solved[k].bit);
+    }
+}
+
 /* at the hand-off of a frame in game */
 static void world_sync(void)
 {
     int key = coop_room_key() * 16 + sys->rcase, k, n, i, sending = 0, sent = 0;
     Event e = { 0 };
+    rebuild(key);
     if (key != atr_key) {   /* another room: nothing open carries over */
         atr_key = key;
         win_tx.open = win_rx.open = 0;
@@ -5110,6 +5405,48 @@ static void skip_now(const char* why)
     host_log("coop: cutscene skipped in %d/%d (%s)\n", sys->stg_no, sys->rom_no, why);
 }
 
+/* ---- one player at a trigger at a time
+   A puzzle runs on the game of the player who examined it: its prompts, its steps in room flags, its
+   screen. Two players in the same one at once each solved or failed it on their own state, and one
+   flag of the other's answer ended the other's steps halfway (a panel or keypad left open with nothing
+   to answer). So the trigger a player examined is sent in its pose (Pose.use) for as long as that player
+   is held by it (a message, a scene, a terminal), and the partner in the same room cannot examine the
+   same trigger meanwhile: "<name> is using this". */
+static int use_etc = -1, use_free, use_key = -1;   /* the trigger we examined; frames we have been free since */
+/* hitchk.c bhCheckExmAtari: we examine trigger `etc` (a puzzle, a message, a terminal); 1: not now */
+int coop_examine(int etc)
+{
+    if (!sys || etc < 0 || etc > 254) return 0;
+    if (have_rx && !echo_delay && partner_here() && rx.use == etc + 1) {
+        snprintf(g_trade.msg, sizeof(g_trade.msg), "%s is using this", g_trade.name[0] ? g_trade.name : "Your partner");
+        g_trade.msg_until = net_ms() + 3000;
+        host_log("coop: trigger %d in %d/%d: the partner is using it\n", etc, sys->stg_no, sys->rom_no);
+        return 1;
+    }
+    use_etc = etc;
+    use_free = 0;
+    use_key = coop_room_key() * 16 + sys->rcase;
+    return 0;
+}
+/* every frame before our pose goes out: we use the trigger while the game holds our player (st_flg 4: a
+   message, a close-up, cinema) or we are out of the game screen (a terminal); free for 10 frames, done */
+static void use_frame(void)
+{
+    if (use_etc >= 0 && (!in_session_game() || (sys->tk_flg & 0x28) || use_key != coop_room_key() * 16 + sys->rcase)) use_etc = -1;
+    if (use_etc >= 0 && tx_in_game && !(sys->st_flg & 0x4) && !(sys->cb_flg & 0x4) && ++use_free > 10) use_etc = -1;
+    else if (use_etc >= 0 && (!tx_in_game || (sys->st_flg & 0x4) || (sys->cb_flg & 0x4))) use_free = 0;
+    tx.use = use_etc >= 0 ? (uint8_t)(use_etc + 1) : 0;
+}
+/* event.c bhEvtComSet: an event of the partner's world event, replayed here, opens no terminal (1/09: the
+   office computer's power-on event ends in the password screen; replayed, it put the partner into it) */
+int coop_replayed_event(void)
+{
+    int l = bhCetask ? (int)(bhCetask - bhEtask) : -1;
+    if (!win_rx.open || l < 0 || l >= 16 || !(win_rx.levels >> l & 1)) return 0;
+    host_log("coop: the partner's replayed event (task level %d) opens no terminal here\n", l);
+    return 1;
+}
+
 /* pad.c bhSetPad (via trade_pad): the skip button while the partner plays a cutscene with us asks instead */
 unsigned int coop_skip_pad(unsigned int pad)
 {
@@ -5313,6 +5650,7 @@ static void stop(void)
        partner's (forget() clears that one), and no grab position guard carried over */
     if (swap_plp) { plp = swap_plp; swap_plp = NULL; ply2 = ply2_save; }
     if (swap_pid >= 0) { sys->ply_id = swap_pid; swap_pid = -1; }
+    ghost.slot = -1;
     memset(&safe, 0, sizeof(safe));
     if (sys && rom) lighter_light(0);   /* the partner's lighter flame and light */
     if (have_peer && !echo_delay) send_bye(0);
@@ -5338,6 +5676,7 @@ static void stop(void)
     bye_reason = NULL;
     left_msg[0] = 0;
     id_ok = id_rejoin = crash_ok = rec_done = 0;
+    if (!is_host && own_live && in_session_game()) own_cont = 1;   /* the host's game goes on here: a join again keeps its items */
     own_live = own_sent_ok = blob_rec = want_rec = 0;
     own_hold = go_was = go_cont = go_want = go_seen = go_held = 0;
     peer_opts = -1;
@@ -5898,6 +6237,40 @@ static void send_frame(void)
                        tx.seq, tx.flags, tx.chr, tx.stg, tx.rom, tx.px, tx.py, tx.pz, tx.ay, tx.mtn_no, tx.frm_no >> 16, tx.wpnr_no);
 }
 
+/* Safety net: the screen stays black while we play. A fade to black whose fade-in never ran (fade_an and its target
+   255), or the full-screen render texture drawn in place of the room (gm_flg 0x100) with no effect 110 (the
+   under-water distortion that sets and clears it) alive: the game runs, the room is not shown, until a door
+   (bhInitRoomChangeSystem, the door's fade-in) - a script step co-op cut short. In normal play for SCREEN_STUCK
+   frames (no event, scene, door or menu; pc_in_play): faded in / the room drawn again, as the door would. */
+#define SCREEN_STUCK 90                 /* game frames: 3 s */
+int pc_in_play(const BH_PWORK* p, int scope);   /* reload_glue.c */
+void bhSetScreenFade(unsigned int argb, float ct);   /* screen.c */
+extern float BHD_ASPECT_X, BHD_ASPECT_Y;
+static void screen_guard(void)
+{
+    static unsigned int fade_n, rt_n, last_gfrm;
+    int i, fx = 0, ev = 0;
+    if (sys->gfrm_ct == last_gfrm) return;   /* game frames only */
+    last_gfrm = sys->gfrm_ct;
+    if (!pc_in_play(plp, 0)) { fade_n = rt_n = 0; return; }
+    for (i = 0; i < 512; i++) if ((eff[i].flg & 1) && eff[i].id == 110 && !(eff[i].stflg & 0x1000000)) fx = 1;   /* alive and stepping (not hidden: EffDispSet) */
+    for (i = 0; i < 16; i++) if (bhEtask[i].status) ev |= 1 << i;
+    fade_n = sys->fade_an >= 255.0f && sys->fade_ap == 255 ? fade_n + 1 : 0;
+    rt_n = (sys->gm_flg & 0x100) && !fx ? rt_n + 1 : 0;
+    if (fade_n == SCREEN_STUCK) {
+        host_log("coop: the screen stayed black for %d s while we play in %d/%d (fade %.0f, flags cb %x st %x sp %x, event tasks %x): faded in\n",
+                 SCREEN_STUCK / 30, sys->stg_no, sys->rom_no, sys->fade_an, sys->cb_flg, sys->st_flg, sys->sp_flg, ev);
+        bhSetScreenFade(0, 10.0f);
+    }
+    if (rt_n == SCREEN_STUCK) {
+        host_log("coop: the room was not drawn for %d s while we play in %d/%d (full-screen picture, no effect 110; cb %x st %x, event tasks %x): drawn again\n",
+                 SCREEN_STUCK / 30, sys->stg_no, sys->rom_no, sys->cb_flg, sys->st_flg, ev);
+        sys->gm_flg &= ~0x100100;   /* as effect 110 ends it (effsub1.c) */
+        BHD_ASPECT_Y = 1.0f;
+        njSetAspect(BHD_ASPECT_X, 1.0f);
+    }
+}
+
 void coop_frame(void)
 {
     int req = g_coop.request ? __atomic_exchange_n(&g_coop.request, 0, __ATOMIC_ACQ_REL) : 0;
@@ -5923,7 +6296,7 @@ void coop_frame(void)
     if (req == COOP_REQ_STOP) stop();
     else if (req == COOP_REQ_KICK) kick();
     else if (req) start(req);
-    if (sys && (sys->tk_flg & 0x8)) title_seen = 1;   /* saved partner inventories: a game from the title takes its save's */
+    if (sys && (sys->tk_flg & 0x8)) title_seen = 1, own_cont = 0;   /* saved partner inventories: a game from the title takes its save's */
     else if (sys && title_seen && in_session_game()) { title_seen = 0; records_for_game(); }
     if (coop_on && !is_host && !echo_delay && items_applied != g_coop.items && !own_live && !pop_pending && !popping) coop_items_apply();   /* F3 changed it */
     if (coop_on && !echo_delay && sys) {   /* back at the title from a game of this session: it ends (both sides) */
@@ -5957,6 +6330,7 @@ void coop_frame(void)
     tx.busy = !sys || (sys->tk_flg & 0x28) || (sys->ss_flg & 0x400000) || (sys->cb_flg & 0x1) ? BUSY_NONE :   /* title, (re)start, demo, a door: gone */
               !tx_in_game ? ((sys->cb_flg & 0x40000) ? BUSY_BOX : BUSY_MENU) : !(tx.flags & PF_VISIBLE) ? BUSY_EVENT : BUSY_NONE;
     if (tx.busy == BUSY_NONE && tx_in_game && g_trade.phase == TRADE_OPEN) tx.busy = BUSY_TRADE;
+    if (sys) use_frame(); else tx.use = 0;
     tx.type = PKT_POSE;
     memset(&tx_ext, 0, sizeof(tx_ext));
     memcpy(tx_ext.name, g_coop.name, sizeof(tx_ext.name) - 1);
@@ -6011,6 +6385,7 @@ void coop_frame(void)
         own_timeout();
         if (sys && !is_host) grab_check();
         if (sys && plp) grab_failsafe();
+        if (sys && plp) hold_watch();
         if (sys && !is_host) gone_frame();
         else if (sys) gone_host_frame();
         apply_snapshots();
@@ -6042,6 +6417,7 @@ void coop_frame(void)
         if (have_peer && !join_dns) send_frame();
     }
     if (sys && plp) self_frame();
+    if (sys && plp && in_session_game()) screen_guard();
     if (sys && rom) lighter_light(p2_show && !p2_busy && p2_wpn == 1 && ply2.mlwP && ply2.mlwP->obj_num >= 10);
     if (trace && sys && rom && tx_in_game) world_trace();
     publish();

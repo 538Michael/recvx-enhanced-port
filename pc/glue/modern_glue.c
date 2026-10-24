@@ -8,6 +8,8 @@
    arrow keys stay modern. Game thread; the direction math is pc/src/input/modern.c. */
 #include "../../decomp/include/ps2/veronica/prog/types.h"
 #include "../../decomp/include/ps2/veronica/prog/main.h"
+#include "../../decomp/include/ps2/veronica/prog/player.h"
+#include "../../decomp/include/ps2/veronica/prog/playpch.h"
 #include "../src/host/modern.h"
 #include <math.h>
 #include <stdio.h>
@@ -16,6 +18,7 @@
 int pad_move_dir(float* x, float* y, int* dpad);   /* pad.c: screen direction (x right, y up), 1 = analog; dpad: the gamepad's d-pad */
 int pc_in_play(const BH_PWORK* p, int scope);   /* reload_glue.c */
 int pad_quickturn_held(void);
+int pad_free_aim(void);
 uint64_t gs_frame_count(void);
 
 #define RUN_PUSH 0.7f                   /* the stick pushed this far runs */
@@ -90,11 +93,20 @@ unsigned int modern_pad(unsigned int pad)
 }
 
 /* player.c bhControlPlayer, after the mode handler: turn towards the direction; not in the
-   game's own turns (the quick turn, auto-aim) or special moves */
+   game's own turns (the quick turn, auto-aim) or special moves. Free aim (the "Aim (no auto-aim)"
+   row, pad.c; fixed cameras, any controls): the turn to a target that raising the weapon or
+   "change aim" started (flg 0x100000: bhCPM2_act_suw, bhSearchNextEnemy; the dual weapons'
+   SetLockOnDirection, whose arms then stay straight) is dropped before it begins, as third
+   person does. The shot goes along the facing either way (bhCheckGunAtari). */
 void modern_player(void)
 {
     int s = steer;
     steer = 0;
+    if (pad_free_aim() && plp == &ply && plp->mode1 == 1 && (plp->flg & 0x100000)) {
+        plp->flg &= ~0x100000;
+        plp->stflg &= ~0x800;
+        if ((WpnTab[plp->wpnr_no].flg & 0x800) && plp->exp2) ((PP_WORK*)plp->exp2)->arm_dl = ((PP_WORK*)plp->exp2)->arm_dr = 0;
+    }
     if (!s || plp != &ply || plp->mode0 != 1 || plp->mode1 != 0 || plp->mode2 > 13 || plp->mode2 == 12 || (plp->flg & 0x100000))
         return;
     plp->ay += (int)modern_turn((short)plp->ay, target);
