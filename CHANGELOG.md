@@ -44,6 +44,7 @@
   boss helpers) and when changing weapons while new enemies appeared.
 - **Co-op black screen**: there were some occurrences of a black screen that did not fade away.
   Those cases were adjusted so it properly fades away again.
+- **Rebinding the triggers**: binding LT/RT in ENHANCED SETTINGS no longer turns the menu page.
 - **Crash reports**: a crash now always writes a small `recvx-crash.log` next to the game. Attach it
   to a bug report; IP addresses are hidden in it.
 
