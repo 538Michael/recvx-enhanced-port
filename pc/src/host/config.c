@@ -91,7 +91,7 @@ static const struct { const char* key; int* val; int lo, hi; } keys[] = {
     { "enemy_seed", &g_enemy_opts.seed, 0, 0x7FFFFFFF },
     { "enemy_variety", &g_enemy_opts.variety, 0, 1 },    /* 0 Mild, 1 Wild */
     { "enemy_random_events", &g_enemy_opts.events, 0, 1 },
-    { "cast_random", &g_enemy_opts.cast, 0, 3 },         /* cutscene cast (docs/ACTORS.md "Cutscene cast"): 0 off, 1 characters, 2 enemies, 3 both */
+    { "cast_random", &g_enemy_opts.cast, 0, 3 },         /* cutscene cast (docs/ACTORS.md "Cutscene cast"): 0/1 (an older 2, Enemies, is off; 3, Both, on: config_load) */
     { "cast_models", &g_enemy_opts.cast_all, 0, 1 },     /* characters: 0 cutscene models, 1 all models */
     { "cast_assign", &g_enemy_opts.cast_assign, 0, 1 },  /* 0 fixed per character, 1 random per cutscene */
     { "cast_imports", &g_enemy_opts.cast_imports, 0, 1 },
@@ -178,6 +178,7 @@ void config_load(void)
        written, becomes Combined; Classic, never the default since Modern, stays */
     if (!combined_seen && g_modern_on == 1) g_modern_on = MODERN_COMBINED;
     g_coop.chr = appear_canon(g_coop.chr);   /* an event double no longer listed: its listed twin (actors.c) */
+    g_enemy_opts.cast = g_enemy_opts.cast == 1 || g_enemy_opts.cast == 3;   /* the cutscene cast had 1 Characters, 2 Enemies, 3 Both: the characters' on */
     default_name();
     player_id();
 }

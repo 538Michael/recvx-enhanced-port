@@ -65,6 +65,7 @@ extern ETTY_WORK lkmtab[2];             /* player.c: Claire's hair (1211), Weske
 /* a humanoid skeleton: player node (0..21) -> node, parents, rest positions (model space) */
 typedef struct Rig {
     signed char map[22];
+    signed char rot[22];                /* the node whose rotation turns role k's bone (rig_rot): map[k], or past a zero-length child */
     signed char par[NODES];
     float rest[NODES][3];
     int n, ok;
@@ -247,6 +248,8 @@ static int rig_role(const Rig* r, int from, const int* c, int n, int lim, float 
     return c[best];
 }
 
+static void rig_rot(Rig* r);
+
 /* Node roles from the rest skeleton of a chunk object array (pre-order, child/sibling): a T-pose
    with all bind angles 0 is required of a model (`bind`); a source's node offsets are its rest
    pose whatever its current angles. Returns rig->ok. */
@@ -340,7 +343,26 @@ static int rig_build(Rig* r, const NJS_CNK_OBJECT* o, int n, int bind)
             for (k = 1; k < 4 && j < m; k++) r->map[base + k] = c[j++];
         }
     }
+    rig_rot(r);
     return r->ok = 1;
+}
+
+/* The node whose world rotation turns the bone of role k (towards the next mapped joint of its chain): the mapped
+   node itself, or the deepest node on the way to that joint lying at the mapped node's own position (a zero-length
+   bone). Rodrigo's and the hazmat man's shoulders are two nodes at one place: the arm's chain (rig_next) passes
+   through the second, whose rotation is the upper arm's; the first barely turns. Taken from the first, the model's
+   upper arm stayed near its rest pose (raised, a T-pose) while his hung down or lay on the table. */
+static void rig_rot(Rig* r)
+{
+    int k;
+    for (k = 0; k < 22; k++) {
+        int a = r->map[k], b = dir_child[k] >= 0 ? r->map[(int)dir_child[k]] : -1, p, best = -1;
+        r->rot[k] = (signed char)a;
+        if (a < 0 || b < 0) continue;
+        for (p = r->par[b]; p >= 0 && p != a; p = r->par[p])
+            if (best < 0 && rig_dist(r, p, a) < 0.05f) best = p;
+        if (p == a && best >= 0) r->rot[k] = (signed char)best;
+    }
 }
 
 /* rotation (row-vector convention, NJS: p' = p * M) taking direction u onto direction v */
@@ -478,7 +500,7 @@ static void retarget(Disguise* d, BH_PWORK* src, const Rig* sr)
         int p = tr->par[i];
         k = from[i];
         if (k >= 0) {   /* source world rotation, after the rest correction */
-            const float* s = sow[(int)sr->map[k]].mtx;
+            const float* s = sow[(int)(actor_retarget ? sr->rot[k] : sr->map[k])].mtx;
             float a[9] = { 1, 0, 0, 0, 1, 0, 0, 0, 1 }, sw[9];
             /* An imported model (d->skin) is skinned to its own T-pose, the same pose as the source's
                rest: it takes the source's rotations unchanged. A correction would turn its rest mesh
@@ -1660,7 +1682,6 @@ int actor_set(int who, int idx)
 
 int actor_shown(int who) { return dg[who].model >= 0; }
 int actor_rigged(int who) { return dg[who].model >= 0 && dg[who].rig.ok; }
-int actor_mapped(int who) { return dg[who].model >= 0 && dg[who].mapped; }
 
 /* pose slot `who` from `src` (after its bhSetMotion and bhCalcModel), in its gender-matched pose
    if it has one (slots 0, 1: actor_source) */

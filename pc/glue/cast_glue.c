@@ -1,17 +1,17 @@
 /* The cutscene cast randomizer in the game (docs/ACTORS.md "Cutscene cast"; the choices: pc/src/host/cast.c).
  *
- * At the end of every room load (enemyopt_glue.c enemy_room_finished, after the enemy randomizer) each room
- * record of the story cast (cast_character: Alfred, Steve, Rodrigo, ...; not the character played, whose
- * doubles are "You appear as"'s) and, with Enemies, each zombie, anatomist or Hunter record the room script
- * drives or shows (the enemy options' scan_script) is given another model (cast_model), loaded into a display
+ * At the end of every room load (enemyopt_glue.c enemy_room_finished) each room record of a story character
+ * (cast_character: Alfred, Steve, Rodrigo, ...) is given another model (cast_model), loaded into a display
  * slot of the appearance system (ACTOR_CAST + k, one per model the room shows; the retargeting of
- * actor_glue.c). Then, only while a record has one (cast_n):
+ * actor_glue.c). Then, only while a record has one (cast_n), and only during a cutscene (cast_scene: the
+ * game's cinema mode, or the player hidden by an event); in gameplay every record is drawn as itself:
  *  - eneset.c bhDrawEnemy -> actor_put_enemy -> cast_draw: the model is drawn in the record's place, posed
- *    from its skeleton (a zombie's linked parts hidden with it, a blown-off head hidden on the model);
+ *    from its skeleton;
  *  - coop_glue.c coop_control_remote -> actor_double_tick -> cast_tick, every tick before the objects follow
- *    their links: a character's face takes its lip sync, and the hand pieces and props the script links to
- *    its hands go to the model's hands (as for the cutscene double).
- * Nothing else changes: the record keeps its type, its motions, hits, collision and script.
+ *    their links: its face takes the record's lip sync and eyes, and the hand pieces and props the script
+ *    links to its hands go to the model's hands (as for the cutscene double).
+ * Nothing else changes: the record keeps its type, its motions, collision and script. The doubles of the
+ * character played are "You appear as"'s (played).
  */
 #include "../../decomp/include/ps2/veronica/prog/types.h"
 #include "../../decomp/include/ps2/veronica/prog/main.h"
@@ -25,13 +25,11 @@ void host_log(const char* fmt, ...);
 extern int coop_on;
 extern int cast_n;                      /* actor_glue.c: hooks run while > 0 */
 unsigned coop_partner_import_id(void);  /* coop_glue.c: the partner's cast_import_id, 0 none */
-BH_PWORK* pc_enemy_root(BH_PWORK* ep);  /* variant_glue.c */
-int pc_enemy_draw_as(BH_PWORK* ep, int who);
 
 #define CSLOTS (ACTOR_SLOTS - ACTOR_CAST)
 #define RECS 128
 static signed char rec_slot[RECS];      /* record -> cast slot, -1: drawn as itself */
-static unsigned char rec_id[RECS], rec_ver[RECS], rec_chr[RECS];   /* what it was when given its model; a character (1 + cast_character) */
+static unsigned char rec_id[RECS], rec_ver[RECS], rec_chr[RECS];   /* what it was when given its model: type, model version, character */
 static short slot_model[CSLOTS] = { -1, -1, -1, -1, -1, -1 };
 _Static_assert(CSLOTS == 6, "slot_model");
 
@@ -51,8 +49,16 @@ static int import_count(const EnemyOpts* o)
 
 static int shown(int slot) { return slot >= 0 && slot < CSLOTS && slot_model[slot] >= 0 && actor_shown(ACTOR_CAST + slot); }
 
-/* record k still holds what was given a model (an enemy that died and a spawn took its slot: not) */
+/* record k still holds what was given a model */
 static int still(const BH_PWORK* ep, int k) { return (ep->flg & 0x1) && ep->id == rec_id[k] && ep->mdlver == rec_ver[k] && shown(rec_slot[k]); }
+
+/* A cutscene runs: an event camera shows the room (cam.flg 0x2, which light.c mirrors in st_flg 0x1000000: the
+   event lights), the game's cinema mode is on (cb_flg 0x4: the scenes the skip button ends), or an event has hidden
+   the player (its double acts). In-engine scenes are shot with event cameras, also the ones the played character
+   acts in without the cinema mode (Chris and Rodrigo in 7220); gameplay uses the room's own cameras. So a character
+   who stays in the room afterwards (Rodrigo at his desk after the opening) is itself again from the cut back to the
+   player's camera on: no shot shows the change. */
+static int cast_scene(void) { return sys && ((sys->st_flg & 0x1000000) || (sys->cb_flg & 0x4) || (plp && (plp->stflg & 0x1000000))); }
 
 void cast_release(void)
 {
@@ -63,8 +69,8 @@ void cast_release(void)
     cast_n = 0;
 }
 
-/* enemyopt_glue.c, the end of the room load: scripted[k] & 3: the script drives (1) or shows (2) record k */
-void cast_room(const EnemyOpts* o, const unsigned char* scripted)
+/* enemyopt_glue.c, the end of the room load */
+void cast_room(const EnemyOpts* o)
 {
     int want[RECS], k, j, n = 0, room = room_file_now(), imports;
     unsigned scene;
@@ -79,17 +85,13 @@ void cast_room(const EnemyOpts* o, const unsigned char* scripted)
     scene = o->cast_assign ? (unsigned)room + 1 : 0;
     for (k = 0; k < rom->ene_n && k < RECS; k++) {
         BH_PWORK* ep = &ene[k];
-        int c, kind = -1, key = -1;
+        int c;
         want[k] = -1;
-        if (!(ep->flg & 0x1) || !ep->mlwP) continue;
-        c = cast_character(ep->id, ep->mdlver);
-        if (c >= 0 && (o->cast & CAST_CHARS)) kind = CASTK_CHAR, key = c;   /* (the character played's doubles too: skipped while it is played, played()) */
-        else if (c < 0 && (o->cast & CAST_ENEMIES) && (scripted[k] & 3) && !(ep->flg & 0x80) && (kind = cast_enemy_kind(ep->id)) >= 0) key = cast_look(ep->id, ep->mdlver);
-        if (kind < 0 || key < 0) continue;
+        if (!(ep->flg & 0x1) || !ep->mlwP || (c = cast_character(ep->id, ep->mdlver)) < 0) continue;   /* (the character played's doubles too: played()) */
         for (j = 0; j < (int)(sizeof(kept) / sizeof(kept[0])) && !(kept[j].room == room && kept[j].rec == k); j++);
         if (j < (int)(sizeof(kept) / sizeof(kept[0]))) { host_log("cast: room %04d record %d (type %d) stays: %s\n", room, k, ep->id, kept[j].why); continue; }
-        want[k] = cast_model((unsigned)o->seed, scene, kind, key, kind == CASTK_CHAR && o->cast_all, imports);
-        rec_chr[k] = (unsigned char)(kind == CASTK_CHAR ? 1 + c : 0);
+        want[k] = cast_model((unsigned)o->seed, scene, c, o->cast_all, imports);
+        rec_chr[k] = (unsigned char)c;
     }
     cast_release();   /* (normally all went with the last room's textures; their buffer is free again) */
     for (k = 0; k < rom->ene_n && k < RECS; k++) {
@@ -115,36 +117,40 @@ void cast_room(const EnemyOpts* o, const unsigned char* scripted)
         rec_ver[k] = ene[k].mdlver;
         cast_n++;
         n++;
-        host_log("cast: room %04d record %d (type %d model %d) -> %s (%s, slot %d)\n", room, k, ene[k].id, ene[k].mdlver, name,
-                 rec_chr[k] ? "character" : "enemy", s);
+        host_log("cast: room %04d record %d (type %d model %d) -> %s (slot %d)\n", room, k, ene[k].id, ene[k].mdlver, name, s);
     }
-    host_log("cast: room %04d: %d records drawn as other models (seed %d, %s, %s%s)\n", room, n, o->seed, o->cast_assign ? "random per cutscene" : "fixed",
-             o->cast_all ? "all models" : "cutscene models", imports ? ", imported models" : "");
+    host_log("cast: room %04d: %d records drawn as other models in cutscenes (seed %d, %s, %s%s)\n", room, n, o->seed,
+             o->cast_assign ? "random per cutscene" : "fixed", o->cast_all ? "all models" : "cutscene models", imports ? ", imported models" : "");
 }
 
 /* a double of the character played: "You appear as" and "Swapped model in cutscenes" decide how it looks (the character
    played is known only now: a story switch, and the test aid RECVX_PLAYER, change it after the room load) */
-static int played(int k) { return rec_chr[k] >= 1 && rec_chr[k] <= 4 && rec_chr[k] - 1 == (sys->ply_id & 3); }
+static int played(int k) { return rec_chr[k] < 4 && rec_chr[k] == (sys->ply_id & 3); }
 
-/* actor_double_tick: every character shown, posed with its face and hands */
+/* record k is drawn as its model now */
+static int as_model(const BH_PWORK* ep, int k) { return k >= 0 && k < RECS && rec_slot[k] >= 0 && !played(k) && still(ep, k) && cast_scene(); }
+
+/* actor_double_tick: every character shown in a cutscene, posed with its face and hands */
 void cast_tick(void)
 {
-    int k;
+    static int was = -1;
+    int k, now = cast_scene();
+    if (now != was && getenv("RECVX_CAST_TRACE")) {   /* test aid: where each cast record is when the cutscene starts or ends */
+        host_log("cast: %s at game frame %d\n", now ? "a cutscene: the cast as their models" : "gameplay: the cast as themselves", (int)sys->gfrm_ct);
+        for (k = 0; k < RECS; k++)
+            if (rec_slot[k] >= 0) host_log("cast:  record %d (type %d) at %.1f %.1f %.1f%s\n", k, ene[k].id, ene[k].px, ene[k].py, ene[k].pz, (ene[k].stflg & 0x1000000) ? ", hidden" : "");
+    }
+    was = now;
     for (k = 0; k < (int)sys->ewk_n && k < RECS; k++) {
         BH_PWORK* ep = &ene[k];
-        if (rec_slot[k] < 0 || !rec_chr[k] || played(k) || !still(ep, k) || (ep->stflg & 0x41000000) || !ep->mlwP) continue;
+        if (!as_model(ep, k) || (ep->stflg & 0x41000000) || !ep->mlwP) continue;
         actor_act(ACTOR_CAST + rec_slot[k], ep);
     }
 }
 
-/* actor_put_enemy: 1 = drawn (or left out: an enemy's part the model stands in for) */
+/* actor_put_enemy: 1 = drawn */
 int cast_draw(BH_PWORK* ep)
 {
-    BH_PWORK* r;
     int k = (int)(ep - ene);
-    if (k >= 0 && k < RECS && rec_slot[k] >= 0 && rec_chr[k]) return !played(k) && still(ep, k) && actor_put_as(ACTOR_CAST + rec_slot[k], ep);
-    r = pc_enemy_root(ep);
-    k = (int)(r - ene);
-    if (k >= 0 && k < RECS && rec_slot[k] >= 0 && !rec_chr[k] && still(r, k)) return pc_enemy_draw_as(ep, ACTOR_CAST + rec_slot[k]);
-    return 0;
+    return as_model(ep, k) && actor_put_as(ACTOR_CAST + rec_slot[k], ep);
 }

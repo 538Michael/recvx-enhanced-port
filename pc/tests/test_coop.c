@@ -235,7 +235,7 @@ static void test_events(void)
     BAD(EV_EOPTS, 1, e->u.eo.rand = 2);
     BAD(EV_EOPTS, 1, e->u.eo.variety = 2);
     BAD(EV_EOPTS, 1, e->u.eo.events = -1);
-    BAD(EV_EOPTS, 1, e->u.eo.cast = 4);
+    BAD(EV_EOPTS, 1, e->u.eo.cast = 2);
     BAD(EV_EOPTS, 1, e->u.eo.cast_all = 2);
     BAD(EV_EOPTS, 1, e->u.eo.cast_assign = -1);
     BAD(EV_EOPTS, 1, e->u.eo.cast_imports = 2);
