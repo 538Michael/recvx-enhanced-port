@@ -262,10 +262,33 @@ until the right square on the white strip is.
 | Enemy randomizer | Off | enemies become other kinds; bosses stay |
 | Randomizer variety | Wild | Wild: any kind that fits. Mild: two common kinds per room |
 | Randomize event enemies | On | event enemies change too |
-| Enemy seed | 0 | the same seed gives the same enemies |
+| Enemy seed | 0 | the same seed gives the same enemies (and the same cutscene cast) |
+| Randomize cutscene cast | Off | see [Cutscene cast](#cutscene-cast): Off, Characters, Enemies or Both |
+| Character models | Cutscene models (faces move) | where the characters' new looks come from |
+| Assignment | Fixed per character | Fixed: the same model in every cutscene. Random per cutscene: each cutscene room picks again |
 
 Enemy options apply from the next room (ENEMIES.md, "Enemy options"). In co-op the host's enemy
 options, ink ribbons and BioRand count for both.
+
+#### Cutscene cast
+
+GAMEPLAY, under CUTSCENE CAST (and in the co-op lobby: GAME RULES, RANDOMIZER, CUTSCENE CAST). The
+people and zombies of the cutscenes are shown as other models; nothing else changes: the scenes,
+the voices, the enemies and what they do stay as they are.
+
+* **Randomize cutscene cast**: *Characters* swaps the story characters (Alfred, Alexia, Steve,
+  Rodrigo, Wesker, and Claire or Chris while you play the other one); *Enemies* the zombies (and
+  Hunters) that the cutscenes show, each as another look of its kind; *Both*.
+* **Character models**: *Cutscene models* picks among the characters' cutscene models: their mouths
+  move with the lines and their eyes look where the original character's do (the voice stays the
+  original character's). *All models* also uses the player models, the creatures and the zombies;
+  most of those keep a still face.
+* **Assignment**: *Fixed per character*: e.g. Steve is shown as Alfred in every cutscene, and no two
+  characters share a model. *Random per cutscene*: each cutscene room picks again. Both come from
+  the enemy seed: the same seed gives the same cast.
+* Your own character is not part of it: how you look in cutscenes follows APPEARANCE ("You appear
+  as", "Swapped model in cutscenes"). Alexia asleep in her capsule keeps her own look.
+* In co-op the host's settings and seed count, so both players see the same cast.
 
 ### Controls
 
