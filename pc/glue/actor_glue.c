@@ -1634,7 +1634,7 @@ int actor_rigged(int who) { return dg[who].model >= 0 && dg[who].rig.ok; }
 void actor_weapon_hands(int who, O_WRK* wpn, int n)
 {
     int hide = who >= 0 && who < ACTOR_SLOTS && dg[who].model >= 0 && dg[who].skin && dg[who].mapped;
-    for (int i = 0; i < n; i++) {
+    for (int i = 0; wpn && i < n; i++) {   /* (sys->obwp is NULL before the first game: co-op started from the command line) */
         NJS_CNK_OBJECT* o = wpn[i].mlwP && wpn[i].mlwP->objP && wpn[i].mlwP->obj_num > 0 ? &wpn[i].mlwP->objP[0] : NULL;
         if (!o || (wpn[i].lkono != 9 && wpn[i].lkono != 13)) continue;
         if (hide) o->evalflags |= 0x8; else o->evalflags &= ~0x8u;   /* (NJD_EVAL_HIDE: MdlPut.c skips the model, not the children) */
