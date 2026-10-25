@@ -12,6 +12,10 @@ enum { IMPORT_OUTBREAK2, IMPORT_SOURCES };
    RECVX_IMPORT_WHAT) */
 enum { IMPORT_GROUP_PLAYERS, IMPORT_GROUP_CUTSCENE, IMPORT_GROUP_NPCS, IMPORT_GROUP_ENEMIES, IMPORT_GROUPS };
 enum { IMPORT_PLAYERS = 1, IMPORT_CUTSCENE = 2, IMPORT_NPCS = 4, IMPORT_ENEMIES = 8, IMPORT_ALL = 15 };
+/* the groups offered for now: F9's checkboxes and table, what import_run extracts and what "You appear
+   as" lists (a manifest of an older run may hold the others: left out). The cutscene / high-detail
+   versions and the enemies work the same way; IMPORT_ALL here brings them back. */
+#define IMPORT_OFFERED (IMPORT_PLAYERS | IMPORT_NPCS)
 
 typedef struct ImportSettings {
     char dir[1024];                     /* ini import_dir; empty: <mods>/import (RECVX_MODS, default ./mods) */

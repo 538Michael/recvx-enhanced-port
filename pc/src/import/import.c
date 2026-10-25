@@ -90,7 +90,7 @@ int import_run(int src, int what)
     snprintf(pg->phase, sizeof(pg->phase), "reading the disc");
     source_dir(src, dir, sizeof(dir));
     SDL_CreateDirectory(dir);   /* (creates the parents too) */
-    r = ob2_extract(g_import.iso[src], dir, what, items, ITEMS_MAX, &n);
+    r = ob2_extract(g_import.iso[src], dir, what & IMPORT_OFFERED, items, ITEMS_MAX, &n);
     if (r < 0) { host_log("import: %s: %s\n", import_sources[src].key, pg->phase); return -1; }
     Save s = { src, n, items, g_import.iso[src] };
     snprintf(p, sizeof(p), "%s/manifest.txt", dir);
@@ -138,7 +138,7 @@ void import_registry_load(void)
         for (int i = 0; i < n; i++) {
             char file[1200], name[96];
             int j;
-            if (!items[i].player || (items[i].group > 0 ? items[i].group : 0) != g) continue;
+            if (!items[i].player || (items[i].group > 0 ? items[i].group : 0) != g || !(IMPORT_OFFERED & (1 << g))) continue;
             SDL_snprintf(file, sizeof(file), "%s/%s/%s.cvxm", dir, items[i].id, items[i].id);
             for (j = 0; j < k && strcmp(actor_import_file[j], file); j++) {}
             if (j < k) continue;   /* listed already: it keeps its place (a later extraction appends) */

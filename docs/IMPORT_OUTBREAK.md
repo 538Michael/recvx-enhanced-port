@@ -27,11 +27,14 @@ lists what was extracted; it is built so other games can be added as further sou
 | 13. Blink (round 4) | fixed: the whole forehead moved with the lids; the upper lid's weights are now set from the height (the lid only) and it closes by its own measured opening ("Faces") |
 | 14. Grip (round 4) | retuned: the support hand hung low and its fingers reached far past the grip; now right under the gun hand on the centre line, for all 8 characters ("Posture") |
 | 15. Lobby list (round 4) | main's MODEL page lists all imports, grouped with headers; scroll bar click; checked with 384 entries ("F9 window") |
+| 16. Weapon hands (round 5) | the weapons' hand pieces (Claire's / Chris's) hidden on imported models; their own hands hold the gun ("Posture") |
+| 17. Groups offered (round 6) | for now only the playable characters and the NPCs: F9 offers, extracts and lists only those; "You appear as" leaves out the other groups of an older manifest (`IMPORT_OFFERED`) |
+| 18. Left arm in idle and holds (round 6) | fixed: men's left arm pulled in across the thigh in idle, and the support hand pulled under the gun hand in long-gun holds ("Posture") |
 
 Resume notes: build with `cmake --build build`; headless run:
 `RECVX_MODS=<out> RECVX_IMPORT=outbreak2 RECVX_IMPORT_ISO=<image> build/pc/recvx --save-dir <tmp>`
-(`RECVX_IMPORT_WHAT` = 1 playable, 2 cutscene / high detail, 4 NPCs, 8 enemies, summed (15: all);
-exit status 0 = no failures).
+(`RECVX_IMPORT_WHAT` = 1 playable, 4 NPCs, summed (5: both; the bits 2 cutscene / high detail and
+8 enemies are ignored while they are not offered, `IMPORT_OFFERED`); exit status 0 = no failures).
 Check the output with `pc/tools/import_check.py <model>.glb|.cvxm out.png`. In game:
 `RECVX_MODS=<out> RECVX_APPEAR=30:68` shows the first imported model (chr `COOP_CHR_IMPORT` = 68).
 Test aids: `RECVX_IMPORT_POSE=file` (per pose of slot 0 the node matrices in the base's frame,
@@ -160,6 +163,12 @@ cast: "Cutscene, costume n", "High detail"), `N*` / `HN*` NPCs (276, by file nam
 enemies (191). The scenario archives `rNNN.afs` hold rooms (`r*.nbd`), objects and effects only:
 no character models (checked: every `.nbd` in them is a room, an object or an effect).
 
+Offered for now: the playable characters and the NPCs only (`import.h IMPORT_OFFERED`). F9 shows
+only their checkboxes and table groups, `import_run` extracts only them and `import_registry_load`
+lists only them, also from the manifest of an older run that holds the other groups. The code for
+the cutscene / high-detail versions and the enemies stays (the counts below are from a run with all
+four groups); `IMPORT_OFFERED = IMPORT_ALL` brings them back.
+
 Output per model in `<dir>/outbreak2/<id>/`: `<id>.glb` (viewable in Blender: one skinned mesh, a
 primitive per texture, the full skeleton, scale 0.01 to metres, textures embedded),
 `<id>_tex<k>.png`, and for every model on the human skeleton `<id>.cvxm`. `<dir>/outbreak2/manifest.txt`
@@ -287,6 +296,24 @@ the grip. The same for men (Chris's motions) and women
 unchanged (the shot still comes from the game's own skeleton). Dual weapons hold the hands further
 apart and keep the scaled offset only.
 
+**The left arm in idle and in holds** (sixth report: men's left arm broken and clipping when
+standing and in idle, and holding weapons at the wrong spot, most of all the shotgun; aim, walk and
+run fine). Cause: the two-handed solve above ran whenever the source's hands were less than 6 units
+apart, and Chris's hang 3.4 apart in his idle (Claire's 3.75): the model's left hand was pulled to
+"the right hand + the source's offset" scaled by the narrower shoulders, in across the thigh. And
+the grip pull of round 4 (the palm under the gun hand) faded out only at 4 units, so it also took
+the long guns' holds (the support hand on the shotgun's or rifle's fore-end, 2.6..3.8 from the gun
+hand) and the two sub machine guns (2.3..3) back under the gun hand. Measured from the dumped poses
+(Kevin, Chris's motions; Alyssa, Claire's), per motion: source hand distance, the source's left hand
+forward of its shoulder, model vs source. Fix: for imported models the solve runs only while the
+source's left hand reaches forward (full from 1.0 units in front of its shoulder, none below 0.6:
+idle 0.2..0.5, holds 1.7, aims 1.0..4.5), and the grip pull only for one-gun grips (hands up to 1
+apart, none from 1.5: the handgun's and magnum's 0.3..0.65). Kevin's left hand in idle is now 0.26
+outward of Chris's instead of 0.8 inward, and in the shotgun hold 2.85 from the gun hand (Chris
+2.65) instead of 1.22 (the rifle and the two sub machine guns alike). The handgun and magnum aims are
+unchanged. Checked with the five men, two male NPCs and two women (Alyssa, Cindy), front and side,
+next to Chris and Claire.
+
 **The weapon hand** (fifth report: the gun hand too far left, clipping, not on the gun). Cause: Code:
 Veronica's weapon models carry the hand that holds them: object 0 of each weapon file model is
 Claire's or Chris's gloved hand piece (43 vertices) and the gun, its slide and magazine are its
@@ -359,7 +386,7 @@ close; it cannot form vowels.
 
 `overlay.cpp import_window`, hotkey row "Import window" (F9, `B_IMPORT`; F9 was free). A section
 per source: the disc image (file selector, saved as `import_outbreak2_iso`), the output folder,
-checkboxes (playable characters, cutscene / high detail, NPCs, enemies), "Extract characters" (a
+checkboxes (the groups offered: playable characters and NPCs), "Extract characters" (a
 thread; progress bar with the model being read), then the manifest per group (collapsible, with
 counts; the playable characters open) as a table (character, variant, file, meshes, vertices,
 triangles, textures, player model yes/no/failed, notes). After an extraction the new player

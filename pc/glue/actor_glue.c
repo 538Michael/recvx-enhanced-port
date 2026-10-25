@@ -497,6 +497,17 @@ static void retarget(Disguise* d, BH_PWORK* src, const Rig* sr)
             float t[3], ds = 0, w;
             for (j = 0; j < 3; j++) ds += (sL[j] - sR[j]) * (sL[j] - sR[j]);
             w = (6.0f - sqrtf(ds)) / 3.0f;
+            if (d->skin && sr->map[11] >= 0) {
+                /* An imported model: only while the source's left hand reaches forward (a hold or an aim:
+                   1.0 units and more in front of its shoulder, none below 0.6). Chris's hands hang 3.4
+                   apart in his idle (Claire's 3.75), inside the 6-unit fade: the solve pulled the
+                   model's left hand in across its thigh (its shoulders are narrower than Chris's). */
+                const float* sS = &sow[(int)sr->map[11]].mtx[12];
+                float fz = 0, zl = 0, fwd;
+                for (j = 0; j < 3; j++) { fz += (sL[j] - sS[j]) * dm[8 + j]; zl += dm[8 + j] * dm[8 + j]; }
+                fwd = zl > 1e-6f ? -fz / sqrtf(zl) : 0;   /* (the actor's z axis points backwards) */
+                w *= fminf(1.0f, fmaxf(0.0f, (fwd - 0.6f) / 0.4f));
+            }
             if (w > 0) {
                 if (w > 1) w = 1;
                 float off[3];
@@ -506,10 +517,12 @@ static void retarget(Disguise* d, BH_PWORK* src, const Rig* sr)
                        quarter wider than Claire's: unscaled, the left hand was pulled in across the body even
                        with the arms down, which the source holds 3.5 apart) */
                     float ms = rig_dist(tr, tr->map[7], u), ss = rig_dist(sr, sr->map[7], sr->map[11]), k = 1;
-                    float g = w * fminf(1.0f, fmaxf(0.0f, (4.0f - sqrtf(ds)) / 2.0f)), y[3], dn = 0, yl = 0, rd[3], rl = 0, hl = 0;
+                    float g = w * fminf(1.0f, fmaxf(0.0f, (1.5f - sqrtf(ds)) / 0.5f)), y[3], dn = 0, yl = 0, rd[3], rl = 0, hl = 0;
                     if (ms > 0.1f && ss > 0.1f) k = ms / ss;
                     for (j = 0; j < 3; j++) off[j] *= k;
-                    /* In a grip (hands up to 2 apart, fading out at 4) the palm under the gun: Code: Veronica's
+                    /* In a one-gun grip (the handgun's and magnum's: hands up to 1 apart, fading out at 1.5;
+                       a long gun's support hand on the fore-end is 2.6..3.8 from the gun hand, two guns
+                       2.3..3, and keep the source's offset) the palm under the gun: Code: Veronica's
                        grip pieces reach in from the wrist and curl under the weapon, Outbreak's hand is open and
                        straight (it went on along the left forearm, across and past the gun to the right, or with
                        its wrist pulled back it hid behind the gun hand; with the source's full drop and a quarter
@@ -533,7 +546,7 @@ static void retarget(Disguise* d, BH_PWORK* src, const Rig* sr)
                 if (d->skin && tr->map[8] >= 0) {
                     /* and in a grip its left hand turned so the fingers point the way the right forearm does,
                        under the gun (they went on along the left forearm, across and past the gun to the right) */
-                    float g = w * fminf(1.0f, fmaxf(0.0f, (4.0f - sqrtf(ds)) / 2.0f)), fdir[3], tdir[3], tl = 0, q[9];
+                    float g = w * fminf(1.0f, fmaxf(0.0f, (1.5f - sqrtf(ds)) / 0.5f)), fdir[3], tdir[3], tl = 0, q[9];
                     const float *rh = &m->owP[r].mtx[12], *re = &m->owP[(int)tr->map[8]].mtx[12];
                     for (j = 0; j < 3; j++) { fdir[j] = d->hand_dir[0] * rot[h][j] + d->hand_dir[1] * rot[h][3 + j] + d->hand_dir[2] * rot[h][6 + j]; tdir[j] = rh[j] - re[j]; tl += tdir[j] * tdir[j]; }
                     if (g > 0 && tl > 1e-4f) {

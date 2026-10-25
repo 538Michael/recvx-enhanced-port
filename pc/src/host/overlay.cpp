@@ -767,10 +767,18 @@ static void import_window(void)
         }
         import_source_dir(s, dir, sizeof(dir));
         ImGui::TextDisabled("Output: %s", dir);
-        ImGui::CheckboxFlags("Playable characters", &what[s], IMPORT_PLAYERS); ImGui::SameLine();
-        ImGui::CheckboxFlags("Cutscene / high detail", &what[s], IMPORT_CUTSCENE); ImGui::SameLine();
-        ImGui::CheckboxFlags("NPCs", &what[s], IMPORT_NPCS); ImGui::SameLine();
-        ImGui::CheckboxFlags("Enemies", &what[s], IMPORT_ENEMIES);
+        {   /* (only the groups offered, IMPORT_OFFERED) */
+            static const struct { const char* label; int bit; } groups[] = {
+                { "Playable characters", IMPORT_PLAYERS }, { "Cutscene / high detail", IMPORT_CUTSCENE }, { "NPCs", IMPORT_NPCS }, { "Enemies", IMPORT_ENEMIES } };
+            int first = 1;
+            what[s] &= IMPORT_OFFERED;
+            for (const auto& g : groups) {
+                if (!(IMPORT_OFFERED & g.bit)) continue;
+                if (!first) ImGui::SameLine();
+                ImGui::CheckboxFlags(g.label, &what[s], g.bit);
+                first = 0;
+            }
+        }
         ImGui::BeginDisabled(!g_import.iso[s][0] || !what[s]);
         if (ImGui::Button("Extract characters")) import_start(s, what[s]);
         ImGui::EndDisabled();
@@ -782,12 +790,17 @@ static void import_window(void)
             ImGui::TextWrapped("%s", pg->phase);
         }
         int ok = 0, players = 0, failed = 0;
-        for (int i = 0; i < n[s]; i++) { ok += items[s][i].ok; players += items[s][i].player; failed += !items[s][i].ok; }
+        for (int i = 0; i < n[s]; i++) {
+            const ImportItem* x = &items[s][i];
+            if (x->group < 0 || !(IMPORT_OFFERED & (1 << x->group))) continue;
+            ok += x->ok; players += x->player; failed += !x->ok;
+        }
         if (!n[s]) ImGui::TextDisabled("Nothing extracted yet.");
         else {
             ImGui::Text("Extracted %s: %d models, %d usable as player models, %d failed", when[s], ok, players, failed);
             static const char* const gname[IMPORT_GROUPS] = { "Playable characters", "Cutscene and high-detail versions", "NPCs", "Enemies" };
             for (int g = 0; g < IMPORT_GROUPS; g++) {
+                if (!(IMPORT_OFFERED & (1 << g))) continue;   /* (an older run's other groups: not listed) */
                 int gn = 0, gp = 0;
                 for (int i = 0; i < n[s]; i++) if (items[s][i].group == g) { gn++; gp += items[s][i].player != 0; }
                 if (!gn) continue;

@@ -131,7 +131,8 @@ int main(int argc, char** argv)
        new) keeps every listed entry where it was, unchanged, and appends the new one */
     {
         static const char* man[2] = {
-            "item|N01_00|Nurse||1|1|1|4|2|1|1|1|\nitem|P00_00|Kevin Ryman|Costume 1|1|1|1|4|2|1|1|0|\nitem|E01_00|Zombie||1|1|1|4|2|1|0|0|\n",
+            "item|N01_00|Nurse||1|1|1|4|2|1|1|1|\nitem|P00_00|Kevin Ryman|Costume 1|1|1|1|4|2|1|1|0|\nitem|E01_00|Zombie||1|1|1|4|2|1|0|0|\n"
+            "item|EP00_00|Kevin Ryman|Cutscene, costume 1|1|1|1|4|2|1|1|0|\nitem|HE01_00|Enemy HE01_00|High detail|1|1|1|4|2|1|1|0|\n",   /* (groups not offered: not listed) */
             "item|P01_00|Mark Wilkins||1|1|1|4|2|1|1|0|\nitem|P00_00|Kevin Ryman|Costume 1|1|1|1|4|2|1|1|0|\n",
         };
         const char *kevin, *nurse;
