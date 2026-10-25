@@ -1679,6 +1679,7 @@ void lobby_frame(void)
     static const char* join = (const char*)-1, *stop = (const char*)-1, *title = (const char*)-1;
     static unsigned int hand;
     hand++;
+    { extern void crash_test(unsigned); crash_test(hand); }   /* RECVX_TEST_CRASH (log.c) */
     if (join == (const char*)-1) join = getenv("RECVX_TEST_JOIN");
     if (join && *join && hand >= (unsigned)atoi(join)) {   /* RECVX_TEST_JOIN="n": F3's Join at the n-th frame hand-off */
         host_log("test: join (F3) at hand-off %u\n", hand);

@@ -1050,6 +1050,9 @@ Command-line options override the saved settings for that run.
   exception with the backtrace or frame chain, and the last 48 `host_log` messages (kept in memory,
   IPv4 addresses masked) - a few KB for bug reports (`host/log.c`). Addresses resolve with
   `addr2line -f -e recvx` (Windows: `i686-w64-mingw32-addr2line -f -e recvx.exe`): the image base is fixed.
+  Linux: the signal, fault address, instruction pointer and thread go out first with `write()` alone,
+  then the backtrace (primed at start) and the messages; the main, game, HD loader, update and movie
+  threads each have an alternate signal stack (`crash_thread_init`), so a stack overflow is reported too.
 - `--profile[=file]` writes one CSV line per game frame: total frame time and exclusive time in
   game logic, VU0, VU1, GS emulation + GL submission, interpolation, presentation and idle wait.
   F1 -> Performance shows the same live. The native `CALCPOINT` (single calls and runs) is not
@@ -1080,6 +1083,7 @@ and game frames for game-state aids, as noted. Co-op test aids (`RECVX_COOP_*`,
 | `RECVX_SHOW_OVERLAY=1` / `=2` / `=3` / `=4` | open the F1 overlay / the cheats window (F2) / the co-op window / the import window (F9) at start |
 | `RECVX_IMPORT=outbreak2`, `RECVX_IMPORT_ISO`, `RECVX_IMPORT_WHAT` | headless import, then exit ([IMPORT_OUTBREAK.md](IMPORT_OUTBREAK.md)) |
 | `RECVX_EXIT_FRAME=n` | exit at presented frame n |
+| `RECVX_TEST_CRASH=stack\|null[:n]` | crash the game thread at frame hand-off n (default 100) with a stack overflow or a null write (the crash report) |
 | `RECVX_WATCHDOG=sec` | Linux: print a backtrace after sec seconds and exit |
 | `RECVX_FAST_DEMO=1` | start the attract demo right away |
 | `RECVX_SKIP_MOVIES=1` | movies end after 30 game frames without decoding (repeatable test runs) |
