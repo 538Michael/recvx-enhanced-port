@@ -1,6 +1,10 @@
 /* Imports (pc/src/import, docs/IMPORT_OUTBREAK.md): the SLD decoder, TIM2 decoding (the CSM1
-   palette order) and the two writers on a small synthetic humanoid (no disc data). */
+   palette order), the two writers on a small synthetic humanoid (no disc data), and the "You
+   appear as" registry growing append-only. */
 #include "../src/import/impmodel.h"
+#include "../src/import/import.h"
+#include "../src/host/actors.h"
+#include <SDL3/SDL.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -104,6 +108,32 @@ int main(int argc, char** argv)
     CHECK(rd(d) == 0x46546C67 && rd(d + 4) == 2 && rd(d + 8) == n && rd(d + 16) == 0x4E4F534A);
     CHECK(strstr((char*)d + 20, "\"skins\"") && strstr((char*)d + 20, "\"inverseBindMatrices\""));
     imp_free(&m);
+
+    /* the registry: grouped at the first load; a second manifest (another order, one model gone, one
+       new) keeps every listed entry where it was, unchanged, and appends the new one */
+    {
+        static const char* man[2] = {
+            "item|N01_00|Nurse||1|1|1|4|2|1|1|1|\nitem|P00_00|Kevin Ryman|Costume 1|1|1|1|4|2|1|1|0|\nitem|E01_00|Zombie||1|1|1|4|2|1|0|0|\n",
+            "item|P01_00|Mark Wilkins||1|1|1|4|2|1|1|0|\nitem|P00_00|Kevin Ryman|Costume 1|1|1|1|4|2|1|1|0|\n",
+        };
+        const char *kevin, *nurse;
+        snprintf(g_import.dir, sizeof(g_import.dir), "%s/test_import_reg", dir);
+        import_source_dir(IMPORT_OUTBREAK2, p, sizeof(p));
+        SDL_CreateDirectory(p);
+        strcat(p, "/manifest.txt");
+        for (int r = 0; r < 2; r++) {
+            f = fopen(p, "w");
+            CHECK(f && fputs(man[r], f) >= 0);
+            fclose(f);
+            import_registry_load();
+            if (r) break;
+            CHECK(actor_import_n == 2 && strstr(actor_import_file[0], "/P00_00/P00_00.cvxm") && !strcmp(actor_imports[0].name, "Kevin Ryman (Costume 1)"));
+            CHECK(actor_import_group[1] == IMPORT_GROUP_NPCS && actor_imports[1].anim == ANIM_FEMALE);
+            kevin = actor_import_file[0]; nurse = actor_imports[1].name;
+        }
+        CHECK(actor_import_n == 3 && actor_import_file[0] == kevin && actor_imports[1].name == nurse && strstr(actor_import_file[2], "/P01_00/"));
+        remove(p);
+    }
     printf("import: ok\n");
     return 0;
 }

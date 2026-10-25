@@ -27,11 +27,12 @@ extern const ActorModel actor_models[];
 
 /* Player models imported from other games' discs (F9, pc/src/import; docs/IMPORT_OUTBREAK.md):
    actor index ACTOR_MODELS + k, "You appear as" chr COOP_CHR_MAX + 1 + k. Filled by
-   import_registry_load (main thread, before the game uses them; the count is published last). */
-#define ACTOR_IMPORT_MAX 384   /* (all of Outbreak File #2's people fit) */
+   import_registry_load (main thread, the only writer) append-only: an entry below actor_import_n
+   (published last, release) never changes or goes away, so the game thread reads it without a
+   lock and k keeps meaning the same model while it is shown (a model extracted again keeps its k). */
+#define ACTOR_IMPORT_MAX 2048   /* (Outbreak File #2 has about 300 people) */
 extern ActorModel actor_imports[ACTOR_IMPORT_MAX];
-extern char actor_import_name[ACTOR_IMPORT_MAX][96];
-extern char actor_import_file[ACTOR_IMPORT_MAX][1200];   /* its .cvxm */
+extern const char* actor_import_file[ACTOR_IMPORT_MAX];   /* its .cvxm */
 extern unsigned char actor_import_group[ACTOR_IMPORT_MAX];   /* IMPORT_GROUP_* (import.h) */
 extern int actor_import_n;
 const ActorModel* actor_model(int idx);   /* catalogue entry or import idx, NULL if none */
@@ -81,7 +82,7 @@ const char* appear_group(int chr);    /* the list's group of chr (the lobby's mo
 #define ACTOR_SLOTS 5
 #define ACTOR_DOUBLE 2
 #define ACTOR_VARIANT 3                 /* 3, 4: enemy variants' models (pc/glue/variant_glue.c), each posed per enemy drawn */
-#define ACTOR_PART 1000
+#define ACTOR_PART 10000   /* past ACTOR_MODELS + ACTOR_IMPORT_MAX */
 int  actor_set(int who, int idx);       /* 1 = shown (a failed entry is not retried) */
 int  actor_shown(int who);
 int  actor_rigged(int who);             /* its model is posed from a source's skeleton (a humanoid node map was found) */

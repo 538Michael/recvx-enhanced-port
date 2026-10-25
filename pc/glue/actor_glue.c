@@ -1018,7 +1018,7 @@ static int load_import_model(Disguise* d, int k)
         return 0;
     }
     texn = realize(d, d->keep + 60, own);
-    if (d->w.mdl_n != 1 || d->w.mdl[0].obj_num < 2 || !d->w.mdl[0].objP[1].model || !tex_room(actor_import_name[k], texn)) return 0;
+    if (d->w.mdl_n != 1 || d->w.mdl[0].obj_num < 2 || !d->w.mdl[0].objP[1].model || !tex_room(actor_imports[k].name, texn)) return 0;
     p = (unsigned char*)d->w.mdl[0].objP[1].model->vlist;
     if (!p || p[0] != 51 || rd32(p + 4) >> 16 != nv) { host_log("actor: %s: no vertex chunk of %u vertices\n", path, nv); return 0; }
     if (own[0]) {
