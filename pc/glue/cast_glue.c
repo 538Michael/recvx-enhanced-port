@@ -30,7 +30,7 @@ int pc_enemy_draw_as(BH_PWORK* ep, int who);
 #define CSLOTS (ACTOR_SLOTS - ACTOR_CAST)
 #define RECS 128
 static signed char rec_slot[RECS];      /* record -> cast slot, -1: drawn as itself */
-static unsigned char rec_id[RECS], rec_ver[RECS], rec_chr[RECS];   /* what it was when given its model; a character */
+static unsigned char rec_id[RECS], rec_ver[RECS], rec_chr[RECS];   /* what it was when given its model; a character (1 + cast_character) */
 static short slot_model[CSLOTS] = { -1, -1, -1, -1, -1, -1 };
 _Static_assert(CSLOTS == 6, "slot_model");
 
@@ -65,10 +65,8 @@ void cast_release(void)
 /* enemyopt_glue.c, the end of the room load: scripted[k] & 3: the script drives (1) or shows (2) record k */
 void cast_room(const EnemyOpts* o, const unsigned char* scripted)
 {
-    int want[RECS], k, j, n = 0, room = room_file_now(), pid = sys->ply_id & 3, imports;
+    int want[RECS], k, j, n = 0, room = room_file_now(), imports;
     unsigned scene;
-    memset(rec_slot, -1, sizeof(rec_slot));
-    cast_n = 0;
     if (!o || !o->cast || !rom) { cast_release(); return; }
     imports = import_count(o);
     scene = o->cast_assign ? (unsigned)room + 1 : 0;
@@ -78,19 +76,15 @@ void cast_room(const EnemyOpts* o, const unsigned char* scripted)
         want[k] = -1;
         if (!(ep->flg & 0x1) || !ep->mlwP) continue;
         c = cast_character(ep->id, ep->mdlver);
-        if (c >= 0 && (o->cast & CAST_CHARS) && !(c == pid && c < 4)) kind = CASTK_CHAR, key = c;   /* (the character played: "You appear as") */
+        if (c >= 0 && (o->cast & CAST_CHARS)) kind = CASTK_CHAR, key = c;   /* (the character played's doubles too: skipped while it is played, played()) */
         else if (c < 0 && (o->cast & CAST_ENEMIES) && (scripted[k] & 3) && !(ep->flg & 0x80) && (kind = cast_enemy_kind(ep->id)) >= 0) key = cast_look(ep->id, ep->mdlver);
         if (kind < 0 || key < 0) continue;
         for (j = 0; j < (int)(sizeof(kept) / sizeof(kept[0])) && !(kept[j].room == room && kept[j].rec == k); j++);
         if (j < (int)(sizeof(kept) / sizeof(kept[0]))) { host_log("cast: room %04d record %d (type %d) stays: %s\n", room, k, ep->id, kept[j].why); continue; }
         want[k] = cast_model((unsigned)o->seed, scene, kind, key, kind == CASTK_CHAR && o->cast_all, imports);
-        rec_chr[k] = kind == CASTK_CHAR;
+        rec_chr[k] = (unsigned char)(kind == CASTK_CHAR ? 1 + c : 0);
     }
-    for (j = 0; j < CSLOTS; j++) {   /* models no record wants go (normally all went with the last room's textures) */
-        for (k = 0; k < rom->ene_n && k < RECS && want[k] != slot_model[j]; k++);
-        if (slot_model[j] >= 0 && !(k < rom->ene_n && k < RECS)) { actor_set(ACTOR_CAST + j, -1); slot_model[j] = -1; }
-        if (slot_model[j] >= 0 && !actor_shown(ACTOR_CAST + j)) slot_model[j] = -1;   /* (njReleaseTextureAll took it) */
-    }
+    cast_release();   /* (normally all went with the last room's textures; their buffer is free again) */
     for (k = 0; k < rom->ene_n && k < RECS; k++) {
         const ActorModel* am;
         const char* name;
@@ -121,13 +115,17 @@ void cast_room(const EnemyOpts* o, const unsigned char* scripted)
              o->cast_all ? "all models" : "cutscene models", imports ? ", imported models" : "");
 }
 
+/* a double of the character played: "You appear as" and "Swapped model in cutscenes" decide how it looks (the character
+   played is known only now: a story switch, and the test aid RECVX_PLAYER, change it after the room load) */
+static int played(int k) { return rec_chr[k] >= 1 && rec_chr[k] <= 4 && rec_chr[k] - 1 == (sys->ply_id & 3); }
+
 /* actor_double_tick: every character shown, posed with its face and hands */
 void cast_tick(void)
 {
     int k;
     for (k = 0; k < (int)sys->ewk_n && k < RECS; k++) {
         BH_PWORK* ep = &ene[k];
-        if (rec_slot[k] < 0 || !rec_chr[k] || !still(ep, k) || (ep->stflg & 0x41000000) || !ep->mlwP) continue;
+        if (rec_slot[k] < 0 || !rec_chr[k] || played(k) || !still(ep, k) || (ep->stflg & 0x41000000) || !ep->mlwP) continue;
         actor_act(ACTOR_CAST + rec_slot[k], ep);
     }
 }
@@ -137,7 +135,7 @@ int cast_draw(BH_PWORK* ep)
 {
     BH_PWORK* r;
     int k = (int)(ep - ene);
-    if (k >= 0 && k < RECS && rec_slot[k] >= 0 && rec_chr[k] && still(ep, k)) return actor_put_as(ACTOR_CAST + rec_slot[k], ep);
+    if (k >= 0 && k < RECS && rec_slot[k] >= 0 && rec_chr[k]) return !played(k) && still(ep, k) && actor_put_as(ACTOR_CAST + rec_slot[k], ep);
     r = pc_enemy_root(ep);
     k = (int)(r - ene);
     if (k >= 0 && k < RECS && rec_slot[k] >= 0 && !rec_chr[k] && still(r, k)) return pc_enemy_draw_as(ep, ACTOR_CAST + rec_slot[k]);
