@@ -64,9 +64,13 @@ int appear_grab_motion(int id, int mtn, int from, int to);
 #define COOP_CHR_ACTOR 6
 #define COOP_CHR_MAX (COOP_CHR_ACTOR + ACTOR_MODELS - 1)
 #define COOP_CHR_IMPORT (COOP_CHR_MAX + 1)   /* the imported models after the catalogue */
+/* "As played (cutscene)": the played character's cutscene model. A fixed value past every import
+   (stored in recvx.ini); never sent to the partner: appear_played resolves it first. */
+#define COOP_CHR_CINE 4095
+int appear_played(int chr, int ply_id);   /* chr; for COOP_CHR_CINE the cutscene model of ply_id (0..3; else 0, as played) */
 
-/* The list the menus show (F3, the lobby, ENHANCED SETTINGS): one entry per distinct look, the player
-   files first, the player characters' cutscene models last. Event doubles of a listed look are left
+/* The list the menus show (F3, the lobby, ENHANCED SETTINGS): one entry per distinct look, "As played"
+   and "As played (cutscene)" first, then the player files, the player characters' cutscene models last. Event doubles of a listed look are left
    out of the list only: their chr values stay valid (co-op, recvx.ini) and appear_canon maps them to
    the listed one. */
 int appear_count(void);

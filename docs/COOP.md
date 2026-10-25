@@ -662,8 +662,9 @@ appear in the joiner's game in the same slots. Details: [ENEMIES.md](ENEMIES.md)
 ## You appear as
 
 "You appear as" (lobby MODEL, F3, F1 / ENHANCED SETTINGS APPEARANCE; ini `coop_char`) chooses your model: the
-character you play, Claire, Chris, Steve, Wesker, Claire's second costume, or a story-cast, creature
-or zombie model. Your partner sees you as that model, and so do you (also in single player). The
+character you play, the character you play in its cutscene model ("As played (cutscene)": sent to
+the partner as that cutscene model, no protocol change), Claire, Chris, Steve, Wesker, Claire's second
+costume, or a story-cast, creature or zombie model. Your partner sees you as that model, and so do you (also in single player). The
 partner's voice follows its model. Both players need the same build. "Swapped model in cutscenes"
 (`appear_in_cutscenes`) counts for your own screen: off, your cutscenes (also one replayed from
 the partner's event) show the real Claire or Chris. Models, voices and cutscene behaviour:
@@ -691,7 +692,7 @@ only on the host; "locked" ones cannot change during a session.
 
 | Label | ini key | Values (default) |
 |---|---|---|
-| You appear as (APPEARANCE page) | `coop_char` | model index (0: as played) |
+| You appear as (APPEARANCE page) | `coop_char` | model index (0: as played; 4095: as played, cutscene model) |
 | Partner's name tag | `coop_nametag` | 0/1 (1) |
 | Show ping | `show_ping` | 0/1 (1) |
 | Hide IP addresses | `hide_ip` | 0/1 (0); see "Hiding IP addresses" |

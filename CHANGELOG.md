@@ -6,6 +6,8 @@
 
 - **Rifle ammo stacks** (Gameplay, on by default): rifle and assault rifle bullets stack in one slot
   like the other ammo. Off: each pickup takes its own slot, as in the original.
+- **As played (cutscene)** (You appear as, second entry): the character you play in its cutscene
+  model, also after the story switches to another character.
 
 ### Fixes
 

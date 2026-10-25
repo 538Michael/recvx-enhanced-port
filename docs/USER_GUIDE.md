@@ -295,7 +295,7 @@ Music and voice, Sound effects: 0-100%, default 100%.
 
 | Setting | Default | What it does |
 |---|---|---|
-| You appear as | As played | play as another character, creature or zombie; your co-op partner sees it too |
+| You appear as | As played | play as another character, creature or zombie; your co-op partner sees it too. "As played (cutscene)": the character you play in its cutscene model (follows character switches; also over other costumes) |
 | Use gender-matched animations | On | a male model moves like Chris, a female one like Claire |
 | Swapped model in cutscenes | On | Off: cutscenes show the real Claire or Chris |
 | Talking faces in cutscenes (experimental) | Off | the swapped model moves its mouth |

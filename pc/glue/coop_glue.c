@@ -433,18 +433,21 @@ static void self_keep(void)
     }
 }
 
+/* "You appear as" for the character played now ("As played (cutscene)": its cutscene model) */
+static int my_chr(void) { return appear_played(g_coop.chr, sys ? sys->ply_id : 0); }
+
 /* at the hand-off */
 static void self_frame(void)
 {
-    int own = sys->ply_id + (sys->costume & 3) * 4, want;
+    int own = sys->ply_id + (sys->costume & 3) * 4, want, chr = my_chr();
     if (!plp || !plp->mdl_n) return;
     if (self_mesh >= 0 && !self_ours()) self_restore();   /* the game reloaded the player */
     if (tx_in_game)   /* in cutscenes the character played is acted by its event double */
-        actor_doubles(!g_coop.chr ? -1 : g_coop.chr >= COOP_CHR_ACTOR ? g_coop.chr - COOP_CHR_ACTOR :
-                      (g_coop.chr == 5 ? 4 : g_coop.chr - 1) == own ? -1 : ACTOR_PART + (g_coop.chr == 5 ? 4 : g_coop.chr - 1));
+        actor_doubles(!chr ? -1 : chr >= COOP_CHR_ACTOR ? chr - COOP_CHR_ACTOR :
+                      (chr == 5 ? 4 : chr - 1) == own ? -1 : ACTOR_PART + (chr == 5 ? 4 : chr - 1));
     if (!tx_in_game || (sys->cb_flg & 0x1)) return;
-    self_actor(g_coop.chr >= COOP_CHR_ACTOR ? g_coop.chr - COOP_CHR_ACTOR : -1);
-    want = !g_coop.chr || g_coop.chr >= COOP_CHR_ACTOR ? -1 : g_coop.chr == 5 ? 4 : g_coop.chr - 1;
+    self_actor(chr >= COOP_CHR_ACTOR ? chr - COOP_CHR_ACTOR : -1);
+    want = !chr || chr >= COOP_CHR_ACTOR ? -1 : chr == 5 ? 4 : chr - 1;
     if (want == own) want = -1;
     if (want == self_mesh || (want >= 0 && want == self_fail)) return;   /* (-1 is no failure: back to the original) */
     self_restore();
@@ -637,8 +640,9 @@ void coop_control_remote(void)
     for (i = 0; tx.mset == MSET_NONE && i < (int)sys->ewk_n && i < PC_ENE_SLOTS; i++)
         if ((ene[i].flg & 0x1) && ene[i].mnwP == plp->mnwP) tx.mset = i;   /* grabbed: the player plays the enemy's set */
     tx.mfile = sys->ply_id + (sys->costume & 3) * 4;
-    tx.chr = !g_coop.chr || g_coop.chr >= COOP_CHR_IMPORT ? sys->ply_id : g_coop.chr == 5 ? 0 : g_coop.chr >= COOP_CHR_ACTOR ? 4 + g_coop.chr - COOP_CHR_ACTOR : g_coop.chr - 1;   /* (an imported model, which the partner may not have: shown as played) */
-    tx.costume = !g_coop.chr ? sys->costume & 3 : g_coop.chr == 5;
+    i = my_chr();   /* ("As played (cutscene)": sent as the cutscene model) */
+    tx.chr = !i || i >= COOP_CHR_IMPORT ? sys->ply_id : i == 5 ? 0 : i >= COOP_CHR_ACTOR ? 4 + i - COOP_CHR_ACTOR : i - 1;   /* (an imported model, which the partner may not have: shown as played) */
+    tx.costume = !i ? sys->costume & 3 : i == 5;
     tx.stg = sys->stg_no; tx.rom = sys->rom_no; tx.pos = sys->pos_no;
     tx.rcase = (unsigned)my_case() <= 9 ? (uint8_t)(my_case() + 1) : 0;   /* (sys->rcase alone: a door's script picks the next room's before it leaves) */
     tx.px = plp->px; tx.py = plp->py; tx.pz = plp->pz;
@@ -836,7 +840,7 @@ int pc_player_voice(int se)
     if (partner_voice)
         v = voice_of(rx.chr >= 4 ? COOP_CHR_ACTOR + rx.chr - 4 : rx.chr + 1, rx.mfile & 3);   /* (pose chr 0..3: the player files) */
     else {
-        v = !g_appear_cutscene && actor_double_acting() ? own : voice_of(g_coop.chr, own);   /* "Swapped model in cutscenes" off: the double's own */
+        v = !g_appear_cutscene && actor_double_acting() ? own : voice_of(my_chr(), own);   /* "Swapped model in cutscenes" off: the double's own */
         tx.voice = (unsigned char)se;
         tx.voice_n++;
     }
@@ -6453,7 +6457,7 @@ void coop_frame(void)
     memset(&tx_ext, 0, sizeof(tx_ext));
     memcpy(tx_ext.name, g_coop.name, sizeof(tx_ext.name) - 1);
     memcpy(tx_ext.note, g_coop.note, sizeof(tx_ext.note) - 1);
-    tx_ext.lchr = g_coop.chr <= COOP_CHR_MAX ? g_coop.chr : 0;   /* (int8_t; an import: the character played, as in tx.chr) */
+    tx_ext.lchr = my_chr() <= COOP_CHR_MAX ? my_chr() : 0;   /* (int8_t; an import: the character played, as in tx.chr; "As played (cutscene)": the cutscene model) */
     tx_ext.lobby = g_coop.lobby;
     if (!is_host) { memcpy(tx_ext.pid, g_coop.pid, 16); memcpy(tx_ext.tag, my_tag, 16); tx_ext.items = (uint8_t)items_wire(); }
     else tx_ext.rec = !g_coop.remember ? REC_OFF : !id_ok ? REC_UNKNOWN : rec_have(id_pid) ? REC_HAVE : REC_NONE;

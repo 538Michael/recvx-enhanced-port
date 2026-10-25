@@ -358,8 +358,9 @@ catalogue: chr `COOP_CHR_IMPORT + k`, actor index `ACTOR_MODELS + k`, skinned ev
 
 ### The list
 
-The menus list one entry per distinct look: "As played", the five player files, 50 catalogue
-models and, last, the player characters' four cutscene models (60 entries instead of 68). They share
+The menus list one entry per distinct look: "As played", "As played (cutscene)", the five player
+files, 50 catalogue models and, last, the player characters' four cutscene models (61 entries instead
+of 69). They share
 `actors.c` `appear_count`, `appear_at`, `appear_pos`, `appear_step`, `appear_name`, `appear_canon`;
 the list is filtered and ordered for display only, so catalogue indices, `g_coop.chr`, `Pose.chr`
 and the cutscene doubles are unaffected (no protocol change). A hidden value in `recvx.ini` is
@@ -384,6 +385,22 @@ unarmed pieces are drawn, as for the rest of the cast), and no head part of thei
 cutscenes the scripts link the player's `sys->obwp[2]` to the double); the display actor brings
 Claire's ponytail and Wesker's sunglasses itself ("Head parts" below). Earlier versions hid them as
 twins of the player files; their stored values stayed valid.
+
+**As played (cutscene)** (second in every list): the cutscene model of the character played now:
+Claire's (0) while Claire is played, Chris's (1), Steve's (3) or Wesker's (5, the Battle Game). Its
+value is a fixed id, `COOP_CHR_CINE` 4095 (past every import), so no entry was renumbered: the
+list's display order puts it second (`appear_at(1)`, `appear_pos`), and an old `coop_char` keeps its
+model. `appear_played(chr, sys->ply_id)` turns it into that catalogue entry wherever the choice is
+used (`coop_glue.c my_chr`: our model, the cutscene doubles, the voice, the co-op pose; the lobby
+preview with the character of the chosen save, else Claire), every frame, so it follows a story
+switch (Claire -> Chris) as "As played" does. From there everything is that cutscene model's: the
+gender-matched motions, the hand pieces, the voice, Claire's ponytail, and in cutscenes the
+game's own double (the played character's own cutscene model replaces no double, see "Cutscene
+doubles"). Costumes: there is one cutscene model per character, so Claire's second costume and any
+other costume are shown as that model too (the entry is chosen for it; "As played" keeps the
+costume). Co-op: the partner gets the resolved cutscene model (`Pose.chr` 4 + entry, `lchr` the
+entry), as if it had been chosen; no protocol change, and an older partner shows it too. An older
+build reading the id finds it out of range and keeps "As played".
 
 ### Head parts
 
@@ -668,7 +685,7 @@ same 4 programs each. No other character has player vocal sounds.
 
 | Shown as | Voice |
 |---|---|
-| As played | the character played |
+| As played, As played (cutscene) | the character played |
 | Claire (all files and doubles) | Claire (`CORE_000`) |
 | Chris and his doubles | Chris (`CORE_001`) |
 | Steve and his doubles, Monster Steve | Steve (`CORE_002`) |

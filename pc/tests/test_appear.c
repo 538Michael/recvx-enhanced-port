@@ -1,4 +1,4 @@
-/* "You appear as" list (pc/src/host/actors.c): event doubles left out, the cutscene models last,
+/* "You appear as" list (pc/src/host/actors.c): "As played (cutscene)" second, event doubles left out, the cutscene models last,
    every chr still valid. */
 #include "../src/host/actors.h"
 #include <stdio.h>
@@ -8,13 +8,20 @@
 int main(void)
 {
     int n = appear_count();
-    CHECK(n == COOP_CHR_MAX + 1 - 8);
+    CHECK(n == COOP_CHR_MAX + 1 - 8 + 1);   /* (+ "As played (cutscene)") */
     for (int i = 0; i < n; i++) {
         CHECK(appear_pos(appear_at(i)) == i && appear_canon(appear_at(i)) == appear_at(i));
-        if (i && i != n - 4) CHECK(appear_at(i) > appear_at(i - 1));   /* catalogue order: player files first, then the tail */
+        if (i > 2 && i != n - 4) CHECK(appear_at(i) > appear_at(i - 1));   /* catalogue order: player files first, then the tail */
     }
     for (int c = 0; c <= COOP_CHR_MAX; c++) CHECK(appear_canon(appear_canon(c)) == appear_canon(c));
-    CHECK(appear_at(0) == 0 && appear_at(5) == 5);                       /* As played, the player files */
+    CHECK(appear_at(0) == 0 && appear_at(1) == COOP_CHR_CINE && appear_at(2) == 1 && appear_at(6) == 5);   /* As played, As played (cutscene), the player files */
+    CHECK(appear_pos(COOP_CHR_CINE) == 1 && appear_pos(1) == 2 && appear_step(0, 1) == COOP_CHR_CINE && appear_step(COOP_CHR_CINE, 1) == 1);
+    CHECK(!strcmp(appear_name(COOP_CHR_CINE), "As played (cutscene)") && !strcmp(appear_group(COOP_CHR_CINE), "CVX characters") && appear_voice(COOP_CHR_CINE) < 0);
+    /* "As played (cutscene)" resolved for the character played (Claire, Chris, Steve, Wesker); every stored value keeps its model */
+    CHECK(appear_played(COOP_CHR_CINE, 0) == COOP_CHR_ACTOR + 0 && appear_played(COOP_CHR_CINE, 1) == COOP_CHR_ACTOR + 1);
+    CHECK(appear_played(COOP_CHR_CINE, 2) == COOP_CHR_ACTOR + 3 && appear_played(COOP_CHR_CINE, 3) == COOP_CHR_ACTOR + 5 && appear_played(COOP_CHR_CINE, 4) == 0);
+    for (int c = 0; c <= COOP_CHR_MAX; c++) CHECK(appear_played(c, 1) == c);
+    CHECK(appear_canon(COOP_CHR_CINE - 1) == 0 && appear_canon(COOP_CHR_CINE + 1) == 0);
     /* the player characters' cutscene models last: Claire, Chris, Steve, Wesker */
     CHECK(appear_at(n - 4) == COOP_CHR_ACTOR + 0 && appear_at(n - 3) == COOP_CHR_ACTOR + 1);
     CHECK(appear_at(n - 2) == COOP_CHR_ACTOR + 3 && appear_at(n - 1) == COOP_CHR_ACTOR + 5);

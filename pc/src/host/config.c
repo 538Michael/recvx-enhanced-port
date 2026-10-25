@@ -62,7 +62,7 @@ static const struct { const char* key; int* val; int lo, hi; } keys[] = {
     { "smooth_menus", &g_config.menu_smooth, 0, 1 },
     { "frame_blend", &g_config.frame_blend, -1, 1 },
     { "coop_port", &g_coop.port, 1, 65535 },
-    { "coop_char", &g_coop.chr, 0, COOP_CHR_IMPORT + ACTOR_IMPORT_MAX - 1 },   /* (imports: checked after import_registry_load) */
+    { "coop_char", &g_coop.chr, 0, COOP_CHR_CINE },   /* (imports and the ids between: checked after import_registry_load) */
     { "appear_gender_anim", &g_appear_anim, 0, 1 },
     { "appear_cutscene_face", &g_appear_face, 0, 1 },
     { "appear_in_cutscenes", &g_appear_cutscene, 0, 1 },

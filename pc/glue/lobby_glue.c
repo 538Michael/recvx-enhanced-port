@@ -1536,7 +1536,7 @@ static void draw_previews(void)
        few frames (scrolling through the list) */
     int chr = lb.step == 6 && lb.pick < appear_count() ? appear_at(lb.pick) : g_coop.chr;
     if (chr != lb.want_chr) { lb.want_chr = chr; lb.chr_stable = 0; }
-    if (++lb.chr_stable >= 8 || pv[0].chr < 0) pv_set(0, lb.want_chr, played);
+    if (++lb.chr_stable >= 8 || pv[0].chr < 0) pv_set(0, appear_played(lb.want_chr, played), played);   /* ("As played (cutscene)": that character's cutscene model) */
     pv_set(1, partner && g_coop.peer_lchr >= 0 && g_coop.peer_lchr <= COOP_CHR_MAX ? g_coop.peer_lchr : -1, 0);
     lb.spin += 1;
     {

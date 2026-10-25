@@ -167,9 +167,18 @@ static const struct { short hidden, kept; } twins[] = {
 static const short tail[] = { M(0), M(1), M(3), M(5) };
 #define TAILS ((int)(sizeof(tail) / sizeof(tail[0])))
 
+_Static_assert(COOP_CHR_CINE >= COOP_CHR_IMPORT + ACTOR_IMPORT_MAX, "COOP_CHR_CINE");
+
+int appear_played(int chr, int ply_id)
+{
+    static const signed char cine[4] = { M(0), M(1), M(3), M(5) };   /* Claire, Chris, Steve, Wesker */
+    if (chr != COOP_CHR_CINE) return chr;
+    return ply_id >= 0 && ply_id < 4 ? cine[ply_id] : 0;
+}
+
 int appear_canon(int chr)
 {
-    if (import_of(chr) >= 0) return chr;
+    if (import_of(chr) >= 0 || chr == COOP_CHR_CINE) return chr;
     if (chr < 0 || chr > COOP_CHR_MAX) return 0;
     for (int i = 0; i < (int)(sizeof(twins) / sizeof(twins[0])); i++)
         if (chr == twins[i].hidden) return twins[i].kept;
@@ -184,16 +193,18 @@ static int tail_at(int chr)
 
 static int head(int c) { return appear_canon(c) == c && tail_at(c) < 0; }   /* listed before the tail */
 
-/* the list: the heads, the tail, then the imported models */
+/* the list: "As played", "As played (cutscene)", the other heads, the tail, then the imported models */
 int appear_count(void)
 {
-    int n = 0;
+    int n = 1;
     for (int c = 0; c <= COOP_CHR_MAX; c++) n += appear_canon(c) == c;
     return n + imports();
 }
 
 int appear_at(int i)
 {
+    if (i == 1) return COOP_CHR_CINE;
+    if (i > 1) i--;
     for (int c = 0; c <= COOP_CHR_MAX; c++)
         if (head(c) && i-- == 0) return c;
     if (i >= 0 && i < TAILS) return tail[i];
@@ -204,8 +215,10 @@ int appear_at(int i)
 int appear_pos(int chr)
 {
     int n = 0, t = tail_at(chr = appear_canon(chr)), k = import_of(chr);
+    if (chr == COOP_CHR_CINE) return 1;
     for (int c = 0; c < (t >= 0 || k >= 0 ? COOP_CHR_MAX + 1 : chr); c++) n += head(c);
-    return n + (t >= 0 ? t : 0) + (k >= 0 ? TAILS + k : 0);
+    n += (t >= 0 ? t : 0) + (k >= 0 ? TAILS + k : 0);
+    return n + (n > 0);   /* (everything but "As played" after "As played (cutscene)") */
 }
 
 int appear_step(int chr, int dir)
@@ -222,7 +235,7 @@ const char* appear_group(int chr)
     int k = import_of(chr), id;
     if (k >= 0) return imp[actor_import_group[k] & 3];
     chr = appear_canon(chr);
-    if (chr < COOP_CHR_ACTOR) return "CVX characters";
+    if (chr < COOP_CHR_ACTOR || chr == COOP_CHR_CINE) return "CVX characters";
     if (tail_at(chr) >= 0) return "CVX cutscene";
     id = actor_models[chr - COOP_CHR_ACTOR].id;
     return id > 30 && id != 51 && id != 52 ? "CVX story cast" : "CVX enemies";   /* (51, 52: zombies) */
@@ -232,5 +245,6 @@ const char* appear_name(int chr)
 {
     static const char* files[COOP_CHR_ACTOR] = { "As played", "Claire", "Chris", "Steve", "Wesker", "Claire (2nd costume)" };
     if (import_of(chr) >= 0) return actor_imports[import_of(chr)].name;
+    if (chr == COOP_CHR_CINE) return "As played (cutscene)";
     return chr >= 0 && chr < COOP_CHR_ACTOR ? files[chr] : chr <= COOP_CHR_MAX ? actor_models[chr - COOP_CHR_ACTOR].name : "?";
 }
