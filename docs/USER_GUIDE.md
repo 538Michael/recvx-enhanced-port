@@ -195,7 +195,6 @@ pad only to the focused window: turn Steam Input off for the game.
 | F2 | cheats and tools |
 | F3 | co-op window |
 | F5 | third person on / off |
-| F9 | import models from other games |
 | F11 | windowed / fullscreen |
 | Page Up; F or Page Down | fly up / down (noclip cheat) |
 
@@ -400,7 +399,6 @@ mod, delete its files.
 | `enemies.ini` | custom enemies (ENEMIES.md, "Enemy variants") |
 | `textures/` | [HD texture packs](#hd-texture-packs) |
 | `biorand/` | the [BioRand](#randomizer-biorand) pack |
-| `import/` | models imported with [F9](#importing-models-from-other-games-f9) |
 
 Co-op partners need the same `enemies.ini` and BioRand pack. Modding guide: modding/README.md.
 
@@ -421,17 +419,6 @@ optionally, doors. It reads your disc image and writes a pack for this game.
   save asks first.
 - **Co-op**: the host switches BIORAND in GAME RULES. The partner needs the same pack (same seed and
   options) to join.
-
-## Importing models from other games (F9)
-
-F9 extracts the character models of *Resident Evil Outbreak File #2* (US, SLUS-20984) from your own
-disc image so you can play as them:
-
-1. Press F9, choose the disc image and what to extract.
-2. Click **Extract characters**. The models go to `mods/import/outbreak2/`.
-3. They appear in **You appear as** (APPEARANCE, F3, the lobby's MODEL list).
-
-Details: IMPORT_OUTBREAK.md.
 
 ## Cheats and tools (F2)
 

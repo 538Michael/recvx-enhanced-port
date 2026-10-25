@@ -74,7 +74,7 @@ int overlay_event(const void* e)
         coop_visible = !coop_visible;
         return 1;
     }
-    if (bind_hotkey(ev, B_IMPORT)) {
+    if (g_dev_mode && bind_hotkey(ev, B_IMPORT)) {
         import_visible = !import_visible;
         return 1;
     }
