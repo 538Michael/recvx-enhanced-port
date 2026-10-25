@@ -16,6 +16,7 @@ int main(void)
     for (int i = 0; i < na; i++) CHECK(all[i] >= ACTOR_PART || actor_models[all[i]].anim != ANIM_IDLE);   /* humanoids only */
     /* who is cast */
     CHECK(cast_character(91, 0) == 0 && cast_character(43, 0) == 2 && cast_character(96, 1) == 4 && cast_character(98, 0) == 6);
+    CHECK(cast_character(99, 0) < 0 && !in(cine, nc, 14) && !in(all, na, 14));   /* the man in the hazmat suit: neither cast nor a pick */
     CHECK(cast_character(16, 0) < 0 && cast_character(12, 0) < 0 && cast_character(1, 0) < 0 && cast_character(68, 0) < 0);
     for (s = 0; s < 50; s++) {
         int got[CAST_CHARACTERS];

@@ -9,7 +9,7 @@
 extern "C" {
 #endif
 
-#define CAST_CHARACTERS 8   /* Claire, Chris, Steve, Wesker, Alfred, Alexia, Rodrigo, the man in the hazmat suit */
+#define CAST_CHARACTERS 7   /* Claire, Chris, Steve, Wesker, Alfred, Alexia, Rodrigo (not the man in the hazmat suit: his mouth does not move) */
 
 /* the story character (0..7) a record of type id, model version ver is, -1: none (Alfred's and
    Alexia's boss types, props, enemies) */

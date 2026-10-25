@@ -4,7 +4,7 @@
 #include <string.h>
 
 /* the characters' cutscene models (a face mask: their faces move with the lip sync), in character order */
-static const signed char cine[CAST_CHARACTERS] = { 0, 1, 3, 5, 8, 12, 13, 14 };
+static const signed char cine[CAST_CHARACTERS] = { 0, 1, 3, 5, 8, 12, 13 };
 
 int cast_character(int id, int ver)
 {
@@ -17,7 +17,6 @@ int cast_character(int id, int ver)
     case 94: case 96: case 44: return 4;     /* Alfred (16, his boss type, is not cast) */
     case 95: return 5;                       /* Alexia (12..14, her forms, are not) */
     case 98: return 6;                       /* Rodrigo */
-    case 99: return 7;                       /* the man in the hazmat suit */
     default: return -1;
     }
 }
@@ -33,7 +32,7 @@ int cast_pool(int all, int imports, int* out, int max)
     else {   /* every humanoid look the menus list, the player files too; not the wounded Alfred (a special state) */
         for (i = 0; i < 5 && n < max; i++) out[n++] = ACTOR_PART + i;
         for (i = 0; i < ACTOR_MODELS && n < max; i++)
-            if (actor_models[i].anim != ANIM_IDLE && appear_canon(COOP_CHR_ACTOR + i) == COOP_CHR_ACTOR + i && i != 10) out[n++] = i;
+            if (actor_models[i].anim != ANIM_IDLE && appear_canon(COOP_CHR_ACTOR + i) == COOP_CHR_ACTOR + i && i != 10 && i != 14) out[n++] = i;   /* (14 the man in the hazmat suit: no moving mouth) */
     }
     for (i = 0; i < imports_n(imports) && n < max; i++) out[n++] = ACTOR_MODELS + i;
     return n;

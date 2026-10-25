@@ -763,7 +763,7 @@ other enemy options, `EV_EOPTS`, [COOP.md](COOP.md) "Added enemies and options")
 
 At the end of every room load (`enemyopt_glue.c enemy_room_finished` -> `cast_room`) each room record of a
 story character (`cast_character`) gets a model: Claire 91; Chris 92, 42; Steve 93, 43; Wesker 97, 49,
-47; Alfred 94, 96 (both model versions), 44; Alexia 95; Rodrigo 98; the man in the hazmat suit 99. Not:
+47; Alfred 94, 96 (both model versions), 44; Alexia 95; Rodrigo 98. Not: the man in the hazmat suit 99 (his helmet's mouth does not move, so neither cast nor a pick, in either pool);
 the bosses (Alfred's boss type 16, Alexia's forms 12..14), props and set pieces, enemies (zombies and
 creatures stay as they are; a first version swapped the cutscenes' zombies too, removed), anything
 spawned after the load. Kept by hand (`cast_glue.c kept[]`):
@@ -792,7 +792,7 @@ with where the cast records are.
 
 | Character models | Pool |
 |---|---|
-| *Cutscene models* | the eight cutscene models with a face mask: Claire (catalogue 0), Chris (1), Steve (3), Wesker (5), Alfred (8), Alexia (12), Rodrigo (13), the hazmat man (14) |
+| *Cutscene models* | the seven cutscene models with a face mask: Claire (catalogue 0), Chris (1), Steve (3), Wesker (5), Alfred (8), Alexia (12), Rodrigo (13) |
 | *All models* | the five player files (`ACTOR_PART + n`) and every listed humanoid catalogue model (`anim` not `ANIM_IDLE`, not a hidden twin): the cast, Alexia's first form, Nosferatu, the Tyrant, Monster Steve, the Hunters, the Bandersnatch, the anatomist, every zombie; not "Alfred Ashford (wounded)" (a special state) |
 | with imported models | the imported models after them (playable characters and NPCs, `IMPORT_OFFERED`: people with jaw and lid bones, [IMPORT_OUTBREAK.md](IMPORT_OUTBREAK.md) "Faces", so they count as cutscene models: their jaw follows the record's mask, `imp_face`) |
 
@@ -806,7 +806,7 @@ lasts (the cutscene pool: a derangement of the eight), and every answer is the s
 is asked.
 
 * *Fixed per character*: scene 0, the same in every room (seed 1: Steve as Alfred in 0030 and 2050,
-  Alfred as the hazmat man in 1020 and 7030, Alexia as Rodrigo in 2030, 2050, 9150, 9320, Rodrigo as
+  Alfred as another character in 1020 and 7030, Alexia as Rodrigo in 2030, 2050, 9150, 9320, Rodrigo as
   Claire in 0000 and 7220).
 * *Random per cutscene*: scene = room file + 1: each cutscene room (`RM_<stg><rom><case>`) picks again,
   the same room the same; deterministic from (seed, room file, character), so both co-op sides pick alike
