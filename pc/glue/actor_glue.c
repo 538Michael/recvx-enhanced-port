@@ -81,6 +81,7 @@ typedef struct Disguise {
     int model, fail, tex_gone, posed, mapped;   /* mapped: the last pose came from the source's skeleton */
     int face;                           /* faces in its face mask (face_init; 0 none): lip sync mirrored from the double */
     int lip, lip_max;                   /* the double's lip data (a line) and its highest phoneme */
+    signed char src_hand[2];            /* the last pose's source hand nodes (right, left; -1 none) */
     NJS_TEXLIST* tex[16];               /* texlists we uploaded */
     int tex_n;
     Rig rig;                            /* rig.ok: posed from the source's skeleton */
@@ -1775,11 +1776,17 @@ void actor_pose(int who, BH_PWORK* src)
                     }
                 trace_hands(who, src);
             } else if (dbl_tick) {   /* the cutscene double: what the script links to its hands (the cast's hand
-                pieces, props) goes to the model's hands; its own come back with its next bhCalcModel */
+                pieces, props) goes to the model's hands; its own come back with its next bhCalcModel. The cutscene cast:
+                turned as the model's hands too, so a piece lies along the model's forearm, not the record's (cast_glue.c
+                hides the record's own hand pieces where the model has hands of its own) */
                 int k;
                 for (k = 9; k <= 13; k += 4)
-                    if (d->rig.map[k] >= 0 && sr.map[k] >= 0) memcpy(&src->mlwP->owP[(int)sr.map[k]].mtx[12], &m->owP[(int)d->rig.map[k]].mtx[12], 12);
+                    if (d->rig.map[k] >= 0 && sr.map[k] >= 0)
+                        memcpy(who >= ACTOR_CAST ? src->mlwP->owP[(int)sr.map[k]].mtx : &src->mlwP->owP[(int)sr.map[k]].mtx[12],
+                               who >= ACTOR_CAST ? m->owP[(int)d->rig.map[k]].mtx : &m->owP[(int)d->rig.map[k]].mtx[12], who >= ACTOR_CAST ? 15 * sizeof(float) : 12);
             }
+            d->src_hand[0] = sr.map[9];
+            d->src_hand[1] = sr.map[13];
             head_pose(d, who == ACTOR_DOUBLE || who >= ACTOR_CAST ? dbl_tick == 1 : !redraw);   /* (one head part, one swing per tick) */
             if (d->skin) imp_face(d, src, who == ACTOR_DOUBLE || who >= ACTOR_CAST ? dbl_tick == 1 : !redraw);
             imp_skin(d);
@@ -2069,6 +2076,19 @@ static int node_has_mesh(const BH_PWORK* w, int n)
 
 /* the source's hand node (9, 13) is at the model's hand (actor_pose) and the model has no hand
    there of its own (the story cast's models; zombies and creatures have theirs) */
+/* the cutscene cast (cast_glue.c): slot who's last pose put its model's hand `side` (0 right, 1 left) on source node
+   *node, and the model has a hand of its own there (a mesh on its hand node, skinned vertices there, or an imported
+   model's hands): 1 */
+int actor_own_hand(int who, int side, int* node)
+{
+    Disguise* d = &dg[who];
+    int n = d->model >= 0 && d->mapped ? d->rig.map[side ? 13 : 9] : -1;
+    *node = d->src_hand[side & 1];
+    if (*node < 0 || d->model < 0 || !d->mapped) return 0;
+    if (n < 0) return 2;   /* (no such hand at all: the Bandersnatch's left, Nosferatu's right) */
+    return d->skin || node_has_mesh(&d->w, n);
+}
+
 int actor_hand_free(int who, int node)
 {
     Disguise* d = &dg[who];

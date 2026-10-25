@@ -32,6 +32,9 @@ static signed char rec_slot[RECS];      /* record -> cast slot, -1: drawn as its
 static unsigned char rec_id[RECS], rec_ver[RECS], rec_chr[RECS];   /* what it was when given its model: type, model version, character */
 static short slot_model[CSLOTS] = { -1, -1, -1, -1, -1, -1 };
 _Static_assert(CSLOTS == 6, "slot_model");
+#define HIDDEN_MAX 16
+static NJS_CNK_OBJECT* hidden[HIDDEN_MAX];   /* hand pieces hidden this tick (hands_hide) */
+static int hidden_n;
 
 /* records whose scene needs their own look */
 static const struct { unsigned short room; unsigned char rec; const char* why; } kept[] = {
@@ -67,6 +70,7 @@ void cast_release(void)
         if (slot_model[k] >= 0) { actor_set(ACTOR_CAST + k, -1); slot_model[k] = -1; }
     memset(rec_slot, -1, sizeof(rec_slot));
     cast_n = 0;
+    hidden_n = 0;   /* (the room's objects go with the room: nothing to show again) */
 }
 
 /* enemyopt_glue.c, the end of the room load */
@@ -130,6 +134,37 @@ static int played(int k) { return rec_chr[k] < 4 && rec_chr[k] == (sys->ply_id &
 /* record k is drawn as its model now */
 static int as_model(const BH_PWORK* ep, int k) { return k >= 0 && k < RECS && rec_slot[k] >= 0 && !played(k) && still(ep, k); }
 
+/* The record's hand pieces. The cast's cutscene models have no hands: the room script links a hand piece (the
+   character's own gloved fist, open hand or hand holding something) to the record's hand node and swaps it per
+   gesture, and actor_act puts those nodes where the model's hands are, turned as them. A model with hands of its own
+   (a player model, a creature, a zombie, an imported model) showed the record's piece over or beside its own hand;
+   one without that hand at all (the Bandersnatch's left) showed it floating at the wrist. There the record's pieces are
+   hidden while it is drawn as the model (each piece's mesh, NJD_EVAL_HIDE, as actor_weapon_hands does for the weapons'
+   hand pieces), and shown again at the next tick. Only one-node pieces are hands alone: a piece of more nodes holds a
+   prop in the same mesh (Claire's hand with the lighter, Rodrigo's with what he hands over) and stays, so the prop does
+   not go with it; items the script links to the hand are other objects and stay too. */
+
+static void hands_show(void)
+{
+    while (hidden_n) hidden[--hidden_n]->evalflags &= ~0x8u;
+}
+
+static void hands_hide(BH_PWORK* ep, int who)
+{
+    int side, node, o;
+    for (side = 0; side < 2; side++) {
+        if (!actor_own_hand(who, side, &node)) continue;   /* (no hand of its own: the record's piece is the model's hand) */
+        for (o = 4; o < 32; o++) {   /* (0..3: the player's weapons and head part) */
+            O_WRK* op = &sys->obwp[o];
+            NJS_CNK_OBJECT* m = op->mlwP && op->mlwP->objP ? &op->mlwP->objP[0] : NULL;
+            if (!(op->flg & 0x1) || !(op->flg & 0x80) || op->lkwkp != (unsigned char*)ep || op->lkono != node || !m || op->mlwP->obj_num != 1) continue;
+            if ((m->evalflags & 0x8) || hidden_n == HIDDEN_MAX) continue;   /* (hidden already: by the game, or a piece shared by two records) */
+            m->evalflags |= 0x8;
+            hidden[hidden_n++] = m;
+        }
+    }
+}
+
 /* actor_double_tick: every character shown in a cutscene, posed with its face and hands */
 void cast_tick(void)
 {
@@ -141,10 +176,12 @@ void cast_tick(void)
             if (rec_slot[k] >= 0) host_log("cast:  record %d (type %d) at %.1f %.1f %.1f%s\n", k, ene[k].id, ene[k].px, ene[k].py, ene[k].pz, (ene[k].stflg & 0x1000000) ? ", hidden" : "");
     }
     was = now;
+    hands_show();
     for (k = 0; k < (int)sys->ewk_n && k < RECS; k++) {
         BH_PWORK* ep = &ene[k];
         if (!as_model(ep, k) || (ep->stflg & 0x41000000) || !ep->mlwP) continue;
         actor_act(ACTOR_CAST + rec_slot[k], ep);
+        hands_hide(ep, ACTOR_CAST + rec_slot[k]);
     }
 }
 
