@@ -34,15 +34,15 @@
    Files in $RECVX_MODS (default ./mods) replace disc files without touching the image
    (docs/modding/README.md "The mods folder"): <mods>/NAME for files opened by name (room files RM_SRRC.RDX, also names the
    disc does not have, and plain ISO files), <mods>/<AFS file>/<id> for entries of AFS archives
-   (e.g. mods/MRY.AFS/12). While BioRand is on, <mods>/biorand/ (its pack: room files, SYSTEM.AFS/10, /11,
-   ADV.AFS/2) comes first; off, that folder is not looked at (pc/src/host/biorand.h). */
+   (e.g. mods/MRY.AFS/12). While BioRand is on, <mods>/biorand/ (its pack: room files, SYSTEM.AFS/10, /11;
+   not its title picture ADV.AFS/2) comes first; off, that folder is not looked at (pc/src/host/biorand.h). */
 static FILE* mod_open_path(const char* name, uint32_t* size, char* path, size_t npath)
 {
     static const char* dir;
     FILE* f = NULL;
     if (!dir) dir = SDL_getenv("RECVX_MODS") ? SDL_getenv("RECVX_MODS") : "mods";
     while (*name == '\\' || *name == '/') name++;
-    if (biorand_active()) {
+    if (biorand_active() && SDL_strcasecmp(name, "ADV.AFS/2")) {   /* (not its title picture: its colours are broken; the disc's, or an HD pack's) */
         snprintf(path, npath, "%s/biorand/%s", dir, name);
         f = pc_fopen(path, "rb");
     }
