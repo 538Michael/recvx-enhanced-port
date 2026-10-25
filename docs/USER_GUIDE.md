@@ -276,8 +276,8 @@ cutscenes the story characters are shown as other models; nothing else changes: 
 voices and what happens stay as they are.
 
 * **Randomize cutscene cast**: On swaps the story characters (Alfred, Alexia, Steve, Rodrigo, Wesker,
-  the man in the hazmat suit, and Claire or Chris while you play the other one) while a cutscene runs.
-  A character who stays in the room afterwards is itself again once you have control.
+  the man in the hazmat suit, and Claire or Chris while you play the other one) in cutscenes; a
+  character who stays in the room afterwards keeps the new look.
 * **Character models**: *Cutscene models* picks among the characters' cutscene models: their mouths
   move with the lines and their eyes look where the original character's do (the voice stays the
   original character's). *All models* also uses the player models, the creatures and the zombies;

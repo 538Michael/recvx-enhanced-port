@@ -779,17 +779,14 @@ read when a record is drawn, not at the load (a story switch changes it after th
 double gets a model at the load but is not drawn as it while its character is played. The other player
 characters' records are ordinary cast (Claire while Chris is played, Chris in Claire's part, Steve).
 
-### Only in cutscenes
+### For the whole room visit
 
-A record is drawn as its model only while a cutscene runs (`cast_scene`): an event camera shows the room
-(`cam.flg & 0x2`, mirrored by `light.c` in `sys->st_flg & 0x1000000`: the event lights), the game's
-cinema mode is on (`cb_flg & 0x4`), or an event has hidden the player. In-engine scenes are shot with
-event cameras, also those the played character acts in without the cinema mode (Chris and Rodrigo in
-7220); gameplay uses the room's own cameras. A character who stays in the room as a gameplay figure is
-itself again from the cut back to the player's camera on, so no shot shows the change: Rodrigo at his
-desk after the opening (0000). The first version drew him as his model for the whole room visit (in
-gameplay too); with `RECVX_CAST_TRACE=1` the log names each change (`cast: a cutscene ...`,
-`cast: gameplay ...`) with where the cast records are.
+A record is drawn as its model for the whole room visit: in the cutscene and afterwards, where the
+character stays in the room as a gameplay figure (Rodrigo at his desk after the opening, 0000).
+`cast_scene` (an event camera: `cam.flg & 0x2`, mirrored by `light.c` in `sys->st_flg & 0x1000000`;
+the cinema mode `cb_flg & 0x4`; or the player hidden by an event) only marks the cutscene for the test
+aid: with `RECVX_CAST_TRACE=1` the log names each change (`cast: a cutscene ...`, `cast: gameplay ...`)
+with where the cast records are.
 
 ### The pools
 
@@ -851,8 +848,6 @@ is asked.
 * Records drawn as the same model share its face mask: the one posed last talks.
 * Mouth shapes past the model's face table are not shown (as for the double); expressions keep the
   model's neutral face, only the eyes follow.
-* A scene shot with the room's own cameras (no event camera, no cinema mode, the player not hidden) shows
-  the characters as themselves.
 * Each model is read from its room file during the room load (as the enemy spawner reads one), at most
   six per room.
 * Test aids: `RECVX_CAST=0|1[:all][:random][:imports]` sets the options; `RECVX_CAST_TRACE=1` logs the

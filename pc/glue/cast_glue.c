@@ -3,8 +3,8 @@
  * At the end of every room load (enemyopt_glue.c enemy_room_finished) each room record of a story character
  * (cast_character: Alfred, Steve, Rodrigo, ...) is given another model (cast_model), loaded into a display
  * slot of the appearance system (ACTOR_CAST + k, one per model the room shows; the retargeting of
- * actor_glue.c). Then, only while a record has one (cast_n), and only during a cutscene (cast_scene: the
- * game's cinema mode, or the player hidden by an event); in gameplay every record is drawn as itself:
+ * actor_glue.c). Then, while a record has one (cast_n), for the whole room visit (the cutscene and after it, where
+ * the character stays in the room); cast_scene only marks the cutscene for the trace:
  *  - eneset.c bhDrawEnemy -> actor_put_enemy -> cast_draw: the model is drawn in the record's place, posed
  *    from its skeleton;
  *  - coop_glue.c coop_control_remote -> actor_double_tick -> cast_tick, every tick before the objects follow
@@ -128,7 +128,7 @@ void cast_room(const EnemyOpts* o)
 static int played(int k) { return rec_chr[k] < 4 && rec_chr[k] == (sys->ply_id & 3); }
 
 /* record k is drawn as its model now */
-static int as_model(const BH_PWORK* ep, int k) { return k >= 0 && k < RECS && rec_slot[k] >= 0 && !played(k) && still(ep, k) && cast_scene(); }
+static int as_model(const BH_PWORK* ep, int k) { return k >= 0 && k < RECS && rec_slot[k] >= 0 && !played(k) && still(ep, k); }
 
 /* actor_double_tick: every character shown in a cutscene, posed with its face and hands */
 void cast_tick(void)
