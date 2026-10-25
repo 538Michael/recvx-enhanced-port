@@ -475,7 +475,7 @@ event is the partner's").
 
 ### BioRand
 
-With BioRand ([USER_GUIDE.md](USER_GUIDE.md#randomizer-biorand)) the host chooses in GAME RULES, row
+With BioRand (only with `--dev`; [modding/README.md](modding/README.md#randomizer-biorand)) the host chooses in GAME RULES, row
 **BIORAND** (the same setting as single player's; shown only when the host has a pack in `mods/biorand`).
 On, both play the host's pack:
 

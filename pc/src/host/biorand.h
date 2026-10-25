@@ -34,6 +34,7 @@ int  biorand_seed(void);              /* its seed number (BioRand's, 0..1048575)
 unsigned int biorand_id(void);        /* the pack: a hash of its seed line (all options), log and room files; 0 none */
 const char* biorand_seed_text(void);  /* "seed 123456", "" unknown */
 int  biorand_active(void);            /* the loader serves the pack now: our setting, a co-op guest the host's choice */
+int  biorand_shown(void);            /* the BioRand settings exist: only with --dev (g_dev_mode) */
 const char* biorand_locked(void);     /* why the setting cannot change now (no pack, in game, a co-op guest), or NULL */
 int  biorand_setting(void);           /* the setting (ini biorand), whether or not a pack is there */
 int  biorand_toggle(void);            /* the title's BIORAND row: flips the setting; 0 when it is locked (biorand_locked) */
