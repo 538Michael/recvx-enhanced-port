@@ -17,6 +17,7 @@
 - **Menu arrows**: the arrows in ENHANCED SETTINGS and the lobby no longer slide between entries when
   you move the cursor.
 - The lobby no longer freezes or crashes with unusual save file names.
+- Unplugging or switching a gamepad while the controls settings are open is safe.
 
 ## 0.6.9 (2026-10-24)
 
