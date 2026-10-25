@@ -148,6 +148,9 @@ static unsigned int k_seed;             /* imported models' blink seeds */
 /* the retargeting of docs/ACTORS.md "Retargeting" (limb roles along each chain, the root's height
    scaled, the aim solved on the drawn weapon, the camera scaled); RECVX_RETARGET=0: the previous one */
 int actor_retarget = 1;
+/* the cutscene cast's hands (cast_glue.c hands_hide, the turn above); test aid RECVX_CAST_HANDS=0: as before (the record's
+   pieces kept everywhere, moved to the model's hands without its turn) */
+int cast_hands = 1;
 
 /* the player's chains: the node whose position gives a node's bone direction (-1: a chain end) */
 static const signed char dir_child[22] = { -1, 2, 3, 4, 5, -1, 7, 8, 9, -1, 11, 12, 13, -1, 15, 16, 17, -1, 19, 20, 21, -1 };
@@ -1782,8 +1785,9 @@ void actor_pose(int who, BH_PWORK* src)
                 int k;
                 for (k = 9; k <= 13; k += 4)
                     if (d->rig.map[k] >= 0 && sr.map[k] >= 0)
-                        memcpy(who >= ACTOR_CAST ? src->mlwP->owP[(int)sr.map[k]].mtx : &src->mlwP->owP[(int)sr.map[k]].mtx[12],
-                               who >= ACTOR_CAST ? m->owP[(int)d->rig.map[k]].mtx : &m->owP[(int)d->rig.map[k]].mtx[12], who >= ACTOR_CAST ? 15 * sizeof(float) : 12);
+                        memcpy(who >= ACTOR_CAST && cast_hands ? src->mlwP->owP[(int)sr.map[k]].mtx : &src->mlwP->owP[(int)sr.map[k]].mtx[12],
+                               who >= ACTOR_CAST && cast_hands ? m->owP[(int)d->rig.map[k]].mtx : &m->owP[(int)d->rig.map[k]].mtx[12],
+                               who >= ACTOR_CAST && cast_hands ? 15 * sizeof(float) : 12);
             }
             d->src_hand[0] = sr.map[9];
             d->src_hand[1] = sr.map[13];
@@ -2054,6 +2058,7 @@ __attribute__((constructor)) static void actor_init(void)
     for (i = 0; i < ACTOR_CAST; i++) { dg[i].keep = keep_big[i]; dg[i].keep_cap = KEEP_SIZE; }
     for (i = 0; i < 2; i++) sh[i].chr = sh[i].fail = sh[i].wpn_no = sh[i].motion = -1;
     if (getenv("RECVX_RETARGET")) actor_retarget = atoi(getenv("RECVX_RETARGET")) != 0;
+    if (getenv("RECVX_CAST_HANDS")) cast_hands = atoi(getenv("RECVX_CAST_HANDS")) != 0;
 }
 
 /* the display actor's work (its model, node matrices after actor_pose), NULL when none is shown */

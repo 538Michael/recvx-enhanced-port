@@ -159,9 +159,11 @@ static void hands_show(void)
     while (hidden_n) hidden[--hidden_n]->evalflags &= ~0x8u;
 }
 
+extern int cast_hands;                  /* actor_glue.c: 0 (test aid RECVX_CAST_HANDS=0): the record's pieces kept */
 static void hands_hide(BH_PWORK* ep, int who)
 {
     int side, node, o;
+    if (!cast_hands) return;
     for (side = 0; side < 2; side++) {
         if (!actor_own_hand(who, side, &node)) continue;   /* (no hand of its own: the record's piece is the model's hand) */
         for (o = 4; o < 32; o++) {   /* (0..3: the player's weapons and head part) */

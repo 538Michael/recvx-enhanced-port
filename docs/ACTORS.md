@@ -779,10 +779,14 @@ spawned after the load. Kept by hand (`cast_glue.c kept[]`):
 
 **Precedence**: the doubles of the character played (Claire 91 while Claire is played; Chris 92/42,
 Steve 93/43, Wesker 97/49/47 likewise) belong to "You appear as" and "Swapped model in cutscenes"
-("Cutscene doubles"); the cast leaves them to the game or the appearance. Which character is played is
-read when a record is drawn, not at the load (a story switch changes it after the load), so such a
-double gets a model at the load but is not drawn as it while its character is played. The other player
-characters' records are ordinary cast (Claire while Chris is played, Chris in Claire's part, Steve).
+("Cutscene doubles"); the cast leaves them to the game or the appearance. Which characters count as
+played is read when a record is drawn, not at the load (`cast_glue.c played`): the one played now
+(`sys->ply_id`, which a story switch changes at the end of the next room load's `bhFinishRoom`, after
+`cast_room`), the one a switch the script has set is about to make played (`PlayerChangeSet`:
+`cb_flg & 0x80`, `cng_pid`; Claire's part ends in 6100 with a switch to Chris and the door to his first
+scene, 7240), and in co-op the partner's (its part file, `Pose.mfile & 3`). Such a double gets a model at
+the load but is never drawn as it. The other player characters' records are ordinary cast (Claire in
+9150 while Chris is played, Chris in Claire's part, Steve).
 
 ### For the whole room visit
 
@@ -797,22 +801,29 @@ with where the cast records are.
 
 | Character models | Pool |
 |---|---|
-| *Cutscene models* | the seven cutscene models with a face mask: Claire (catalogue 0), Chris (1), Steve (3), Wesker (5), Alfred (8), Alexia (12), Rodrigo (13) |
-| *All models* | the five player files (`ACTOR_PART + n`) and every listed humanoid catalogue model (`anim` not `ANIM_IDLE`, not a hidden twin): the cast, Alexia's first form, Nosferatu, the Tyrant, Monster Steve, the Hunters, the Bandersnatch, the anatomist, every zombie; not "Alfred Ashford (wounded)" (a special state) |
+| *Cutscene models* | the cutscene models with a face mask: Steve (catalogue 3), Wesker (5), Alfred (8), Alexia (12), Rodrigo (13) |
+| *All models* | the five player files (`ACTOR_PART + n`) and every listed humanoid catalogue model (`anim` not `ANIM_IDLE`, not a hidden twin): the cast, Alexia's first form, Nosferatu, the Tyrant, Monster Steve, the Hunters, the Bandersnatch, the anatomist, and **the zombies as one entry** (`CAST_ZOMBIES`): a character that draws it gets one of the 27 zombie looks, from (seed, scene, character) (`cast_zombie_look`: Fixed, the same look everywhere; Random, per room). As 27 entries they were more than half of the pool, and most characters became zombies. Not "Alfred Ashford (wounded)" (a special state). No other family is large: each player character has two or three looks (its player files and its cutscene model), Hunter and Sweeper two; the event models and Tyrant 2 are hidden twins already |
 | with imported models | the imported models after them (playable characters and NPCs, `IMPORT_OFFERED`: people with jaw and lid bones, [IMPORT_OUTBREAK.md](IMPORT_OUTBREAK.md) "Faces", so they count as cutscene models: their jaw follows the record's mask, `imp_face`) |
 
 ### The picks
 
-`cast_model(seed, scene, character)`: all eight characters are assigned at once from a Fisher-Yates
+Never in a pool: Claire's and Chris's looks (their cutscene models 0 and 1, their player files, Claire's
+second costume). They are the characters the story is played as, whose look "You appear as" decides; on
+someone else they read as the player character (Steve at the end of Claire's part, 6100, just before the
+switch to Chris, was drawn as Chris's cutscene model: it looked as if Chris's part began with a random
+Chris instead of the chosen model). Claire and Chris themselves are still cast when they appear as the
+other, non-played character.
+
+`cast_model(seed, scene, character)`: all seven characters are assigned at once from a Fisher-Yates
 shuffle of the pool by xorshift32 seeded with (seed, scene): each character in turn takes the first model
 of the shuffle not taken and not its own look (its own cutscene model or player file); when only its own
-are left it trades with an earlier character. Different characters get different models while the pool
-lasts (the cutscene pool: a derangement of the eight), and every answer is the same whichever character
-is asked.
+are left it trades with an earlier character; with the pool used up (seven characters, five cutscene
+models) a new round over it begins, so a model serves at most two characters. Every answer is the same
+whichever character is asked, and it depends on neither the character played nor the room (Fixed):
+the same in Claire's part and in Chris's.
 
-* *Fixed per character*: scene 0, the same in every room (seed 1: Steve as Alfred in 0030 and 2050,
-  Alfred as another character in 1020 and 7030, Alexia as Rodrigo in 2030, 2050, 9150, 9320, Rodrigo as
-  Claire in 0000 and 7220).
+* *Fixed per character*: scene 0, the same in every room (seed 1: Steve as Alfred in 0030 and 6100,
+  Claire as Wesker in 0000, 0030 and 6100).
 * *Random per cutscene*: scene = room file + 1: each cutscene room (`RM_<stg><rom><case>`) picks again,
   the same room the same; deterministic from (seed, room file, character), so both co-op sides pick alike
   and a revisit shows the same cast.
@@ -829,14 +840,26 @@ is asked.
 * **As the cutscene double** ("Cutscene doubles"): every tick of a cutscene before the objects follow
   their links (`coop_control_remote` -> `actor_double_tick` -> `cast_tick` -> `actor_act`) the record is
   posed (humanoid retarget from its skeleton), the model's face mask takes the record's lip sync and eye
-  angles (`face_step`), and the record's hand nodes are moved to the model's hands, so the hand pieces and
-  props the script links there sit on the model's wrists; then it is drawn in place of the record
+  angles (`face_step`), and the record's hand nodes are moved to the model's hands and turned as them (the
+  double keeps the record's turn), so the hand pieces and props the script links there sit on the model's
+  wrists along its forearms; then it is drawn in place of the record
   (`eneset.c bhDrawEnemy` -> `actor_put_enemy` -> `cast_draw` -> `actor_put_as`; records sharing a slot are
   posed in turn). Every cast model with a face mask gets it (`face_init`, whatever "Talking faces" says),
   so with *Cutscene models* every character talks (measured in the opening, Rodrigo as Claire's cutscene
   model: the model's lips run with his, its jaw 0..8.4 degrees against his 0..7.6). A record without a
   mask (the event models 42..49) leaves the model's face at rest. In single player `appear_on` includes
   `cast_n`, so `coop_control_remote` runs while a room has cast records.
+* **Hands**: the cast's cutscene models have no hands; the room script links hand pieces (the
+  character's own gloved fist, open hand, a hand holding something: objects `sys->obwp[4..31]` with ids
+  1000..1137 in the rooms checked) to the record's hand nodes and swaps them per gesture. On a model
+  with no hands of its own (the cutscene models, the player files) they stay: they are its hands. On a
+  model with hands of its own (the zombies, the creatures, the imported models; `actor_own_hand`: a mesh
+  or skinned vertices on its hand node) the record's one-node pieces are hidden while it is drawn as the
+  model (`cast_glue.c hands_hide`: the piece's mesh `NJD_EVAL_HIDE`, shown again at the next tick, as
+  `actor_weapon_hands` does for the weapons' hand pieces): before, Rodrigo's gloves lay over a zombie's
+  own hands. A piece of more nodes holds a prop in the same mesh as the hand (Claire's hand with the
+  lighter, two of Rodrigo's) and stays whole; items the script links to a hand are other objects and stay.
+  The same for a model without that hand at all (the Bandersnatch's left).
 * **Zero-length bones**: Rodrigo's and the hazmat man's shoulders are two nodes at one place, and the
   arm's rotation is the second's (see "Retargeting"). Taken from the first, the models on Rodrigo kept
   their upper arms near their rest pose, raised like a T-pose, while his hung down or lay on the table.
@@ -847,9 +870,9 @@ is asked.
 
 ### Limits
 
-* Props the scripts link to a character's head stay at the record's head; the hand pieces are the
-  record's (Rodrigo's gloves on Claire); on a model shorter or taller than the record they sit a little
-  off.
+* Props the scripts link to a character's head stay at the record's head. On a model without hands the
+  hand pieces are the record's (Rodrigo's gloves on Claire), sized for the record's hands; on one with
+  hands a piece that holds a prop in its own mesh is shown with its hand.
 * Records drawn as the same model share its face mask: the one posed last talks.
 * Mouth shapes past the model's face table are not shown (as for the double); expressions keep the
   model's neutral face, only the eyes follow.

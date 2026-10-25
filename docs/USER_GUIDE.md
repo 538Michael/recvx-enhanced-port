@@ -280,8 +280,10 @@ voices and what happens stay as they are.
   character who stays in the room afterwards keeps the new look.
 * **Character models**: *Cutscene models* picks among the characters' cutscene models: their mouths
   move with the lines and their eyes look where the original character's do (the voice stays the
-  original character's). *All models* also uses the player models, the creatures and the zombies;
-  most of those keep a still face.
+  original character's). *All models* also uses the player models, the creatures and the zombies
+  (all zombie looks count as one choice, so zombies do not crowd out the rest); most of those keep a
+  still face. A model with hands of its own shows them instead of the character's gloves. Claire's
+  and Chris's looks are never given to someone else: how they look is up to "You appear as".
 * **Assignment**: *Fixed per character*: e.g. Steve is shown as Alfred in every cutscene, and no two
   characters share a model. *Random per cutscene*: each cutscene room picks again. Both come from
   the enemy seed: the same seed gives the same cast.

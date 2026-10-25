@@ -10,9 +10,12 @@ static int in(const int* p, int n, int v) { for (int i = 0; i < n; i++) if (p[i]
 int main(void)
 {
     int cine[16], all[128], nc = cast_pool(0, 0, cine, 16), na = cast_pool(1, 0, all, 128), c, s, scene, differ = 0;
-    CHECK(nc == CAST_CHARACTERS && na > 15 && na < 30);              /* the cutscene models; all models with the zombies as one entry */
-    CHECK(cine[0] == 0 && cine[4] == 8 && cine[6] == 13);            /* Claire's, Alfred's, Rodrigo's cutscene models */
-    CHECK(!in(all, na, 10) && !in(all, na, 2) && in(all, na, ACTOR_PART + 4) && in(all, na, 17));   /* no wounded Alfred, no twin; player files, Tyrant */
+    static const int own[CAST_CHARACTERS] = { 0, 1, 3, 5, 8, 12, 13 };   /* each character's cutscene model */
+    CHECK(nc == CAST_CHARACTERS - 2 && na > 12 && na < 30);          /* the cutscene models but Claire's and Chris's; all models with the zombies as one entry */
+    CHECK(cine[0] == 3 && cine[2] == 8 && cine[4] == 13);            /* Steve's, Alfred's, Rodrigo's cutscene models */
+    CHECK(!in(all, na, 10) && !in(all, na, 2) && in(all, na, ACTOR_PART + 2) && in(all, na, 17));   /* no wounded Alfred, no twin; player files, Tyrant */
+    for (int i = 0; i < 5; i++) CHECK(!in(cine, nc, i < 2 ? i : -1) && !in(all, na, i < 2 ? i : -1));   /* never Claire's or Chris's look: */
+    CHECK(!in(all, na, ACTOR_PART + 0) && !in(all, na, ACTOR_PART + 1) && !in(all, na, ACTOR_PART + 4));   /* their player files neither */
     for (int i = 0; i < na; i++) CHECK(all[i] >= ACTOR_PART || actor_models[all[i]].anim != ANIM_IDLE);   /* humanoids only */
     {   /* the zombie looks: one entry; no zombie look itself; the anatomist stays an entry of its own */
         int z = 0;
@@ -42,16 +45,18 @@ int main(void)
     CHECK(cast_character(16, 0) < 0 && cast_character(12, 0) < 0 && cast_character(1, 0) < 0 && cast_character(68, 0) < 0);
     for (s = 0; s < 50; s++) {
         int got[CAST_CHARACTERS];
-        for (c = 0; c < CAST_CHARACTERS; c++) {   /* fixed: a permutation of the cutscene models, nobody as itself */
+        for (c = 0; c < CAST_CHARACTERS; c++) {   /* fixed: the cutscene models, nobody as itself, each model for at most two characters */
+            int same = 0;
             got[c] = cast_model((unsigned)s, 0, c, 0, 0);
-            CHECK(in(cine, nc, got[c]) && got[c] != cine[c] && got[c] == cast_model((unsigned)s, 0, c, 0, 0));
-            for (int d = 0; d < c; d++) CHECK(got[d] != got[c]);
+            CHECK(in(cine, nc, got[c]) && got[c] != own[c] && got[c] == cast_model((unsigned)s, 0, c, 0, 0));
+            for (int d = 0; d < c; d++) same += got[d] == got[c];
+            CHECK(same <= 1);
             int a = cast_model((unsigned)s, 0, c, 1, 0);   /* all models: none of the character's own looks */
-            CHECK((in(all, na, a) || a == cast_zombie_look((unsigned)s, 0, c)) && a != cine[c] && (c > 3 || a != ACTOR_PART + c) && !(c == 0 && a == ACTOR_PART + 4));
+            CHECK((in(all, na, a) || a == cast_zombie_look((unsigned)s, 0, c)) && a != own[c] && (c > 3 || a != ACTOR_PART + c));
         }
         for (scene = 1; scene < 20; scene++) {   /* random per cutscene: again in each room, the same for the same room */
             int m = cast_model((unsigned)s, (unsigned)scene * 10 + 1, 2, 0, 0);
-            CHECK(m == cast_model((unsigned)s, (unsigned)scene * 10 + 1, 2, 0, 0) && m != cine[2]);
+            CHECK(m == cast_model((unsigned)s, (unsigned)scene * 10 + 1, 2, 0, 0) && m != own[2]);
             differ += m != got[2];
         }
     }
@@ -73,7 +78,7 @@ int main(void)
     {
         unsigned id = cast_import_id();
         int p[16], n = cast_pool(0, 2, p, 16), seen = 0;
-        CHECK(id != 0 && n == CAST_CHARACTERS + 2 && p[n - 1] == ACTOR_MODELS + 1);
+        CHECK(id != 0 && n == nc + 2 && p[n - 1] == ACTOR_MODELS + 1);
         for (s = 0; s < 40; s++)
             for (c = 0; c < CAST_CHARACTERS; c++) seen |= cast_model((unsigned)s, 0, c, 0, 2) >= ACTOR_MODELS;
         CHECK(seen);

@@ -40,15 +40,21 @@ int cast_zombie_look(unsigned seed, unsigned scene, int c)
     return -1;
 }
 
+/* Claire's and Chris's looks (their cutscene models, their player files, Claire's second costume) are never picked: they
+   are the characters the story is played as, whose look "You appear as" decides. Picked for someone else they read as
+   the player character: Steve at the end of Claire's part (6100, just before the switch to Chris) shown as Chris's
+   cutscene model looked like Chris's part starting with a random Chris instead of the chosen model. */
+static int protagonist(int m) { return m == cine[0] || m == cine[1] || m == ACTOR_PART + 0 || m == ACTOR_PART + 1 || m == ACTOR_PART + 4; }
+
 int cast_pool(int all, int imports, int* out, int max)
 {
     int n = 0, i;
-    if (!all)
-        for (i = 0; i < CAST_CHARACTERS && n < max; i++) out[n++] = cine[i];
-    else {   /* every humanoid look the menus list, the player files too; not the wounded Alfred (a special state) */
-        for (i = 0; i < 5 && n < max; i++) out[n++] = ACTOR_PART + i;
+    if (!all) {
+        for (i = 0; i < CAST_CHARACTERS && n < max; i++) if (!protagonist(cine[i])) out[n++] = cine[i];
+    } else {   /* every humanoid look the menus list, the player files too; not the wounded Alfred (a special state) */
+        for (i = 0; i < 5 && n < max; i++) if (!protagonist(ACTOR_PART + i)) out[n++] = ACTOR_PART + i;
         for (i = 0; i < ACTOR_MODELS && n < max; i++)
-            if (actor_models[i].anim != ANIM_IDLE && appear_canon(COOP_CHR_ACTOR + i) == COOP_CHR_ACTOR + i && i != 10 && i != 14 && !zombie(i)) out[n++] = i;   /* (14 the man in the hazmat suit: no moving mouth) */
+            if (actor_models[i].anim != ANIM_IDLE && appear_canon(COOP_CHR_ACTOR + i) == COOP_CHR_ACTOR + i && i != 10 && i != 14 && !zombie(i) && !protagonist(i)) out[n++] = i;   /* (14 the man in the hazmat suit: no moving mouth) */
         if (n < max) out[n++] = CAST_ZOMBIES;   /* the zombie looks: one entry (cast_model picks the look) */
     }
     for (i = 0; i < imports_n(imports) && n < max; i++) out[n++] = ACTOR_MODELS + i;
@@ -90,6 +96,11 @@ int cast_model(unsigned seed, unsigned scene, int c, int all, int imports)
             if (used[k]) continue;   /* a model left (its own): to an earlier character it suits */
             for (t = 0; t < i && pick[i] < 0; t++)
                 if (model_char(pool[k]) != t && model_char(pool[pick[t]]) != i) { pick[i] = pick[t]; pick[t] = k; used[k] = 1; }
+        }
+        if (pick[i] < 0) {   /* the pool used up (more characters than models): a new round over it */
+            for (k = 0; k < n && used[k]; k++);
+            if (k == n) memset(used, 0, (size_t)n);
+            for (k = 0; k < n && pick[i] < 0; k++) if (!used[k] && model_char(pool[k]) != i) pick[i] = k;
         }
         for (k = 0; k < n && pick[i] < 0; k++) if (model_char(pool[k]) != i) pick[i] = k;
         if (pick[i] < 0) return -1;
