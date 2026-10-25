@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.6.10 (2026-10-25)
 
 > [!NOTE]
 > Hey, sorry for just this small update!
