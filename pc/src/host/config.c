@@ -91,6 +91,10 @@ static const struct { const char* key; int* val; int lo, hi; } keys[] = {
     { "enemy_seed", &g_enemy_opts.seed, 0, 0x7FFFFFFF },
     { "enemy_variety", &g_enemy_opts.variety, 0, 1 },    /* 0 Mild, 1 Wild */
     { "enemy_random_events", &g_enemy_opts.events, 0, 1 },
+    { "cast_random", &g_enemy_opts.cast, 0, 3 },         /* cutscene cast (docs/ACTORS.md "Cutscene cast"): 0 off, 1 characters, 2 enemies, 3 both */
+    { "cast_models", &g_enemy_opts.cast_all, 0, 1 },     /* characters: 0 cutscene models, 1 all models */
+    { "cast_assign", &g_enemy_opts.cast_assign, 0, 1 },  /* 0 fixed per character, 1 random per cutscene */
+    { "cast_imports", &g_enemy_opts.cast_imports, 0, 1 },
     { "tps", (int*)&g_tps.on, 0, 1 },
     { "tps_fov", &g_tps.fov, 30, 130 },
     { "tps_aim_fov", &g_tps.aim_fov, 20, 130 },

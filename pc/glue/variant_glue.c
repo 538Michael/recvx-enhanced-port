@@ -36,7 +36,7 @@ void RequestEnemySe(int EnemyNo, NJS_POINT3* pPos, int SeNo);   /* sdfunc.c */
 int snd_xbank_load(int key);
 extern int enemy_room_gen;              /* enemyopt_glue.c */
 
-#define VSLOTS (ACTOR_SLOTS - ACTOR_VARIANT)
+#define VSLOTS (ACTOR_CAST - ACTOR_VARIANT)
 #define VSETS 4                         /* variants with their own motion set in one room */
 
 int pc_variant_n;                       /* variant enemies in this room */
@@ -392,6 +392,22 @@ int pc_zombie_head(BH_PWORK* ep, int hide)
         return 0;
     head_hide(ep->mlwP, 11);
     return head_n > 0;
+}
+
+/* the cutscene cast (cast_glue.c): enemy ep (of a body whose root is drawn as display slot who's model) drawn
+   as a variant's model is: posed from the root, its linked parts hidden, a blown-off zombie head hidden. 1 = drawn */
+BH_PWORK* pc_enemy_root(BH_PWORK* ep) { return ep >= ene && ep < ene + PC_ENE_SLOTS ? root(ep) : ep; }
+int pc_enemy_draw_as(BH_PWORK* ep, int who)
+{
+    BH_PWORK *r = pc_enemy_root(ep), *w;
+    if (ep != r) return (ep->flg & 0x80) != 0;   /* its body's parts: the model stands in for all of them */
+    actor_pose(who, r);
+    if (!(w = actor_work(who)) || !actor_mapped(who)) return 0;
+    w->draw_tp = ep->draw_tp;
+    if (headless(r)) head_hide(w->mlwP, actor_head_node(who));
+    bhPutModel(w);
+    head_show();
+    return 1;
 }
 
 int pc_variant_draw(BH_PWORK* ep)

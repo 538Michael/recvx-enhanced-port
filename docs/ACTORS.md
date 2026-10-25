@@ -21,6 +21,8 @@ unless noted; types are in `decomp/include/ps2/veronica/prog/types.h`. Related:
   [ENEMIES.md](ENEMIES.md) "Enemy spawner (F2)").
 * Any enemy or NPC model can be shown as the player ("You appear as"): a display actor drawn in
   place of the player, retargeted from the player's skeleton.
+* The cutscene cast randomizer draws the story characters and the scenes' zombies as other models
+  the same way, retargeted from their own skeletons ("Cutscene cast").
 
 ## Memory and load pipeline
 
@@ -425,7 +427,7 @@ cutscene double ("Swapped model in cutscenes" on) and the lobby previews (`actor
   shows the same swing), in work of its own (`exp0`/`exp3`, 20 KB per slot,
   flag `0x100000`), so it never takes `bhGetFreeMemory` (the earlier crash: memory under a pending
   weapon read). Drawn right after the display actor.
-* **Memory**: per display slot (3) 34 KB of static buffers (103 KB in all, not the game's arena); per shown head part one texture
+* **Memory**: per display slot (11) 34 KB of static buffers (374 KB in all, not the game's arena); per shown head part one texture
   entry and the texture above; one part-file read (about 1.2 MB, the existing buffer) per model
   change. Released with the model (`unload`, `njReleaseTextureAll`: game over, the title).
 * **The played character's own cutscene model** (Claire's while Claire is played): the doubles
@@ -453,16 +455,18 @@ Models not in the catalogue:
   load), animation set (below) and idle motion. Only ids, no disc data.
 * **Loading** (`pc/glue/actor_glue.c`): the room file is read from `RDX_LNK.AFS` and expanded into
   a static 12 MB buffer. The record's model chunk list (`hed01`) and its type's motion list
-  (`hed02`) are copied into the display slot's buffer (1.5 MB) and realized as `bhSetEneMdl` /
+  (`hed02`) are copied into the display slot's buffer (1.5 MB; the cutscene cast's slots: their piece of
+  one shared 3 MB buffer, without the motions, "Cutscene cast") and realized as `bhSetEneMdl` /
   `bhSetEneMtn` do. Textures: the table (`hed04`) has, after the room model's entry, one entry per
   first (type, model version, textured sub-model) in `bhSetRoom` order; the loader replays that
   order and uploads its model's entries (a model the room already shows costs nothing). Player
   part files use `bhReadPlayerData`'s layout (one loader: `afs_read`, `player_model_read`,
   `player_hair`). Released when the model changes; refused (the character's own model stays) with
   fewer than 32 texture entries or 2 MB of heap left.
-* **Display actor**: a `BH_PWORK` per slot (our player, the co-op partner, the cutscene double, and
+* **Display actor**: a `BH_PWORK` per slot (our player, the co-op partner, the cutscene double,
   two for enemy variants' models: [ENEMIES.md](ENEMIES.md) "Enemy variants", posed from each such
-  enemy's skeleton, or from another enemy's (a donor) playing a borrowed motion, when it is drawn),
+  enemy's skeleton, or from another enemy's (a donor) playing a borrowed motion, when it is drawn,
+  and six for the cutscene cast's models, "Cutscene cast"),
   drawn in place of the source (`game.c actor_put_player`, `coop_draw_remote`,
   `eneset.c actor_put_enemy`). The source stays what the game animates, collides with and links
   weapons and effects to; it is only not drawn. The head part (`sys->obwp[2]`) is disabled while a
@@ -641,9 +645,11 @@ weapon of a hand the model lacks floated at the invisible source's hand.
   `appear_cutscene_face`, default 0): the cast talks through a face mask (`face.c`, `face_bh.c`,
   the model's `MASK` chunk; `fmCnkInitContext` inserts jaw/tongue/eye pivots, 27 -> 31 nodes;
   op `bhLipSet` starts a line of phonemes from the model's face table). With the option a cast
-  model shown for the double gets its own mask (`face_init`, ~55 KB in `face_mem`) and the
-  double's lip state is copied onto it every tick (`face_step`). Lines past the model's face
-  table are not shown; expressions are not copied. A player file chosen as the appearance is shown
+  model shown for the double gets its own mask (`face_init`, ~55 KB of its slot's 128 KB in `face_mem`)
+  and the double's lip state is copied onto it every tick (`face_step`), and so are its eye angles
+  (pivots 9 and 13 of every cast mask: the eyes look where the double's expression has them). Lines
+  past the model's face table are not shown; the expressions' muscles are not copied (each face has
+  its own). A player file chosen as the appearance is shown
   on the double as the same character's cutscene model. `face_src` copies rest meshes to 64-byte
   boundaries (the morph reads them with `lq`). A mask that does not fit leaves the model without.
 * **Swapped model in cutscenes** (APPEARANCE page and F1, ini `appear_in_cutscenes`, default 1). Off: the
@@ -724,11 +730,129 @@ partner's), taken from the same 31 extra-bank numbers as the spawner's enemy ban
   in its claw; the hazmat man's and the zombies' torso is one bone from the hips; the camera scales by
   the neck where no head is found (the Bandersnatch).
 * No creature sounds (footsteps stay the player's; the voice per "Voices").
-* Lip sync only for cast models and with the option; the double's hand pieces are its own.
+* Lip sync only for cast models and with the option (the cutscene cast: always); the double's hand pieces are its own.
 * A room with little texture memory left refuses the model (logged as `actor: ... not enough
   texture memory`). Wrong colours are possible where a model's CLUT bank collides with the room's.
 * Test aids: `RECVX_APPEAR="frame:chr,..."` sets the appearance at a frame;
   `RECVX_COOP_ECHO` runs the partner path locally.
+
+## Cutscene cast
+
+Setting "Randomize cutscene cast" (GAMEPLAY, group CUTSCENE CAST; the lobby's GAME RULES, RANDOMIZER,
+CUTSCENE CAST page; ini `cast_random`, default 0): the people and zombies of cutscenes are drawn as
+other "You appear as" models. Purely visual: every record keeps its type, motions, script, hits and
+collision. The voices are the scripts' and stay the original character's (cutscene dialogue is
+streamed); the faces follow the lip data where the model has a face mask. Code: `pc/src/host/cast.c`
+(who is cast and the picks; no game state, ctest `cast`), `pc/glue/cast_glue.c` (in the game), the
+display actors of `actor_glue.c`.
+
+| Setting | ini | Values |
+|---|---|---|
+| Randomize cutscene cast | `cast_random` | 0 Off, 1 Characters, 2 Enemies, 3 Both (`EnemyOpts.cast`) |
+| Character models (shown with Characters) | `cast_models` | **0 Cutscene models (faces move)**, 1 All models |
+| Assignment (shown while on) | `cast_assign` | **0 Fixed per character**, 1 Random per cutscene |
+| Include imported models (shown with Characters while imported models exist) | `cast_imports` | **0**/1 |
+
+The seed is the enemy options' (`enemy_seed`). In co-op the host's options count (they travel with the
+other enemy options, `EV_EOPTS`, [COOP.md](COOP.md) "Added enemies and options").
+
+### Who is cast
+
+At the end of every room load (`enemyopt_glue.c enemy_room_finished` -> `cast_room`, after the enemy
+randomizer) each room record is looked at as it is then:
+
+| Records | Kind | Drawn as |
+|---|---|---|
+| the story characters (`cast_character`): Claire 91; Chris 92, 42; Steve 93, 43; Wesker 97, 49, 47; Alfred 94, 96 (both model versions), 44; Alexia 95; Rodrigo 98; the man in the hazmat suit 99 | character | a model of the character pool |
+| zombies (1, the scripted 51 and 52) and the anatomist (26) that the room script drives or shows (the enemy options' `scan_script`: event-driven, or shown and hidden) | zombie | another zombie look, or the anatomist |
+| Hunters (5) the script drives or shows | Hunter | the other Hunter look |
+
+Never: bosses and their forms (Alfred's boss type 16, Alexia 12..14, Nosferatu, Monster Steve, the
+Tyrants: their rooms wait on them, their parts are hit targets), creatures without a humanoid
+skeleton, props and set pieces (the other ids 31..90), records linked to another enemy, free-roaming
+enemies (no scene shows them), anything spawned after the load. Kept by hand (`cast_glue.c kept[]`):
+
+| Room, record | Why |
+|---|---|
+| 7030, 1 | Alexia asleep in her ice capsule (the monitor scene): the scene needs her silhouette |
+
+**Precedence**: the doubles of the character played (Claire 91 while Claire is played; Chris 92/42,
+Steve 93/43, Wesker 97/49/47 likewise) belong to "You appear as" and "Swapped model in cutscenes"
+("Cutscene doubles"); the cast leaves them to the game or the appearance. Which character is played
+is read when a record is drawn, not at the load (a story switch changes it after the load), so such a
+double gets a model at the load but is not drawn as it while its character is played. The other
+player characters' records are ordinary cast (Claire while Chris is played, Chris in Claire's part,
+Steve).
+
+### The pools
+
+| Kind | Pool |
+|---|---|
+| characters, *Cutscene models* | the eight cutscene models with a face mask: Claire (catalogue 0), Chris (1), Steve (3), Wesker (5), Alfred (8), Alexia (12), Rodrigo (13), the hazmat man (14) |
+| characters, *All models* | the five player files (`ACTOR_PART + n`) and every listed humanoid catalogue model (`anim` not `ANIM_IDLE`, not a hidden twin): the cast, Alexia's first form, Nosferatu, the Tyrant, Monster Steve, the Hunters, the Bandersnatch, the anatomist, every zombie; not "Alfred Ashford (wounded)" (a special state) |
+| characters, with imported models | the imported models after them (playable characters and NPCs, `IMPORT_OFFERED`: people with jaw and lid bones, [IMPORT_OUTBREAK.md](IMPORT_OUTBREAK.md) "Faces", so they count as cutscene models: their jaw follows the record's mask, `imp_face`) |
+| zombie | the 27 zombie looks and the anatomist |
+| Hunter | Hunter, Sweeper |
+
+### The picks
+
+`cast_model(seed, scene, kind, key)`: every key of the kind (the 8 characters; each look of the enemy
+pool) is assigned at once from a Fisher-Yates shuffle of the pool by xorshift32 seeded with (seed,
+scene, kind): each key in turn takes the first model of the shuffle not taken and not its own look (a
+character's own cutscene model or player file; a look itself); when only its own are left it trades
+with an earlier key. Different characters get different models while the pool lasts (the cutscene
+pool: a derangement of the eight), and every answer is the same whichever key is asked.
+
+* *Fixed per character*: scene 0, the same in every room (seed 1: Steve as Alfred in 0030 and 2050,
+  Alfred as the hazmat man in 1020 and 7030, Alexia as Rodrigo in 2030, 2050, 9150, 9320).
+* *Random per cutscene*: scene = room file + 1: each cutscene room (`RM_<stg><rom><case>`) picks
+  again, the same room the same; deterministic from (seed, room file, character), so both co-op sides
+  pick alike and a revisit shows the same cast.
+* A pick that cannot be loaded or mapped (texture memory, an imported model without a humanoid node
+  map) leaves that record as itself (logged `cast: ... cannot be loaded or mapped`).
+
+### Drawing
+
+* **Slots**: one display slot per model the room shows (`ACTOR_CAST + k`, 6), shared by every record
+  drawn as it; a seventh model leaves its records as themselves. Their model data share one 3 MB
+  buffer (`cast_mem`; the cast's own models 0.1..0.2 MB, imported ones up to 1.35 MB), given back once
+  all the cast's slots are unloaded: with the room's textures (`spawn_glue.c spawn_release`, the door)
+  and at `njReleaseTextureAll`. Each slot also has 128 KB for a face mask (`face_mem`).
+* **Characters**, as the cutscene double ("Cutscene doubles"): every tick before the objects follow
+  their links (`coop_control_remote` -> `actor_double_tick` -> `cast_tick` -> `actor_act`) the record is
+  posed (humanoid retarget from its skeleton), the model's face mask takes the record's lip sync and
+  eye angles (`face_step`), and the record's hand nodes are moved to the model's hands, so the hand
+  pieces and props the script links there sit on the model's wrists; then it is drawn in place of the
+  record (`eneset.c bhDrawEnemy` -> `actor_put_enemy` -> `cast_draw` -> `actor_put_as`; records sharing
+  a slot are posed in turn). Every cast model with a face mask gets it (`face_init`, whatever "Talking
+  faces" says), so with *Cutscene models* every character talks (measured in the opening, Rodrigo as
+  Claire's cutscene model: the model's lips run with his, its jaw 0..8.4 degrees against his 0..7.6). A
+  record without a mask (the event models 42..49) leaves the model's face at rest. In single player
+  `appear_on` includes `cast_n`, so `coop_control_remote` runs while a room has cast records.
+* **Enemies**, as an enemy variant's model ([ENEMIES.md](ENEMIES.md) "Enemy variants",
+  `variant_glue.c pc_enemy_draw_as`): posed from the record's skeleton when it is drawn, its linked
+  parts left out, a blown-off zombie head hidden on the model; also while a zombie chews or walks with
+  its mouth morph (`mdflg & 2`: `bhDrawEnemy` asks `actor_put_enemy` there too).
+* Off (and in every room without cast records, `cast_n` 0) none of this runs: frames are identical to
+  a build without it (`layout_check.sh`). On, the game's state is unchanged: the opening, Steve's
+  scene (0030) and the graveyard's zombies (0020) gave the same flags, items and player position at
+  every room load and the same player pose every game frame as with it off.
+
+### Limits
+
+* Props the scripts link to a character's head stay at the record's head; the hand pieces are the
+  record's (Rodrigo's gloves on Claire); on a model shorter or taller than the record they sit a
+  little off.
+* Records drawn as the same model share its face mask: the one posed last talks.
+* Mouth shapes past the model's face table are not shown (as for the double); expressions keep the
+  model's neutral face, only the eyes follow.
+* Each model is read from its room file during the room load (as the enemy spawner reads one), at
+  most six per room.
+* Test aids: `RECVX_CAST=mode[:all][:random][:imports]` sets the options; `RECVX_CAST_TRACE=1` logs
+  the game's state (flags, items, the player) at each room load and, every 10 ticks, each cast face's
+  lips, muscles and jaw against its record's; `RECVX_TEST_EVENT="f:level:ev,..."` starts a room
+  script's event (a cutscene) without walking to its trigger.
+
 
 ## Limits
 

@@ -35,6 +35,7 @@ int ikou3(BH_PWORK* epw, NJS_POINT3* pos, int add_dir);   /* zonzon.c (its heade
 #include "../src/host/cheat.h"
 #include "../src/host/bindings.h"
 #include "../src/host/actors.h"
+#include "../src/host/cast.h"
 #include "../src/host/enemies.h"
 #include "../src/host/biorand.h"
 #include "../src/net/net.h"
@@ -120,6 +121,8 @@ static NetAddr peer;
 static int have_peer, is_host, have_rx, tx_in_game, trace = -1, echo_delay;
 static Pose rx, tx, echo_ring[256];
 static PoseExt rx_ext, tx_ext;
+extern int cast_n;                      /* actor_glue.c: cutscene cast records drawn as other models */
+unsigned coop_partner_import_id(void) { return coop_on && have_rx ? rx_ext.imp_id : 0; }   /* (cast_glue.c) */
 static unsigned int frame_no, rx_at, join_at, join_frame, join_hinted;
 /* ping: the partner's clock in the first datagram of its newest frame here and when that arrived
    (net_rx_us: the network's arrival, not our frame's); the round trip smoothed (ms, < 0: none yet) */
@@ -6431,7 +6434,7 @@ void coop_frame(void)
     }
     g_coop.at_title = sys && (sys->tk_flg & 0x8);   /* the lobby hint (overlay) */
     if (!coop_on) {   /* "You appear as" also in single player (appear_on: game.c calls coop_control_remote) */
-        appear_on = sys && plp && (g_coop.chr || self_mesh >= 0 || actor_shown(0) || actor_shown(ACTOR_DOUBLE));
+        appear_on = sys && plp && (g_coop.chr || self_mesh >= 0 || actor_shown(0) || actor_shown(ACTOR_DOUBLE) || cast_n);   /* (cast_n: the cutscene cast's hands and faces, actor_double_tick) */
         if (appear_on) self_frame();
         tx_in_game = 0;
         publish_status();
@@ -6464,6 +6467,7 @@ void coop_frame(void)
     tx_ext.br = (uint8_t)(is_host ? biorand_active() : biorand_pack());   /* BioRand (protocol 27): the host's choice; a guest's pack */
     tx_ext.br_seed = biorand_seed() >= 0 ? (uint32_t)biorand_seed() : 0xFFFFFFFFu;
     tx_ext.br_id = biorand_id();
+    tx_ext.imp_id = cast_import_id();   /* (protocol 29) the cutscene cast takes imported models only while both have the same */
     tx.opts = is_host ? (g_coop.loot ? OPT_INDIVIDUAL : 0) | (g_coop.trade_freeze ? OPT_TRADE_FREEZE : 0) | (g_coop.important ? OPT_IMPORTANT : 0) |
                         (pc_cfg_no_ink_ribbon() ? OPT_NO_RIBBON : 0) | (g_coop.skip_sync ? OPT_SKIP_SYNC : 0) |
                         (g_coop.gameover_both ? OPT_GAMEOVER_BOTH : 0) | (g_coop.skip_detector ? OPT_SKIP_DETECTOR : 0) |

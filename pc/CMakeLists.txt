@@ -270,6 +270,9 @@ add_test(NAME parsers COMMAND test_parsers)
 # enemy variants (pc/src/host/variants.c): the built-in table, the mods/enemies.ini reader
 add_executable(test_variants tests/test_variants.c src/host/variants.c src/host/actors.c src/host/fileio.c)
 add_test(NAME variants COMMAND test_variants)
+# the cutscene cast randomizer's picks (pc/src/host/cast.c): deterministic, never the model itself, distinct per room
+add_executable(test_cast tests/test_cast.c src/host/cast.c src/host/actors.c)
+add_test(NAME cast COMMAND test_cast)
 
 # co-op networking (pc/src/net): a busy port, the port mapping started and stopped again
 add_executable(test_net tests/test_net.c src/net/net.c src/net/portmap.c)
