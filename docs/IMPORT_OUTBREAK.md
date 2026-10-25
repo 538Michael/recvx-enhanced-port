@@ -287,6 +287,17 @@ the grip. The same for men (Chris's motions) and women
 unchanged (the shot still comes from the game's own skeleton). Dual weapons hold the hands further
 apart and keep the scaled offset only.
 
+**The weapon hand** (fifth report: the gun hand too far left, clipping, not on the gun). Cause: Code:
+Veronica's weapon models carry the hand that holds them: object 0 of each weapon file model is
+Claire's or Chris's gloved hand piece (43 vertices) and the gun, its slide and magazine are its
+children. The piece was drawn at the import's wrist next to the import's own hand, so a second,
+brown-gloved hand sat on the grip and the import's real hand looked beside the gun. Fix:
+`actor_glue.c actor_weapon_hands` hides object 0 of the weapon models (both hands, the partner's
+too) while an imported model is shown; the weapon itself stays. Checked with the handgun, magnum,
+shotgun, assault rifle, sub machine guns and Gold Lugers (both hands), the knife and unarmed, idle,
+walk and aim, all 8 characters (men with Chris's motions, women with Claire's): the import's own
+hand holds the grip where Claire's does, so no arm correction was needed.
+
 ### Faces
 
 Outbreak's player models move their faces with five bones under the head (group 2): upper and
