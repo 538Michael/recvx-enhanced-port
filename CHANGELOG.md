@@ -12,6 +12,10 @@
 - **Rifle ammo stacks** (Gameplay): rifle and assault rifle bullets can stack in one slot like the other
   ammo. Off by default, as in the original.
 
+### Fixes
+
+- Menu arrows no longer slide between entries when you move the cursor (Smooth menus).
+
 ## 0.6.9 (2026-10-24)
 
 ### Gameplay

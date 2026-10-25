@@ -287,8 +287,10 @@ shows in-between images at the display rate:
   are aligned pointers, effects odd). The matcher pairs it with the least-moved polygon of the
   same look in the previous frame (as instances of one mesh, `NATIVE_JUMP`); sprites, lines and
   points (`EV_RAW`) under such a tag become groups too (`RAW_KEY`) and their positions are blended
-  in the replay. An untextured piece also carries its colour and which way each corner lies from
-  the first (left and right arrows, horizontal and vertical lines differ). A letter of the font
+  in the replay. An untextured piece also carries which way each corner lies from the first (left
+  and right arrows, horizontal and vertical lines differ), not its colour: a cursor recolours a
+  row's arrows, and with the colour in the look the old row's highlighted arrows paired with the
+  new row's and slid across between frames. A letter of the font
   (`sys->ef_tlist`) carries the letters before it on its line and the steps between them, so a
   changed text never slides letters from one string to another. Looks repeat (both OPTION picture
   bands show the same pictures 368 px apart and scroll round; every row of a list says "On"), so
