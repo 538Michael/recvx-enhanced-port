@@ -24,6 +24,22 @@ int cast_character(int id, int ver)
 static int listed(void) { return __atomic_load_n(&actor_import_n, __ATOMIC_ACQUIRE); }   /* (the main thread appends) */
 static int imports_n(int imports) { return imports > 0 && imports <= listed() ? imports : 0; }
 
+/* a zombie look (the zombies' 27 looks, the scripted ones too; not the anatomist): in "All models" they are one entry,
+   else they were most of the pool and most characters became zombies */
+static int zombie(int i) { return actor_models[i].id == 1 || actor_models[i].id == 51 || actor_models[i].id == 52; }
+
+int cast_zombie_look(unsigned seed, unsigned scene, int c)
+{
+    unsigned h = (seed * 2654435761u) ^ (scene * 40503u + (unsigned)c * 0x9E3779B9u + 0x7F4A7C15u);
+    int i, n = 0, k;
+    h ^= h >> 15; h *= 0x2C1B3C6Du; h ^= h >> 12; h *= 0x297A2D39u; h ^= h >> 15;
+    for (i = 0; i < ACTOR_MODELS; i++) n += zombie(i);
+    k = n ? (int)(h % (unsigned)n) : -1;
+    for (i = 0; i < ACTOR_MODELS && k >= 0; i++)
+        if (zombie(i) && k-- == 0) return i;
+    return -1;
+}
+
 int cast_pool(int all, int imports, int* out, int max)
 {
     int n = 0, i;
@@ -32,7 +48,8 @@ int cast_pool(int all, int imports, int* out, int max)
     else {   /* every humanoid look the menus list, the player files too; not the wounded Alfred (a special state) */
         for (i = 0; i < 5 && n < max; i++) out[n++] = ACTOR_PART + i;
         for (i = 0; i < ACTOR_MODELS && n < max; i++)
-            if (actor_models[i].anim != ANIM_IDLE && appear_canon(COOP_CHR_ACTOR + i) == COOP_CHR_ACTOR + i && i != 10 && i != 14) out[n++] = i;   /* (14 the man in the hazmat suit: no moving mouth) */
+            if (actor_models[i].anim != ANIM_IDLE && appear_canon(COOP_CHR_ACTOR + i) == COOP_CHR_ACTOR + i && i != 10 && i != 14 && !zombie(i)) out[n++] = i;   /* (14 the man in the hazmat suit: no moving mouth) */
+        if (n < max) out[n++] = CAST_ZOMBIES;   /* the zombie looks: one entry (cast_model picks the look) */
     }
     for (i = 0; i < imports_n(imports) && n < max; i++) out[n++] = ACTOR_MODELS + i;
     return n;
@@ -78,7 +95,7 @@ int cast_model(unsigned seed, unsigned scene, int c, int all, int imports)
         if (pick[i] < 0) return -1;
         used[pick[i]] = 1;
     }
-    return pool[pick[c]];
+    return pool[pick[c]] == CAST_ZOMBIES ? cast_zombie_look(seed, scene, c) : pool[pick[c]];   /* (the zombie entry: which look, from the same seed and scene) */
 }
 
 unsigned cast_import_id(void)

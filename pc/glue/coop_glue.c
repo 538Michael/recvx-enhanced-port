@@ -123,6 +123,7 @@ static Pose rx, tx, echo_ring[256];
 static PoseExt rx_ext, tx_ext;
 extern int cast_n;                      /* actor_glue.c: cutscene cast records drawn as other models */
 unsigned coop_partner_import_id(void) { return coop_on && have_rx ? rx_ext.imp_id : 0; }   /* (cast_glue.c) */
+int coop_partner_ply(void) { return coop_on && have_rx && rx.mfile >= 0 ? rx.mfile & 3 : -1; }   /* (cast_glue.c) the character the partner plays, -1 */
 static unsigned int frame_no, rx_at, join_at, join_frame, join_hinted;
 /* ping: the partner's clock in the first datagram of its newest frame here and when that arrived
    (net_rx_us: the network's arrival, not our frame's); the round trip smoothed (ms, < 0: none yet) */

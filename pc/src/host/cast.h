@@ -16,8 +16,11 @@ extern "C" {
 int cast_character(int id, int ver);
 /* the models a character may be drawn as (all: "All models"; imports: the imported models
    0..imports-1 too), as actor indices (catalogue entries, ACTOR_PART + n player files, imports
-   ACTOR_MODELS + k); the count */
+   ACTOR_MODELS + k, CAST_ZOMBIES for every zombie look together); the count */
 int cast_pool(int all, int imports, int* out, int max);
+#define CAST_ZOMBIES 10100   /* cast_pool's one entry for all the zombie looks ("All models"); past ACTOR_PART + 9 */
+/* the zombie look (catalogue entry) character c gets when it draws the zombie entry: from (seed, scene, c) */
+int cast_zombie_look(unsigned seed, unsigned scene, int c);
 /* What character c is drawn as: the actor index, -1 none. scene: 0 for "Fixed per character" (the
    same in every room), else the room file + 1 ("Random per cutscene"). All eight characters are
    assigned at once from a shuffle of the pool seeded by (seed, scene), each in turn the next model not

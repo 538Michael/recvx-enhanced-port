@@ -35,6 +35,7 @@ _Static_assert(CSLOTS == 6, "slot_model");
 #define HIDDEN_MAX 16
 static NJS_CNK_OBJECT* hidden[HIDDEN_MAX];   /* hand pieces hidden this tick (hands_hide) */
 static int hidden_n;
+static unsigned char hid_logged[4];   /* (test aid: objects logged hidden in this room) */
 
 /* records whose scene needs their own look */
 static const struct { unsigned short room; unsigned char rec; const char* why; } kept[] = {
@@ -71,6 +72,7 @@ void cast_release(void)
     memset(rec_slot, -1, sizeof(rec_slot));
     cast_n = 0;
     hidden_n = 0;   /* (the room's objects go with the room: nothing to show again) */
+    memset(hid_logged, 0, sizeof(hid_logged));
 }
 
 /* enemyopt_glue.c, the end of the room load */
@@ -127,9 +129,17 @@ void cast_room(const EnemyOpts* o)
              o->cast_assign ? "random per cutscene" : "fixed", o->cast_all ? "all models" : "cutscene models", imports ? ", imported models" : "");
 }
 
-/* a double of the character played: "You appear as" and "Swapped model in cutscenes" decide how it looks (the character
-   played is known only now: a story switch, and the test aid RECVX_PLAYER, change it after the room load) */
-static int played(int k) { return rec_chr[k] < 4 && rec_chr[k] == (sys->ply_id & 3); }
+/* a double of a character played: "You appear as" and "Swapped model in cutscenes" decide how it looks. Read when it
+   is drawn: the character played now (a story switch changes sys->ply_id after the room load: the end of bhFinishRoom);
+   the one a switch the script has set (PlayerChangeSet: cb_flg 0x80, cng_pid) is about to make played, so the scene
+   around the switch already counts it; and in co-op the partner's (its own part file), whom a scene of ours may show
+   while its game plays it. Claire while Chris is played (and no switch to her is pending) is cast as any character. */
+int coop_partner_ply(void);             /* coop_glue.c: -1 none */
+static int played(int k)
+{
+    int c = rec_chr[k];
+    return c < 4 && (c == (sys->ply_id & 3) || ((sys->cb_flg & 0x80) && c == (sys->cng_pid & 3)) || c == coop_partner_ply());
+}
 
 /* record k is drawn as its model now */
 static int as_model(const BH_PWORK* ep, int k) { return k >= 0 && k < RECS && rec_slot[k] >= 0 && !played(k) && still(ep, k); }
@@ -161,6 +171,11 @@ static void hands_hide(BH_PWORK* ep, int who)
             if ((m->evalflags & 0x8) || hidden_n == HIDDEN_MAX) continue;   /* (hidden already: by the game, or a piece shared by two records) */
             m->evalflags |= 0x8;
             hidden[hidden_n++] = m;
+            if (getenv("RECVX_CAST_TRACE") && !(hid_logged[o >> 3] & (1 << (o & 7)))) {   /* test aid: once per object and room */
+                hid_logged[o >> 3] |= (unsigned char)(1 << (o & 7));
+                host_log("cast: room %04d record %d (type %d): its hand piece (object %d, id %d) on node %d hidden: the model has %s\n", room_file_now(),
+                         (int)(ep - ene), ep->id, o, op->id, node, actor_own_hand(who, side, &node) == 2 ? "no such hand" : "a hand of its own");
+            }
         }
     }
 }
