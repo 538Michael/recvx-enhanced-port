@@ -854,7 +854,7 @@ What the options do in detail, beyond [USER_GUIDE.md](USER_GUIDE.md#settings):
 
 Two save systems, chosen by `save_system` (F1 / ENHANCED SETTINGS GAMEPLAY "Save system"):
 
-- **Native files** (0, default): `<save dir>/saves/NNN_<label>.sav`, one file per save, no limit
+- **Native files** (0, default): `<save dir>/saves/NNN_<label>.sav`, one file per save, up to `SAVESTORE_MAX` (10,000) listed
   (`pc/src/host/savestore.c`, tested by `pc/tests/test_savestore.c`).
 - **Memory card** (1): the PS2 card as before, `pc/src/ps2/mc.c` (libmc on a folder,
   `<save dir>/card0`, 15 save slots plus the system file).
@@ -915,7 +915,8 @@ whose bytes are already there are skipped).
 
 **Other readers** go through `pc/src/host/lobby.h`, which follows the active system: save "slots"
 are the card's 0..14 or the native number - 1 (so a migrated slot keeps its meaning in `coop_start`
-and `coop_items`), `lobby_save_slots()` is their count. The co-op lobby's START list, the joiner's
+and `coop_items`); native numbers can be sparse, so lists come from `lobby_save_list()` (the saves
+there are, by slot), never from a count. The co-op lobby's START list, the joiner's
 ITEMS choice, `RECVX_TEST_SAVE`, the host's partner records (`coop-partners-nn.bin` /
 `saves/NNN.coop-partners.bin`, written after each save by `coop_save_written`) use it. Game over
 "continue" and the retry points live in memory and never touch a save.

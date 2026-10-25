@@ -556,8 +556,12 @@ static void coop_window(void)
         };
         label(v, cur, sizeof(cur));
         ImGui::BeginDisabled(cs.state != COOP_OFF && cs.host);
+        static LobbySave* saves;   /* listed when the list opens */
+        static int saves_n;
         if (ImGui::BeginCombo("Items when joining", cur)) {
-            for (int i = COOP_ITEMS_CURRENT, slots = lobby_save_slots(); i < slots; i++) {
+            if (ImGui::IsWindowAppearing()) { free(saves); saves_n = lobby_save_list(&saves); }
+            for (int k = 0; k < 3 + saves_n; k++) {
+                int i = k < 3 ? COOP_ITEMS_CURRENT + k : saves[k - 3].slot;
                 label(i, lab, sizeof(lab));
                 if (ImGui::Selectable(lab, i == v)) { c->items = i; changed = true; }
             }
