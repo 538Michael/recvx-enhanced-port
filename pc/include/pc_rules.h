@@ -272,6 +272,15 @@ static inline unsigned int pc_inv_take(unsigned int* b, int max, int s, int coun
     return e;
 }
 
+/* sub1.c ItemBoxChange / GetItem: a special-slot item (`standard`: the lighter, Claire's lockpick too) goes into word 1
+   only while that is empty. Claire can hold both (the lockpick from a pickup or the randomizer lies in a cell, an
+   event puts it into the slot); the game wrote it over the item there, which was lost. Else it takes a cell like
+   any other item. */
+static inline int pc_to_special(const unsigned int* b, int id, int std0, int std1)
+{
+    return (id == std0 || id == std1) && !((b[1] >> 16) & 0xFF);
+}
+
 /* ---------------------------------------------------------------- BioRand (biorand_glue.c, coop_glue.c; decomp hitchk.c) */
 /* the item a floor pickup gives: a generated room's item record names it in `type` (its `id` stays the model);
    retail leaves type 0 (docs/modding/ROOM_FORMAT.md "Enemies, objects, items") */

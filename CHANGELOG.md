@@ -18,6 +18,9 @@
   skipped.
 - **Unusual save names**: the lobby no longer freezes or crashes with unusual save file names.
 - **Crash reports on Linux**: written more reliably, also when the game runs out of stack.
+- **Lighter and lockpick in the item box**: taking the lighter or Claire's lockpick out of the item box
+  no longer makes the other one disappear; with its slot taken, it goes into your bag like any item.
+  Picking up the lighter while holding the lockpick keeps both too.
 
 ## 0.6.9 (2026-10-24)
 

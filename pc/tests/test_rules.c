@@ -259,6 +259,17 @@ static void inventory(void)
         CHECK(c[2] == 0x210000 && c[3] == 0x5000f && c[4] == 0x80000 && c[0] == 3);
         CHECK(pc_inv_room(c, 8, it) == 4);
     }
+    {   /* the item box's and GetItem's special slot (Claire: lighter 55, lockpick 50; Chris: the lighter) */
+        unsigned int d[12] = { 0, 0x370001 };
+        CHECK(!pc_to_special(d, 50, 55, 50));                  /* the lockpick out of the box: the lighter stays, a cell */
+        CHECK(!pc_to_special(d, 55, 55, 50));                  /* a second lighter: a cell */
+        d[1] = 0x320001;
+        CHECK(!pc_to_special(d, 55, 55, 50));                  /* the lighter with the lockpick in the slot: a cell */
+        d[1] = 0;
+        CHECK(pc_to_special(d, 55, 55, 50) && pc_to_special(d, 50, 55, 50));   /* an empty slot takes either */
+        CHECK(!pc_to_special(d, 50, 55, -1));                  /* Chris: the lockpick is any item */
+        CHECK(!pc_to_special(d, 0x08, 55, 50));                /* the knife (count 0) is no special-slot item */
+    }
 }
 
 /* BioRand: the item a pickup gives (a room's type, else id) and the seed from its log line */
