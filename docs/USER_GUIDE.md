@@ -252,7 +252,7 @@ until the right square on the white strip is.
 | Quick knife | On | see [Quick knife](#quick-knife) |
 | Auto-climb stairs | On | walk into stairs to climb them. Ledges, doors and items still need the button |
 | Head blow-offs | On | a zombie whose head bursts (magnum, close shotgun) loses it |
-| Rifle ammo stacks | Off | rifle bullets stack in one slot; always on with BioRand |
+| Rifle ammo stacks | **On** | rifle bullets stack in one slot; always on with BioRand |
 | BioRand | Off | see [Randomizer (BioRand)](#randomizer-biorand) |
 | Save system | Native files | see [Saves](#saves) |
 | Import memory card saves | | copies the card's saves into save files |

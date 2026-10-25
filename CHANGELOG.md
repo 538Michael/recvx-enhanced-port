@@ -4,28 +4,17 @@
 
 ### Gameplay
 
-- **BioRand randomizer**: play randomized games made with [BioRand](https://github.com/biorand/classic)
-  (thanks to IntelOrca and the BioRand team, who also wrote the game-side support). Generate a seed
-  into the game's folder, then turn BIORAND on in NEW GAME's difficulty screen (or in the settings at
-  the title). Off, you get the normal game. A save made with another seed asks before it loads, and in
-  co-op both players need the same seed.
-- **Rifle ammo stacks** (Gameplay): rifle and assault rifle bullets can stack in one slot like the other
-  ammo. Off by default, as in the original.
+- **Rifle ammo stacks** (Gameplay, on by default): rifle and assault rifle bullets stack in one slot
+  like the other ammo. Off: each pickup takes its own slot, as in the original.
 
 ### Fixes
 
 - **Menu arrows**: the arrows in ENHANCED SETTINGS and the lobby no longer slide between entries when
   you move the cursor.
-- **Co-op join with BioRand**: co-op with BioRand, or from some late-game saves, could fail to start
-  for the joining player.
-- **Co-op security**: better protection against a malicious partner and against guessing the join
-  code; direct sessions are now encrypted too.
 - **Damaged files**: damaged or crafted mod, room, texture and archive files no longer crash the game;
   a broken room file from the mods folder falls back to the disc's, and oversized HD textures are
   skipped.
 - **Unusual save names**: the lobby no longer freezes or crashes with unusual save file names.
-- **Gamepad unplugging**: unplugging or switching a gamepad while the controls settings are open is
-  safe.
 - **Crash reports on Linux**: written more reliably, also when the game runs out of stack.
 
 ## 0.6.9 (2026-10-24)
