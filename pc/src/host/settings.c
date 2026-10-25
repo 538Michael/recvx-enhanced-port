@@ -415,7 +415,7 @@ const Setting g_settings[] = {
       .help = "Enemies that rooms show later or that events drive change too: the ones events animate get another look of their own kind, so the scenes still play. Next room." },
     { SP_GAMEPLAY, "Enemy seed", V(g_enemy_opts.seed), 0, 99999, 1, .fmt = "%d", .help = "Placements, randomizer and cutscene cast: the same seed gives the same rooms. In co-op both use the host's." },
     { SP_GAMEPLAY, "Randomize cutscene cast", V(g_enemy_opts.cast), 0, 3, 1, cast_modes, .group = "CUTSCENE CAST",
-      .help = "The story characters (Alfred, Steve, ...) and the zombies of cutscenes are shown as other models, from the enemy seed. Only the look changes: voices, scenes and enemies play as before. Your own character follows APPEARANCE. Next room." },
+      .help = "Story characters (Alfred, Steve, ...) and cutscene zombies are shown as other models, from the enemy seed. Only the look changes. Next room." },
     { SP_GAMEPLAY, "Character models", V(g_enemy_opts.cast_all), 0, 1, 1, cast_pools, .shown = cast_chars_on,
       .help = "Cutscene models: the characters' cutscene models, whose mouths and eyes move with the lines. All models: any character, creature or zombie model and the player models; most of them keep a still face." },
     { SP_GAMEPLAY, "Assignment", V(g_enemy_opts.cast_assign), 0, 1, 1, cast_assigns, .shown = cast_on,
