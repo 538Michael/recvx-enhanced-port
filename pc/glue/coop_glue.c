@@ -6079,7 +6079,7 @@ static void receive(void)
         }
         if (p.type == PKT_BYE) {   /* sent three times: the copies after the first find no partner */
             if (is_host && have_peer) {   /* the next partner may come */
-                host_log("coop: partner left\n");
+                host_log("coop: partner left%s\n", p.reject == COOP_REJ_STATE ? ": it cannot load our game state" : p.reject == COOP_REJ_BIORAND ? ": its BioRand pack is not ours" : "");
                 partner_gone(1);
                 snprintf(left_msg, sizeof(left_msg), p.reject == COOP_REJ_BIORAND ? "%s left: its BioRand pack is not this one" :
                          p.reject == COOP_REJ_STATE ? "%s left: it cannot load this game" : "%s left",

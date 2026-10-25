@@ -395,13 +395,13 @@ uint32_t coop_guard_fail(CoopGuard* g, uint32_t ip, uint32_t now);    /* it fail
 int coop_guard_take(CoopGuard* g, uint32_t now);                      /* 1: a new handshake fits the budget (and is counted) */
 
 enum { HS_FREE, HS_HELLO, HS_KEYED, HS_PROVEN };   /* joiner: sent HELLO; both: keys; a datagram opened with them */
-typedef struct CoopHs {
+typedef struct __attribute__((aligned(8))) CoopHs {
+    RdvSession ses;                     /* first, 8-aligned: rdv_seal counts tx_ctr atomically (no split lock on 32-bit x86) */
     uint32_t ip; uint16_t port;         /* network byte order (NetAddr) */
     uint8_t state;
     uint8_t sk[32];                     /* joiner, HS_HELLO: our secret until the answer */
     uint8_t yj[32], yh[32];             /* both public values (the host answers a repeated HELLO with the same yh) */
     uint32_t t;                         /* made / last opened datagram (ms) */
-    RdvSession ses;
 } CoopHs;
 typedef struct CoopDirect {
     int host;
