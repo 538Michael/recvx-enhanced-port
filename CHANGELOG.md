@@ -16,6 +16,9 @@
 
 - **Menu arrows**: the arrows in ENHANCED SETTINGS and the lobby no longer slide between entries when
   you move the cursor.
+- Co-op with BioRand, or from some late-game saves, could fail to start for the joining player.
+- Co-op is better protected against a malicious partner and against guessing the join code; a direct
+  session is now encrypted too (both players need this version).
 
 ## 0.6.9 (2026-10-24)
 

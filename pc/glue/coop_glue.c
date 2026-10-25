@@ -1665,6 +1665,8 @@ void coop_enemy_end(BH_PWORK* ep)
    partner (they are cosmetic: a busy link drops them). */
 #define FX_FRAME 8
 #define FX_BACKLOG 48
+#define FX_IN_FRAME 64                  /* the partner's effects started here in one frame (it sends FX_FRAME; more after a stall) ... */
+#define FX_IN_MAX 256                   /* ... and alive at once: half of eff[] at most */
 static uint32_t fx_was[16];             /* eff[] slots in use when the window opened */
 /* the larger state (~190 KB with the saved enemies) on the heap, allocated with the first window or EV_FX */
 static struct {
@@ -1801,7 +1803,7 @@ static void fx_send(O_WRK* op, BH_PWORK* owner, int player)
         e.u.fx.o[0] = op->lox; e.u.fx.o[1] = op->loy; e.u.fx.o[2] = op->loz;
         e.u.fx.n[0] = op->xn; e.u.fx.n[1] = op->yn; e.u.fx.n[2] = op->zn;
         if (!why && (txp >= 0 || mlw >= 0) && own < 0) why = "model of no enemy or player";
-        if (!why && coop_check_event(&e, is_host)) why = "fields out of range";
+        if (!why && coop_check_event(&e, is_host)) why = coop_fx_rule(op->id) ? "fields out of range (coop_proto.c fx_rules)" : "not an effect co-op sends (coop_proto.c fx_rules)";
     }
     if (why) { fx_note(op->id, why); return; }
     fx_queue(&e);
@@ -1848,9 +1850,17 @@ static int apply_fx(const Event* e)
     EF_WORK ef;
     NJS_POINT3 off;
     O_WRK* op;
-    int k, ix = coop_fx_get(e->idx, e->u.fx.refs, FXR_IDX), owner = coop_fx_get(e->u.fx.owner, e->u.fx.refs, FXR_OWNER),
+    int k, n, ix = coop_fx_get(e->idx, e->u.fx.refs, FXR_IDX), owner = coop_fx_get(e->u.fx.owner, e->u.fx.refs, FXR_OWNER),
         exp0 = coop_fx_get(e->u.fx.exp0, e->u.fx.refs, FXR_EXP0);   /* (the generic entry's; a particle call has its own refs) */
     if (!sys || !rom || e->stg != sys->stg_no || e->rom != sys->rom_no || !in_session_game() || (sys->cb_flg & 0x1) || !fx_heap()) return 1;   /* another room: gone */
+    if (e->u.fx.id != FX_ARM) {   /* bounded: the partner's effects never take most of eff[] (ours: shots, blasts) - they are cosmetic */
+        static unsigned int in_frame, in_n;
+        if (in_frame != frame_no) { in_frame = frame_no; in_n = 0; }
+        if (in_n >= FX_IN_FRAME) return 1;
+        for (k = n = 0; k < 512; k++) n += fx_mirror[k] && (eff[k].flg & 0x3);
+        if (n >= FX_IN_MAX) return 1;
+        in_n++;
+    }
     if (e->u.fx.id == FX_BURST) {
         OR_WORK* o = bhSetRapEff(FX_BURST, (void*)e->u.fxr.w, FX_RAW_WORDS);
         if (o) fx_mirror[(O_WRK*)o - eff] = 1;
@@ -1877,14 +1887,19 @@ static int apply_fx(const Event* e)
         if (trace) fprintf(stderr, "coop: fx %d in (particles %d, follows %d)\n", FX_PARTICLE, e->u.fxp.typ, pix);
         return 1;
     }
+    /* (coop_check_event checked it against its FxRule: the effect, its numbers, which references it has;
+       here they must name works that are here, with the nodes, models and textures it will index) */
     lk = ix == FX_NONE ? NULL : fx_ref_in(ix);
     own = owner == FX_NONE ? NULL : fx_ref_in(owner);
     ex = exp0 == FX_NONE ? NULL : fx_ref_in(exp0);
     if ((ix != FX_NONE && !lk) || (exp0 != FX_NONE && !ex)) return 1;
     if ((e->u.fx.txp >= 0 || e->u.fx.mlw >= 0) && !own) return 1;
-    if ((e->u.fx.txp >= 0 && (e->u.fx.txp >= own->mdl_n || !own->mdl[e->u.fx.txp].texP)) ||
-        (e->u.fx.mlw >= 0 && (e->u.fx.mlw >= own->mdl_n || !own->mdl[e->u.fx.mlw].objP))) return 1;
-    if (lk && (e->u.fx.flg & 0x80) && (!lk->mlwP || !lk->mlwP->owP || e->u.fx.lkono >= (int)lk->mlwP->obj_num)) return 1;
+    if ((e->u.fx.txp >= 0 && (e->u.fx.txp >= own->mdl_n || !own->mdl[e->u.fx.txp].texP || e->u.fx.tex_id >= (int)own->mdl[e->u.fx.txp].texP->nbTexture)) ||
+        (e->u.fx.mlw >= 0 && (e->u.fx.mlw >= own->mdl_n || !own->mdl[e->u.fx.mlw].objP || e->u.fx.mdlver >= own->mdl[e->u.fx.mlw].obj_num))) return 1;
+    if (lk && (!lk->mlwP || !lk->mlwP->owP || e->u.fx.lkono >= (int)lk->mlwP->obj_num)) return 1;   /* (with or without flg 0x80: steps read its nodes) */
+    if ((e->u.fx.id == 260 && (owner >= PC_ENE_SLOTS || own->id != 6 || e->u.fx.txp != 1 || own->mdl[1].texP->nbTexture < 5)) ||   /* the moth's powder cycles textures 1..4 */
+        (e->u.fx.id == 356 && (ix >= PC_ENE_SLOTS || lk->id != 1 || lk->mlwP->obj_num <= 10)) ||   /* a zombie's head (its node 10) */
+        (e->u.fx.id == 397 && (exp0 >= PC_ENE_SLOTS || ex->id != 15 || !ex->exp0))) return 1;   /* the en15 whose poison it is (its exp0 is read and written) */
     memset(&ef, 0, sizeof(ef));
     ef.flg = e->u.fx.flg;
     ef.id = e->u.fx.id; ef.type = e->u.fx.type; ef.flr_no = e->u.fx.flr_no; ef.mdlver = e->u.fx.mdlver;
@@ -1896,8 +1911,7 @@ static int apply_fx(const Event* e)
     op = &eff[k];
     op->lkwkp = (unsigned char*)lk;
     op->ax = e->u.fx.ang[0]; op->ay = e->u.fx.ang[1]; op->az = e->u.fx.ang[2];
-    op->stflg = e->u.fx.stflg; op->tex_id = e->u.fx.tex_id;
-    op->mode0 = e->u.fx.mode[0]; op->mode1 = e->u.fx.mode[1]; op->mode2 = e->u.fx.mode[2]; op->mode3 = e->u.fx.mode[3];
+    op->stflg = e->u.fx.stflg; op->tex_id = e->u.fx.tex_id;   /* (modes stay 0: its own init runs here) */
     op->xn = e->u.fx.n[0]; op->yn = e->u.fx.n[1]; op->zn = e->u.fx.n[2];
     op->ct0 = e->u.fx.ct[0]; op->ct1 = e->u.fx.ct[1]; op->ct2 = e->u.fx.ct[2]; op->ct3 = e->u.fx.ct[3];
     if (e->u.fx.txp >= 0) op->txp[0] = own->mdl[e->u.fx.txp].texP;
@@ -2232,6 +2246,19 @@ static void apply_snapshots(void)
    are left out of EV_FLAGS both ways, and a guest loading the host's game state keeps its own (imp_restore). */
 #define IMP_SPOTS 256                   /* 16 words: it_flg bits */
 #define IMP_TAKEN 272                   /* 16 words */
+#define GRANT0 320                      /* GRANT_N entries of 5 words: flr << 24 | item << 16 | count, room, x y z (grant_frame) */
+#define GRANT_N 8
+/* sys->itm as a whole (save region 0x270, 384 words; decomp sub1.c AllItemInit clears all of it):
+     0..63     the four characters' inventories (16 words each: word 0 the equipped slot, then item words)
+     64..191   the item box (sub1.c st->bxp; BOX0 below)
+     192..223  the metal detector's tray (cb_flg 0x80000); 224..255 the other special box (0x100000; 224 also
+               keeps a count in its low byte, sub1.c 4139 / 6636)
+     256..287  IMP_SPOTS, IMP_TAKEN: it_flg bitmaps (any bits)
+     288, 289  BioRand: its marker and seed, the pack's id (biorand_glue.c BR_W: any value)
+     320..359  GRANT0: pending event items (word 0 of each entry an item word, its floor in bits 24..31)
+     290..319, 360..382  unused (any value: no code reads them)
+     383       the files read (fileview.c: a bit per file, 24 files, so bits 16..23 too)
+   Only the item words are items: the game indexes item tables with their bits 16..23. */
 static int own_copies(void);
 static void imp_restore(const unsigned int* host);
 static unsigned char blob[0x900], blob_in[0x900];   /* the game state to load; as it arrives */
@@ -2254,19 +2281,24 @@ static int room_exists(int stg, int rom_no, int rcase)
     return 0;
 }
 
-static int blob_valid(const unsigned char* b)
+/* NULL: fine; else what is wrong (the log, the guest's message) */
+static const char* blob_valid(const unsigned char* b)
 {
 #define BF(f) (*(const __typeof__(sys->f)*)(b + ((const char*)&sys->f - (const char*)&sys->version)))
     int i;
     if (BF(version) != 10 || (unsigned char)BF(ply_id) > 3 || BF(stg_no) < 0 || BF(stg_no) > 9 || BF(rom_no) < 0 || BF(rcase) < 0 ||
         BF(rcase) > 9 || BF(pos_no) < 0 || BF(gm_mode) < 0 || BF(gm_mode) > 2 || !finite3(BF(ply_pos).x, BF(ply_pos).y, BF(ply_pos).z))
-        return 0;
-    if (!room_exists(BF(stg_no), BF(rom_no), BF(rcase))) return 0;
+        return "its header: version, character, room, difficulty or position";
+    if (!room_exists(BF(stg_no), BF(rom_no), BF(rcase))) return "a room this game does not have";
     for (i = 0; i < 4; i++)
-        if (BF(ply_wno)[i] < 0 || BF(ply_wno)[i] >= 23) return 0;
-    for (i = 0; i < 384; i++)
-        if (((BF(itm)[i] >> 16) & 0xFF) >= 156) return 0;
-    return 1;
+        if (BF(ply_wno)[i] < 0 || BF(ply_wno)[i] >= 23) return "a weapon number";
+    for (i = 0; i < 256; i++)   /* the inventories and boxes (the layout above); the words after them are no items */
+        if (((BF(itm)[i] >> 16) & 0xFF) >= 156) return "an item in an inventory or box";
+    for (i = 0; i < GRANT_N; i++) {
+        unsigned int w = BF(itm)[GRANT0 + i * 5];
+        if (((w >> 16) & 0xFF) >= 156 || (w >> 24) > 63) return "a pending event item";
+    }
+    return NULL;
 #undef BF
 }
 static unsigned int last[NFLAG];        /* the flag block as the partner knows it */
@@ -3143,6 +3175,8 @@ static void mask_host_changes(Event* c)
     }
 }
 
+static const char* bye_reason;          /* the session ends (the partner said goodbye, or why we leave): the message, handled in coop_frame */
+static int bye_code;                    /* our goodbye's reason: COOP_REJ_BIORAND (biorand_from_host), COOP_REJ_STATE (the host's game state) */
 /* returns 0 when the event cannot be applied yet (the stream waits for it) */
 static int apply_session_event(const Event* e)
 {
@@ -3150,7 +3184,15 @@ static int apply_session_event(const Event* e)
     if (e->type == EV_BLOB) {   /* the chunks of one transfer into blob_in; complete and valid: it is the game state */
         if (is_host || e->u.blob.total != SAVE_SIZE) return 1;
         if (coop_xfer_chunk(&blob_x, e->u.blob.tid, e->u.blob.total, e->u.blob.off, e->u.blob.len, e->u.blob.data) == 1) {
-            if (!blob_valid(blob_in)) { host_log("coop: the host's game state is not valid here: ignored\n"); coop_xfer_reset(&blob_x); return 1; }
+            const char* bad = blob_valid(blob_in);
+            if (bad) {   /* the host would only send the same again: the session ends, and both sides say why */
+                static char why[160];
+                snprintf(why, sizeof(why), "The host's game cannot be loaded here (%s): left the session", bad);
+                host_log("coop: the host's game state is not valid here: %s\n", bad);
+                coop_xfer_reset(&blob_x);
+                if (!bye_reason) { bye_reason = why; bye_code = COOP_REJ_STATE; }
+                return 1;
+            }
             memcpy(blob, blob_in, SAVE_SIZE);
             blob_rec = e->u.blob.pad;   /* its items are our saved ones (2: as at the host's continue point) */
             own_tid = e->u.blob.tid;
@@ -5063,8 +5105,6 @@ static void ts_frame(void)
    weapons (with the lighter) and key items (the partner cannot run the event); shared loot (one pool) key items and
    the lighter, weapons and ink ribbons only with "important items for both". The others stay the triggering
    player's: with shared loot a partner that replayed the event here and got one too gives it back (give_back). */
-#define GRANT0 320                      /* GRANT_N entries of 5 words: flr << 24 | item << 16 | count, room, x y z */
-#define GRANT_N 8
 #define GRANT_NOWHERE 63                /* floor of a grant whose spot is unknown (the giver was hidden in its scene) */
 #define GRANT_GLINT 100                 /* the glint of floor loot (item record aspd: its light 0.1 * aspd; most pickups have 100) */
 static struct { int item, count, room, flr; float p[3]; } gout[4];   /* ours, to send when we are in control */
@@ -5596,8 +5636,6 @@ static int apply_event(const Event* e)
    title, quitting) says goodbye: PKT_BYE (protocol 10 has it) three times, UDP may drop one; a partner
    that never hears it times out (LOST_MS). */
 #define LOST_MS 15000
-static const char* bye_reason;          /* the partner said goodbye (receive): the message, handled in coop_frame */
-static int bye_code;                    /* our goodbye's reason: COOP_REJ_BIORAND (biorand_from_host) */
 static int host_br = -1;                /* guest: the host plays its BioRand pack (1) or not (0), -1 not known yet */
 static NetResolve* join_dns;            /* joiner: the host's name being looked up (join_resolve) */
 static char join_host[128];
@@ -5606,19 +5644,26 @@ static int was_game;                    /* we were in a game during this session
 static unsigned int gone_sid;           /* host: the session of the partner that said goodbye */
 
 /* The join code (protocol 11): the host's game makes one per run and shows it in the lobby and F3
-   ("Copy join address" gives ip:port#CODE). Every packet carries coop_auth(code, sender session):
-   the host only takes a partner whose packets prove the code, and the partner only listens to a
-   host that proves it. Without the code a stranger gets nothing but a rate-limited "wrong code". */
+   ("Copy join address" gives ip:port#CODE). A direct session starts with a handshake bound to the
+   whole code (protocol 28, coop_proto.h CoopDirect); from then on every datagram is sealed with its
+   keys: the host only takes a partner whose datagrams open with them, and the partner only listens
+   to a host whose do. Without the code a stranger gets nothing but a rate-limited "wrong code", and
+   each failed address waits longer (CoopGuard). */
 static char code_rx[COOP_CODE_LEN + 1];   /* the session's code (host: ours; joining: from the address) */
+static CoopDirect direct;               /* the direct session's handshakes and keys (none through a server) */
 static char ver_msg[96];                /* a sender of another protocol version (shown while waiting) */
 static char srv_msg[160];               /* host: why there is no room on the server (shown while waiting) */
 
 /* Through the server (docs/SERVER.md) the partner is rdv_peer, whatever the path (punched,
-   relayed): rendezvous.c frames, encrypts and routes what goes there, and its join code (derived
-   by both games from the session keys) replaces the host's for that partner. */
+   relayed): rendezvous.c frames, encrypts and routes what goes there. Directly, CoopDirect seals it. */
 static int via_rdv(const NetAddr* a) { return rdv_active() && a->ip == rdv_peer.ip && a->port == rdv_peer.port; }
-static void xsend(const NetAddr* to, const void* b, int n) { if (via_rdv(to)) rdv_send(b, n); else net_send(to, b, n); }
-static const char* code_for(const NetAddr* a) { return via_rdv(a) && rdv_join_code() ? rdv_join_code() : code_rx; }
+static void xsend(const NetAddr* to, const void* b, int n)
+{
+    static uint8_t out[COOP_DGRAM_MAX + COOP_DIRECT_OVER];
+    int k;
+    if (via_rdv(to)) rdv_send(b, n);
+    else if ((k = coop_direct_seal(&direct, to->ip, to->port, b, n, out, sizeof(out)))) net_send(to, out, k);   /* nothing without keys */
+}
 
 static void hdr(Pose* b, int type)
 {
@@ -5627,7 +5672,6 @@ static void hdr(Pose* b, int type)
     b->version = COOP_VERSION;
     b->type = type;
     b->sid = my_sid;
-    b->auth = coop_auth(code_for(&peer), my_sid);
 }
 
 static void send_bye(int why)
@@ -5639,7 +5683,8 @@ static void send_bye(int why)
     for (k = 0; k < 3; k++) xsend(&peer, &b, sizeof(b));
 }
 
-/* host: a sender without the code (or a second partner) hears why, at most once a second */
+/* host: a sender without the code (or a second partner) hears why, at most once a second; in plain
+   text (one without the code has no keys of ours to open it with) */
 static void send_reject(const NetAddr* to, int why)
 {
     static unsigned int last;
@@ -5647,9 +5692,9 @@ static void send_reject(const NetAddr* to, int why)
     if (net_ms() - last < 1000) return;
     last = net_ms();
     hdr(&b, PKT_REJECT);
-    b.auth = 0;
     b.reject = why;
-    xsend(to, &b, sizeof(b));
+    if (via_rdv(to)) rdv_send(&b, sizeof(b));
+    else net_send(to, &b, sizeof(b));
     host_log("coop: %s from %s refused\n", why == COOP_REJ_CODE ? "a join without our code" : "a second partner", net_addr_str(to));
 }
 
@@ -5672,6 +5717,7 @@ static void stop(void)
     bye_code = 0;
     host_br = -1;   /* single player: our own BioRand setting again */
     rdv_stop();
+    coop_direct_wipe(&direct);
     if (join_dns) { net_resolve_cancel(join_dns); join_dns = NULL; }
     g_coop.room[0] = 0;
     srv_msg[0] = 0;
@@ -5722,6 +5768,7 @@ static void kick(void)
     host_log("coop: removing the partner %s\n", who);
     send_bye(COOP_REJ_REMOVED);
     if (via_rdv(&peer)) rdv_kick();
+    else coop_direct_forget(&direct, peer.ip, peer.port);   /* its keys go: back only with a new handshake */
     partner_gone(0);   /* its next session is a rejoin: its saved items */
     gone_sid = peer_sid;
     have_peer = have_rx = 0;
@@ -5852,7 +5899,6 @@ static void start(int req)
             join_at = net_ms(); join_frame = frame_no; join_hinted = 0;
             code_rx[0] = 0;
             g_coop.state = COOP_JOINING;
-            tx.auth = 0;
             coop_on = 1;
             host_log("coop: joining room %s through the server\n", room);
             return;
@@ -5879,7 +5925,7 @@ static void start(int req)
         join_at = net_ms(); join_frame = frame_no; join_hinted = 0;
         g_coop.state = COOP_JOINING;
     }
-    tx.auth = coop_auth(code_rx, my_sid);
+    coop_direct_init(&direct, is_host, code_rx);   /* the handshake's generator from the code (direct joins, also while hosting with a server) */
     coop_on = 1;
     host_log("coop: %s\n", is_host ? "hosting" : "joining");
 }
@@ -5889,25 +5935,24 @@ static void start(int req)
 static void resync(void)
 {
     tx.sid = my_sid = new_sid();
-    tx.auth = coop_auth(code_rx, my_sid);
     session_reset();
     host_log("coop: resynchronised (new session %08x)\n", my_sid);
 }
 
 /* What came this frame, read within a budget (datagrams, bytes, time): a flood from anywhere cannot
    stall the game thread. Datagrams not from our partner are dropped unread once we have one. Each
-   datagram is checked as a whole - header, version, proof of the join code, exact size, every event
-   and snapshot within its ranges - before it may change anything, make its sender our partner or
-   restart its session. */
+   datagram is opened with its session's keys (the proof of the join code) and checked as a whole -
+   header, version, exact size, every event and snapshot within its ranges - before it may change
+   anything, make its sender our partner or restart its session. */
 /* host: a datagram from a new address (or session) of our partner's player - the same player id
    and the rejoin tag only it can make for this session's code: its game crashed and started again
    while our session with the old one still runs. 1: it is our partner now (the old session goes). */
-static int takeover(const NetAddr* from, const unsigned char* buf, int n, const char* code)
+static int takeover(const NetAddr* from, const unsigned char* buf, int n)
 {
     PoseExt x;
     Pose p;
     int nev, nene, ext;
-    if (!id_ok || zero16(id_pid) || zero16(id_tag) || coop_check_all(buf, n, code, 0, &nev, &nene, &ext) || !ext) return 0;
+    if (!id_ok || zero16(id_pid) || zero16(id_tag) || coop_check_all(buf, n, 0, &nev, &nene, &ext) || !ext) return 0;
     memcpy(&p, buf, sizeof(p));
     memcpy(&x, buf + n - sizeof(x), sizeof(x));
     if (p.type != PKT_POSE || p.sid == peer_sid || p.sid == gone_sid || !same16(x.pid, id_pid) || !same16(x.tag, id_tag)) return 0;
@@ -5939,6 +5984,21 @@ int coop_biorand(void) { return coop_on && !is_host ? host_br : -1; }
 #define RX_BYTES (128 * 1024)
 #define RX_MS 3
 static unsigned int rx_bad, rx_strangers;   /* counted for the trace and the stats line */
+/* host: a datagram with keys of another code (CoopDirect): it hears so (send_reject) and waits; the log says
+   it at most once a second */
+static void wrong_code(const NetAddr* from)
+{
+    static unsigned int last, n;
+    n++;
+    if (net_ms() - last >= 1000) {
+        host_log("coop: %u join attempt%s with a wrong code, the last from %s: that address waits %d ms\n", n, n == 1 ? "" : "s",
+                 net_addr_str(from), coop_guard_wait(&direct.guard, from->ip, net_ms()));
+        last = net_ms();
+        n = 0;
+    }
+    send_reject(from, COOP_REJ_CODE);
+}
+
 static void receive(void)
 {
     static unsigned char buf[COOP_DGRAM_MAX + 64];
@@ -5953,8 +6013,7 @@ static void receive(void)
        counter) is never dropped for it */
     while (count < RX_DGRAMS && bytes < RX_BYTES && ((count & 15) || net_ms() - now <= RX_MS) &&
            (n = net_recv(&from, buf, sizeof(buf))) >= 0) {
-        int known;
-        const char* code;
+        int known, sealed = 1;   /* sealed: opened with a session's keys (direct or through the server) */
         uint64_t arr = net_rx_us();
         count++;
         bytes += n;
@@ -5963,17 +6022,25 @@ static void receive(void)
             if (k < 0) continue;
             if (k > 0) n = k;
         }
+        if (!via_rdv(&from)) {   /* direct: the handshake, a sealed datagram, or plain text of another kind */
+            CoopHello reply;
+            int rn, d = coop_direct_in(&direct, from.ip, from.port, net_ms(), buf, n, sizeof(buf), &reply, &rn);
+            if (rn) net_send(&from, &reply, rn);
+            if (d == COOP_DIN_WRONG) { rx_bad++; wrong_code(&from); continue; }
+            if (d == 0) continue;
+            if (d > 0) n = d;
+            else sealed = 0;   /* COOP_DIN_RAW: a PKT_REJECT, another protocol version */
+        }
         known = have_peer && from.ip == peer.ip && from.port == peer.port;
-        code = code_for(&from);
         if (!known && (!is_host || (have_peer && have_rx))) {   /* not our partner */
-            if (is_host && takeover(&from, buf, n, code)) known = 1;   /* our partner's player again, from a new game: the stale session goes */
+            if (is_host && sealed && takeover(&from, buf, n)) known = 1;   /* our partner's player again, from a new game: the stale session goes */
             else {
                 rx_strangers++;
-                if (is_host && !coop_check_dgram(buf, n, code, &nev, &nene, &ext)) send_reject(&from, COOP_REJ_BUSY);
+                if (is_host && sealed && !coop_check_dgram(buf, n, &nev, &nene, &ext)) send_reject(&from, COOP_REJ_BUSY);   /* it has the code */
                 continue;
             }
         }
-        r = coop_check_all(buf, n, code, !is_host, &nev, &nene, &ext);
+        r = coop_check_all(buf, n, !is_host, &nev, &nene, &ext);
         if (r == COOP_BAD_VERSION && n >= 8) {   /* another build: say so (an older one reads our version from the reply) */
             memcpy(&p, buf, 8);
             if (!ver_msg[0]) host_log("coop: %s runs co-op protocol %d, we %d\n", net_addr_str(&from), p.version, COOP_VERSION);
@@ -5981,13 +6048,13 @@ static void receive(void)
             if (is_host) send_reject(&from, COOP_REJ_CODE);
             continue;
         }
-        if (r == COOP_BAD_AUTH && is_host) { send_reject(&from, COOP_REJ_CODE); rx_bad++; continue; }
         if (r) { rx_bad++; if (trace) fprintf(stderr, "coop: datagram from %s dropped (check %d)\n", net_addr_str(&from), r); continue; }
         memcpy(&p, buf, sizeof(p));
         if (p.type == PKT_REJECT) {   /* the host answers our join: wrong code, or it has a partner */
             if (!is_host && known && !have_rx) bye_reason = p.reject == COOP_REJ_BUSY ? "The host already has a partner" : "The host did not accept the join code";
             continue;
         }
+        if (!sealed) continue;   /* (coop_direct_in passes nothing else in plain text) */
         ev = (const Event*)(buf + sizeof(Pose));
         sn = (const EneSnap*)(buf + sizeof(Pose) + nev * sizeof(Event));
         /* the whole datagram is fine: from here it may change things */
@@ -6011,7 +6078,8 @@ static void receive(void)
             if (is_host && have_peer) {   /* the next partner may come */
                 host_log("coop: partner left\n");
                 partner_gone(1);
-                snprintf(left_msg, sizeof(left_msg), p.reject == COOP_REJ_BIORAND ? "%s left: its BioRand pack is not this one" : "%s left",
+                snprintf(left_msg, sizeof(left_msg), p.reject == COOP_REJ_BIORAND ? "%s left: its BioRand pack is not this one" :
+                         p.reject == COOP_REJ_STATE ? "%s left: it cannot load this game" : "%s left",
                          g_coop.peer_name[0] ? g_coop.peer_name : "The partner");
                 have_rx = have_peer = 0;
                 snap_n = 0;
@@ -6116,7 +6184,7 @@ static void publish_status(void)
 static const char* peer_desc(void)
 {
     static char s[160];
-    if (!via_rdv(&peer)) return net_addr_str(&peer);
+    if (!via_rdv(&peer)) { snprintf(s, sizeof(s), "%s, encrypted", net_addr_str(&peer)); return s; }
     snprintf(s, sizeof(s), "the partner (%s)", rdv_status());
     return s;
 }
@@ -6229,8 +6297,16 @@ static void send_frame(void)
     static int stats = -1, frames, dgrams, evn, snn, bytes, maxb, peakd, peakb;
     unsigned int id;
     int ne = 0, ns, ie = 0, is = 0, first = 1, fd = 0, fb = 0;
+    if (!is_host && !via_rdv(&peer) && !coop_direct_ready(&direct, peer.ip, peer.port)) {   /* direct, no keys yet: the handshake */
+        static unsigned int hello_at;
+        CoopHello h;
+        if (net_ms() - hello_at < 250) return;   /* until the host answers */
+        hello_at = net_ms();
+        if (coop_direct_hello(&direct, peer.ip, peer.port, &h)) net_send(&peer, &h, sizeof(h));
+        else if (!bye_reason) bye_reason = "No randomness from the system for the handshake: cannot join";
+        return;
+    }
     if (need_blob) tx.flags |= PF_WANT_BLOB;
-    tx.auth = coop_auth(code_for(&peer), my_sid);
     tx.ev_ack = in_last;
     for (id = ring.head; id != ring.next && ne < COOP_EV_FRAME && !drop_now(1); id++) evs[ne++] = *coop_ring_get(&ring, id);
     ns = build_snapshots(snaps);
@@ -6241,7 +6317,7 @@ static void send_frame(void)
         tx.echo_age = have_rx && t > echo_arr ? (uint32_t)((t - echo_arr + 500) / 1000) : 0;
     }
     do {
-        int room = COOP_DGRAM_MAX - (via_rdv(&peer) ? rdv_overhead() : 0) - (int)sizeof(Pose) - (first ? (int)sizeof(PoseExt) : 0), a = 0, b = 0, off = sizeof(Pose);
+        int room = COOP_DGRAM_MAX - (via_rdv(&peer) ? rdv_overhead() : COOP_DIRECT_OVER) - (int)sizeof(Pose) - (first ? (int)sizeof(PoseExt) : 0), a = 0, b = 0, off = sizeof(Pose);
         while (ie + a < ne && room >= (int)sizeof(Event)) { a++; room -= sizeof(Event); }
         while (is + b < ns && room >= (int)sizeof(EneSnap)) { b++; room -= sizeof(EneSnap); }
         tx.nev = a;
@@ -6254,7 +6330,7 @@ static void send_frame(void)
         if (!drop_now(0)) xsend(&peer, buf, off);
         ie += a; is += b; first = 0;
         dgrams++; bytes += off; if (off > maxb) maxb = off;
-        fd++; fb += off + (via_rdv(&peer) ? rdv_wire_extra() : 0);
+        fd++; fb += off + (via_rdv(&peer) ? rdv_wire_extra() : COOP_DIRECT_OVER);
     } while (ie < ne || is < ns);
     if (fd > peakd) peakd = fd;
     if (fb > peakb) peakb = fb;
@@ -6265,7 +6341,7 @@ static void send_frame(void)
                  "busiest frame %d datagrams / %d bytes on the wire, effects sent %u (dropped %u)\n",
                  frames, dgrams / (float)frames, bytes / dgrams, maxb, bytes / frames, evn / (float)frames, snn / (float)frames, ping_f,
                  sys ? sys->stg_no : -1, sys ? sys->rom_no : -1, sys ? (int)sys->ewk_n : 0, rx_bad, rx_strangers,
-                 via_rdv(&peer) ? rdv_path() : "direct (address)", via_rdv(&peer) ? rdv_wire_extra() : 0, peakd, peakb, fx_sent, fx_dropped);
+                 via_rdv(&peer) ? rdv_path() : "direct (address)", via_rdv(&peer) ? rdv_wire_extra() : COOP_DIRECT_OVER, peakd, peakb, fx_sent, fx_dropped);
         fx_sent = fx_dropped = 0;
         frames = dgrams = evn = snn = bytes = maxb = peakd = peakb = 0;
     }
