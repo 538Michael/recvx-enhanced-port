@@ -53,6 +53,7 @@ int pc_biorand_save_differs(const void* save)
 {
     unsigned int w[2], now[2];
     int seed, cur = biorand_seed();
+    if (!biorand_shown()) return 0;   /* (BioRand only with --dev) */
     memcpy(w, (const char*)save + BR_OFFSET, sizeof(w));
     if ((w[0] & 0xFF000000u) != BR_ON) w[0] = w[1] = 0;
     words(now);

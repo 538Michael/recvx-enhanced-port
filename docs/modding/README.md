@@ -126,3 +126,24 @@ Run from the repository root. The disc image is taken from `--iso`, `$RECVX_ISO`
 * `pc/tools/re4/`: NumPy; the previews, contact sheets and several surveys also need Pillow;
   `slope_engine.py` needs a C compiler (`cc`).
 * `compare_frames.py` / `compare_native.sh`: OpenCV (`cv2`) and NumPy.
+
+## Randomizer (BioRand)
+
+For now only with the `--dev` launch option: without it the BioRand settings, the BIORAND row and
+the lobby rule are hidden and `mods/biorand/` is not read.
+
+[BioRand](https://github.com/biorand/classic) randomizes items, the start inventory, enemies and,
+optionally, doors. It reads your disc image and writes a pack for this game.
+
+1. In BioRand choose Code: Veronica, the PC version, your `.iso` as game data and this game's
+   folder (with `recvx.exe` and `mods`) as the PC folder. Generate. The pack goes to
+   `mods/biorand/`, with the spoiler log `log_pl0.txt`.
+2. On NEW GAME's difficulty screen, the row **BIORAND ON / OFF** switches it.
+   Without Difficulty select, use **BioRand** (GAMEPLAY) at the title.
+
+- It can only be switched at the title. Off, the pack is ignored.
+- Each generation replaces `mods/biorand/` completely; keep nothing else there.
+- A save remembers its pack. Loading it with BioRand off, another seed, or BioRand on for a normal
+  save asks first.
+- **Co-op**: the host switches BIORAND in GAME RULES. The partner needs the same pack (same seed and
+  options) to join.

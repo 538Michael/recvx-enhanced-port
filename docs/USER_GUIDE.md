@@ -30,7 +30,7 @@ folders.
 | `save/recvx.ini` | settings, key bindings, the disc image path, your co-op name |
 | `save/saves/` | your saves, one file each |
 | `save/card0/` | the emulated memory card (Save system: Memory card only) |
-| `mods/` | mods, HD textures (`mods/textures/`), BioRand packs (`mods/biorand/`) |
+| `mods/` | mods and HD textures (`mods/textures/`) |
 | `recvx.log`, `recvx-crash.log` | logs ([Troubleshooting](#troubleshooting)) |
 
 If the directory you start from has a `save/` folder, that directory is used instead (for `mods/`
@@ -252,8 +252,7 @@ until the right square on the white strip is.
 | Quick knife | On | see [Quick knife](#quick-knife) |
 | Auto-climb stairs | On | walk into stairs to climb them. Ledges, doors and items still need the button |
 | Head blow-offs | On | a zombie whose head bursts (magnum, close shotgun) loses it |
-| Rifle ammo stacks | **On** | rifle bullets stack in one slot; always on with BioRand |
-| BioRand | Off | see [Randomizer (BioRand)](#randomizer-biorand) |
+| Rifle ammo stacks | **On** | rifle bullets stack in one slot |
 | Save system | Native files | see [Saves](#saves) |
 | Import memory card saves | | copies the card's saves into save files |
 | No ink ribbons needed | Off | typewriters save without an ink ribbon |
@@ -268,7 +267,7 @@ until the right square on the white strip is.
 | Assignment | Fixed per character | Fixed: the same model in every cutscene. Random per cutscene: each cutscene room picks again |
 
 Enemy options apply from the next room (ENEMIES.md, "Enemy options"). In co-op the host's enemy
-options, ink ribbons and BioRand count for both.
+options and ink ribbons count for both.
 
 #### Cutscene cast
 
@@ -421,27 +420,8 @@ mod, delete its files.
 | `ARCHIVE.AFS/N` | entries of the game's AFS archives |
 | `enemies.ini` | custom enemies (ENEMIES.md, "Enemy variants") |
 | `textures/` | [HD texture packs](#hd-texture-packs) |
-| `biorand/` | the [BioRand](#randomizer-biorand) pack |
 
-Co-op partners need the same `enemies.ini` and BioRand pack. Modding guide: modding/README.md.
-
-## Randomizer (BioRand)
-
-[BioRand](https://github.com/biorand/classic) randomizes items, the start inventory, enemies and,
-optionally, doors. It reads your disc image and writes a pack for this game.
-
-1. In BioRand choose Code: Veronica, the PC version, your `.iso` as game data and this game's
-   folder (with `recvx.exe` and `mods`) as the PC folder. Generate. The pack goes to
-   `mods/biorand/`, with the spoiler log `log_pl0.txt`.
-2. On NEW GAME's difficulty screen, the row **BIORAND ON / OFF** switches it.
-   Without Difficulty select, use **BioRand** (GAMEPLAY) at the title.
-
-- It can only be switched at the title. Off, the pack is ignored.
-- Each generation replaces `mods/biorand/` completely; keep nothing else there.
-- A save remembers its pack. Loading it with BioRand off, another seed, or BioRand on for a normal
-  save asks first.
-- **Co-op**: the host switches BIORAND in GAME RULES. The partner needs the same pack (same seed and
-  options) to join.
+Co-op partners need the same `enemies.ini`. Modding guide: modding/README.md.
 
 ## Cheats and tools (F2)
 
