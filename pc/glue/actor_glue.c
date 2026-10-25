@@ -1613,6 +1613,21 @@ int actor_rigged(int who) { return dg[who].model >= 0 && dg[who].rig.ok; }
 
 /* pose slot `who` from `src` (after its bhSetMotion and bhCalcModel), in its gender-matched pose
    if it has one (slots 0, 1: actor_source) */
+/* The weapon models (weapon file: sys->obwp[0..1], the partner's copies) are a hand piece, object 0
+   (Claire's or Chris's gloved hand holding the grip, 43 vertices; unarmed: the fist alone), with the
+   weapon as its child (gun, slide, magazine...). An imported model has its own hands in its skinned
+   mesh: the piece showed as a second hand around the grip, beside the model's. Hidden on it (the
+   object's NJD_EVAL_HIDE: the weapon below it is still drawn); shown again for any other model. */
+void actor_weapon_hands(int who, O_WRK* wpn, int n)
+{
+    int hide = who >= 0 && who < ACTOR_SLOTS && dg[who].model >= 0 && dg[who].skin && dg[who].mapped;
+    for (int i = 0; i < n; i++) {
+        NJS_CNK_OBJECT* o = wpn[i].mlwP && wpn[i].mlwP->objP && wpn[i].mlwP->obj_num > 0 ? &wpn[i].mlwP->objP[0] : NULL;
+        if (!o || (wpn[i].lkono != 9 && wpn[i].lkono != 13)) continue;
+        if (hide) o->evalflags |= 0x8; else o->evalflags &= ~0x8u;   /* (NJD_EVAL_HIDE: MdlPut.c skips the model, not the children) */
+    }
+}
+
 void actor_pose(int who, BH_PWORK* src)
 {
     Disguise* d = &dg[who];

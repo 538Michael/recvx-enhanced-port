@@ -577,6 +577,10 @@ weapon of a hand the model lacks floated at the invisible source's hand.
 * **Weapon hands** (`actor_pose`): the source's hand nodes 9/13 get the model's hand position and
   the copy's hand rotation for the tick's effects, objects and drawing, so weapons sit in the
   model's hands and the muzzle flash starts there.
+* **Hand pieces on imported models** (`actor_weapon_hands`): a weapon model is a hand piece, object 0
+  (the character's gloved hand around the grip; unarmed: the fist), with the weapon as its child. On
+  an imported model (which has its own hands) object 0 is hidden (`NJD_EVAL_HIDE`, the weapon below it
+  still drawn): ours from `coop_glue.c self_keep` every tick, the partner's after its pose.
 * **Two-handed grips** (`retarget`, `arm_ik`): when the source's left hand is near its right
   (closer than 6 units, full below 3), the model's left hand gets a target at its right hand +
   (source left - source right), solved by a two-bone IK on the model's own bone lengths (elbow

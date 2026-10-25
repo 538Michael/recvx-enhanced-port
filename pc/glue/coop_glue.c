@@ -381,6 +381,7 @@ static void self_actor(int idx)
     int was = actor_shown(0);
     if (actor_set(0, idx)) { if (!self_cine) sys->obwp[2].flg = 0; }
     else if (was) { setup_hair(sys->obwp, plp, self_mesh >= 0 ? self_mesh & 3 : sys->ply_id); self_cine = 0; }
+    actor_weapon_hands(0, sys->obwp, 2);   /* (the weapon's hand piece back when no imported model is shown) */
 }
 
 /* "Swapped model in cutscenes" off (g_appear_cutscene), or the doubles kept for the played character's
@@ -422,6 +423,7 @@ static void self_keep(void)
     if (actor_shown(0) && !self_cine) op->flg &= ~0x1;   /* also when the game set up the player again (story switch) */
     actor_source(0, plp, self_mesh >= 0 && self_ours() ? self_mesh & 3 : actor_shown(0) ? -1 : sys->ply_id, sys->ply_id, tps_aim_pitch());   /* gender-matched animations */
     actor_pose(0, plp);
+    actor_weapon_hands(0, sys->obwp, 2);   /* an imported model: its own hands on the weapon, not the piece's */
     if (self_mesh < 0 || !self_ours()) return;
     keep_bones(&plp->mdl[0], self_bone);
     if (self_part.objP && op->mdl[0].objP == self_part.objP) {
@@ -732,6 +734,7 @@ pose:
     ply2.watr.r = 2.5f;
     actor_source(1, &ply2, p2_chr < 4 ? p2_chr : -1, p2_mfile & 3, p2_pitch);   /* gender-matched animations */
     actor_pose(1, &ply2);
+    actor_weapon_hands(1, p2wpn, 2);
     for (i = 0; i < 2; i++) {
         O_WRK* op = &p2wpn[i];
         if (!(op->flg & 0x1) || op->mlwP == &no_model || !op->mlwP || !op->mlwP->objP) continue;
