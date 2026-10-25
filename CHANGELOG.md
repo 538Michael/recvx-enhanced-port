@@ -16,6 +16,9 @@
 
 - **Menu arrows**: the arrows in ENHANCED SETTINGS and the lobby no longer slide between entries when
   you move the cursor.
+- **Damaged files**: damaged or crafted mod, room, texture and archive files can no longer crash the
+  game; a broken room file from the mods folder falls back to the disc's, and oversized HD textures
+  are skipped.
 
 ## 0.6.9 (2026-10-24)
 

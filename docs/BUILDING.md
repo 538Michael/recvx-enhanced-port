@@ -183,6 +183,7 @@ ctest --test-dir build --output-on-failure
 | `net` | co-op UDP socket and port mapping start/stop |
 | `coop` | co-op packet parser: malformed events of every type, join code, fuzz loop |
 | `fileio` | UTF-8 paths and replace-on-rename saving |
+| `parsers` | checked file reading: PRS rooms against the game's decoder, crafted AFS tables, `.cvxm` models, DDS / PNG headers, BioRand start-kit scripts (also worth running in a `-fsanitize=address,undefined` build) |
 | `rdv`, `rdv_client` | co-op server protocol, server core and client state machine |
 | `rdv_fuzz` | parser and state machines under AddressSanitizer/UBSan (Linux) |
 | `rdv_paths` | a local server and two test clients: punched, relayed, passwords, loss (~45 s, Linux) |

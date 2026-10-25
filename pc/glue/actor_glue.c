@@ -40,6 +40,7 @@ void njRotateXYZ(NJS_MATRIX* m, Angle angx, Angle angy, Angle angz);
 #include "../../decomp/include/ps2/veronica/prog/objitm.h"
 #include "../src/host/actors.h"
 #include "../src/import/impmodel.h"
+#include "../include/pc_parse.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -596,7 +597,7 @@ static int tex_owner(const ETTY_WORK* recs, int n, const unsigned int* mdltab, c
         p = room + mdltab[m++];
         while (p + 4 <= end && (dt = (int)rd32(p)) != -1) {
             p += 4;
-            if (dt > 0 && is_mlb(p) && mlb_textured(p)) {
+            if (dt >= 16 && is_mlb(p) && mlb_textured(p)) {
                 int key = (recs[i].id << 16) | (recs[i].mdlver << 8) | ++t, j;
                 for (j = 0; j < owners && seen[j] != key; j++);
                 if (j == owners) {
@@ -766,21 +767,77 @@ void actor_tex_free(int* entries, int* heap) { bhGarbageTexture(NULL, 0); *entri
    enemy spawner (spawn_glue.c). */
 static const unsigned char* end;        /* of the room file in `room` */
 
+/* the tables actor_find, tex_owner and actor_fx_tex read, inside the n bytes of the room file */
+static int room_ok(uint32_t n)
+{
+    const RDT_WORK* hdr = (const RDT_WORK*)room;
+    const ROM_WORK* rw;
+    const ETTY_WORK* recs;
+    uint32_t i, k = 1, ene, cnt;
+    if (n < sizeof(RDT_WORK) || hdr->ver < 1.72f || !pc_range_ok(hdr->hed00, sizeof(ROM_WORK), n)) return 0;
+    rw = (const ROM_WORK*)(room + hdr->hed00);
+    ene = (uint32_t)rw->ene_n;
+    if (!pc_range_ok((uint32_t)rw->enep, (uint64_t)ene * sizeof(ETTY_WORK), n) ||
+        !pc_range_ok((uint32_t)rw->effp, (uint64_t)(uint32_t)rw->eff_n * sizeof(EF_WRK), n) ||
+        !pc_range_ok(hdr->hed02, (uint64_t)ene * 4, n) || !pc_range_ok(hdr->hed04, 4, n))
+        return 0;
+    recs = (const ETTY_WORK*)(room + (uint32_t)rw->enep);
+    for (i = 0; i < ene; i++) {
+        if (rd32(room + hdr->hed02 + 4 * i) >= n) return 0;
+        if (!(recs[i].flg & 0x1)) continue;
+        if (!pc_range_ok(hdr->hed01, 4 * ((uint64_t)k + 1), n) || rd32(room + hdr->hed01 + 4 * k) >= n) return 0;
+        k++;
+    }
+    cnt = rd32(room + hdr->hed04);   /* the texture table: count, then the entries (actor_find reads them from + 8, actor_fx_tex from + 4) */
+    if (!pc_range_ok(hdr->hed04, 4 + 4 * (uint64_t)cnt, n)) return 0;
+    for (i = 0; i < cnt; i++) if (rd32(room + hdr->hed04 + 4 + 4 * i) >= n) return 0;
+    return 1;
+}
+
 static int load_rdx(int rm)
 {
     static int loaded = -1;
-    RDT_WORK* hdr = (RDT_WORK*)room;
     char name[16];
-    int f;
+    int f, len;
     if (loaded == rm) return 1;
     loaded = -1;
     snprintf(name, sizeof(name), "RM_%04d.RDX", rm);
     for (f = 0; f < rdx_image_data_max && strcmp(rdx_files[f], name); f++);
     if (f == rdx_image_data_max || !read_file(17, f)) return 0;
-    end = room + Expand((char*)pack, room);
-    if (hdr->ver < 1.72f || hdr->hed00 + sizeof(ROM_WORK) > (unsigned)(end - room)) return 0;
+    if ((len = pc_prs_decode(pack, sizeof(pack), room, sizeof(room))) < 0 || !room_ok((uint32_t)len)) {
+        host_log("actor: %s %s\n", name, len == PC_PRS_FULL ? "does not fit when expanded" : "is damaged");
+        return 0;
+    }
+    end = room + len;
     loaded = rm;
     return 1;
+}
+
+/* system.c: the room file `name` the game read (to the top of [memp, endp)) could not be expanded
+   (err: pc_prs_decode's): if it was the mods folder's, the disc's is read there and expanded instead.
+   Its size, or err */
+int pc_mod_file_size(const char* name);   /* adx.c */
+int pc_room_from_disc(const char* name, unsigned char* memp, unsigned char* endp, int err)
+{
+    char up[16];
+    unsigned char* p;
+    void* h;
+    int f, i, sct, ok;
+    for (i = 0; name[i] && i < 15; i++) up[i] = (char)(name[i] >= 'a' && name[i] <= 'z' ? name[i] - 32 : name[i]);
+    up[i] = 0;
+    if (pc_mod_file_size(up) < 0) return err;   /* (the disc's itself) */
+    host_log("mods: %s %s: the disc's is used\n", up, err == PC_PRS_FULL ? "does not fit the room arena when expanded" : "is damaged");
+    for (f = 0; f < rdx_image_data_max && strcmp(rdx_files[f], up); f++);
+    if (f == rdx_image_data_max || !(h = ADXF_OpenAfs(17, f))) return err;   /* (a room the disc does not have) */
+    sct = ADXF_GetFsizeSct(h);
+    p = (unsigned char*)((uintptr_t)(endp - (size_t)sct * 2048) & ~(uintptr_t)63);
+    ok = sct > 0 && (size_t)sct * 2048 + 64 <= (size_t)(endp - memp) && p >= memp;
+    if (ok) {
+        ADXF_ReadNw32(h, sct, p);
+        ok = ADXF_GetStat(h) == 3;   /* ADXF_STAT_READEND */
+    }
+    ADXF_Close(h);
+    return ok ? pc_prs_decode(p, (uint32_t)(endp - p), memp, (uint32_t)(endp - memp)) : err;
 }
 
 int actor_find(const ActorModel* am, ActorData* out)
@@ -816,7 +873,7 @@ int actor_find(const ActorModel* am, ActorData* out)
     if (!out->mlen || (out->mtn && !out->nlen)) { host_log("actor: %s: bad chunk list in %s\n", am->name, name); return 0; }
     /* the entries of the room's texture table the game would upload them from */
     for (p = out->mdl; (dt = (int)rd32(p)) != -1 && out->ntex < 16; p += 4 + (dt > 0 ? dt : 0))
-        if (dt > 0 && is_mlb(p + 4) && mlb_textured(p + 4)) {
+        if (dt >= 16 && is_mlb(p + 4) && mlb_textured(p + 4)) {
             const unsigned char* texdat = room + hdr->hed04;
             int o = tex_owner(recs, n, mdltab, end, am->id, am->mdlver, out->ntex);
             out->tex[out->ntex++] = o < 0 || o + 1 >= (int)rd32(texdat) ? NULL : room + rd32(texdat + 8 + 4 * o);
@@ -994,13 +1051,15 @@ static void head_draw(Disguise* d)
 
 /* An imported player model (pc/src/import, .cvxm: impmodel.h): its chunk list and textures as the
    game's, one mesh on the pelvis whose vertices imp_skin moves with the skeleton. */
+_Static_assert(sizeof(CvxmSkin) == 44, "pc_cvxm_check's skin entry");
 static int load_import_model(Disguise* d, int k)
 {
     const char* path = actor_import_file[k];
-    unsigned char *p, own[16] = { 0 };
+    unsigned char own[16] = { 0 };
     FILE* f = pc_fopen(path, "rb");
     int size = 0, texn;
-    unsigned int nv, toff, soff;
+    PcCvxm cv;
+    char why[96];
     if (f && !fseek(f, 0, SEEK_END)) size = (int)ftell(f);
     if (!f || size < 64 || size > KEEP_SIZE || fseek(f, 0, SEEK_SET)) {
         if (f) fclose(f);
@@ -1011,24 +1070,22 @@ static int load_import_model(Disguise* d, int k)
     if (fread(d->keep, 1, size, f) != (size_t)size) size = 0;
     fclose(f);
     if (!size) { host_log("actor: %s cannot be read\n", path); return 0; }
-    nv = rd32(d->keep + 20); toff = rd32(d->keep + 12); soff = rd32(d->keep + 16);
-    if (rd32(d->keep) != CVXM_MAGIC || rd32(d->keep + 4) < 1 || rd32(d->keep + 4) > CVXM_VERSION || rd32(d->keep + 8) != 60 || toff >= (unsigned)size ||
-        (uint64_t)soff + (uint64_t)nv * sizeof(CvxmSkin) > (uint64_t)size || !list_len(d->keep + 60, d->keep + toff)) {
-        host_log("actor: %s is not a model of this version\n", path);
+    /* everything realize, the texture upload, the draw and imp_skin use (pc_parse.h); imp_skin writes
+       the checked vertex range only */
+    if (!pc_cvxm_check(d->keep, (uint32_t)size, &cv, why, sizeof(why))) {
+        host_log("actor: %s is not usable: %s\n", path, why);
         return 0;
     }
     texn = realize(d, d->keep + 60, own);
-    if (d->w.mdl_n != 1 || d->w.mdl[0].obj_num < 2 || !d->w.mdl[0].objP[1].model || !tex_room(actor_import_name[k], texn)) return 0;
-    p = (unsigned char*)d->w.mdl[0].objP[1].model->vlist;
-    if (!p || p[0] != 51 || rd32(p + 4) >> 16 != nv) { host_log("actor: %s: no vertex chunk of %u vertices\n", path, nv); return 0; }
+    if (d->w.mdl_n != 1 || !tex_room(actor_import_name[k], texn)) return 0;
     if (own[0]) {
-        bhSetMemPvpTexture(d->w.mdl[0].texP, d->keep + toff, 0);
+        bhSetMemPvpTexture(d->w.mdl[0].texP, d->keep + rd32(d->keep + 12), 0);
         d->w.mdl[0].flg |= 0x200;
         d->tex[d->tex_n++] = d->w.mdl[0].texP;
     }
-    d->skin = (const CvxmSkin*)(d->keep + soff);
-    d->vtx = (float*)(p + 64);
-    d->nv = (int)nv;
+    d->skin = (const CvxmSkin*)(d->keep + cv.skin);
+    d->vtx = (float*)(d->keep + cv.vtx);
+    d->nv = (int)cv.nv;
     for (int k = 0; k < IMP_FACES - 1; k++)   /* (version 1: no face bones) */
         d->fbone[k] = rd32(d->keep + 4) >= 2 && d->keep[28 + k] < d->w.mdl[0].obj_num ? (signed char)d->keep[28 + k] : -1;
     d->blink = -1;

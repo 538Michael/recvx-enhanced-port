@@ -3,6 +3,7 @@
 #include "../ps2_platform.h"
 #include "biorand.h"
 #include "settings.h"
+#include "../../include/pc_parse.h"
 #include <SDL3/SDL.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -106,7 +107,6 @@ int biorand_rifle_stack(void) { return g_config.rifle_stack || biorand_active();
 
 void* biorand_room0(int* size)
 {
-    long pc_prs_expand(const unsigned char* s, long n, unsigned char** out, long* cap);   /* teleport.c */
     char path[1200];
     unsigned char *in = NULL, *d = NULL;
     long n, cap = 4 << 20, m = -1;

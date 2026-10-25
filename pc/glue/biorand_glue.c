@@ -9,6 +9,7 @@
 #include "../../decomp/include/ps2/veronica/prog/item.h"
 #include "../src/host/biorand.h"
 #include "../src/host/savestore.h"
+#include "../include/pc_parse.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -103,29 +104,16 @@ extern unsigned int (*bhScenarioJmpT[256])();
 
 void pc_biorand_start_kit(void)
 {
-    static const unsigned char ck[6] = { 0x04, 0x01, 0x01, 0x00, 0x00, 0x01 };   /* Ck ev_flg bit 1 is clear */
     unsigned char *d, *save = bhScePtr;
-    unsigned int hed03, scd0, scd1, o, end;
-    int size = 0, ops = 0, len;
+    unsigned int at[PC_KIT_MAX];
+    int size = 0, ops, i;
     if (!sys || !biorand_active() || !(sys->ev_flg[0] & 0x40000000u) || !(d = biorand_room0(&size))) return;
-    memcpy(&hed03, d + 0x1C, 4);
-    if (hed03 + 8 <= (unsigned)size) {
-        memcpy(&scd0, d + hed03, 4);
-        memcpy(&scd1, d + hed03 + 4, 4);
-        o = hed03 + scd0;
-        end = scd1 > scd0 && hed03 + scd1 <= (unsigned)size ? hed03 + scd1 : (unsigned)size;
-        while (o + 8 <= end && d[o] && (len = coop_insn_len_raw(d + o)) > 0) {
-            if (d[o] == 0x01 && !memcmp(d + o + 2, ck, 6)) {   /* IfelCk n: the block to o + 2 + n */
-                unsigned int p = o + 8, stop = o + 2 + d[o + 1];
-                while (p < stop && stop <= end && (len = coop_insn_len_raw(d + p)) > 0) {
-                    if (d[p] == 0xC7 || d[p] == 0xC9) { bhScePtr = d + p; bhScenarioJmpT[d[p]](); ops++; }
-                    p += len;
-                }
-                len = (int)(stop - o);   /* past the block */
-            }
-            o += len;
-        }
+    if ((ops = pc_startkit_scan(d, (unsigned int)size, at, PC_KIT_MAX, coop_insn_len_raw)) < 0) {   /* (checked whole first: all of it or nothing) */
+        free(d);
+        host_log("biorand: the start inventory of the pack's room 0/0 is damaged: not given\n");
+        return;
     }
+    for (i = 0; i < ops; i++) { bhScePtr = d + at[i]; bhScenarioJmpT[d[at[i]]](); }
     bhScePtr = save;
     free(d);
     host_log("biorand: start inventory from the pack's room 0/0 (%d actions)\n", ops);

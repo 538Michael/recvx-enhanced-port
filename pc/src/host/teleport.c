@@ -14,6 +14,7 @@
 #include "../audio/audio.h"
 #include "cheat.h"
 #include "biorand.h"
+#include "../../include/pc_parse.h"
 #include <SDL3/SDL.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -119,45 +120,7 @@ static const char* const stages[10] = {
 };
 
 /* ---------------------------------------------------------------- reading */
-static unsigned rd32(const unsigned char* d, long n, long o) { return o >= 0 && o + 4 <= n ? d[o] | d[o + 1] << 8 | d[o + 2] << 16 | (unsigned)d[o + 3] << 24 : 0; }
-
-/* expand.c Expand (docs/modding/ROOM_FORMAT.md "Compression") into *out, grown as needed: the size, -1 if broken */
-long pc_prs_expand(const unsigned char* s, long n, unsigned char** out, long* cap)   /* (also biorand_glue.c) */
-{
-    const unsigned char* e = s + n;
-    long o = 0;
-    unsigned field = 0, b;
-    int left = 1;
-#define BIT() (--left ? 0 : (field = s < e ? *s++ : 0, left = 8), b = field & 1, field >>= 1, b)
-    if (s < e) { field = *s++; left = 9; }
-    while (s < e) {
-        long len, off;
-        if (o + 260 > *cap) {
-            unsigned char* p = realloc(*out, *cap * 2);
-            if (!p) return -1;
-            *out = p; *cap *= 2;
-        }
-        if (BIT()) { (*out)[o++] = *s++; continue; }
-        if (!BIT()) {
-            len = 2 * BIT(); len += BIT() + 2;
-            if (s >= e) return -1;
-            off = *s++ - 256;
-        } else {
-            unsigned w;
-            if (s + 2 > e) return -1;
-            w = s[0] | s[1] << 8; s += 2;
-            if (!w) return o;
-            off = (long)(w >> 3) - 8192;
-            len = w & 7;
-            if (len) len += 2;
-            else { if (s >= e) return -1; len = *s++ + 1; }
-        }
-        if (-off > o) return -1;
-        for (long k = 0; k < len; k++, o++) (*out)[o] = (*out)[o + off];
-    }
-#undef BIT
-    return -1;
-}
+static unsigned rd32(const unsigned char* d, long n, long o) { return o >= 0 && o <= n - 4 ? d[o] | d[o + 1] << 8 | d[o + 2] << 16 | (unsigned)d[o + 3] << 24 : 0; }
 
 static void add_src(int stg, int rom, int pos, int from)
 {
@@ -206,7 +169,7 @@ static void sweep(const unsigned char* d, long n, long o, long hint, int event, 
 {
     long ends[64];
     int ne = 0;
-    while (o < n) {
+    while (o >= 0 && o < n) {   /* (o: from the file) */
         int op = d[o], len;
         while (ne && ends[ne - 1] <= o) ne--;
         if (!(len = insn_len(d, n, o))) return;
@@ -230,7 +193,7 @@ static void parse(const unsigned char* d, long n, int from)
     if (npos > r->r.npos) r->r.npos = npos > TP_POS ? TP_POS : npos;
     for (unsigned i = 0; etc && i < netc && i < 4096; i++) {   /* ATR_WORK 0x24: type at 1, prm0..3 at 0x20 */
         long t = etc + i * 0x24;
-        if (t + 0x24 <= n && d[t + 1] == 0) add_src(d[t + 0x20], d[t + 0x21], d[t + 0x22], from);
+        if (t >= 0 && t <= n - 0x24 && d[t + 1] == 0) add_src(d[t + 0x20], d[t + 0x21], d[t + 0x22], from);
     }
     first = rd32(d, n, base);   /* hed03: offsets of scd0, scd1, events, up to the first script */
     for (unsigned i = 0; base && i * 4 < first && k < 256; i++) {

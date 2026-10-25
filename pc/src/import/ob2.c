@@ -10,6 +10,7 @@
 #include "import.h"
 #include "impmodel.h"
 #include "../host/fileio.h"
+#include "../../include/pc_parse.h"
 #include <SDL3/SDL.h>
 #include <math.h>
 #include <stdint.h>
@@ -18,6 +19,8 @@
 #include <string.h>
 
 #define SECTOR 2048
+#define NBD_VERTS (1 << 20)      /* a model's vertices and strip indices, at most (far above Outbreak's) */
+#define NBD_INDICES (1 << 24)
 
 static int64_t rd_at(FILE* f, int64_t off, void* buf, size_t n)
 {
@@ -60,26 +63,29 @@ static int iso_find(FILE* f, const char* name, int64_t* off, uint32_t* size)
 /* ---------------------------------------------------------------- AFS */
 typedef struct AfsFile { int64_t off; uint32_t size; char name[32]; } AfsFile;
 
-/* the files of the AFS archive at `base` (malloc'd), with their names if it has a name table */
-static AfsFile* afs_list(FILE* f, int64_t base, int* count)
+/* the files of the AFS archive at `base` (`size` bytes; malloc'd), with their names if it has a name
+   table; an entry outside the archive gets size 0 (not read) */
+static AfsFile* afs_list(FILE* f, int64_t base, uint64_t size, int* count)
 {
     unsigned char h[8];
-    if (!rd_at(f, base, h, 8) || memcmp(h, "AFS", 4)) return NULL;
-    uint32_t n = le32(h + 4);
-    if (!n || n > 100000) return NULL;
-    unsigned char* t = malloc((size_t)(n + 1) * 8);
+    int c;
+    if (!rd_at(f, base, h, 8) || memcmp(h, "AFS", 4) || (c = pc_afs_count(h, size)) <= 0 || !pc_range_ok(8, (uint64_t)c * 8 + 8, size)) return NULL;
+    uint32_t n = (uint32_t)c;
+    unsigned char* t = malloc((size_t)(n + 1) * 8 + 8);
     AfsFile* out = calloc(n, sizeof(*out));
-    if (!t || !out || !rd_at(f, base + 8, t, (size_t)(n + 1) * 8)) { free(t); free(out); return NULL; }
+    if (!t || !out || !rd_at(f, base, t, (size_t)(n + 1) * 8 + 8)) { free(t); free(out); return NULL; }
     uint32_t first = 0xFFFFFFFF;
     for (uint32_t i = 0; i < n; i++) {
-        out[i].off = base + le32(t + 8 * i);
-        out[i].size = le32(t + 8 * i + 4);
-        if (le32(t + 8 * i) && le32(t + 8 * i) < first) first = le32(t + 8 * i);
+        uint32_t o, l;
+        if (!pc_afs_entry(t, i, size, &o, &l)) o = l = 0;
+        out[i].off = base + o;
+        out[i].size = l;
+        if (o && o < first) first = o;
     }
-    uint32_t noff = le32(t + 8 * n), nsz = le32(t + 8 * n + 4);
+    uint32_t noff = le32(t + 8 + 8 * n), nsz = le32(t + 8 + 8 * n + 4);
     unsigned char p[8];
     if ((nsz != n * 48 || !noff) && first != 0xFFFFFFFF && first >= 16 && rd_at(f, base + first - 8, p, 8)) { noff = le32(p); nsz = le32(p + 4); }
-    unsigned char* nt = nsz == n * 48 && noff ? malloc(nsz) : NULL;
+    unsigned char* nt = nsz == n * 48 && noff && pc_range_ok(noff, nsz, size) ? malloc(nsz) : NULL;
     if (nt && rd_at(f, base + noff, nt, nsz))
         for (uint32_t i = 0; i < n; i++) memcpy(out[i].name, nt + 48 * i, 31);
     else
@@ -96,29 +102,32 @@ static AfsFile* afs_list(FILE* f, int64_t base, int* count)
    (0: that many zero words). Returns the output size in bytes, -1 if the input is broken. */
 int ob2_sld(const unsigned char* src, int n, unsigned char* dst, int cap)
 {
-    const uint16_t* s = (const uint16_t*)src;
-    uint16_t* d = (uint16_t*)dst;
-    int sn = n / 2, dn = cap / 2, i = 0, o = 0, bits = 0;
+    int sn = n / 2, dn = cap / 2, i = 0, o = 0, bits = 0;   /* (16-bit words at any alignment) */
+#define S(k) pc_rd16(src + 2 * (k))
     unsigned flag = 0;
     while (i < sn) {
-        if (!bits) { flag = s[i++]; bits = 16; if (i >= sn) break; }
+        if (!bits) { flag = S(i); i++; bits = 16; if (i >= sn) break; }
         if (flag & 0x8000) {
-            unsigned c = s[i++], cnt = c >> 11, dist = c & 0x7ff;
-            if (!cnt) { if (i >= sn) return -1; cnt = s[i++]; }
+            unsigned c = S(i), cnt = c >> 11, dist = c & 0x7ff;
+            i++;
+            if (!cnt) { if (i >= sn) return -1; cnt = S(i); i++; }
             if (!cnt && !dist) break;   /* the end marker */
             if (dist > (unsigned)o) return -1;
             for (unsigned k = 0; k < cnt; k++, o++) {
                 if (o >= dn) return -1;
-                d[o] = dist ? d[o - dist] : 0;
+                if (dist) memmove(dst + 2 * o, dst + 2 * (o - dist), 2);
+                else memset(dst + 2 * o, 0, 2);
             }
         } else {
             if (o >= dn) return -1;
-            d[o++] = s[i++];
+            memcpy(dst + 2 * o, src + 2 * i, 2);
+            o++; i++;
         }
         flag <<= 1;
         bits--;
     }
     return o * 2;
+#undef S
 }
 
 /* ---------------------------------------------------------------- NBD */
@@ -193,11 +202,11 @@ static int read_amo(Rd* r, uint32_t o, Amo* a)
     if (u32(r, o) != T_MODEL) return 0;
     for (uint32_t c = 0; c < cnt && !r->bad; c++) {
         uint32_t t = u32(r, p), n = u32(r, p + 4), sz = u32(r, p + 8), q = p + 12;
-        if (sz < 12) return 0;
+        if (sz < 12 || !pc_range_ok(p, sz, r->n)) return 0;
         if (t == T_MESHLIST)
             for (uint32_t k = 0; k < n && a->nmesh < 64; k++) {
                 uint32_t ms = u32(r, q + 8);
-                if (ms < 12 || u32(r, q) != T_MESH) return 0;
+                if (ms < 12 || !pc_range_ok(q, ms, r->n) || u32(r, q) != T_MESH) return 0;
                 a->mesh[a->nmesh].at = q; a->mesh[a->nmesh++].end = q + ms;
                 q += ms;
             }
@@ -205,14 +214,14 @@ static int read_amo(Rd* r, uint32_t o, Amo* a)
             for (uint32_t k = 0; k < n && a->nmat < 256; k++) {
                 uint32_t ms = u32(r, q + 8), nt = u32(r, q + 12 + 52);
                 a->mattex[a->nmat++] = nt ? (int)u32(r, q + 12 + 56 + 200) : -1;
-                if (ms < 12) return 0;
+                if (ms < 12 || !pc_range_ok(q, ms, r->n)) return 0;
                 q += ms;
             }
         else if (t == T_TEXLIST)
             for (uint32_t k = 0; k < n && a->ntexl < 64; k++) {
                 uint32_t ms = u32(r, q + 8);
                 a->texl[a->ntexl++] = (int)u32(r, q + 12);
-                if (ms < 12) return 0;
+                if (ms < 12 || !pc_range_ok(q, ms, r->n)) return 0;
                 q += ms;
             }
         p += sz;
@@ -228,7 +237,7 @@ static int read_mesh(Rd* r, const Mesh* me, const Amo* a, int mi, const int* mes
     uint32_t vert = 0, nrm = 0, uv = 0, wgt = 0, jnt = 0, prims = 0, matref = 0, stripmat = 0, nv = 0, nmr = 0, nsm = 0, nj = 0;
     for (uint32_t c = 0; c < cnt && p + 12 <= me->end && !r->bad; c++) {
         uint32_t t = u32(r, p), n = u32(r, p + 4), sz = u32(r, p + 8);
-        if (sz < 12) break;
+        if (sz < 12 || sz > me->end - p) break;
         if (t == T_VERT) { vert = p + 12; nv = n; }
         else if (t == T_NORM && n == nv) nrm = p + 12;
         else if (t == T_UV && n == nv) uv = p + 12;
@@ -239,7 +248,7 @@ static int read_mesh(Rd* r, const Mesh* me, const Amo* a, int mi, const int* mes
         else if (t == T_STRIPMAT) { stripmat = p + 12; nsm = n; }
         p += sz;
     }
-    if (!vert || !nv || !prims || nv > 65535 || r->bad) return 0;
+    if (!vert || !nv || !prims || nv > 65535 || m->nv > NBD_VERTS - (int)nv || r->bad) return 0;
     if (wgt && jnt && nj == 1 && nv < 40) {   /* the eyeball overlay: a few quads on the head alone (the node
         with the face bones below it), textured with a bare white eyeball; drawn, it hides the irises the face
         texture has painted (the eyes looked blind; when Outbreak shows it is not known). Left out. */
@@ -298,11 +307,11 @@ static int read_mesh(Rd* r, const Mesh* me, const Amo* a, int mi, const int* mes
     uint32_t nl = u32(r, prims + 4), lp = prims + 12, si = 0;
     for (uint32_t l = 0; l < nl && l < 2 && !r->bad; l++) {
         uint32_t ns = u32(r, lp + 4), sp = lp + 12, lsz = u32(r, lp + 8);
-        if (lsz < 12) return 0;
+        if (lsz < 12 || !pc_range_ok(lp, lsz, r->n)) return 0;
         for (uint32_t s = 0; s < ns && !r->bad; s++, si++) {
             uint32_t n = u32(r, sp) & 0x7FFFFFFF;
             sp += 4;
-            if (n > 65535 || sp + 4 * n > r->n) return 0;
+            if (n > 65535 || !pc_range_ok(sp, 4 * n, r->n) || m->nidx > NBD_INDICES - (int)n) return 0;
             if (!(q = realloc(m->idx, sizeof(int) * (m->nidx + n)))) return 0;
     m->idx = q;
             if (!(q = realloc(m->strip, sizeof(ImpStrip) * (m->ns + 1)))) return 0;
@@ -325,16 +334,16 @@ static int read_mesh(Rd* r, const Mesh* me, const Amo* a, int mi, const int* mes
 }
 
 /* model + textures of an NBD file's first AMO/AHI pair */
-static int read_nbd(const unsigned char* d, uint32_t n, ImpModel* m, char* err, int en)
+int ob2_read_nbd(const unsigned char* d, uint32_t n, ImpModel* m, char* err, int en)
 {
     Rd r = { d, n, 0 };
     memset(m, 0, sizeof(*m));
-    uint32_t hs = u32(&r, 4);   /* the table: 16 bytes per entry, ends where the textures start */
-    if (r.bad || memcmp(d, "TEX", 4) || hs < 48 || hs > 256) { snprintf(err, en, "not an NBD model"); return 0; }
+    uint32_t hs = u32(&r, 4);   /* the table: 16 bytes per entry, ends where the textures start; all of it in the file */
+    if (r.bad || u32(&r, 0) != 0x00584554u || hs < 48 || hs > 256 || hs > n) { snprintf(err, en, "not an NBD model"); return 0; }   /* "TEX\0" */
     uint32_t amo = 0, ahi = 0;
     for (uint32_t e = 16; e + 16 <= hs; e += 16) {
-        if (!memcmp(d + e, "AMO", 4) && !amo) amo = u32(&r, e + 4);
-        if (!memcmp(d + e, "AHI", 4) && !ahi) ahi = u32(&r, e + 4);
+        if (u32(&r, e) == 0x004F4D41u && !amo) amo = u32(&r, e + 4);   /* "AMO\0" */
+        if (u32(&r, e) == 0x00494841u && !ahi) ahi = u32(&r, e + 4);   /* "AHI\0" */
     }
     if (!amo || !ahi) { snprintf(err, en, "no model/hierarchy in the file"); return 0; }
     /* textures: count entries of u32 size + SLD data */
@@ -342,7 +351,7 @@ static int read_nbd(const unsigned char* d, uint32_t n, ImpModel* m, char* err, 
     for (uint32_t k = 0; k < tc && k < IMP_TEX && !r.bad; k++) {
         uint32_t sz = u32(&r, tp);
         tp += 4;
-        if (sz > n - tp) { r.bad = 1; break; }
+        if (r.bad || sz > n - tp) { r.bad = 1; break; }
         int cap = 8 << 20, got;
         unsigned char* out = malloc(cap);
         if (!out || (got = ob2_sld(d + tp, (int)sz, out, cap)) < 64) { free(out); snprintf(err, en, "texture %u: bad compressed data", k); imp_free(m); return 0; }
@@ -513,9 +522,9 @@ int ob2_extract(const char* isopath, const char* outdir, int what, ImportItem* i
         fclose(f);
         return -1;
     }
-    AfsFile *top = iso_find(f, "NETBIO00.DAT", &off, &size) ? afs_list(f, off, &nfiles) : NULL, *rom = NULL;
+    AfsFile *top = iso_find(f, "NETBIO00.DAT", &off, &size) ? afs_list(f, off, size, &nfiles) : NULL, *rom = NULL;
     for (int i = 0; top && i < nfiles && !rom; i++)
-        if (!SDL_strcasecmp(top[i].name, "romdata_usa.afs")) rom = afs_list(f, top[i].off, &nrom);
+        if (!SDL_strcasecmp(top[i].name, "romdata_usa.afs")) rom = afs_list(f, top[i].off, top[i].size, &nrom);
     free(top);
     if (!rom) { snprintf(pg->phase, sizeof(pg->phase), "NETBIO00.DAT / romdata_usa.afs not found"); fclose(f); return -1; }
 
@@ -560,7 +569,7 @@ int ob2_extract(const char* isopath, const char* outdir, int what, ImportItem* i
         snprintf(pg->phase, sizeof(pg->phase), "%s %s (%s)", it->name, it->variant, e->name);
         unsigned char* data = e->size > 0 && e->size < (64u << 20) ? malloc(e->size) : NULL;
         if (!data || !rd_at(f, e->off, data, e->size)) snprintf(err, sizeof(err), "cannot read %s from the disc", e->name);
-        else if (read_nbd(data, e->size, &m, err, sizeof(err))) {
+        else if (ob2_read_nbd(data, e->size, &m, err, sizeof(err))) {
             it->nodes = m.nn; it->verts = m.nv; it->tris = imp_tris(&m); it->textures = m.ntex;
             it->meshes = m.nmesh;
             snprintf(dir, sizeof(dir), "%s/%s", outdir, id);

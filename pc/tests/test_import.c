@@ -8,6 +8,7 @@
 #define CHECK(x) do { if (!(x)) { printf("FAIL %s:%d: %s\n", __FILE__, __LINE__, #x); return 1; } } while (0)
 
 int ob2_sld(const unsigned char* src, int n, unsigned char* dst, int cap);
+int ob2_read_nbd(const unsigned char* d, uint32_t n, ImpModel* m, char* err, int en);
 void host_log(const char* fmt, ...) { (void)fmt; }
 static uint32_t rd(const unsigned char* p) { uint32_t v; memcpy(&v, p, 4); return v; }
 
@@ -35,6 +36,23 @@ int main(int argc, char** argv)
     CHECK(ob2_sld((unsigned char*)in, sizeof(in), (unsigned char*)out, sizeof(out)) == 7 * 2);
     CHECK(out[0] == 1 && out[1] == 2 && out[2] == 1 && out[3] == 2 && out[4] == 1 && out[5] == 0 && out[6] == 0);
     CHECK(ob2_sld((unsigned char*)in, sizeof(in), (unsigned char*)out, 8) < 0);   /* (no room: refused, not overrun) */
+    {   /* at an odd address (the words are read and written bytewise) */
+        unsigned char ib[sizeof(in) + 1], ob[sizeof(out) + 1];
+        memcpy(ib + 1, in, sizeof(in));
+        CHECK(ob2_sld(ib + 1, sizeof(in), ob + 1, sizeof(out)) == 7 * 2 && !memcmp(ob + 1, out, 7 * 2));
+    }
+
+    {   /* NBD: a 16-byte file "TEX" with a 256-byte entry table: refused before its table is looked at
+           (an allocation of exactly 16 bytes: ASan sees any read past it) */
+        ImpModel nm;
+        char err[160];
+        unsigned char* nbd = calloc(1, 16);
+        memcpy(nbd, "TEX", 4); nbd[4] = 0; nbd[5] = 1;   /* hs = 256 */
+        CHECK(!ob2_read_nbd(nbd, 16, &nm, err, sizeof(err)));
+        nbd = realloc(nbd, 48); memset(nbd + 16, 0, 32); nbd[4] = 48; nbd[5] = 0;   /* hs = 48, no AMO / AHI */
+        CHECK(!ob2_read_nbd(nbd, 48, &nm, err, sizeof(err)));
+        free(nbd);
+    }
 
     /* TIM2: CSM1 swaps palette entries 8..15 and 16..23 of every 32 */
     int len, w, h;
