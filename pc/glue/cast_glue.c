@@ -18,6 +18,7 @@
 #include "../src/host/actors.h"
 #include "../src/host/cast.h"
 #include "../src/host/enemies.h"
+#include <stdlib.h>
 #include <string.h>
 
 void host_log(const char* fmt, ...);
@@ -67,6 +68,12 @@ void cast_room(const EnemyOpts* o, const unsigned char* scripted)
 {
     int want[RECS], k, j, n = 0, room = room_file_now(), imports;
     unsigned scene;
+    if (getenv("RECVX_CAST_TRACE")) {   /* test aid: the game's state at each room load (the same with the cast on and off) */
+        const unsigned char* b = (const unsigned char*)sys->ev_flg;
+        unsigned h = 2166136261u;
+        for (k = 0; k < (int)((const unsigned char*)sys->ply_stflg - b); k++) h = (h ^ b[k]) * 16777619u;   /* story, item, kill, key, map flags and items */
+        host_log("cast: room %04d loaded: state %08x, player %.2f %.2f %.2f hp %d\n", room, h, plp ? plp->px : 0.0f, plp ? plp->py : 0.0f, plp ? plp->pz : 0.0f, plp ? plp->hp : 0);
+    }
     if (!o || !o->cast || !rom) { cast_release(); return; }
     imports = import_count(o);
     scene = o->cast_assign ? (unsigned)room + 1 : 0;
