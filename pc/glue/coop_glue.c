@@ -2823,19 +2823,22 @@ static void records_resolve(void)
     const int itm = (int)((char*)&sys->itm - (char*)&sys->version), stg = (int)((char*)&sys->stg_no - (char*)&sys->version),
               rno = (int)((char*)&sys->rom_no - (char*)&sys->version);
     unsigned int h[3];
-    int slot, n, slots;
+    LobbySave* l;
+    int i, slot, n, saves;
     if (!rec_pending) return;
     rec_pending = 0;
-    for (slot = 0, slots = lobby_save_slots(); slot < slots; slot++) {
-        if ((n = lobby_read_partners(slot, f, sizeof(f))) < 12 || !lobby_read_save(slot, b)) continue;
+    for (i = 0, saves = lobby_save_list(&l); i < saves; i++) {
+        slot = l[i].slot;
+        if ((n = lobby_read_partners(slot, f, sizeof(f))) < 12 || !lobby_read_listed(&l[i], b)) continue;
         if (memcmp(b + itm, game_itm, sizeof(game_itm)) || memcmp(b + stg, &game_stg, sizeof(game_stg)) || memcmp(b + rno, &game_rom, sizeof(game_rom))) continue;
         memcpy(h, f, 12);
-        if (h[0] != REC_MAGIC || h[1] != 1 || h[2] > REC_MAX || n != 12 + (int)(h[2] * sizeof(Rec))) { host_log("coop: the partners file of save %d is not valid: ignored\n", slot + 1); return; }
+        if (h[0] != REC_MAGIC || h[1] != 1 || h[2] > REC_MAX || n != 12 + (int)(h[2] * sizeof(Rec))) { host_log("coop: the partners file of save %d is not valid: ignored\n", slot + 1); break; }
         rec_n = (int)h[2];
         memcpy(recs, f + 12, rec_n * sizeof(Rec));
         host_log("coop: save %d: the saved items of %d partner%s\n", slot + 1, rec_n, rec_n == 1 ? "" : "s");
-        return;
+        break;
     }
+    free(l);
 }
 
 /* Loot (M4). "Item" flags are it_flg (taken) and ic_flg (examined, not taken) - block words

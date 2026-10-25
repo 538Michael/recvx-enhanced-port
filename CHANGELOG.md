@@ -16,6 +16,9 @@
 
 - **Menu arrows**: the arrows in ENHANCED SETTINGS and the lobby no longer slide between entries when
   you move the cursor.
+- The lobby no longer freezes or crashes with unusual save file names.
+- Unplugging or switching a gamepad while the controls settings are open is safe.
+- Crash reports are written more reliably on Linux, also when the game runs out of stack.
 - **Damaged files**: damaged or crafted mod, room, texture and archive files can no longer crash the
   game; a broken room file from the mods folder falls back to the disc's, and oversized HD textures
   are skipped.

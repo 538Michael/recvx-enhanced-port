@@ -1077,7 +1077,7 @@ static int load_import_model(Disguise* d, int k)
         return 0;
     }
     texn = realize(d, d->keep + 60, own);
-    if (d->w.mdl_n != 1 || !tex_room(actor_import_name[k], texn)) return 0;
+    if (d->w.mdl_n != 1 || !tex_room(actor_imports[k].name, texn)) return 0;
     if (own[0]) {
         bhSetMemPvpTexture(d->w.mdl[0].texP, d->keep + rd32(d->keep + 12), 0);
         d->w.mdl[0].flg |= 0x200;

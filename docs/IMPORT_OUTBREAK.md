@@ -352,8 +352,12 @@ checkboxes (playable characters, cutscene / high detail, NPCs, enemies), "Extrac
 thread; progress bar with the model being read), then the manifest per group (collapsible, with
 counts; the playable characters open) as a table (character, variant, file, meshes, vertices,
 triangles, textures, player model yes/no/failed, notes). After an extraction the new player
-models are added to "You appear as" at once (up to 384 imports, `ACTOR_IMPORT_MAX`; an import is
-sent to the co-op partner as the played character, the lobby's model byte too).
+models are added to "You appear as" at once (up to 2048 imports, `ACTOR_IMPORT_MAX`, a log line
+when more do not fit; an import is sent to the co-op partner as the played character, the lobby's
+model byte too). The list only grows while the game runs: a model already listed keeps its place
+(extracting it again replaces its file, written to a temporary file and renamed, so a model being
+loaded is never half written), new ones are added at the end, and entries are never rewritten or
+freed, so the game thread reads them without a lock (`actors.h`). A restart lists them by group again.
 
 The lobby's MODEL page (main's scrollable list of "You appear as") lists the imports after Code:
 Veronica's own models, by group (`import_registry_load` registers them group by group; the

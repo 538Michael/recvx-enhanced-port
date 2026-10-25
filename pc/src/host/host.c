@@ -307,6 +307,7 @@ static int SDLCALL game_thread(void* ud)
 {
     char* game_argv[] = { "cdrom0:\\SLUS_201.84;1", NULL };
     (void)ud;
+    crash_thread_init();
     prof_thread(PROF_LOGIC);
     { extern void profile_thread(char); profile_thread('g'); }   /* RECVX_PROFILE */
     exit(recvx_game_main(1, game_argv));

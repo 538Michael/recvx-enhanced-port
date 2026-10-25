@@ -548,6 +548,7 @@ static void read_check(Entry* e, uint64_t need)
 static int SDLCALL loader(void* unused)
 {
     (void)unused;
+    crash_thread_init();
     SDL_LockMutex(qm);
     for (;;) {
         Entry* e;

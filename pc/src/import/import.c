@@ -129,24 +129,30 @@ int import_start(int src, int what)
 void import_registry_load(void)
 {
     static ImportItem items[ITEMS_MAX];
-    int k = 0;
+    int k = actor_import_n, full = 0;   /* (we are the only writer) */
     for (int src = 0; src < IMPORT_SOURCES; src++) {
         char dir[1100];
         int n = import_results(src, items, ITEMS_MAX, NULL, 0);
         source_dir(src, dir, sizeof(dir));
         for (int g = 0; g < IMPORT_GROUPS; g++)   /* grouped (the manifest is in disc order): the lobby's list shows the groups */
-        for (int i = 0; i < n && k < ACTOR_IMPORT_MAX; i++) {
+        for (int i = 0; i < n; i++) {
+            char file[1200], name[96];
+            int j;
             if (!items[i].player || (items[i].group > 0 ? items[i].group : 0) != g) continue;
-            ActorModel* am = &actor_imports[k];
-            if (items[i].variant[0]) SDL_snprintf(actor_import_name[k], sizeof(actor_import_name[k]), "%s (%s)", items[i].name, items[i].variant);
-            else SDL_snprintf(actor_import_name[k], sizeof(actor_import_name[k]), "%s", items[i].name);
+            SDL_snprintf(file, sizeof(file), "%s/%s/%s.cvxm", dir, items[i].id, items[i].id);
+            for (j = 0; j < k && strcmp(actor_import_file[j], file); j++) {}
+            if (j < k) continue;   /* listed already: it keeps its place (a later extraction appends) */
+            if (k == ACTOR_IMPORT_MAX) { full++; continue; }
+            if (items[i].variant[0]) SDL_snprintf(name, sizeof(name), "%s (%s)", items[i].name, items[i].variant);
+            else SDL_snprintf(name, sizeof(name), "%s", items[i].name);
+            char *f = SDL_strdup(file), *nm = SDL_strdup(name);   /* never freed: the game may show it any time */
+            if (!f || !nm) { SDL_free(f); SDL_free(nm); full++; continue; }
+            actor_import_file[k] = f;
             actor_import_group[k] = (unsigned char)(items[i].group >= 0 ? items[i].group : 0);
-            SDL_snprintf(actor_import_file[k], sizeof(actor_import_file[k]), "%s/%s/%s.cvxm", dir, items[i].id, items[i].id);
-            memset(am, 0, sizeof(*am));
-            am->name = actor_import_name[k];
-            am->anim = items[i].female ? ANIM_FEMALE : ANIM_MALE;
+            actor_imports[k] = (ActorModel){ .name = nm, .anim = items[i].female ? ANIM_FEMALE : ANIM_MALE };
             k++;
         }
     }
+    if (full) host_log("import: the list of imported models is full (%d): %d more not listed\n", ACTOR_IMPORT_MAX, full);
     __atomic_store_n(&actor_import_n, k, __ATOMIC_RELEASE);
 }

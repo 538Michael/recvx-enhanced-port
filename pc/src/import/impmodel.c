@@ -52,12 +52,13 @@ static int fail(char* err, int en, const char* fmt, ...)
     return 0;
 }
 
+typedef struct Blob { const void* d; size_t n; } Blob;
+static int put_blob(FILE* f, void* ud) { const Blob* b = ud; return fwrite(b->d, 1, b->n, f) == b->n ? 0 : -1; }
+/* a temporary file renamed over it: the game may be loading the model it replaces */
 static int save(const char* path, const void* d, size_t n)
 {
-    FILE* f = pc_fopen(path, "wb");
-    int ok = f && fwrite(d, 1, n, f) == n;
-    if (f && fclose(f)) ok = 0;
-    return ok;
+    Blob b = { d, n };
+    return pc_save_file(path, "wb", put_blob, &b) == 0;
 }
 
 void imp_free(ImpModel* m)
