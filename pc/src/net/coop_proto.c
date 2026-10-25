@@ -8,7 +8,7 @@
 #include <stdlib.h>
 
 _Static_assert(sizeof(Pose) == 112, "wire: Pose");
-_Static_assert(sizeof(PoseExt) == 104, "wire: PoseExt");
+_Static_assert(sizeof(PoseExt) == 108, "wire: PoseExt");
 _Static_assert(sizeof(Event) == 88, "wire: Event");
 _Static_assert(sizeof(EneSnap) == 100, "wire: EneSnap");
 _Static_assert(sizeof(AtrRec) == 36, "wire: AtrRec (ATR_WORK)");
@@ -250,7 +250,8 @@ int coop_check_event(const Event* e, int from_host)
         return fin(e->u.sp.px) && fin(e->u.sp.py) && fin(e->u.sp.pz) ? COOP_OK : COOP_BAD_FLOAT;
     case EV_EOPTS:
         return e->u.eo.extra >= 0 && e->u.eo.extra <= 3 && (unsigned)e->u.eo.place <= 1 && (unsigned)e->u.eo.rand <= 1 && e->u.eo.seed >= 0 &&
-               (unsigned)e->u.eo.variety <= 1 && (unsigned)e->u.eo.events <= 1 ? COOP_OK : COOP_BAD_FIELD;
+               (unsigned)e->u.eo.variety <= 1 && (unsigned)e->u.eo.events <= 1 && (unsigned)e->u.eo.cast <= 3 && (unsigned)e->u.eo.cast_all <= 1 &&
+               (unsigned)e->u.eo.cast_assign <= 1 && (unsigned)e->u.eo.cast_imports <= 1 ? COOP_OK : COOP_BAD_FIELD;
     case EV_FX:   /* (a burst: Event.idx is not read) */
         if (e->u.fx.id == FX_BURST) {   /* counts and times bounded (the effect loops over them), floats finite */
             const uint32_t* w = e->u.fxr.w;

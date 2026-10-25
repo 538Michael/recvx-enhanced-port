@@ -83,13 +83,15 @@ const char* appear_group(int chr);    /* the list's group of chr (the lobby's mo
 /* game thread (pc/glue/actor_glue.c). who: display slot 0 our player, 1 the co-op partner,
    ACTOR_DOUBLE the cutscene double of the character played, ACTOR_VARIANT + k enemy variants. idx: catalogue entry, ACTOR_PART + n
    for player part file 10 + n, or -1. */
-#define ACTOR_SLOTS 5
 #define ACTOR_DOUBLE 2
 #define ACTOR_VARIANT 3                 /* 3, 4: enemy variants' models (pc/glue/variant_glue.c), each posed per enemy drawn */
+#define ACTOR_CAST 5                    /* 5..10: the cutscene cast's models (pc/glue/cast_glue.c), one per model a room shows */
+#define ACTOR_SLOTS (ACTOR_CAST + 6)
 #define ACTOR_PART 10000   /* past ACTOR_MODELS + ACTOR_IMPORT_MAX */
 int  actor_set(int who, int idx);       /* 1 = shown (a failed entry is not retried) */
 int  actor_shown(int who);
 int  actor_rigged(int who);             /* its model is posed from a source's skeleton (a humanoid node map was found) */
+int  actor_mapped(int who);             /* its last pose came from the source's skeleton (the source has a humanoid node map too) */
 struct BH_PWORK;
 void actor_pose(int who, struct BH_PWORK* src);   /* after src's bhSetMotion and bhCalcModel */
 void actor_draw(int who);               /* bhPutModel: the caller sets camera matrix, lights, textures state */
@@ -102,6 +104,11 @@ void actor_doubles(int idx);            /* at the hand-off: the appearance for t
 void actor_double_tick(void);           /* every tick before the objects follow their links: the double's pose, hands, face */
 int  actor_double_acting(void);         /* a cutscene double of the character played is shown (a cutscene) */
 int  actor_double_kept(void);           /* the doubles stay the game's for the chosen model: the played character's own cutscene model */
+/* the cutscene cast (cast_glue.c): source ep drawn as slot who's model. actor_act: every tick before the
+   objects follow their links (its face from ep's lip sync, ep's hand nodes at the model's hands, as for the
+   double); actor_put_as: in place of bhPutModel(ep), posed from ep unless it was this tick; 1 = drawn */
+void actor_act(int who, struct BH_PWORK* ep);
+int  actor_put_as(int who, struct BH_PWORK* ep);
 /* before actor_pose(who, src) (slots 0, 1): src shows the mesh of player character `mesh` (0..3, a
    part-file mesh on the real skeleton; -1: a catalogue model is shown) and plays the motions of
    character `motion`, its upper body bent by `pitch` (radians: the free-aim bend, tps_bend). Gender-matched
