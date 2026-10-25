@@ -54,6 +54,7 @@ static int ask(void)
 static int SDLCALL check(void* ud)
 {
     (void)ud;
+    crash_thread_init();
     SDL_SetAtomicInt(&state, ask() ? UPD_KNOWN : UPD_UNKNOWN);
     return 0;
 }

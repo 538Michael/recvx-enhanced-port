@@ -854,7 +854,7 @@ What the options do in detail, beyond [USER_GUIDE.md](USER_GUIDE.md#settings):
 
 Two save systems, chosen by `save_system` (F1 / ENHANCED SETTINGS GAMEPLAY "Save system"):
 
-- **Native files** (0, default): `<save dir>/saves/NNN_<label>.sav`, one file per save, no limit
+- **Native files** (0, default): `<save dir>/saves/NNN_<label>.sav`, one file per save, up to `SAVESTORE_MAX` (10,000) listed
   (`pc/src/host/savestore.c`, tested by `pc/tests/test_savestore.c`).
 - **Memory card** (1): the PS2 card as before, `pc/src/ps2/mc.c` (libmc on a folder,
   `<save dir>/card0`, 15 save slots plus the system file).
@@ -915,7 +915,8 @@ whose bytes are already there are skipped).
 
 **Other readers** go through `pc/src/host/lobby.h`, which follows the active system: save "slots"
 are the card's 0..14 or the native number - 1 (so a migrated slot keeps its meaning in `coop_start`
-and `coop_items`), `lobby_save_slots()` is their count. The co-op lobby's START list, the joiner's
+and `coop_items`); native numbers can be sparse, so lists come from `lobby_save_list()` (the saves
+there are, by slot), never from a count. The co-op lobby's START list, the joiner's
 ITEMS choice, `RECVX_TEST_SAVE`, the host's partner records (`coop-partners-nn.bin` /
 `saves/NNN.coop-partners.bin`, written after each save by `coop_save_written`) use it. Game over
 "continue" and the retry points live in memory and never touch a save.
@@ -1049,6 +1050,9 @@ Command-line options override the saved settings for that run.
   exception with the backtrace or frame chain, and the last 48 `host_log` messages (kept in memory,
   IPv4 addresses masked) - a few KB for bug reports (`host/log.c`). Addresses resolve with
   `addr2line -f -e recvx` (Windows: `i686-w64-mingw32-addr2line -f -e recvx.exe`): the image base is fixed.
+  Linux: the signal, fault address, instruction pointer and thread go out first with `write()` alone,
+  then the backtrace (primed at start) and the messages; the main, game, HD loader, update and movie
+  threads each have an alternate signal stack (`crash_thread_init`), so a stack overflow is reported too.
 - `--profile[=file]` writes one CSV line per game frame: total frame time and exclusive time in
   game logic, VU0, VU1, GS emulation + GL submission, interpolation, presentation and idle wait.
   F1 -> Performance shows the same live. The native `CALCPOINT` (single calls and runs) is not
@@ -1079,6 +1083,7 @@ and game frames for game-state aids, as noted. Co-op test aids (`RECVX_COOP_*`,
 | `RECVX_SHOW_OVERLAY=1` / `=2` / `=3` / `=4` | open the F1 overlay / the cheats window (F2) / the co-op window / the import window (F9) at start |
 | `RECVX_IMPORT=outbreak2`, `RECVX_IMPORT_ISO`, `RECVX_IMPORT_WHAT` | headless import, then exit ([IMPORT_OUTBREAK.md](IMPORT_OUTBREAK.md)) |
 | `RECVX_EXIT_FRAME=n` | exit at presented frame n |
+| `RECVX_TEST_CRASH=stack\|null[:n]` | crash the game thread at frame hand-off n (default 100) with a stack overflow or a null write (the crash report) |
 | `RECVX_WATCHDOG=sec` | Linux: print a backtrace after sec seconds and exit |
 | `RECVX_FAST_DEMO=1` | start the attract demo right away |
 | `RECVX_SKIP_MOVIES=1` | movies end after 30 game frames without decoding (repeatable test runs) |
@@ -1094,7 +1099,7 @@ and game frames for game-state aids, as noted. Co-op test aids (`RECVX_COOP_*`,
 |---|---|
 | `RECVX_INPUT="frame:buttons,..."` | scripted pad input by presented frame, e.g. `200:start,205:-` |
 | `RECVX_KEYS="f:key+key,f:-,f:@x:y"` | hold keyboard keys (SDL names, `_` for a space; `Mouse_Left` .. `Mouse_X2` a mouse button) from presented frame f, sent as key and button events; `@x:y` left-clicks at a window pixel, `@x:y:r` right-clicks |
-| `RECVX_VPAD="f:input+input,..."`, `RECVX_VPAD_TYPE=xbox\|ps5\|generic` | a virtual SDL gamepad holding inputs (ini spelling) from frame f; `axis=value` holds an axis at -1..1 (`leftx=0.5+lefty=-0.5`: the left stick half up-right) |
+| `RECVX_VPAD="f:input+input,..."`, `RECVX_VPAD_TYPE=xbox\|ps5\|generic` | a virtual SDL gamepad holding inputs (ini spelling) from frame f; `axis=value` holds an axis at -1..1 (`leftx=0.5+lefty=-0.5`: the left stick half up-right); `unplug` / `plug` disconnect and reconnect it (hotplug) |
 | `RECVX_MENU_MOUSE="f:x:y[:act],..."` | scripted mouse in menus (window pixels; act `l`/`r` click, `L`/`U` left down/up, `w`/`s` wheel) |
 | `RECVX_TPS_MOUSE="frame:dx:dy,..."` | scripted third-person mouse motion |
 | `RECVX_UNFOCUS="f:1,f:0"` | hide the window at frame f (focus loss), `0` shows it again |

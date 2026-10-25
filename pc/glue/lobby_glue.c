@@ -554,8 +554,8 @@ void pc_lobby_textures_released(void)
 }
 
 /* ---------------------------------------------------------------- saves */
-typedef struct SaveInfo { int valid, ply_id, stg, rom, gm_mode, count; } SaveInfo;
-static SaveInfo* saves;   /* by slot (lobby.h: the card's 0..14 or native save number - 1) */
+typedef struct SaveInfo { int slot, ply_id, stg, rom, gm_mode, count; } SaveInfo;
+static SaveInfo* saves;   /* the valid ones by slot (lobby.h: the card's 0..14 or native save number - 1) */
 static int n_saves;
 static unsigned char save_buf[LOBBY_SAVE_BYTES];   /* the host's chosen save, read when the game starts */
 
@@ -563,41 +563,53 @@ static unsigned char save_buf[LOBBY_SAVE_BYTES];   /* the host's chosen save, re
 static void scan_saves(void)
 {
     static unsigned char b[LOBBY_SAVE_BYTES];
-    int i;
-    n_saves = lobby_save_slots();
-    saves = realloc(saves, sizeof(SaveInfo) * (n_saves ? n_saves : 1));
-    memset(saves, 0, sizeof(SaveInfo) * (n_saves ? n_saves : 1));
-    for (i = 0; i < n_saves; i++) {
+    LobbySave* l;
+    int i, n = lobby_save_list(&l);
+    free(saves);
+    saves = n ? malloc(sizeof(SaveInfo) * n) : NULL;   /* n <= SAVESTORE_MAX */
+    n_saves = 0;
+    for (i = 0; saves && i < n; i++) {
         const SAVEFILE* sf = (const SAVEFILE*)b;
-        SaveInfo* s = &saves[i];
-        s->valid = lobby_read_save(i, b);
-        if (!s->valid) continue;
-        s->ply_id = sf->ply_id & 3; s->stg = sf->stg_no; s->rom = sf->rom_no; s->gm_mode = sf->gm_mode; s->count = sf->save_ct;
+        SaveInfo* s = &saves[n_saves];
+        if (!lobby_read_listed(&l[i], b)) continue;
+        s->slot = l[i].slot; s->ply_id = sf->ply_id & 3; s->stg = sf->stg_no; s->rom = sf->rom_no; s->gm_mode = sf->gm_mode; s->count = sf->save_ct;
+        n_saves++;
     }
+    free(l);
+}
+
+/* the index in saves of a slot, -1 none */
+static int save_at(int slot)
+{
+    int lo = 0, hi = n_saves - 1;
+    while (lo <= hi) {
+        int m = lo + (hi - lo) / 2;
+        if (saves[m].slot == slot) return m;
+        if (saves[m].slot < slot) lo = m + 1; else hi = m - 1;
+    }
+    return -1;
 }
 
 static const char* chr_names[] = { "Claire", "Chris", "Steve", "Wesker" };
 
 static void save_label(char* out, int n, int slot)
 {
-    const SaveInfo* s = &saves[slot];
-    snprintf(out, n, "Save %02d: %s %d-%02d", slot + 1, chr_names[s->ply_id], s->stg, s->rom);
+    int i = save_at(slot);
+    if (i < 0) { snprintf(out, n, "Save %02d", slot + 1); return; }
+    snprintf(out, n, "Save %02d: %s %d-%02d", slot + 1, chr_names[saves[i].ply_id], saves[i].stg, saves[i].rom);
 }
 
 /* the choices as lists: host START WITH: 0..2 new game, 3 + slot; joining ITEMS FROM: saved with the host, new, slot */
-static int start_valid(int v) { return v >= 0 && (v < 3 || (v - 3 < n_saves && saves[v - 3].valid)); }
-static int items_valid(int v) { return v == COOP_ITEMS_HOST || v == COOP_ITEMS_NEW || (v >= 0 && v < n_saves && saves[v].valid); }
+static int start_valid(int v) { return v >= 0 && (v < 3 || save_at(v - 3) >= 0); }
+static int items_valid(int v) { return v == COOP_ITEMS_HOST || v == COOP_ITEMS_NEW || (v >= 0 && save_at(v) >= 0); }
 
-static int step_choice(int v, int dir, int lo, int hi, int (*valid)(int))
+/* the next choice in that list: the fixed ones first .. first + nfixed - 1, then base + each save's slot */
+static int step_choice(int v, int dir, int first, int nfixed, int base)
 {
-    int i;
-    for (i = 0; i < hi - lo + 1; i++) {
-        v += dir;
-        if (v > hi) v = lo;
-        if (v < lo) v = hi;
-        if (valid(v)) return v;
-    }
-    return v;
+    int n = nfixed + n_saves, k = v - base >= 0 ? save_at(v - base) : -1;
+    int i = v >= first && v < first + nfixed ? v - first : k >= 0 ? nfixed + k : dir > 0 ? -1 : n;
+    i = (i + dir + n) % n;
+    return i < nfixed ? first + i : base + saves[i - nfixed].slot;
 }
 
 static void start_label(char* out, int n, int v)
@@ -934,8 +946,8 @@ static void change(int r, int dir)
     case R_BIORAND: if (!biorand_toggle()) { say(biorand_locked()); CallSystemSe(0, 1); return; } break;
     case R_DETECTOR: g_coop.skip_detector ^= 1; break;
     case R_RIBBON: settings_step(lset("No ink ribbons needed"), dir); break;   /* the GAMEPLAY setting (g_config) */
-    case R_START: g_coop.start = step_choice(g_coop.start, dir, 0, n_saves + 2, start_valid); break;
-    case R_ITEMS: g_coop.items = step_choice(g_coop.items, dir, COOP_ITEMS_HOST, n_saves - 1, items_valid); break;
+    case R_START: g_coop.start = step_choice(g_coop.start, dir, 0, 3, 3); break;
+    case R_ITEMS: g_coop.items = step_choice(g_coop.items, dir, COOP_ITEMS_HOST, 2, 0); break;
     case R_FOLLOW: g_coop.follow ^= 1; break;   /* the joining player's own choice, also during a session */
     case R_EXTRA: settings_step(eset(&g_enemy_opts.extra), dir); break;
     case R_PLACE: settings_step(eset(&g_enemy_opts.place), dir); break;
@@ -1519,7 +1531,7 @@ static void draw_previews(void)
 {
     int partner = g_coop.state == COOP_CONNECTED && !g_coop.peer_in_game, k;
     float sx[2] = { partner ? 92.0f : 120.0f, 222.0f };
-    int played = g_coop.start >= 3 && lb.role == 0 && start_valid(g_coop.start) ? saves[g_coop.start - 3].ply_id : 0;
+    int played = g_coop.start >= 3 && lb.role == 0 && start_valid(g_coop.start) ? saves[save_at(g_coop.start - 3)].ply_id : 0;
     /* the chosen model (on the model page the one under the cursor) loads once it has stayed for a
        few frames (scrolling through the list) */
     int chr = lb.step == 6 && lb.pick < appear_count() ? appear_at(lb.pick) : g_coop.chr;
@@ -1667,6 +1679,7 @@ void lobby_frame(void)
     static const char* join = (const char*)-1, *stop = (const char*)-1, *title = (const char*)-1;
     static unsigned int hand;
     hand++;
+    { extern void crash_test(unsigned); crash_test(hand); }   /* RECVX_TEST_CRASH (log.c) */
     if (join == (const char*)-1) join = getenv("RECVX_TEST_JOIN");
     if (join && *join && hand >= (unsigned)atoi(join)) {   /* RECVX_TEST_JOIN="n": F3's Join at the n-th frame hand-off */
         host_log("test: join (F3) at hand-off %u\n", hand);

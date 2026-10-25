@@ -256,9 +256,16 @@ add_executable(test_appear tests/test_appear.c src/host/actors.c)
 add_test(NAME appear COMMAND test_appear)
 
 # imports (src/import): SLD, TIM2, the glTF and .cvxm writers on a synthetic model
-add_executable(test_import tests/test_import.c src/import/impmodel.c src/import/ob2.c src/import/import.c src/host/actors.c src/host/fileio.c)
+add_executable(test_import tests/test_import.c src/import/impmodel.c src/import/ob2.c src/import/import.c src/host/actors.c src/host/fileio.c src/host/parse.c)
 target_link_libraries(test_import PRIVATE SDL3::SDL3 m)
 add_test(NAME import COMMAND test_import ${CMAKE_CURRENT_BINARY_DIR})
+
+# checked file reading (include/pc_parse.h): PRS against the game's decoder, crafted AFS tables, .cvxm
+# models, DDS / PNG headers and BioRand start-kit scripts
+add_executable(test_parsers tests/test_parsers.c src/host/parse.c src/net/coop_proto.c src/net/rdv_proto.c)
+target_compile_options(test_parsers PRIVATE -std=gnu11)
+target_link_libraries(test_parsers PRIVATE monocypher m)
+add_test(NAME parsers COMMAND test_parsers)
 
 # enemy variants (pc/src/host/variants.c): the built-in table, the mods/enemies.ini reader
 add_executable(test_variants tests/test_variants.c src/host/variants.c src/host/actors.c src/host/fileio.c)

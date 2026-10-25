@@ -2,6 +2,7 @@
    model (impmodel.h; docs/IMPORT_OUTBREAK.md "Conversion"). */
 #include "impmodel.h"
 #include "../host/fileio.h"
+#include "../../include/pc_parse.h"
 #include <SDL3/SDL.h>
 #include <math.h>
 #include <stdarg.h>
@@ -51,12 +52,13 @@ static int fail(char* err, int en, const char* fmt, ...)
     return 0;
 }
 
+typedef struct Blob { const void* d; size_t n; } Blob;
+static int put_blob(FILE* f, void* ud) { const Blob* b = ud; return fwrite(b->d, 1, b->n, f) == b->n ? 0 : -1; }
+/* a temporary file renamed over it: the game may be loading the model it replaces */
 static int save(const char* path, const void* d, size_t n)
 {
-    FILE* f = pc_fopen(path, "wb");
-    int ok = f && fwrite(d, 1, n, f) == n;
-    if (f && fclose(f)) ok = 0;
-    return ok;
+    Blob b = { d, n };
+    return pc_save_file(path, "wb", put_blob, &b) == 0;
 }
 
 void imp_free(ImpModel* m)
@@ -96,7 +98,7 @@ typedef struct Pic {
 
 static int pic(const unsigned char* t, int len, Pic* p)
 {
-    int at = t[5] ? 128 : 16;   /* the file header: 16 bytes, or 128 (format id 1: 128-byte aligned) */
+    int at = len >= 16 && t[5] ? 128 : 16;   /* the file header: 16 bytes, or 128 (format id 1: 128-byte aligned) */
     if (len < at + 48 || memcmp(t, "TIM2", 4)) return 0;
     const unsigned char* h = t + at;   /* the first picture */
     memcpy(&p->total, h, 4); memcpy(&p->clut, h + 4, 4); memcpy(&p->img, h + 8, 4);
@@ -626,7 +628,10 @@ int imp_write_cvxm(const ImpModel* m, const char* path, float scale, unsigned gi
     align(&f, 16, 0);
     set32(&f, 16, (uint32_t)f.n);
     put(&f, sk, sizeof(*sk) * (size_t)m->nv);
+    PcCvxm cv;
+    char why[96];
     if (f.bad || mlb.bad) fail(err, en, "out of memory");
+    else if (f.n > UINT32_MAX || !pc_cvxm_check(f.p, (uint32_t)f.n, &cv, why, sizeof(why))) fail(err, en, "not loadable: %s", why);   /* (as the game will check it) */
     else if (!(ok = save(path, f.p, f.n))) fail(err, en, "cannot write %s", path);
     free(W); free(sk); free(mlb.p); free(f.p);
     return ok;

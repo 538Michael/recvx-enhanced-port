@@ -81,9 +81,9 @@ const ActorModel actor_models[] = {
 };
 _Static_assert(sizeof(actor_models) / sizeof(actor_models[0]) == ACTOR_MODELS, "ACTOR_MODELS");
 
+_Static_assert(ACTOR_MODELS + ACTOR_IMPORT_MAX <= ACTOR_PART, "ACTOR_PART");
 ActorModel actor_imports[ACTOR_IMPORT_MAX];
-char actor_import_name[ACTOR_IMPORT_MAX][96];
-char actor_import_file[ACTOR_IMPORT_MAX][1200];
+const char* actor_import_file[ACTOR_IMPORT_MAX];
 unsigned char actor_import_group[ACTOR_IMPORT_MAX];
 int actor_import_n;
 

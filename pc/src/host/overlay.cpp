@@ -186,8 +186,9 @@ static void controls_section(void)
         if (ImGui::BeginTabItem("Gamepad")) { if (dev != BIND_PAD) cap_row = -1; dev = BIND_PAD; ImGui::EndTabItem(); }
         ImGui::EndTabBar();
     }
+    char pad_name[96];
     if (dev == BIND_PAD) ImGui::TextDisabled("%s; the left stick also moves, as on the DS2. The third-person rows play in third\n"
-                                             "person with Modern gamepad controls, instead of the game rows of the same buttons.", bind_pad_desc());
+                                             "person with Modern gamepad controls, instead of the game rows of the same buttons.", bind_pad_desc(pad_name, sizeof pad_name));
     ImGui::TextDisabled("Click a binding, then press the key/button (Esc cancels, Delete clears); right click clears.\n"
                         "Reload can share a button: then Aim + button reloads.");
     if (dev == BIND_KB) ImGui::TextDisabled("Mouse buttons work on any row, also with the fixed cameras.");
@@ -556,8 +557,12 @@ static void coop_window(void)
         };
         label(v, cur, sizeof(cur));
         ImGui::BeginDisabled(cs.state != COOP_OFF && cs.host);
+        static LobbySave* saves;   /* listed when the list opens */
+        static int saves_n;
         if (ImGui::BeginCombo("Items when joining", cur)) {
-            for (int i = COOP_ITEMS_CURRENT, slots = lobby_save_slots(); i < slots; i++) {
+            if (ImGui::IsWindowAppearing()) { free(saves); saves_n = lobby_save_list(&saves); }
+            for (int k = 0; k < 3 + saves_n; k++) {
+                int i = k < 3 ? COOP_ITEMS_CURRENT + k : saves[k - 3].slot;
                 label(i, lab, sizeof(lab));
                 if (ImGui::Selectable(lab, i == v)) { c->items = i; changed = true; }
             }

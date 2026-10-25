@@ -337,7 +337,7 @@ START in the lobby.
 ## Saves
 
 With **Save system: Native files** (default) each save is a file in `save/saves/`, such as
-`001_Claire_Prison-front.sav`: no limit, no memory card screens. Saving adds a new entry at the end
+`001_Claire_Prison-front.sav`: up to 10,000 saves, no memory card screens. Saving adds a new entry at the end
 of the list, or overwrites one. Loading starts on the newest save.
 
 - Renaming the part after the number is fine; deleting a file deletes the save.
