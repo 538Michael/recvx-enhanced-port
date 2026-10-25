@@ -412,7 +412,7 @@ optionally, doors. It reads your disc image and writes a pack for this game.
 1. In BioRand choose Code: Veronica, the PC version, your `.iso` as game data and this game's
    folder (with `recvx.exe` and `mods`) as the PC folder. Generate. The pack goes to
    `mods/biorand/`, with the spoiler log `log_pl0.txt`.
-2. On NEW GAME's difficulty screen, the row **BIORAND ON / OFF** (with the seed) switches it.
+2. On NEW GAME's difficulty screen, the row **BIORAND ON / OFF** switches it.
    Without Difficulty select, use **BioRand** (GAMEPLAY) at the title.
 
 - It can only be switched at the title. Off, the pack is ignored.

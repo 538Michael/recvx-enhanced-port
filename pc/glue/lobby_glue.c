@@ -192,9 +192,8 @@ void pc_tex_keep_original(int texno);
 
 /* NEW GAME's difficulty screen (DisplayNewGamePlate, CheckButton level 1: "Difficulty select") with a BIORAND row
    when a pack is there (biorand.h; without one the game draws it, as ever): MODE SELECT 28 higher, the row between
-   it and NORMAL, "BIORAND ON" / "BIORAND OFF" in the game's font (the plates' texture lacks letters) with the seed
-   smaller after it. It is cursor 3 (CursorMax[1] 4, pc_title_menu_init): the level's cursor wraps, so up from
-   NORMAL and down from VERY EASY reach it as drawn. Confirm or a click toggles it (pc_title_mouse). */
+   it and NORMAL, "BIORAND ON" / "BIORAND OFF" in the game's font (the plates' texture lacks letters). It is
+   cursor 3 (CursorMax[1] 4, pc_title_menu_init): the level's cursor wraps, so up from NORMAL and down from VERY EASY reach it as drawn. Confirm or a click toggles it (pc_title_mouse). */
 static void title_font(void);
 static int br_shown(void) { return AdvWork.CursorMax[1] > BR_ROW; }
 
@@ -203,7 +202,6 @@ int pc_newgame_plates(int cursor, float fade, int flag)
     static const float v[3] = { 320.0f, 288.0f, 256.0f };   /* NORMAL, EASY, VERY EASY */
     ADV_WORK* ap = &AdvWork;
     unsigned int a, col;
-    char seed[32];
     float w, x, sc = 0.85f;
     QUAD q;
     int i, on;
@@ -228,11 +226,9 @@ int pc_newgame_plates(int cursor, float fade, int flag)
     if (a < 8) return 1;
     col = cursor == BR_ROW ? 0xFFFFFF : 0x808080;   /* as the plates: the cursor bright, the others grey */
     on = biorand_setting();
-    snprintf(seed, sizeof(seed), "%s", on ? biorand_seed_text() : "");
-    w = text_w(on ? "BIORAND ON" : "BIORAND OFF", sc) + (seed[0] ? 10 + text_w(seed, 0.6f) : 0);
+    w = text_w(on ? "BIORAND ON" : "BIORAND OFF", sc);
     x = 320.0f - w / 2;
     text(x, BR_Y, on ? "BIORAND ON" : "BIORAND OFF", sc, a << 24 | col);
-    if (seed[0]) text(x + text_w("BIORAND ON", sc) + 10, BR_Y + 7, seed, 0.6f, a << 24 | 0x60D060);
     AdvEasySetTextureList(0);   /* the title's texture list again */
     return 1;
 }
