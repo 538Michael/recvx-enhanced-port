@@ -178,7 +178,12 @@ int bind_conflict(int row, int dev)
     return 0;
 }
 
-int bind_row_shown(int row, int dev) { return dev == BIND_KB ? bind_rows[row].pad_ok != 2 : bind_rows[row].pad_ok != 0; }
+int g_dev_mode;   /* --dev: developer tools (the import window, F9) */
+int bind_row_shown(int row, int dev)
+{
+    if (row == B_IMPORT && !g_dev_mode) return 0;
+    return dev == BIND_KB ? bind_rows[row].pad_ok != 2 : bind_rows[row].pad_ok != 0;
+}
 
 /* ---------------------------------------------------------------- names */
 static const char* pad_ini[SDL_GAMEPAD_BUTTON_COUNT] = {

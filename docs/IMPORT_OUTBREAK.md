@@ -5,7 +5,7 @@ writes what it extracts to the user's mods folder (`mods/import/outbreak2/`, or 
 
 Goal: take the character models of *Resident Evil Outbreak File #2* (US, SLUS-20984) and use them
 as player models in this port ("You appear as", [ACTORS.md](ACTORS.md#you-appear-as)); later
-voices and the social-call ("ad-lib") animations for co-op. The F9 window runs the extraction and
+voices and the social-call ("ad-lib") animations for co-op. The F9 window (only with the `--dev` launch option) runs the extraction and
 lists what was extracted; it is built so other games can be added as further sources.
 
 ## PROGRESS
