@@ -2253,7 +2253,8 @@ static void apply_snapshots(void)
    are left out of EV_FLAGS both ways, and a guest loading the host's game state keeps its own (imp_restore). */
 #define IMP_SPOTS 256                   /* 16 words: it_flg bits */
 #define IMP_TAKEN 272                   /* 16 words */
-#define GRANT0 320                      /* GRANT_N entries of 5 words: flr << 24 | item << 16 | count, room, x y z (grant_frame) */
+#define GRANT0 320                      /* GRANT_N entries of 5 words: flr << 24 | item << 16 | count, room, x y z (grant_frame;
+                                           x's high half: GRANT_RET, a returned box item's word top byte) */
 #define GRANT_N 8
 /* sys->itm as a whole (save region 0x270, 384 words; decomp sub1.c AllItemInit clears all of it):
      0..63     the four characters' inventories (16 words each: word 0 the equipped slot, then item words)
@@ -4319,6 +4320,20 @@ static void inv_drop(unsigned int w)   /* EV_BOXFIX: an item we took that the pa
     if (inv_remove(w)) trade_msg("the partner took %s out of the item box first", w);
 }
 
+static int grant_return(unsigned int w);
+/* EV_BOXFIX: an item we put into the box that the host's box had no room for (both put items in at the same
+   time). It leaves our copy of the box (the host's is the one that counts) and comes back: into our inventory,
+   else at our feet as a pickup (grant_return: kept with our game, taken back word for word), else (8 items wait
+   there already) it stays in our copy of the box. Added even when our copy no longer has it: we took it out
+   again meanwhile, and the host answers that take with its own EV_BOXFIX (inv_drop), which removes one copy. */
+static void box_back(unsigned int w)
+{
+    box_take(w);
+    if (inv_add(w)) trade_msg("the item box was full: %s back in your inventory", w);
+    else if (grant_return(w)) trade_msg("the item box and your inventory are full: %s lies at your feet", w);
+    else { box_put(w); trade_msg("the item box was full: %s stays in your item box", w); }
+}
+
 static int apply_box(const Event* e)
 {
     unsigned int miss[16], back[16];
@@ -4326,9 +4341,8 @@ static int apply_box(const Event* e)
     if (!tx_in_game || (sys->cb_flg & 0x40000)) return 0;   /* our box screen (or a menu) first */
     if (e->type == EV_BOXFIX) {   /* from the host: what we took that it had not, what it had no room for */
         for (k = 0; k < e->u.bx.nrm; k++) inv_drop(e->u.bx.w[k]);
-        for (; k < e->u.bx.nrm + e->u.bx.nadd; k++)
-            if (inv_add(e->u.bx.w[k])) trade_msg("the item box was full: %s back in your inventory", e->u.bx.w[k]);
-            else trade_msg("the item box was full and so is your inventory: %s is lost", e->u.bx.w[k]);
+        for (; k < e->u.bx.nrm + e->u.bx.nadd; k++) box_back(e->u.bx.w[k]);
+        box_pack();
         count_keys(keys_had);
         return 1;
     }
@@ -5126,6 +5140,10 @@ static int gk = -1, gslot, getc_ix, gtries = -1, groom = -1, ghave;  /* the entr
 
 static unsigned int* gw(int i) { return &sys->itm[GRANT0 + i * 5]; }
 static int g_item(int i) { return (gw(i)[0] >> 16) & 0xFF; }
+#define GRANT_RET 0x1000000u            /* gw()[2]: a box item of ours the host had no room for (bits 16..23: its word's top byte) */
+static int g_ret(int i) { return (gw(i)[2] & GRANT_RET) != 0; }
+static unsigned int g_word(int i) { return (gw(i)[2] >> 16 & 0xFF) << 24 | (gw(i)[0] & 0xFFFFFF); }   /* (a returned one's whole word) */
+static unsigned int gsnap[12];          /* our inventory before the game's pickup of the entry shown */
 static float g_pos(int i, int k) { return (short)(gw(i)[2 + k] & 0xFFFF) / 100.0f; }
 static int stackable(int id) { return (itemdata[id].type & 0x200) != 0; }
 static int story_item(int id) { return (itemdata[id].type & 0x41) != 0; }   /* weapons (and the lighter), key items */
@@ -5193,7 +5211,7 @@ void coop_item_granted(int item)
     gseen[gseen_n & 7].tick = tick;
     gseen[gseen_n++ & 7].room = room;
     for (i = 0; i < GRANT_N; i++)   /* the partner's copy of it waits here: we got it ourselves now */
-        if (g_item(i) == item && (int)gw(i)[1] == room) grant_drop(i, "we got it from the event ourselves");
+        if (g_item(i) == item && (int)gw(i)[1] == room && !g_ret(i)) grant_drop(i, "we got it from the event ourselves");
     if (!grant_for_partner(item)) {
         if (!individual() && win_rx.open && !win_tx.open) {   /* the partner's event, replayed here: its item */
             give_back(item, BACK_EVENT);
@@ -5216,6 +5234,21 @@ void coop_item_granted(int item)
     }
     host_log("coop: an event gave us %s\n", item_name((unsigned)item << 16 | gout[n].count));
     gout_n++;
+}
+
+/* apply_box, box_back: our own item put down where we stand, in a free pending entry; the pickup gives back the
+   word itself (count, ammo kind), not what a pickup of that item adds (grant_frame). 0: all entries in use. */
+static int grant_return(unsigned int w)
+{
+    int i;
+    for (i = 0; i < GRANT_N && g_item(i); i++) ;
+    if (i == GRANT_N || !plp) return 0;
+    gw(i)[0] = (unsigned)(plp->flr_no & 0x3F) << 24 | (w & 0xFFFFFF);
+    gw(i)[1] = coop_room_key();
+    gw(i)[2] = (unsigned short)(short)lrintf(plp->px * 100) | (w >> 24) << 16 | GRANT_RET;
+    gw(i)[3] = (unsigned short)(short)lrintf(plp->py * 100);
+    gw(i)[4] = (unsigned short)(short)lrintf(plp->pz * 100);
+    return 1;
 }
 
 static int apply_grant(const Event* e)
@@ -5275,7 +5308,7 @@ static int grant_model(int item, int i)
     if (!disp) disp = item;
     if (disp == 131) disp = 5;    /* sub1.c: the Enhanced Handgun shows the handgun's */
     if (disp == 136) disp = 33;
-    for (k = 0; k < rom->itm_n && k < ITWP_N; k++)
+    for (k = 0; k < rom->itm_n && k < ITWP_N && !g_ret(i); k++)   /* (a returned item of ours shows beside the room's own) */
         if (pc_pickup_item(sys->itwp[k].type, sys->itwp[k].id) == item) return -1;   /* (one of ours: grant_slot found it, or not to be shown) */
     if (slot >= ITWP_N || slot >= 32) { host_log("coop: no free item slot here for the partner's %s\n", item_name((unsigned)item << 16)); return -1; }
     actor_tex_free(&entries, &heap);
@@ -5370,6 +5403,14 @@ static void grant_frame(void)
         op = &sys->itwp[gslot];
         t = &sys->metcp[getc_ix];
         k = item_amount(g_item(gk));
+        if (k > ghave && sys->etc_idx == (unsigned)(rom->etc_n + getc_ix) && g_ret(gk)) {   /* our own item back: */
+            memcpy(my_inv(), gsnap, sizeof(gsnap));   /* not what the game's pickup adds, the word itself */
+            if (!inv_add(g_word(gk))) {   /* (a whole stack may need a cell the pickup did not): it stays */
+                trade_msg("no room for %s", g_word(gk));
+                sys->cb_flg &= ~0x800;
+                k = ghave;
+            }
+        }
         if (k > ghave && sys->etc_idx == (unsigned)(rom->etc_n + getc_ix)) {   /* the game's pickup took it */
             op->stflg |= 0x1000000;
             t->flg &= ~0x1;
@@ -5378,6 +5419,7 @@ static void grant_frame(void)
             return;
         }
         ghave = k;
+        memcpy(gsnap, my_inv(), sizeof(gsnap));
         if (getc_ix >= sys->metc_n || t->type != 4 || t->prm0 != gslot) gk = -1;   /* the room was set up again */
     }
     if ((sys->cb_flg & 0x5) || !local_visible()) return;   /* not in an event, a cutscene, a door */
@@ -5385,15 +5427,15 @@ static void grant_frame(void)
         for (i = 0; i < GRANT_N; i++) {
             int item = g_item(i);
             if (!item || (int)gw(i)[1] != room) continue;
-            if (!stackable(item) && have_item(item)) { grant_drop(i, "we have one now"); continue; }
+            if (!stackable(item) && !g_ret(i) && have_item(item)) { grant_drop(i, "we have one now"); continue; }
             if ((gw(i)[0] >> 24) == GRANT_NOWHERE) {   /* no spot known (the partner never stood in this room): at our feet */
                 gw(i)[0] = (gw(i)[0] & 0xFFFFFF) | (unsigned)(plp->flr_no & 0x3F) << 24;
-                gw(i)[2] = (unsigned short)(short)lrintf(plp->px * 100);
+                gw(i)[2] = (gw(i)[2] & 0xFFFF0000) | (unsigned short)(short)lrintf(plp->px * 100);
                 gw(i)[3] = (unsigned short)(short)lrintf(plp->py * 100);
                 gw(i)[4] = (unsigned short)(short)lrintf(plp->pz * 100);
             }
             k = grant_slot(item);
-            if (k == -1) {   /* this room has no record of it (3/10's Gold Lugers, 7/4's Enhanced Handgun): its own model */
+            if (k == -1 || (k == -2 && g_ret(i))) {   /* this room has no record of it (3/10's Gold Lugers, 7/4's Enhanced Handgun): its own model */
                 if (gtries == i) continue;
                 gtries = i;
                 if ((k = grant_model(item, i)) < 0) continue;   /* (tried again in the next visit) */
@@ -5401,6 +5443,7 @@ static void grant_frame(void)
             if (k < 0 || sys->metc_n >= 64) continue;   /* the room's own pickup of it is there (taken as usual) */
             gk = i; gslot = k; getc_ix = sys->metc_n++;
             ghave = item_amount(item);
+            memcpy(gsnap, my_inv(), sizeof(gsnap));
             host_log("coop: the partner's %s lies here at %.1f %.1f (item slot %d, trigger %d)\n", item_name((unsigned)item << 16 | (gw(i)[0] & 0xFFFF)),
                      g_pos(i, 0), g_pos(i, 2), k, rom->etc_n + getc_ix);
             break;
@@ -5420,9 +5463,9 @@ static void grant_frame(void)
     op = &sys->itwp[gslot];
     op->px = g_pos(gk, 0); op->py = g_pos(gk, 1); op->pz = g_pos(gk, 2);
     op->flr_no = gw(gk)[0] >> 24;
-    op->flg = (op->flg & ~0x40000000) | 0x1;   /* in every camera cut */
+    op->flg = (op->flg & ~(0x40000000 | 0x80)) | 0x1;   /* in every camera cut; not linked (bhCalcModel reads lkwkp) */
     op->stflg &= ~0x1000000;
-    op->lkwkp = NULL;                          /* not in a cutscene actor's hand */
+    op->lkwkp = NULL;                          /* not in a cutscene actor's hand (0/0's lockpick record is linked) */
     if (!op->aspd) op->aspd = GRANT_GLINT;     /* it glints as floor loot does (objitm.c; an event's prop has none) */
     t = &sys->metcp[getc_ix];
     memset(t, 0, sizeof(*t));

@@ -21,6 +21,11 @@
 - **Lighter and lockpick in the item box**: taking the lighter or Claire's lockpick out of the item box
   no longer makes the other one disappear; with its slot taken, it goes into your bag like any item.
   Picking up the lighter while holding the lockpick keeps both too.
+- **Full shared item box** (co-op): when both players put items into the last free places at the
+  same time, the partner's item comes back into its bag, or lies at its feet with the bag full,
+  instead of being lost.
+- **Partner's event items** (co-op): an item from an event lying on the floor for the partner no
+  longer crashes the game in some rooms, such as the lockpick in the room where the game starts.
 
 ## 0.6.9 (2026-10-24)
 

@@ -448,7 +448,12 @@ when joining", ini `coop_items`):
 
 With shared loot both players use one item box. Both may use a box at the same time; if both take
 the same entry, the host decides and the joiner's copy leaves its inventory again ("the partner
-took ... first"). Saves keep the box as the player's own game has it.
+took ... first"). If both put items into the last free places at once, the host's go in and the
+joiner's item comes back: into its inventory, or, with that full too, onto the floor where the
+joiner stands ("... lies at your feet"). It lies there as the partner's event items do, only for
+that player, kept with its game (saves too) until taken, and taking it gives back exactly that item
+(its rounds, its ammunition kind). No item is lost either way. Saves keep the box as the player's
+own game has it.
 
 ### Items from events
 
@@ -1018,7 +1023,16 @@ floor or trigger, "Yes" chosen, an item used) hold only where the player did it.
   (`sys->itm` 320..359, 8 entries) and shows it on the floor of that room with a pickup trigger. A
   room without a record of the item gets the item's display model for the visit.
 * **Item box** (`EV_BOX`, `EV_BOXFIX`): with shared loot, what was taken out and put in when the box
-  screen closes; the host decides conflicts and sends back what the joiner could not have.
+  screen closes; the host decides conflicts and sends back what the joiner could not have. An item
+  the joiner took that the host had not (taken there first) leaves the joiner's inventory again
+  (`inv_drop`). One it put in that the host's box had no room for (`box_back`) leaves the joiner's copy
+  of the box and goes into its inventory, else into a free pending entry of the event items
+  (`grant_return`: `GRANT_RET` and the word's top byte in the high half of the entry's x word) at its
+  feet; the pickup restores the inventory as it was and adds that word (`pc_inv_add`), not what a
+  pickup of the item gives, and the "already have one" rule of event items does not apply. Shown with
+  the room's record of the item if hidden, else its display model (also beside a visible pickup of
+  the same item). With all 8 entries in use it stays in the joiner's copy of the box. A host's put the
+  joiner's copy has no room for stays the host's (its box is the one both use).
 
 ### Effects and voices
 
