@@ -333,12 +333,10 @@ static const char* const noclips[] = { "Off", "Through walls", "Walls + fly" };
 static const char* const sources[] = { "Auto", "Keyboard/mouse only", "Gamepad only" };
 static const char* const extras[] = { "Off", "Up to 1 per room", "Up to 2 per room", "Up to 3 per room" };
 static const char* const varieties[] = { "Mild", "Wild" };
-static const char* const cast_modes[] = { "Off", "Characters", "Enemies", "Both" };
 static const char* const cast_pools[] = { "Cutscene models (faces move)", "All models" };
 static const char* const cast_assigns[] = { "Fixed per character", "Random per cutscene" };
 static int cast_on(void) { return g_enemy_opts.cast != 0; }
-static int cast_chars_on(void) { return (g_enemy_opts.cast & 1) != 0; }
-static int cast_imports_shown(void) { return cast_chars_on() && __atomic_load_n(&actor_import_n, __ATOMIC_ACQUIRE) > 0; }
+static int cast_imports_shown(void) { return cast_on() && __atomic_load_n(&actor_import_n, __ATOMIC_ACQUIRE) > 0; }
 
 #define V(x) ((int*)&(x))
 const Setting g_settings[] = {
@@ -414,12 +412,12 @@ const Setting g_settings[] = {
     { SP_GAMEPLAY, "Randomize event enemies", V(g_enemy_opts.events), 0, 1, 1,
       .help = "Enemies that rooms show later or that events drive change too: the ones events animate get another look of their own kind, so the scenes still play. Next room." },
     { SP_GAMEPLAY, "Enemy seed", V(g_enemy_opts.seed), 0, 99999, 1, .fmt = "%d", .help = "Placements, randomizer and cutscene cast: the same seed gives the same rooms. In co-op both use the host's." },
-    { SP_GAMEPLAY, "Randomize cutscene cast", V(g_enemy_opts.cast), 0, 3, 1, cast_modes, .group = "CUTSCENE CAST",
-      .help = "Story characters (Alfred, Steve, ...) and cutscene zombies are shown as other models, from the enemy seed. Only the look changes. Next room." },
-    { SP_GAMEPLAY, "Character models", V(g_enemy_opts.cast_all), 0, 1, 1, cast_pools, .shown = cast_chars_on,
+    { SP_GAMEPLAY, "Randomize cutscene cast", V(g_enemy_opts.cast), 0, 1, 1, .group = "CUTSCENE CAST",
+      .help = "In cutscenes the story characters (Alfred, Steve, ...) are shown as other models, from the enemy seed. Only the look changes. Next room." },
+    { SP_GAMEPLAY, "Character models", V(g_enemy_opts.cast_all), 0, 1, 1, cast_pools, .shown = cast_on,
       .help = "Cutscene models: the characters' cutscene models, whose mouths and eyes move with the lines. All models: any character, creature or zombie model and the player models; most of them keep a still face." },
     { SP_GAMEPLAY, "Assignment", V(g_enemy_opts.cast_assign), 0, 1, 1, cast_assigns, .shown = cast_on,
-      .help = "Fixed: each character is always shown as the same model, e.g. Steve as Alfred in every cutscene (each zombie look as another look). Random: every cutscene room picks again. The same seed gives the same picks." },
+      .help = "Fixed: each character is always shown as the same model, e.g. Steve as Alfred in every cutscene. Random: every cutscene room picks again. The same seed gives the same picks." },
     { SP_GAMEPLAY, "Include imported models", V(g_enemy_opts.cast_imports), 0, 1, 1, .shown = cast_imports_shown,
       .help = "The models in the mods folder's import list join the character models. In co-op only when both players have the same ones." },
 

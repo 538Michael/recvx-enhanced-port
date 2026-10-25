@@ -780,8 +780,8 @@ static int row_visible(int r)
                              (r == R_IMP && host && !g_coop.loot);   /* only shared loot has it */
     if (lb.step == 4) return (r >= R_RAND && r <= R_PLACE && (r != R_RSEED || host)) || r == R_CASTPG;
     if (lb.step == 7)   /* the cutscene cast: its model and assignment rows while it is on; the imported models' while we have some */
-        return r == R_CAST || ((r == R_CASTPOOL || r == R_CASTIMP) && (shown_eo()->cast & 1) && (r != R_CASTIMP || __atomic_load_n(&actor_import_n, __ATOMIC_ACQUIRE) > 0)) ||
-               (r == R_CASTASSIGN && shown_eo()->cast);
+        return r == R_CAST || ((r == R_CASTPOOL || r == R_CASTASSIGN || r == R_CASTIMP) && shown_eo()->cast &&
+                               (r != R_CASTIMP || __atomic_load_n(&actor_import_n, __ATOMIC_ACQUIRE) > 0));
     if (lb.step == 5) return (r == R_QUICK && !biorand_active()) || r == R_DETECTOR;   /* BioRand has its own start inventory */
     switch (r) {
     case R_PORT: return host && !srv;
@@ -1227,8 +1227,8 @@ static void row_text(int r, char* label, char* val, int n)
     case R_RAND: strcpy(label, "RANDOMIZER"); snprintf(val, n, "%s", eo->rand ? "On" : "Off"); break;
     case R_VARIETY: strcpy(label, "VARIETY"); snprintf(val, n, "%s", eset(&g_enemy_opts.variety)->names[eo->variety & 1]); break;
     case R_EVENTS: strcpy(label, "EVENT ENEMIES"); snprintf(val, n, "%s", eo->events ? "On" : "Off"); break;
-    case R_CASTPG: strcpy(label, "CUTSCENE CAST"); snprintf(val, n, "%s", eset(&g_enemy_opts.cast)->names[eo->cast & 3]); break;   /* a page */
-    case R_CAST: strcpy(label, "RANDOMIZE CAST"); snprintf(val, n, "%s", eset(&g_enemy_opts.cast)->names[eo->cast & 3]); break;
+    case R_CASTPG: strcpy(label, "CUTSCENE CAST"); snprintf(val, n, "%s", eo->cast ? "On" : "Off"); break;   /* a page */
+    case R_CAST: strcpy(label, "RANDOMIZE CAST"); snprintf(val, n, "%s", eo->cast ? "On" : "Off"); break;
     case R_CASTPOOL: strcpy(label, "CHARACTER MODELS"); snprintf(val, n, "%s", eset(&g_enemy_opts.cast_all)->names[eo->cast_all & 1]); break;
     case R_CASTASSIGN: strcpy(label, "ASSIGNMENT"); snprintf(val, n, "%s", eset(&g_enemy_opts.cast_assign)->names[eo->cast_assign & 1]); break;
     case R_CASTIMP: strcpy(label, "IMPORTED MODELS"); snprintf(val, n, "%s", eo->cast_imports ? "On" : "Off"); break;
@@ -1284,8 +1284,8 @@ static const char* row_help(int r)
     case R_RAND: return eset(&g_enemy_opts.rand)->help;
     case R_VARIETY: return eset(&g_enemy_opts.variety)->help;
     case R_EVENTS: return eset(&g_enemy_opts.events)->help;
-    case R_CASTPG: return host ? "A page for the cutscene cast: the story characters and the zombies of cutscenes shown as other models (fixed or per cutscene, from the seed)."
-                               : "The host's cutscene cast: which characters and cutscene zombies are shown as other models (read-only).";
+    case R_CASTPG: return host ? "A page for the cutscene cast: the story characters shown as other models in cutscenes (fixed or per cutscene, from the seed)."
+                               : "The host's cutscene cast: whether and how the story characters are shown as other models in cutscenes (read-only).";
     case R_CAST: return eset(&g_enemy_opts.cast)->help;
     case R_CASTPOOL: return eset(&g_enemy_opts.cast_all)->help;
     case R_CASTASSIGN: return eset(&g_enemy_opts.cast_assign)->help;

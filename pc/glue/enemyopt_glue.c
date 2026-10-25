@@ -31,7 +31,7 @@ int spawn_base_count(void);
 const char* spawn_refused(int id);
 const ActorModel* variant_base(const EnemyVariant* v);   /* variant_glue.c */
 void variant_room(void);
-void cast_room(const EnemyOpts* o, const unsigned char* scripted);   /* cast_glue.c */
+void cast_room(const EnemyOpts* o);   /* cast_glue.c */
 void spawn_keep_texlist(const NJS_TEXLIST* l);
 void bhCheckEneWorkNum(void);   /* eneset.h */
 
@@ -50,7 +50,7 @@ __attribute__((constructor)) static void opts_env(void)
     if ((e = getenv("RECVX_ENEMY_SEED"))) g_enemy_opts.seed = atoi(e);
     if ((e = getenv("RECVX_ENEMY_VARIETY"))) g_enemy_opts.variety = atoi(e);
     if ((e = getenv("RECVX_ENEMY_EVENTS"))) g_enemy_opts.events = atoi(e);
-    if ((e = getenv("RECVX_CAST"))) g_enemy_opts.cast = atoi(e);   /* the cutscene cast: mode, then ":all" / ":random" / ":imports" */
+    if ((e = getenv("RECVX_CAST"))) g_enemy_opts.cast = atoi(e) != 0;   /* the cutscene cast: 0/1, then ":all" / ":random" / ":imports" */
     if (e && strstr(e, "all")) g_enemy_opts.cast_all = 1;
     if (e && strstr(e, "random")) g_enemy_opts.cast_assign = 1;
     if (e && strstr(e, "imports")) g_enemy_opts.cast_imports = 1;
@@ -456,7 +456,8 @@ void enemy_room_finished(void)
     variant_room();   /* (the slots' enemy variants) */
     if (!rom || !sys) return;
     o = enemy_opts();
-    if (!o->place && !o->rand && !o->extra && !o->cast) { cast_room(o, rec_flags); return; }
+    cast_room(o);   /* the cutscene cast's models (cast_glue.c; it touches no record) */
+    if (!o->place && !o->rand && !o->extra) return;
     scan_script();
     memset(rand_src, 0, sizeof(rand_src));
     memset(rand_var, 0, sizeof(rand_var));
@@ -464,7 +465,6 @@ void enemy_room_finished(void)
     if (o->rand) randomize(o);
     if (o->place) place(o);
     spot_player = 1;
-    cast_room(o, rec_flags);   /* the cutscene cast: how the records look now (after the randomizer) */
 }
 
 /* ---------------------------------------------------------------- (a) extra enemies */

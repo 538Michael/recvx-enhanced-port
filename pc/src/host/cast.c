@@ -22,35 +22,20 @@ int cast_character(int id, int ver)
     }
 }
 
-int cast_enemy_kind(int id)
-{
-    return id == 1 || id == 51 || id == 52 || id == 26 ? CASTK_ZOMBIE : id == 5 ? CASTK_HUNTER : -1;   /* zombies (scripted ones too), the anatomist; Hunters */
-}
-
-int cast_look(int id, int ver)
-{
-    for (int i = 0; i < ACTOR_MODELS; i++)
-        if (actor_models[i].id == id && actor_models[i].mdlver == ver) return i;
-    return -1;
-}
-
 static int listed(void) { return __atomic_load_n(&actor_import_n, __ATOMIC_ACQUIRE); }   /* (the main thread appends) */
 static int imports_n(int imports) { return imports > 0 && imports <= listed() ? imports : 0; }
 
-int cast_pool(int kind, int all, int imports, int* out, int max)
+int cast_pool(int all, int imports, int* out, int max)
 {
     int n = 0, i;
-    if (kind == CASTK_CHAR && !all)
+    if (!all)
         for (i = 0; i < CAST_CHARACTERS && n < max; i++) out[n++] = cine[i];
-    else if (kind == CASTK_CHAR) {   /* every humanoid look the menus list, the player files too; not the wounded Alfred (a special state) */
+    else {   /* every humanoid look the menus list, the player files too; not the wounded Alfred (a special state) */
         for (i = 0; i < 5 && n < max; i++) out[n++] = ACTOR_PART + i;
         for (i = 0; i < ACTOR_MODELS && n < max; i++)
             if (actor_models[i].anim != ANIM_IDLE && appear_canon(COOP_CHR_ACTOR + i) == COOP_CHR_ACTOR + i && i != 10) out[n++] = i;
-    } else
-        for (i = 0; i < ACTOR_MODELS && n < max; i++)
-            if (cast_enemy_kind(actor_models[i].id) == kind) out[n++] = i;
-    if (kind == CASTK_CHAR)
-        for (i = 0; i < imports_n(imports) && n < max; i++) out[n++] = ACTOR_MODELS + i;
+    }
+    for (i = 0; i < imports_n(imports) && n < max; i++) out[n++] = ACTOR_MODELS + i;
     return n;
 }
 
@@ -67,40 +52,34 @@ static unsigned rng;
 static unsigned rnd(void) { rng ^= rng << 13; rng ^= rng >> 17; rng ^= rng << 5; return rng; }   /* xorshift32, as the enemy randomizer's */
 
 #define POOL_MAX (ACTOR_MODELS + 5 + ACTOR_IMPORT_MAX)
-static int pool[POOL_MAX], keys[POOL_MAX], pick[POOL_MAX];
+static int pool[POOL_MAX], pick[CAST_CHARACTERS];
 static unsigned char used[POOL_MAX];
-static int kind_now;
-static int own(int key, int m) { return kind_now == CASTK_CHAR ? model_char(m) == key : m == key; }   /* m is key's own look */
 
-int cast_model(unsigned seed, unsigned scene, int kind, int key, int all, int imports)
+int cast_model(unsigned seed, unsigned scene, int c, int all, int imports)
 {
-    int n = cast_pool(kind, all, imports, pool, POOL_MAX), nk = 0, i, j, k, t;
-    kind_now = kind;
-    if (kind == CASTK_CHAR) for (nk = 0; nk < CAST_CHARACTERS; nk++) keys[nk] = nk;
-    else for (i = 0; i < n; i++) keys[nk++] = pool[i];   /* each look of the kind, in catalogue order */
-    for (j = 0; j < nk && keys[j] != key; j++);
-    if (j == nk || n < 2) return -1;
-    rng = (seed * 2654435761u) ^ (scene * 4u + (unsigned)kind + 0x9E3779B9u);
+    int n = cast_pool(all, imports, pool, POOL_MAX), i, k, t;
+    if (c < 0 || c >= CAST_CHARACTERS || n < 2) return -1;
+    rng = (seed * 2654435761u) ^ (scene * 4u + 0x9E3779B9u);
     if (!rng) rng = 1;
     rnd(); rnd();
     for (i = n - 1; i > 0; i--) { k = (int)(rnd() % (unsigned)(i + 1)); t = pool[i]; pool[i] = pool[k]; pool[k] = t; }   /* Fisher-Yates */
     memset(used, 0, (size_t)n);
-    /* every key in turn (all of them, so each answer is the same whichever key is asked): the first model of the
-       shuffle not taken and not its own; when only its own are left, it trades with an earlier key whose model is
-       not its own and who may take one of those left; with the pool used up, the first not its own again */
-    for (i = 0; i < nk; i++) {
+    /* every character in turn (all of them, so each answer is the same whichever is asked): the first model of the
+       shuffle not taken and not its own; when only its own are left, it trades with an earlier character whose model
+       is not its own and who may take one of those left; with the pool used up, the first not its own again */
+    for (i = 0; i < CAST_CHARACTERS; i++) {
         pick[i] = -1;
-        for (k = 0; k < n && pick[i] < 0; k++) if (!used[k] && !own(keys[i], pool[k])) pick[i] = k;
+        for (k = 0; k < n && pick[i] < 0; k++) if (!used[k] && model_char(pool[k]) != i) pick[i] = k;
         for (k = 0; k < n && pick[i] < 0; k++) {
-            if (used[k]) continue;   /* a model left (its own): to an earlier key it suits */
+            if (used[k]) continue;   /* a model left (its own): to an earlier character it suits */
             for (t = 0; t < i && pick[i] < 0; t++)
-                if (!own(keys[t], pool[k]) && !own(keys[i], pool[pick[t]])) { pick[i] = pick[t]; pick[t] = k; used[k] = 1; }
+                if (model_char(pool[k]) != t && model_char(pool[pick[t]]) != i) { pick[i] = pick[t]; pick[t] = k; used[k] = 1; }
         }
-        for (k = 0; k < n && pick[i] < 0; k++) if (!own(keys[i], pool[k])) pick[i] = k;
+        for (k = 0; k < n && pick[i] < 0; k++) if (model_char(pool[k]) != i) pick[i] = k;
         if (pick[i] < 0) return -1;
         used[pick[i]] = 1;
     }
-    return pool[pick[j]];
+    return pool[pick[c]];
 }
 
 unsigned cast_import_id(void)

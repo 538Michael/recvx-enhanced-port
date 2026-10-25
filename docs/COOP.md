@@ -81,7 +81,7 @@ of their own (an arrow after them; RANDOMIZER also shows On or Off):
 
 | Entry | Its page |
 |---|---|
-| **RANDOMIZER** | The enemy options: **RANDOMIZER**, **VARIETY** (Wild / Mild) and **EVENT ENEMIES** (both shown only with the randomizer on), **SEED**, **NEW RANDOM SEED**, then **EXTRA ENEMIES**, **REARRANGED**, and **CUTSCENE CAST** (it shows its mode), which opens a page of its own: **RANDOMIZE CAST** (Off / Characters / Enemies / Both), **CHARACTER MODELS** (Cutscene models / All models; with Characters) and **ASSIGNMENT** (Fixed per character / Random per cutscene; while on), and **IMPORTED MODELS** (On / Off; with Characters, shown only to a player who has imported models). BACK returns to the RANDOMIZER page. See [ACTORS.md](ACTORS.md) "Cutscene cast". |
+| **RANDOMIZER** | The enemy options: **RANDOMIZER**, **VARIETY** (Wild / Mild) and **EVENT ENEMIES** (both shown only with the randomizer on), **SEED**, **NEW RANDOM SEED**, then **EXTRA ENEMIES**, **REARRANGED**, and **CUTSCENE CAST** (it shows On or Off), which opens a page of its own: **RANDOMIZE CAST** (On / Off), **CHARACTER MODELS** (Cutscene models / All models) and **ASSIGNMENT** (Fixed per character / Random per cutscene; both while on), and **IMPORTED MODELS** (On / Off; while on, shown only to a player who has imported models). BACK returns to the RANDOMIZER page. See [ACTORS.md](ACTORS.md) "Cutscene cast". |
 | **EXTRA EVENTS** | Rules for single events: **QUICK START** (On / Off, see "Quick start"; hidden and off while BioRand is on), **METAL DETECTOR** (Skipped / As original, see "Metal detector"). |
 
 Confirm or a click opens a page; BACK (or cancel, or a right click) returns to GAME RULES on its
@@ -1068,14 +1068,14 @@ floor or trigger, "Yes" chosen, an item used) hold only where the player did it.
   The joiner realizes it into the same slot; one that arrives while the joiner's room does not run
   waits (up to 900 frames). It also carries the randomizer records the host had to keep.
 * `EV_EOPTS` (host): the enemy options (extra, placements, randomizer, seed, variety, event
-  enemies, and the cutscene cast's mode, models, assignment and imported models: protocol 29), at
+  enemies, and the cutscene cast's on/off, models, assignment and imported models: protocol 29), at
   every new session, before each game state and on every change. Placements and
   randomizer are computed from the room file (records, script, collision) and the seed only, so
   both make the same records in the same slots, event records included.
 * More than 48 active enemy slots are sent as a moving window of 48 per frame.
 * **The cutscene cast** ([ACTORS.md](ACTORS.md) "Cutscene cast") is computed on each side from the
-  host's options, the room file and the seed only, so both draw the same models; nothing per record
-  is sent (it is only drawn: the records, their slots and snapshots are untouched). A side that runs
+  host's options, the room file and the seed only, so both draw the same models in the same scenes;
+  nothing per record is sent (it is only drawn: the records, their slots and snapshots are untouched). A side that runs
   out of display slots or texture memory shows that record as itself, only on its own screen.
 * **Imported models** in the cast: each side sends the identity of its imported models list in
   `PoseExt.imp_id` (`cast_import_id`: a hash of the names and groups in list order, 0 none). With the
@@ -1305,7 +1305,7 @@ enemy's (`mode[0]` 0) to one whose own Init ran.
 | `EV_BOX` | 12 | either | Shared item box: words taken out and put in (up to 16) |
 | `EV_BOXFIX` | 13 | host | Box correction: items the joiner could not have |
 | `EV_SPAWN` | 14 | host | An added enemy (`SpawnNote`), or a randomizer record the host kept |
-| `EV_EOPTS` | 15 | host | Enemy options: extra 0..3, placements, randomizer, seed, variety 0..1, event enemies 0..1, cutscene cast 0..3, its models 0..1, assignment 0..1, imported models 0..1 |
+| `EV_EOPTS` | 15 | host | Enemy options: extra 0..3, placements, randomizer, seed, variety 0..1, event enemies 0..1, cutscene cast 0..1, its models 0..1, assignment 0..1, imported models 0..1 |
 | `EV_ATR` | 16 | either | 1..2 room records (wall, trigger, floor, object) after a world event |
 | `EV_FX` | 17 | either | An effect started here (`FX_BURST` 308, `FX_PARTICLE` 302, `FX_ARM`, or a generic entry). What it follows (`idx`), its model's owner and `exp0` are each an enemy slot or, with their bit in `refs` (`FXR_IDX` 1, `FXR_OWNER` 2, `FXR_EXP0` 4), `FX_RECEIVER` 0, `FX_SENDER` 1 or `FX_NONE` 2 |
 | `EV_GRANT` | 18 | either | An event gave the sender an item: item, count, floor, position |

@@ -91,7 +91,6 @@ const char* appear_group(int chr);    /* the list's group of chr (the lobby's mo
 int  actor_set(int who, int idx);       /* 1 = shown (a failed entry is not retried) */
 int  actor_shown(int who);
 int  actor_rigged(int who);             /* its model is posed from a source's skeleton (a humanoid node map was found) */
-int  actor_mapped(int who);             /* its last pose came from the source's skeleton (the source has a humanoid node map too) */
 struct BH_PWORK;
 void actor_pose(int who, struct BH_PWORK* src);   /* after src's bhSetMotion and bhCalcModel */
 void actor_draw(int who);               /* bhPutModel: the caller sets camera matrix, lights, textures state */

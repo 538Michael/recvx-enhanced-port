@@ -8,9 +8,9 @@
   like the other ammo. Off: each pickup takes its own slot, as in the original.
 - **As played (cutscene)** (You appear as, second entry): the character you play in its cutscene
   model, also after the story switches to another character.
-- **Cutscene cast randomizer** (Gameplay, also in the co-op lobby): the characters and zombies of
-  cutscenes appear as other models from the enemy seed, the same one per character or a new one each
-  cutscene; with cutscene models their faces keep moving with the lines.
+- **Cutscene cast randomizer** (Gameplay, also in the co-op lobby): in cutscenes the story characters
+  appear as other models from the enemy seed, the same one per character or a new one each cutscene;
+  with cutscene models their faces keep moving with the lines.
 
 ### Fixes
 

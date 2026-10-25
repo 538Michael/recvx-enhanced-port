@@ -262,7 +262,7 @@ until the right square on the white strip is.
 | Randomizer variety | Wild | Wild: any kind that fits. Mild: two common kinds per room |
 | Randomize event enemies | On | event enemies change too |
 | Enemy seed | 0 | the same seed gives the same enemies (and the same cutscene cast) |
-| Randomize cutscene cast | Off | see [Cutscene cast](#cutscene-cast): Off, Characters, Enemies or Both |
+| Randomize cutscene cast | Off | see [Cutscene cast](#cutscene-cast): the story characters as other models in cutscenes |
 | Character models | Cutscene models (faces move) | where the characters' new looks come from |
 | Assignment | Fixed per character | Fixed: the same model in every cutscene. Random per cutscene: each cutscene room picks again |
 
@@ -271,13 +271,13 @@ options and ink ribbons count for both.
 
 #### Cutscene cast
 
-GAMEPLAY, under CUTSCENE CAST (and in the co-op lobby: GAME RULES, RANDOMIZER, CUTSCENE CAST). The
-people and zombies of the cutscenes are shown as other models; nothing else changes: the scenes,
-the voices, the enemies and what they do stay as they are.
+GAMEPLAY, under CUTSCENE CAST (and in the co-op lobby: GAME RULES, RANDOMIZER, CUTSCENE CAST). In
+cutscenes the story characters are shown as other models; nothing else changes: the scenes, the
+voices and what happens stay as they are.
 
-* **Randomize cutscene cast**: *Characters* swaps the story characters (Alfred, Alexia, Steve,
-  Rodrigo, Wesker, and Claire or Chris while you play the other one); *Enemies* the zombies (and
-  Hunters) that the cutscenes show, each as another look of its kind; *Both*.
+* **Randomize cutscene cast**: On swaps the story characters (Alfred, Alexia, Steve, Rodrigo, Wesker,
+  the man in the hazmat suit, and Claire or Chris while you play the other one) while a cutscene runs.
+  A character who stays in the room afterwards is itself again once you have control.
 * **Character models**: *Cutscene models* picks among the characters' cutscene models: their mouths
   move with the lines and their eyes look where the original character's do (the voice stays the
   original character's). *All models* also uses the player models, the creatures and the zombies;
