@@ -265,6 +265,9 @@ co-op partner):
 3. Sub-models only the original has (Claire's 5..7: the moth egg takes `mdl[6]`, `skp[7]`) keep
    the original's; `owP[7]`/`owP[11]` get `flg |= 0x8` as in `bhSetPlayer`; the hair/sunglasses
    object is set up for the new mesh. Putting the original back copies the saved `ML_WORK`s.
+   The partner (`load_player`) has one model buffer: the mesh is loaded behind the motion file's
+   model, so the motion file's extra sub-models stay, with their textures (before, the mesh
+   overwrote them: an egg laid on a Claire partner shown as Chris, Steve or Wesker took other bytes).
 
 * When the game reloads the player (game start, load, continue, story switch) the mesh is applied
   again at the next frame in control. The original is put back before the game lets go of the
@@ -520,7 +523,9 @@ their file, `appear_part_anim`):
   Every tick after the source's motion the copy plays the same motion number at the source's
   phase, with its `mtn_md` and flip table, blending whenever the source blends; neck and head
   take the source's angles; the third-person aim bend applies too (`tps_bend`). A slot the other
-  character lacks (Claire's 90..97) and room-set acting play the source's own motion. In a grab
+  character lacks and room-set acting play the source's own motion, the other sex's (Claire's
+  90..92, the moth larva, on a man; Chris's, Steve's and Wesker's 51, 57, 58 and Steve's 30 on a
+  woman; weapon files 6, 13 and 18 differ too); it is always loaded. In a grab
   `appear_grab_motion` picks the other character's motion of the enemy's set (zombie
   400/425/450/425, Gulp Worm 21/29, Black Widow 14 * `ply_id`, Cerberus 100/105, bat 30/33/36,
   Bandersnatch 100/110/120, Alexia 2 10/16, Giant Black Widow 60/66).

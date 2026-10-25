@@ -103,6 +103,7 @@ static int frozen;                      /* both players are in the trade screen:
    for another character wrote theirs */
 static float self_bone[22][3], p2_bone[22][3];
 static int p2_other_mesh;
+static int p2_mdl_kept;                /* load_player: sub-models of the motion file kept under another mesh (their textures) */
 
 static void save_bones(ML_WORK* m, float (*bone)[3])
 {
@@ -152,7 +153,7 @@ static int read_part(int file)   /* into p2file (actor_glue.c afs_read) */
 static void release_textures(void)
 {
     int i;
-    for (i = 0; i < ply2.mdl_n; i++)
+    for (i = 0; i < ply2.mdl_n || i < p2_mdl_kept; i++)
         if (ply2.mdl[i].texP) njReleaseTexture(ply2.mdl[i].texP);
     for (i = 0; i < 2; i++)
         if (p2wpn[i].mlwP && p2wpn[i].mlwP != &no_model && p2wpn[i].mlwP->texP) njReleaseTexture(p2wpn[i].mlwP->texP);
@@ -177,6 +178,7 @@ static void forget(void)
     memset(p2wpn, 0, sizeof(p2wpn));
     memset(p2obj, 0, sizeof(p2obj));
     p2_chr = p2_mfile = p2_wpn = -1;
+    p2_mdl_kept = 0;
 }
 
 /* A player model from p2file (actor_glue.c player_model_read) */
@@ -206,10 +208,24 @@ static int load_player(int chr, int costume, int mfile)
     memset(&p2, 0, sizeof(p2));
     read_player(&ply2, p2.plmdl, p2.plbmt, p2.plmth, p2.plzmt);
     if (ply2.mdl_n && mesh != mfile) {
-        release_textures();
+        /* the mesh goes behind the motion file's model, so the sub-models only that file has stay, with their
+           textures, as self_load keeps them for us: Claire's 5..7, the moth egg (en27 takes plp->mdl[6..7] and
+           plp->skp[7] of the player it is laid on; over the first model they were another file's bytes) */
+        BH_PWORK own = ply2;
+        int end = 0, keep;
+        for (i = 0; i < own.mdl_n; i++)
+            if (own.mdl[i].owP && (unsigned char*)(own.mdl[i].owP + own.mdl[i].obj_num) - p2.plmdl > end)
+                end = (unsigned char*)(own.mdl[i].owP + own.mdl[i].obj_num) - p2.plmdl;
+        end = (end + 63) & ~63;
         memset(ply2.skp, 0, sizeof(ply2.skp));   /* the loader leaves stale skin pointers */
-        if (!read_part(mesh + 10)) { forget(); return 0; }
-        read_player(&ply2, p2.plmdl, p2sink.bmt, p2sink.mth, p2sink.zmt);
+        if (!read_part(mesh + 10)) { release_textures(); forget(); return 0; }
+        keep = end + *(unsigned int*)p2file + 8192 <= sizeof(p2.plmdl);   /* (its model block and O_WORKs; the disc's files fit) */
+        if (!keep) { release_textures(); end = 0; }
+        read_player(&ply2, p2.plmdl + end, p2sink.bmt, p2sink.mth, p2sink.zmt);
+        for (i = 0; keep && i < own.mdl_n; i++)
+            if (i < ply2.mdl_n) { if (own.mdl[i].texP) njReleaseTexture(own.mdl[i].texP); }
+            else { ply2.mdl[i] = own.mdl[i]; ply2.skp[i] = own.skp[i]; ply2.mbp[i] = own.mbp[i]; ply2.txp[i] = own.txp[i]; }
+        if (keep) { bhGarbageTexture(NULL, 0); p2_mdl_kept = own.mdl_n; }
         ply2.mnwP = ply2.mnwPb = (MN_WORK*)p2.plmth;
     }
     p2_other_mesh = ply2.mdl_n && mesh != mfile;

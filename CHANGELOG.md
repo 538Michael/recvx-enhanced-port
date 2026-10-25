@@ -29,6 +29,8 @@
   instead of being lost.
 - **Partner's event items** (co-op): an item from an event lying on the floor for the partner no
   longer crashes the game in some rooms, such as the lockpick in the room where the game starts.
+- **Albinoids and moth eggs**: an adult Albinoid no longer crashes the game while a young one holds
+  you, and a moth egg laid on a co-op partner shown as another playable character is drawn properly.
 
 ## 0.6.9 (2026-10-24)
 
