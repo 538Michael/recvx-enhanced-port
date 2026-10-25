@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased
+## 0.7.0 (2026-10-25)
+
+A build from 538Michael's fork, not an official release: 0.6.10 plus the subtitles of
+[pull request #76](https://github.com/aikatore/recvx-enhanced-port/pull/76). No subtitle files are
+included; a fan-made pack is at [538Michael/recvx-subtitles](https://github.com/538Michael/recvx-subtitles).
 
 ### Display
 
