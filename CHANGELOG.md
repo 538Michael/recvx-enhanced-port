@@ -1,6 +1,11 @@
 # Changelog
 
-## Unreleased
+## 0.8.0 (2026-10-26)
+
+A build from 538Michael's fork, not an official release: 0.6.10 plus subtitles and game languages.
+No subtitle files or language packs are included; fan-made packs are at
+[538Michael/recvx-subtitles](https://github.com/538Michael/recvx-subtitles) and
+[538Michael/recvx-ptbr](https://github.com/538Michael/recvx-ptbr) (Brazilian Portuguese).
 
 ### Display
 
