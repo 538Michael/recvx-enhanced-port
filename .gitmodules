@@ -1,4 +1,4 @@
 [submodule "decomp"]
 	path = decomp
-	url = https://github.com/aikatore/recvx-decomp.git
-	branch = pc-port
+	url = https://github.com/538Michael/recvx-decomp.git
+	branch = game-language
