@@ -72,17 +72,19 @@ void pc_save_list(SELECTFILEWINDOW* win, MEMORYCARDSTATE* mc, int saving)
 
 /* mcDisplayFileSelectWindow's header (MEMORY CARD and the slot, messages 463 and 464 + port, at
    y 32): with native saves "Load Game" / "Save Game" instead, as a message in the game's font
-   (codes: ASCII - 32, 0xFF01 a space) drawn by bhDispMessage the same way, centred above the list */
+   (codes: ASCII - 32, 0xFF01 a space) drawn by bhDispMessage the same way, centred above the list;
+   in the game language where it has one (exe/load_game, exe/save_game) */
 int pc_save_header(void)
 {
+    static unsigned short heads[2][16];   /* (each its own: the language's copies are kept by address) */
     const char* s = listing_save ? "Save Game" : "Load Game";
-    unsigned short mes[16];
+    unsigned short* mes = heads[listing_save != 0];
     void* keep = sys->mes_tp;
     int i;
     if (!native) return 0;
     for (i = 0; s[i]; i++) mes[i] = s[i] == ' ' ? 0xFF01 : s[i] - 32;
     mes[i] = 0xFFFF;
-    sys->mes_tp = mes;
+    sys->mes_tp = (void*)pc_lang_str(mes, listing_save ? "exe/save_game" : "exe/load_game");
     bhDispMessage(320.0f - bhMesLen(mes) / 2, 32.0f, 0, 2, 0, 0, 0);
     sys->mes_tp = keep;
     return 1;

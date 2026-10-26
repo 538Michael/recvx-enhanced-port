@@ -30,6 +30,7 @@
 #include "../src/host/menu_mouse.h"
 #include "../src/host/lobby.h"
 #include "../src/host/settings.h"
+#include "../src/host/lang.h"
 #include "../src/host/enemies.h"
 #include "../src/host/biorand.h"
 #include "../src/net/net.h"
@@ -61,15 +62,23 @@ enum { BTN_START = 0x800, BTN_UP = 0x1000, BTN_RIGHT = 0x2000, BTN_DOWN = 0x4000
 #define Z_DIM 0.012f                    /* behind the models */
 #define Z_FRONT 0.3f                    /* in front of them */
 
-static int code_of(char c) { return c > 32 && c < 127 ? c - 32 : 0; }
-static float adv(int c) { return c ? FontSz[c] : 11.0f; }   /* the font's space is a full cell */
+/* the glyph of the character at *p, advanced past it (UTF-8: the game language's drawn letters, as in
+   its item names; others a space) */
+static int code_of(const char** p)
+{
+    int c;
+    if ((unsigned char)**p < 0x80) { c = **p > 32 && **p < 127 ? **p - 32 : 0; (*p)++; return c; }
+    c = lang_utf8_code(p);
+    return c > 0 && lang_active() ? c : 0;
+}
+static float adv(int c) { return c ? lang_font_width(c) : 11.0f; }   /* the font's space is a full cell */
 
 #define TRACK 0.88f                     /* a little tighter than the game's messages */
 
 static float text_w(const char* s, float sc)
 {
     float w = 0;
-    for (; *s; s++) w += adv(code_of(*s)) * sc * TRACK;
+    while (*s) w += adv(code_of(&s)) * sc * TRACK;
     return w;
 }
 
@@ -85,8 +94,8 @@ static void text(float x, float y, const char* s, float sc, unsigned int argb)
     if (!font_ok) return;
     bhFontScaleSet(sc, sc, sc);
     for (pass = 0; pass < 2; pass++)
-        for (p = s, x = x0; *p; p++) {
-            int c = code_of(*p);
+        for (p = s, x = x0; *p;) {
+            int c = code_of(&p);
             NJS_POINT2 pos = { x + (pass ? 0 : 2), y + (pass ? 0 : 2) };
             if (c) bhDispFontEx(&pos, c, pass ? argb : (argb & 0xFF000000) >> 1 & 0xFF000000, PRI_TEXT);
             x += adv(c) * sc * TRACK;
@@ -151,11 +160,18 @@ static const struct { short u, v, w; } mp_letters[] = {
     { 67, 320, 23 },  /* R of NORMAL */
 };
 
+static void title_font(void);
 static void mp_word(float cx, float y, unsigned int col, unsigned int shadow, float scale)
 {
     float w = 0, x;
     int i;
     QUAD q;
+    if (lang_pictures()) {   /* the game language's title pictures lack these letters: the game's font (lang.h) */
+        title_font();
+        text(cx - text_w("MULTIPLAYER", 0.85f * scale) / 2, y + 4 * scale, "MULTIPLAYER", 0.85f * scale, col);
+        AdvEasySetTextureList(0);   /* the title's texture list again */
+        return;
+    }
     for (i = 0; i < (int)(sizeof(mp_letters) / sizeof(mp_letters[0])); i++) w += (mp_letters[i].w + 1) * scale;
     x = cx - w / 2;
     for (i = 0; i < (int)(sizeof(mp_letters) / sizeof(mp_letters[0])); i++) {

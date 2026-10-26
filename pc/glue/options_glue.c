@@ -16,6 +16,7 @@
 #include "../src/host/bindings.h"
 #include "../src/host/menu_mouse.h"
 #include "../src/host/tps.h"
+#include "../src/host/lang.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -93,16 +94,24 @@ static const Glyph w_title[] = { G_R, G_E, G_T, G_U, G_R, G_N, G_SP, G_T, G_O, G
 static const Glyph w_yes[] = { G_Y, G_E, G_S };
 static const Glyph w_no[] = { { 65, 320, 19, 19 }, { 44, 320, 19, 19 } };   /* ON's letters, as ON / OFF */
 
-static float word_w(const Glyph* g, int n)
+/* with the game language's own option pictures the letters are not there: the word in the game's font (lang.h) */
+#define W_SC 0.8f
+static float word_w(const Glyph* g, int n, const char* text)
 {
     float w = 0;
+    if (lang_pictures()) return pc_ui_text_w(text, W_SC);
     for (int i = 0; i < n; i++) w += g[i].dw + 1;
     return w;
 }
 
-static void word(const Glyph* g, int n, float x, float y, unsigned int col, float z)
+static void word(const Glyph* g, int n, const char* text, float x, float y, unsigned int col, float z)
 {
     QUAD* q = &Qtex[15];
+    if (lang_pictures()) {
+        pc_ui_text(x, y + 4, text, W_SC, col);
+        AdvEasySetTextureList(0);   /* the option screen's textures again (the font set its own) */
+        return;
+    }
     pc_tex_keep_original(0);
     for (int i = 0; i < n; i++) {
         if (g[i].u >= 0) {
@@ -116,8 +125,8 @@ static void word(const Glyph* g, int n, float x, float y, unsigned int col, floa
 
 static unsigned int pulse(void) { return ((unsigned int)AdvWork.FlushCount2 + 255) << 24 | 0xFFFFFF; }
 static unsigned int row_col(int i) { return OptionDef[i].SelectFlag ? pulse() : 0x7FAFAFAF; }   /* as the other rows */
-static float row8_x(void) { return ROW_RIGHT - word_w(w_enhanced, N_OF(w_enhanced)); }   /* right-aligned with the values */
-static float row9_x(void) { return ROW_RIGHT - word_w(w_title, N_OF(w_title)); }
+static float row8_x(void) { return ROW_RIGHT - word_w(w_enhanced, N_OF(w_enhanced), "ENHANCED SETTINGS"); }   /* right-aligned with the values */
+static float row9_x(void) { return ROW_RIGHT - word_w(w_title, N_OF(w_title), "RETURN TO TITLE"); }
 
 /* RETURN TO TITLE's question, over the option screen in the game's window: NO preselected; left/right
    (or hover) choose, confirm or a click answers, cancel or a right click is NO. YES leaves the option
@@ -129,7 +138,7 @@ static struct { int open, yes, go; } quit;
 #define Q_Y0 180.0f
 #define Q_Y1 316.0f
 #define Q_YN_Y 268.0f
-static float q_x(int yes) { return yes ? 320 - 56 - word_w(w_yes, 3) : 320 + 56; }
+static float q_x(int yes) { return yes ? 320 - 56 - word_w(w_yes, 3, "YES") : 320 + 56; }
 
 void pc_options_quit_open(void) { quit.open = 1; quit.yes = 0; }
 int pc_options_quit_title(void) { int go = quit.go; quit.go = 0; return go; }
@@ -142,7 +151,7 @@ int pc_options_quit(int port)
     menu_mouse_take(&mt);
     if (mt.y >= Q_YN_Y - 4 && mt.y < Q_YN_Y + 36)
         for (int k = 0; k < 2; k++)
-            if (mt.x >= q_x(k) - 12 && mt.x < q_x(k) + word_w(k ? w_yes : w_no, k ? 3 : 2) + 12) hit = k;
+            if (mt.x >= q_x(k) - 12 && mt.x < q_x(k) + word_w(k ? w_yes : w_no, k ? 3 : 2, k ? "YES" : "NO") + 12) hit = k;
     if (hit >= 0 && (mt.moved || mt.left) && hit != quit.yes) { quit.yes = hit; CallSystemSe(0, 2); }
     if (press & (P_LEFT | P_RIGHT)) { quit.yes ^= 1; CallSystemSe(0, 2); }
     else if ((mt.left && hit >= 0) || (press & (ok_button() | P_START))) {
@@ -161,8 +170,8 @@ static void quit_draw(void)
     float sc2 = coop_on ? 0.5f : 0.6f;
     pc_ui_rect(Q_X0, Q_Y0, Q_X1, Q_Y1, 0xE0000000, 0.19f);
     AdvEasyDrawWindow(&tl, &br, 0xFFAFAFAF, 0x3F5F5F5F);
-    word(w_yes, 3, q_x(1), Q_YN_Y, quit.yes ? pulse() : 0x7FAFAFAF, 0.3f);
-    word(w_no, 2, q_x(0), Q_YN_Y, quit.yes ? 0x7FAFAFAF : pulse(), 0.3f);
+    word(w_yes, 3, "YES", q_x(1), Q_YN_Y, quit.yes ? pulse() : 0x7FAFAFAF, 0.3f);
+    word(w_no, 2, "NO", q_x(0), Q_YN_Y, quit.yes ? 0x7FAFAFAF : pulse(), 0.3f);
     pc_ui_text(320 - pc_ui_text_w(l1, 0.7f) / 2, Q_Y0 + 22, l1, 0.7f, 0xFFFFFFFF);
     pc_ui_text(320 - pc_ui_text_w(l2, sc2) / 2, Q_Y0 + 54, l2, sc2, 0xFFC0C0C0);
     AdvEasySetTextureList(0);   /* the option screen's textures again (the font set its own) */
@@ -171,8 +180,8 @@ static void quit_draw(void)
 /* DisplayOptionPlateLevel0, with the other rows: drawn as they are (dim, or pulsing when selected) */
 void pc_options_rows0(void)
 {
-    word(w_enhanced, N_OF(w_enhanced), row8_x(), 352.0f, row_col(7), 0.05f);
-    if (pc_in_game()) word(w_title, N_OF(w_title), row9_x(), 320.0f, row_col(8), 0.05f);
+    word(w_enhanced, N_OF(w_enhanced), "ENHANCED SETTINGS", row8_x(), 352.0f, row_col(7), 0.05f);
+    if (pc_in_game()) word(w_title, N_OF(w_title), "RETURN TO TITLE", row9_x(), 320.0f, row_col(8), 0.05f);
     if (quit.open) quit_draw();
 }
 

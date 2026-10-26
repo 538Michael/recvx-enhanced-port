@@ -6,6 +6,7 @@
 #include "../../decomp/include/ps2/veronica/prog/types.h"
 #include "../src/gs/stream.h"
 #include "../src/gs/textures.h"
+#include "../src/host/lang.h"
 #include "../../decomp/include/ps2/veronica/prog/main.h"
 #include "../../decomp/include/ps2/veronica/prog/ps2_NaTextureFunction.h"
 #include <stdlib.h>
@@ -85,7 +86,7 @@ static int is_font(const void* tim2)
                                               texture slots its list points to are reused) */
     for (int i = 0; i < 4; i++) {
         const NJS_TEXMEMLIST* m = (const NJS_TEXMEMLIST*)(uintptr_t)sys->ef_tex[i].texaddr;
-        if (m && m->texinfo.texsurface.pSurface == tim2) return 1;
+        if (m && m->texinfo.texsurface.pSurface == tim2) return i ? NTEX_FONT : NTEX_FONT | NTEX_FONT0;
     }
     return 0;
 }
@@ -102,6 +103,7 @@ void pc_tex_keep_original(int texno)
 {
     const NJS_TEXMEMLIST* m;
     const void* t;
+    if (lang_pictures()) return;   /* the game language's menu pictures show; the entries are written in the font (lang.h) */
     if (!Ps2_current_texlist || texno < 0 || texno >= (int)Ps2_current_texlist->nbTexture) return;
     m = (const NJS_TEXMEMLIST*)(uintptr_t)Ps2_current_texlist->textures[texno].texaddr;
     if (!m || !(t = m->texinfo.texsurface.pSurface)) return;
@@ -111,7 +113,7 @@ void pc_tex_keep_original(int texno)
 
 static unsigned int tex_flags(const void* tim2)
 {
-    unsigned int f = is_font(tim2) ? NTEX_FONT : 0;
+    unsigned int f = (unsigned int)is_font(tim2);
     for (int i = 0; i < NKEEP; i++) if (keep[i] == tim2) f |= NTEX_KEEP;
     return f;
 }

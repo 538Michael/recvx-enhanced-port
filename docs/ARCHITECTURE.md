@@ -508,6 +508,17 @@ village, collision. The render thread (GS emulation, replays: `r_exec`, `r_inter
     the factor is 1 and the sprite is the game's.
   - Movie frames have no tagged 3D, so the in-between path never blends or replays them: each
     display refresh shows the latest executed frame.
+  - **Game language** (`pc/src/host/lang.c`; the packs: [TRANSLATING.md](TRANSLATING.md)): the
+    decomp hands each message table to `pc_lang_table` as it loads it (`system.c`, `bup_00.c`,
+    `ranking.c` for `sysmes.ald`; `room.c bhSetRoom` for `rom->mesp`; `adv.c` for `MsgPtr` and
+    `SaveLoadMessage`) and its built-in strings to `pc_lang_str`, and gets a translated copy
+    (cached by content, 1 KB of 0xFF after it for the 1 KB copies of `EasyDispMessage`). The
+    letters the US font lacks are drawn into font page 0's free cells (codes 96 and up) on the
+    decoded page (`textures.c decode`, tag `NTEX_FONT0`) and on an HD pack's page
+    (`hdpack.c font_letters`), after the HD key is taken; `bhGetFontSize` gives codes 96 and up to
+    `pc_lang_font_width`. The pack's pictures (`<mods>/lang/<code>/textures`) are indexed first
+    and used without the content check; `pc_tex_keep_original` is then off, and the port's
+    cut-letter entries are written in the font. English changes nothing.
   - **Subtitles** (`subtitles.c`; the files: [SUBTITLES.md](SUBTITLES.md)). The voice clips' part is
     under "ADX" above; for movies:
     - Loading: `initAll` loads `<mods>/subtitles/MV_nnn.srt` for the file being opened

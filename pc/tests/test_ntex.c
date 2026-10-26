@@ -31,6 +31,8 @@ void gs_get_palette(uint64_t tex0, uint64_t texa, uint32_t* out, int n) { (void)
 uint32_t gs_pixel_addr(int psm, uint32_t bp, uint32_t bw, uint32_t x, uint32_t y) { (void)psm; (void)bw; (void)x; (void)y; return bp * 256; }
 int hdpack_active(void) { return 0; }
 void hdpack_note(unsigned int t, uint64_t tex0, uint64_t texa, int flags) { (void)t; (void)tex0; (void)texa; (void)flags; }
+int lang_active(void) { return 0; }
+void lang_font_compose(uint32_t* rgba, int w, int h) { (void)rgba; (void)w; (void)h; }
 
 /* definition `id` named by the letter c: an image of `pages` pages at block 0 */
 static void define(uint32_t id, char c, uint32_t pages)

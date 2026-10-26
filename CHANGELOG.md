@@ -19,6 +19,14 @@
 - **Subtitle font** (DISPLAY): "Game" draws the subtitles in the game's own lettering, made at start
   from the font on your disc and kept in memory (a font file you add, `mods/subtitles/fonts/cvx.otf`,
   replaces it); "Modern" in a system font.
+- **Game language** (DISPLAY, next start): the game's own text (messages, item names and
+  descriptions, files, the title's and the memory card's messages) and the words in its pictures in
+  another language, from a language pack in `mods/lang/<code>/`; none is included. The letters the
+  disc's font lacks (accents, cedilla) are drawn into it at start from its own letters, also into an
+  HD font page. The map's area labels (models of letters) come from the pack too. A sentence the
+  pack lacks stays English. The subtitles follow the language when
+  `mods/subtitles` has it. See the user guide, "Game language"; making a pack: TRANSLATING.md
+  (`pc/tools/lang.py` lists the English from your disc and checks a translation).
 
 ## 0.6.10 (2026-10-25)
 

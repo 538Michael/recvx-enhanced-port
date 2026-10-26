@@ -60,6 +60,7 @@ void settings_apply_window(void);               /* main thread: the window size 
 void settings_apply_display(void);              /* main thread: windowed / borderless / exclusive from g_config (F11, Display mode) */
 void settings_display_modes(void);              /* main thread: reread the window's display's modes, refit a borderless window (start, display change) */
 void settings_subtitle_languages(void);         /* main thread, at start: the subtitle languages in mods/subtitles, and the one chosen */
+void settings_game_languages(void);             /* main thread, at start: the game languages in mods/lang, the one chosen loaded */
 
 /* game thread glue (options_glue.c) */
 int  pc_in_game(void);

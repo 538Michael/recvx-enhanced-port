@@ -12,6 +12,7 @@
 void bhSetMessage(int mes_typ, int mes_idx);   /* message.h (its macros.h clashes with this file's headers) */
 #include "../src/host/cheat.h"
 #include "../src/host/coop.h"
+#include "../src/host/lang.h"
 #include "../src/net/coop_proto.h"
 #include "pc_rules.h"
 #include <stdio.h>
@@ -340,8 +341,15 @@ static void publish(char* out, int size, const unsigned int* tab, int i)
     const unsigned short* dp = (const unsigned short*)((const char*)tab + ofs);
     char name[32] = { 0 };
     int n = 0;
-    if (ofs < 0x40000)   /* sysmes.ald is 87 KB */
-        for (; n < size - 1 && *dp != 0xFFFF; dp++) name[n++] = *dp == 0xFF01 ? ' ' : *dp < 95 ? (char)(*dp + 32) : '?';
+    if (ofs < 0x40000)   /* sysmes.ald is 87 KB (in the game language the table is a copy, as long or longer) */
+        for (; n < size - 1 && *dp != 0xFFFF; dp++) {
+            char u[4];
+            int k = *dp == 0xFF01 ? (u[0] = ' ', 1) : *dp < 95 ? (u[0] = (char)(*dp + 32), 1) : lang_code_utf8(*dp, u);   /* (the game language's letters as UTF-8) */
+            if (!k) u[0] = '?', k = 1;
+            if (n + k > size - 1) break;
+            memcpy(name + n, u, (size_t)k);
+            n += k;
+        }
     while (n && name[n - 1] == ' ') name[--n] = 0;   /* "Starting Part 2 " */
     if (!memcmp(name, out, size)) return;
     __atomic_store_n(&out[0], 0, __ATOMIC_RELEASE);

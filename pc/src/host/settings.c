@@ -18,6 +18,7 @@
 #include "../net/update.h"
 #include "../audio/audio.h"
 #include "../movie/subtitles.h"
+#include "lang.h"
 #include <SDL3/SDL.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -194,6 +195,29 @@ static void slang_set(int v)
     subs_set_language(g_config.subtitle_lang);
 }
 static const char* slang_name(int v, char* b, int n) { snprintf(b, n, "%s", v > 0 && v <= sub_langs ? sub_names[v - 1] : "English"); return b; }
+/* Game language: English or one of mods/lang/<code>/game.json, listed at start; the game reads it then
+   (lang.c: its text tables, letters and pictures are set up once). The subtitles follow it when
+   mods/subtitles has the same language. */
+static char game_codes[MAX_SUB_LANGS][16], game_names[MAX_SUB_LANGS][64];
+static int game_langs;
+void settings_game_languages(void)
+{
+    game_langs = lang_languages(game_codes, game_names, MAX_SUB_LANGS);
+    lang_init(g_config.game_lang);
+}
+static int glang_n(void) { return game_langs + 1; }
+static int glang_get(void)
+{
+    for (int i = 0; i < game_langs; i++) if (!strcmp(g_config.game_lang, game_codes[i])) return i + 1;
+    return 0;
+}
+static void glang_set(int v)
+{
+    snprintf(g_config.game_lang, sizeof(g_config.game_lang), "%s", v > 0 && v <= game_langs ? game_codes[v - 1] : "");
+    for (int i = 0; i < sub_langs; i++)
+        if (!strcmp(g_config.game_lang, sub_codes[i])) { slang_set(i + 1); break; }
+}
+static const char* glang_name(int v, char* b, int n) { snprintf(b, n, "%s", v > 0 && v <= game_langs ? game_names[v - 1] : "English"); return b; }
 static const char* fullscreen_on(void) { return g_config.fullscreen ? "Only in windowed mode." : NULL; }
 /* Display mode: windowed / borderless / exclusive over fullscreen + fullscreen_exclusive (F11 flips
    only the first, so it returns to the kind chosen last) */
@@ -382,6 +406,8 @@ const Setting g_settings[] = {
     { SP_DISPLAY, "Camera vignette", V(g_config.screen_filter), 0, 2, 1, modes3, .help = "Original keeps it 4:3 in widescreen." },
     { SP_DISPLAY, "Screen effects", V(g_config.screen_effects), 0, 2, 1, modes3, .help = "Full-screen effect layers and the scope's tint. Original keeps them 4:3 in widescreen. The oil pressure puzzle's screen stays with Off (4:3)." },
     { SP_DISPLAY, "Movie zoom", V(g_config.movie_zoom), 0, 1, 1, .help = "Widescreen: movies grow, without stretching, until their black bars leave the screen (or the picture fills the width)." },
+    { SP_DISPLAY, "Game language", NULL, 0, 0, 1, .get = glang_get, .set = glang_set, .name = glang_name, .count = glang_n, .flags = SET_RESTART, .group = "LANGUAGE",
+      .help = "The game's text and pictures: English, or a language pack in mods/lang (see the user guide). The subtitles switch to it too when mods/subtitles has it." },
     { SP_DISPLAY, "Subtitles", V(g_config.subtitles), 0, 1, 1, .group = "SUBTITLES",
       .help = "Movies and cutscene dialogue show subtitles from SRT files you add to mods/subtitles (see the user guide). Without the files nothing changes." },
     { SP_DISPLAY, "Subtitle size", V(g_config.subtitle_size), 0, 2, 1, (const char* const[]){ "Small", "Medium", "Large" }, .locked = subs_off },

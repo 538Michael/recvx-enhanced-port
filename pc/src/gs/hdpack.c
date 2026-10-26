@@ -30,6 +30,7 @@
 #include "textures.h"
 #include "../render/gl_loader.h"
 #include "../ps2_platform.h"
+#include "../host/lang.h"
 #include "../../include/pc_parse.h"
 #include <SDL3/SDL.h>
 #include <stdio.h>
@@ -54,13 +55,15 @@ typedef struct {
     char why[64];           /* a rejection, for the log */
     uint8_t job, inq;       /* the loader threads' work on it; in their queue */
     uint8_t flags;          /* the lookup's NTEX_* tags as it was loaded */
+    uint8_t lang;           /* from the game language's pictures (<mods>/lang/<code>/textures): first, and used as they are */
+    uint16_t root;          /* the length of its folder's path: names are logged and cached relative to it */
     int8_t r;               /* read_check: the check's result, -1 none */
     void* data; size_t n;   /* the file read (DDS bytes, or a PNG as an RGBA surface), until uploaded */
     uint64_t rns, cns;      /* time it took to read and check */
 } Entry;
 static Entry* ents; static int nents, cents;
 static char* names; static size_t nnames, cnames;
-static size_t root_len;              /* names are logged and cached relative to the pack folder */
+static uint16_t scan_root; static uint8_t scan_lang;   /* the folder scan_cb is listing */
 static int state;                    /* 0 not set up, 1 a pack, -1 none */
 static uint32_t* map; static size_t cmap;   /* GL name -> entry + 1 | the definition's NTEX_* tags << 28 */
 static uint64_t clock_, bytes;
@@ -75,9 +78,9 @@ static int key_cmp(const Key* a, const Key* b)
     return a->tex != b->tex ? (a->tex < b->tex ? -1 : 1) : a->clut != b->clut ? (a->clut < b->clut ? -1 : 1)
          : a->bits != b->bits ? (a->bits < b->bits ? -1 : 1) : 0;
 }
-static const char* rel(const Entry* e) { return names + e->name + root_len; }
-/* equal keys (the same texture in several folders): by the path in the pack, '\\' read as '/', so
-   folders named 1_..., 2_... are in that order and lookups take the first */
+static const char* rel(const Entry* e) { return names + e->name + e->root; }
+/* equal keys (the same texture in several folders): the game language's first, then by the path in
+   the pack, '\\' read as '/', so folders named 1_..., 2_... are in that order and lookups take the first */
 static int path_cmp(const char* a, const char* b)
 {
     for (;; a++, b++) {
@@ -88,6 +91,7 @@ static int path_cmp(const char* a, const char* b)
 static int ent_cmp(const void* a, const void* b)
 {
     int c = key_cmp(&((const Entry*)a)->k, &((const Entry*)b)->k);
+    if (!c) c = ((const Entry*)b)->lang - ((const Entry*)a)->lang;
     return c ? c : path_cmp(rel(a), rel(b));
 }
 static int key_only_cmp(const void* a, const void* b) { return key_cmp(&((const Entry*)a)->k, &((const Entry*)b)->k); }
@@ -120,7 +124,7 @@ static SDL_EnumerationResult SDLCALL scan_cb(void* ud, const char* dir, const ch
     if (nents == cents) { cents = cents * 2 + 1024; ents = realloc(ents, (size_t)cents * sizeof(Entry)); }
     while (nnames + len > cnames) { cnames = cnames * 2 + 65536; names = realloc(names, cnames); }
     memcpy(names + nnames, path, len);
-    ents[nents++] = (Entry){ .k = k, .name = (uint32_t)nnames };
+    ents[nents++] = (Entry){ .k = k, .name = (uint32_t)nnames, .lang = scan_lang, .root = scan_root };
     nnames += len;
     return SDL_ENUM_CONTINUE;
 }
@@ -162,27 +166,44 @@ static void cache_load(void)
 }
 
 static void loader_start(void);
+/* the files of folder dir (and its folders) into the index, named relative to its first `root`
+   characters; lang: the game language's pictures */
+static int scan(const char* dir, size_t root, int lang)
+{
+    int n = nents;
+    if (!SDL_GetPathInfo(dir, NULL)) return 0;
+    scan_root = (uint16_t)root; scan_lang = (uint8_t)lang;
+    SDL_EnumerateDirectory(dir, scan_cb, (void*)(intptr_t)0);
+    for (int i = n; i < nents; i++)
+        while (names[ents[i].name + ents[i].root] == '/' || names[ents[i].name + ents[i].root] == '\\') ents[i].root++;
+    return nents - n;
+}
+
 static void setup(void)
 {
-    char dir[1100];
+    char dir[1100], ldir[1100];
     uint64_t t0 = SDL_GetTicks();
-    const char* e;
+    const char* e, *mods = SDL_getenv("RECVX_MODS") ? SDL_getenv("RECVX_MODS") : "mods";
+    int nlang = 0, npack = 0;
     state = -1;
     trace = SDL_getenv("RECVX_TRACE_HD") != NULL;
-    if (!g_config.hd_textures) return;
-    if ((e = SDL_getenv("RECVX_HD_TEXTURES"))) SDL_strlcpy(dir, e, sizeof(dir));
-    else if (g_config.hd_textures_dir[0]) SDL_strlcpy(dir, g_config.hd_textures_dir, sizeof(dir));
-    else SDL_snprintf(dir, sizeof(dir), "%s/textures", SDL_getenv("RECVX_MODS") ? SDL_getenv("RECVX_MODS") : "mods");
     if ((e = SDL_getenv("RECVX_HD_CACHE_MB"))) cap_bytes = (uint64_t)atoi(e) << 20;
-    if (!SDL_GetPathInfo(dir, NULL)) return;
-    SDL_EnumerateDirectory(dir, scan_cb, (void*)(intptr_t)0);
-    if (!nents) { host_log("hd textures: no PCSX2 replacement textures in %s\n", dir); return; }
-    root_len = strlen(dir);
-    while (names[ents[0].name + root_len] == '/' || names[ents[0].name + root_len] == '\\') root_len++;
+    if (lang_active()) {   /* the game language's pictures, also without HD textures (lang.c); named lang/<code>/textures/... */
+        SDL_snprintf(ldir, sizeof(ldir), "%s/lang/%s/textures", mods, lang_code());
+        nlang = scan(ldir, strlen(mods), 1);
+    }
+    if (g_config.hd_textures) {
+        if ((e = SDL_getenv("RECVX_HD_TEXTURES"))) SDL_strlcpy(dir, e, sizeof(dir));
+        else if (g_config.hd_textures_dir[0]) SDL_strlcpy(dir, g_config.hd_textures_dir, sizeof(dir));
+        else SDL_snprintf(dir, sizeof(dir), "%s/textures", mods);
+        if (!(npack = scan(dir, strlen(dir), 0))) host_log("hd textures: no PCSX2 replacement textures in %s\n", dir);
+    }
+    if (!nents) return;
     qsort(ents, (size_t)nents, sizeof(Entry), ent_cmp);
     state = 1;
-    host_log("hd textures: %d replacements in %s (indexed in %u ms, cache %u MB)\n", nents, dir,
-             (unsigned)(SDL_GetTicks() - t0), (unsigned)(cap_bytes >> 20));
+    if (nlang) host_log("hd textures: %d pictures of the game language in %s\n", nlang, ldir);
+    if (npack) host_log("hd textures: %d replacements in %s (indexed in %u ms, cache %u MB)\n", npack, dir,
+                        (unsigned)(SDL_GetTicks() - t0), (unsigned)(cap_bytes >> 20));
     {
         int dup = 0;
         for (int i = 1; i < nents; i++) dup += !key_cmp(&ents[i].k, &ents[i - 1].k) && (i < 2 || key_cmp(&ents[i - 1].k, &ents[i - 2].k));
@@ -293,8 +314,8 @@ void hdpack_note(unsigned int t, uint64_t tex0, uint64_t texa, int flags)
     if (e) hits++; else misses++;
     if (trace) host_log("hd textures: %s %llx-%llx-%x (tex0 %016llx%s)\n", e ? "hit " : "miss", (unsigned long long)k.tex,
                         (unsigned long long)k.clut, k.bits, (unsigned long long)tex0, flags & NTEX_FONT ? ", font" : flags & NTEX_KEEP ? ", port menu letters" : "");
-    if (e && (flags & NTEX_FONT) && !g_config.hd_textures_font) { fonts++; e = NULL; }   /* the game's own font */
-    map[t] = e ? ((uint32_t)(e - ents) + 1) | (uint32_t)(flags & 3) << 28 : 0;
+    if (e && (flags & NTEX_FONT) && !g_config.hd_textures_font && !e->lang) { fonts++; e = NULL; }   /* the game's own font */
+    map[t] = e ? ((uint32_t)(e - ents) + 1) | (uint32_t)(flags & 7) << 28 : 0;
     if (e && e->st == 0 && e->verdict == V_UNKNOWN && !e->orig && (e->orig = malloc((size_t)W * H * 4))) {
         gs_decode_texture(tex0, texa, W, H, e->orig);   /* for the check (GS memory and CLUT are this texture's now) */
         e->ow = (int)W; e->oh = (int)H;
@@ -494,7 +515,7 @@ static int nloading;               /* entries in st 1 */
    entries from) */
 static int usable(const Entry* e, uint32_t flags)
 {
-    if (e->verdict == V_OK) return 1;
+    if (e->verdict == V_OK || e->lang) return 1;   /* (the game language's pictures show other words on purpose) */
     if (e->verdict != V_REJECTED) return 0;
     return flags & NTEX_FONT ? g_config.hd_textures_font : g_config.hd_textures_ui && !(flags & NTEX_KEEP);
 }
@@ -588,6 +609,22 @@ static void loader_start(void)
     if (!n) qm = NULL;   /* loaded on the render thread */
 }
 
+/* the first font page in the game language: its letters drawn into the replacement too (lang.c), the
+   page as RGBA (a DDS decoded); NULL if it cannot be read */
+static SDL_Surface* font_letters(void* data, size_t n, int png)
+{
+    SDL_Surface* c = png ? data : NULL;
+    if (!png) {
+        Img m = { .cbx = -1, .cby = -1 };
+        if (!pc_dds_parse(data, n, n, &m.x) || !(c = SDL_CreateSurface((int)m.x.w, (int)m.x.h, SDL_PIXELFORMAT_ABGR8888))) return NULL;
+        m.d = data; m.w = (int)m.x.w; m.h = (int)m.x.h;
+        for (int y = 0; y < m.h; y++)
+            for (int x = 0; x < m.w; x++) memcpy((uint8_t*)c->pixels + y * c->pitch + x * 4, img_px(&m, x, y), 4);
+    }
+    if (c->pitch == c->w * 4) lang_font_compose(c->pixels, c->w, c->h);
+    return c;
+}
+
 /* the render thread's part: the verdict, the upload, the memory budget */
 static void finish(Entry* e)
 {
@@ -605,9 +642,15 @@ static void finish(Entry* e)
             fputs(line, f);
             fclose(f);
         }
-        if (e->r != 1) { host_log("hd textures: %s does not show the original (%s)%s\n", rel(e), e->why, usable(e, flags) ? "" : ", not used"); rejected++; }
+        if (e->r != 1 && !e->lang) { host_log("hd textures: %s does not show the original (%s)%s\n", rel(e), e->why, usable(e, flags) ? "" : ", not used"); rejected++; }
     }
     free(e->orig); e->orig = NULL;
+    if (e->data && (flags & NTEX_FONT0) && lang_active() && usable(e, flags)) {
+        SDL_Surface* c = font_letters(e->data, e->n, png);
+        if (!png) SDL_free(e->data);
+        e->data = c;
+        png = 1;
+    }
     e->gl = !e->data || !usable(e, flags) ? 0 : png ? upload_rgba(e->data, &e->bytes) : upload_dds(e->data, e->n, &e->bytes);
     if (png) SDL_DestroySurface(e->data); else SDL_free(e->data);
     if (!e->gl) {   /* unreadable or not uploadable: never tried again (bind would on every draw) */

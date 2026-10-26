@@ -13,6 +13,7 @@
 /* tags of a definition (game thread, texture_glue.c), for HD texture packs (hdpack.c) */
 #define NTEX_FONT 1   /* one of the game's font pages */
 #define NTEX_KEEP 2   /* the port cuts its own menu entries from it */
+#define NTEX_FONT0 4  /* the first font page, the letters' (the game language draws its own into it, lang.c) */
 void ntex_define_begin(uint32_t id, uint32_t tbp, uint32_t cbp, uint32_t image_pages, int flags);
 int  ntex_defining(void);
 void ntex_define_reg(int reg, uint64_t v);

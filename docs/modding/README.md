@@ -52,7 +52,8 @@ Related: [../ACTORS.md](../ACTORS.md) (models, skeletons, motions, enemy records
 | `enemies.ini` | nothing: adds custom enemies (enemy variants: a base type, another model, stat factors, motion and sound mappings, randomizer weights) | read once at start; format and limits in [../ENEMIES.md](../ENEMIES.md) "Enemy variants". Co-op partners need the same file |
 
 Not covered: files the game reads with `ReadFileEx` (`MULTSPQ?.IDX`, `SYSMES.ALD`,
-`COMMON.MLT`).
+`COMMON.MLT`). The text of `SYSMES.ALD` and of the rooms can be translated with a language pack
+([../TRANSLATING.md](../TRANSLATING.md)).
 
 A room key is `stage*1000 + room*10 + case` written as four digits (`RM_1150.SPQ.key` for
 RM_1150). Without an alias a new room has no sound bank of its own and the previous room's
@@ -71,7 +72,8 @@ rooms apply to existing saves the next time the room loads.
 | Record counts, sections, new geometry and textures | `rdxbuild.py decompile` / `build` (OBJ + PNG + JSON) | works |
 | A cloned room in a new slot | copy to an unused `RM_xxxx.RDX`, edit, point a door at it | works |
 | New original rooms connected to the game | `rdxbuild.py`, `build_area.py`, `build_village.py` | works, see [BUILDING_ROOMS.md](BUILDING_ROOMS.md) |
-| New sound effects, map screen entries, inventory text, new animated creatures | | not supported |
+| The game's text in another language (messages, items, files) | a language pack, [../TRANSLATING.md](../TRANSLATING.md) | works |
+| New sound effects, map screen entries, new animated creatures | | not supported |
 
 A clone keeps everything in the file, including the scripts' flag numbers (give it its own
 `it_flg`/`ed_flg` bits); it loses the room sound bank (use a `.SPQ.key` alias), its map entry and

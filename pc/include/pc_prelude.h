@@ -89,6 +89,14 @@ int   pc_door_skip_pressed(int start);   /* Skippable: a press since the demo be
 int   pc_intro_pressed(int start);       /* boot logos, intro movie, ending and credits: a press since the screen began (start: it begins now) */
 int   pc_movie_vblanks_left(int frames); /* the playing movie of that many pictures: vblanks until it would end by itself */
 int   pc_fast_loading(void);         /* "Fast loading": room sound packs and texture lists at once */
+/* game language (pc/src/host/lang.c, docs/TRANSLATING.md): a message table (u32 count, the strings' offsets, u16
+   strings) or a built-in string in the language chosen; the table or string itself in English or where nothing of it
+   is translated. where: the place a translation can name (room/RM_1000 -> room/RM_1000/3); a drawn letter's advance */
+const void* pc_lang_table(const void* table, const char* where);
+const unsigned short* pc_lang_str(const unsigned short* s, const char* where);
+float pc_lang_font_width(unsigned short code);
+const char* pc_lang_cstr(const char* s, int terminal, int line);   /* a computer terminal's line (sp_evt.c), ASCII */
+void* pc_lang_map_model(int entry, int object, void* model);       /* map.c: object of MRY.AFS floor entry, the language's area label or model */
 /* mods folder (pc/src/audio/adx.c, docs/modding/README.md "The mods folder"): size of <mods>/name or -1; ADXF handle or NULL */
 int   pc_mod_file_size(const char* name);
 void* pc_mod_open(const char* name);

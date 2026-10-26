@@ -343,6 +343,7 @@ int main(int argc, char** argv)
     }
     update_start();   /* the newest version for the title, on a thread of its own (net/update.h) */
     settings_subtitle_languages();   /* the subtitle languages (mods/subtitles/<code>.json), and the one chosen */
+    settings_game_languages();       /* the game languages (mods/lang/<code>/game.json), the one chosen loaded (lang.c) */
     ps2_memory_init();
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD))

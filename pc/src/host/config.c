@@ -174,6 +174,7 @@ void config_load(void)
         else if (sscanf(line, " import_dir = %1023[^\r\n]", g_import.dir) == 1) continue;   /* F9 imports (pc/src/import) */
         else if (sscanf(line, " import_outbreak2_iso = %1023[^\r\n]", g_import.iso[IMPORT_OUTBREAK2]) == 1) continue;
         else if (sscanf(line, " subtitle_language = %15[A-Za-z0-9_-]", g_config.subtitle_lang) == 1) continue;
+        else if (sscanf(line, " game_language = %15[A-Za-z0-9_-]", g_config.game_lang) == 1) continue;
         else if (sscanf(line, " %63[a-z_0-9] = %127[^\r\n]", k, val) == 2 && bind_ini_line(k, trim(val))) continue;
         else if (sscanf(line, " %63[a-z_0-9] = %d", k, &v) == 2)
             for (size_t i = 0; i < SDL_arraysize(keys); i++)
@@ -229,6 +230,7 @@ static int write_ini(FILE* f, void* ud)
     if (g_import.dir[0]) fprintf(f, "import_dir = %s\n", g_import.dir);
     if (g_import.iso[IMPORT_OUTBREAK2][0]) fprintf(f, "import_outbreak2_iso = %s\n", g_import.iso[IMPORT_OUTBREAK2]);
     if (g_config.subtitle_lang[0]) fprintf(f, "subtitle_language = %s\n", g_config.subtitle_lang);   /* mods/subtitles/<code>.json */
+    if (g_config.game_lang[0]) fprintf(f, "game_language = %s\n", g_config.game_lang);   /* mods/lang/<code>/ */
     bind_ini_write(f);
     return 0;
 }

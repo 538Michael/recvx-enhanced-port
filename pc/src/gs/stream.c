@@ -146,7 +146,7 @@ void stream_tag(uint32_t mesh) { push_ev(EV_TAG, 0, 0, mesh); }
    definition, recorded but not executed; a bind makes a slot show a definition */
 void stream_tex_def_begin(uint32_t id, uint32_t tbp, uint32_t cbp, uint32_t image_pages, int flags)
 {
-    push_ev(EV_TEXDEF, 0, image_pages, id | ((uint64_t)(tbp & 0x3FFF) << 32) | ((uint64_t)(cbp & 0x3FFF) << 46) | ((uint64_t)(flags & 3) << 60));
+    push_ev(EV_TEXDEF, 0, image_pages, id | ((uint64_t)(tbp & 0x3FFF) << 32) | ((uint64_t)(cbp & 0x3FFF) << 46) | ((uint64_t)(flags & 7) << 60));   /* (NTEX_FONT, NTEX_KEEP, NTEX_FONT0) */
 }
 void stream_tex_def_end(void) { push_ev(EV_TEXDEF_END, 0, 0, 0); }
 void stream_tex_forget(uint32_t id) { push_ev(EV_TEXFORGET, 0, 0, id); }
@@ -422,7 +422,7 @@ void stream_exec(Frame* f)
         }
         switch (e->kind) {
         case EV_TEXDEF:
-            ntex_define_begin((uint32_t)e->v, (uint32_t)(e->v >> 32) & 0x3FFF, (uint32_t)(e->v >> 46) & 0x3FFF, e->len, (int)(e->v >> 60) & 3);
+            ntex_define_begin((uint32_t)e->v, (uint32_t)(e->v >> 32) & 0x3FFF, (uint32_t)(e->v >> 46) & 0x3FFF, e->len, (int)(e->v >> 60) & 7);
             break;
         case EV_TEXBIND:
             ntex_bind((uint32_t)e->v, (uint32_t)(e->v >> 32) & 0x3FFF, (uint32_t)(e->v >> 46) & 0x3FFF);

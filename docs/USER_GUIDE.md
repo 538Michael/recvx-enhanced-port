@@ -227,6 +227,7 @@ widescreen, no intro or door animations, fast loading); turn them off for a PS2-
 | Frame blend (trail) | Off | the PS2's motion trail. Auto: only in vanilla |
 | Cutscene bars, Camera vignette, Screen effects | Stretch to width | in widescreen: Original (4:3), Stretch to width or Off |
 | Movie zoom | Off | enlarges movies in widescreen to cut their black bars, never stretched |
+| Game language | English | the game's text and pictures from a language pack in `mods/lang` (next start), see [Game language](#game-language) |
 | Subtitles | On | movies and cutscene dialogue show your subtitle files, see [Subtitles](#subtitles); without files nothing changes |
 | Subtitle size | Medium | Small, Medium or Large |
 | Subtitle language | English | English (the SRT files) or a language file found in `mods/subtitles` at start |
@@ -438,6 +439,28 @@ dialogue of the real-time cutscenes. None are included.
 
 File format, speakers, languages and timing: SUBTITLES.md.
 
+## Game language
+
+The game's own text (messages, item names and descriptions, files, the title and memory card
+messages) and the words drawn in its pictures can come from a language pack. None is included.
+
+1. Put the pack into `mods/lang/<code>/`: `game.json` (the text) and, if it has them, `textures/`
+   (the pictures) and `map.json` (the map's area labels).
+2. Choose it in DISPLAY -> Game language, then restart. The log says
+   `lang: mods/lang/<code>/game.json: N translations`.
+
+- **Subtitles**: choosing a game language also picks the same Subtitle language when
+  `mods/subtitles` has it.
+- **Letters**: the disc's font has no accented letters. At start the game draws them into its font
+  page from the letters it has (with Native textures, on by default); an HD font page from
+  `mods/textures` gets them too.
+- **Pictures**: the pack's pictures win over HD texture packs and show even with HD textures off.
+  The port's entries cut from the menu pictures (ENHANCED SETTINGS, RETURN TO TITLE, YES, NO,
+  MULTIPLAYER) are then written in the game's font. The port's own menus stay in English.
+- A sentence the pack lacks, or one a mod changed, shows in English.
+
+Making a language pack: TRANSLATING.md.
+
 ## Mods
 
 Files in `mods/` replace disc files without touching your image. The log names each one. To remove a
@@ -450,6 +473,7 @@ mod, delete its files.
 | `enemies.ini` | custom enemies (ENEMIES.md, "Enemy variants") |
 | `textures/` | [HD texture packs](#hd-texture-packs) |
 | `subtitles/` | [subtitles](#subtitles) for the movies and cutscenes |
+| `lang/` | [game languages](#game-language): the game's text and pictures in another language |
 
 Co-op partners need the same `enemies.ini`. Modding guide: modding/README.md.
 
@@ -495,6 +519,8 @@ newest version number, in the background.
 | Wrong HD textures after changing a pack | delete `save/hd_textures.txt` |
 | No subtitles | Subtitles on; the files in `mods/subtitles/` named as in [Subtitles](#subtitles); the log names each file read |
 | Subtitle letters show as boxes | Japanese, Korean, Chinese: add `mods/subtitles/fonts/<code>.otf`, see [Subtitles](#subtitles) |
+| The game still in English | Game language set and the game restarted; `mods/lang/<code>/game.json` there; the log's `lang:` lines |
+| Accented letters missing in the game's text | Native textures on (DISPLAY) |
 
 ### Reporting a problem
 

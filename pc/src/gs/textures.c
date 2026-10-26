@@ -33,6 +33,7 @@
 #include "gs.h"
 #include "textures.h"
 #include "hdpack.h"
+#include "../host/lang.h"
 #include "../render/gl_loader.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -389,6 +390,7 @@ static GLuint decode(const Def* d, uint64_t tex0, uint64_t texa, int* w, int* h)
     run_ops(d, d->clut_end, d->nop, d->tbp, d->cbp);
     gs_decode_texture((tex0 & ~0x3FFFull) | d->tbp, texa, W, H, px);
     gs_mem_scratch_end();
+    if ((d->flags & NTEX_FONT0) && lang_active()) lang_font_compose(px, (int)W, (int)H);   /* the game language's letters (its HD key is GS memory's, unchanged) */
     glGenTextures(1, &t);
     glBindTexture(GL_TEXTURE_2D, t);
     glPixelStorei(GL_UNPACK_ALIGNMENT, 4);

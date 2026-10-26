@@ -44,6 +44,7 @@ typedef struct {
     int  subtitle_speaker_colors;   /* ... in a colour per character (overlay.cpp) */
     int  subtitle_font;      /* 0 the game's lettering (pc/src/movie/game_font.c; the user's mods/subtitles/fonts/cvx.otf first), 1 a system font */
     char subtitle_lang[16];  /* ini subtitle_language: mods/subtitles/<code>.json, "" English (the SRTs) */
+    char game_lang[16];      /* ini game_language: mods/lang/<code>/game.json and textures/, "" English (pc/src/host/lang.c; read at start) */
     int  screen_effects;     /* full-screen effect overlays (noise/scanline layers): same modes */
     int  brightness;         /* picture calibration in the present pass (gs_gl.c draw_display): -50..50, 0 neutral */
     int  contrast;           /* 50..150 %, 100 neutral */

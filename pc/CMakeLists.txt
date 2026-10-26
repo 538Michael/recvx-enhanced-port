@@ -279,6 +279,14 @@ add_executable(test_subtitles tests/test_subtitles.c src/movie/subtitles.c src/h
 target_compile_options(test_subtitles PRIVATE -std=gnu11)
 target_link_libraries(test_subtitles PRIVATE SDL3::SDL3)
 add_test(NAME subtitles COMMAND test_subtitles)
+# the game language (pc/src/host/lang.c): markup, the translated message tables, the letters drawn into the font page
+add_executable(test_lang tests/test_lang.c src/host/lang.c src/movie/subtitles.c src/host/fileio.c)
+target_compile_options(test_lang PRIVATE -std=gnu11)
+target_link_libraries(test_lang PRIVATE SDL3::SDL3 m)
+add_test(NAME lang COMMAND test_lang)
+if(Python3_FOUND)   # its tool (pc/tools/lang.py) without a disc
+    add_test(NAME lang_tool COMMAND Python3::Interpreter ${CMAKE_CURRENT_SOURCE_DIR}/tools/test_lang.py)
+endif()
 # the subtitles' game lettering (pc/src/movie/game_font.c): a drawn font page to TrueType, read back with ImGui's stb_truetype
 add_executable(test_game_font tests/test_game_font.c src/movie/game_font.c)
 target_compile_options(test_game_font PRIVATE -std=gnu11)
